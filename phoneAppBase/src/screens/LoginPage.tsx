@@ -1,49 +1,53 @@
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
-import * as ReactNative from "react-native";
-import { genSalt } from "bcryptjs";
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  Image,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+} from "react-native";
+//import { genSalt } from "bcryptjs";
 
-var bcrypt = require("bcryptjs");
-
-export default function Login({ navigation }) {
-  const login = () => {
-    //Check if user exists in database
-    // ----
-    //
-    //Check if password is correct
-    // hashPass = Password from database
-    // bcrypt.compare(pass, hashPass, function (err, result) {
-    //   if (err != null) {
-    //     print(err);
-    //     //Throw a notification for this error
-    //   }
-    //   if (result == true) {
-    //     navigation.push("Home");
-    //   } else if (result == false) {
-    //     //Throw a notification explaining why
-    //   }
-    // });
-    navigation.push("Home");
-    setUname("");
-    setPass("");
-  };
+const LoginPage = ({ navigation }) => {
+  //Check if user exists in database
+  // ----
+  //
+  //Check if password is correct
+  // hashPass = Password from database
+  // bcrypt.compare(pass, hashPass, function (err, result) {
+  //   if (err != null) {
+  //     print(err);
+  //     //Throw a notification for this error
+  //   }
+  //   if (result == true) {
+  //     navigation.push("Home");
+  //   } else if (result == false) {
+  //     //Throw a notification explaining why
+  //   }
+  // });
 
   const signup = () => {
-    navigation.push("SignUp");
+    navigation.navigate("Sign Up");
+  };
+  const login = () => {
+    Alert.alert("Login");
   };
   const [uname, setUname] = useState("");
   const [pass, setPass] = useState("");
 
   return (
-    <ReactNative.View style={styles.container}>
+    <View style={styles.container}>
       {/* Logo */}
-      <ReactNative.Image
+      <Image
         style={styles.logoImage}
-        source={require("../assets/vicoLogoPrimary.png")}
+        source={require("../../assets/DolceNGelato/vicoLogoPrimary.png")}
       />
 
       {/* Username Textbox */}
-      <ReactNative.TextInput
+      <TextInput
         style={[styles.textInput, { marginTop: -20 }]}
         placeholder="Username:"
         onChangeText={(newUname) => setUname(newUname)}
@@ -53,7 +57,7 @@ export default function Login({ navigation }) {
       />
 
       {/* Password Textbox */}
-      <ReactNative.TextInput
+      <TextInput
         style={styles.textInput}
         placeholder="Password:"
         onChangeText={(newPass) => setPass(newPass)}
@@ -64,38 +68,34 @@ export default function Login({ navigation }) {
       />
 
       {/* Login Button */}
-      <ReactNative.TouchableOpacity
+      <TouchableOpacity
         style={[styles.roundButton, { height: 45, marginTop: 40 }]}
         onPress={login}
       >
-        <ReactNative.Text style={[styles.buttonText, { color: "white" }]}>
-          Login
-        </ReactNative.Text>
-      </ReactNative.TouchableOpacity>
+        <Text style={[styles.buttonText, { color: "white" }]}>Login</Text>
+      </TouchableOpacity>
 
       {/* Signup Button */}
-      <ReactNative.TouchableOpacity
+      <TouchableOpacity
         style={[styles.roundButton, { height: 35 }]}
         onPress={signup}
       >
-        <ReactNative.Text style={[styles.buttonText, { color: "white" }]}>
-          Signup
-        </ReactNative.Text>
-      </ReactNative.TouchableOpacity>
+        <Text style={[styles.buttonText, { color: "white" }]}>Signup</Text>
+      </TouchableOpacity>
 
       {/* Forgot Password Button */}
-      <ReactNative.TouchableOpacity>
-        <ReactNative.Text style={[{ color: "blue", marginTop: 15 }]}>
-          Forgot Password
-        </ReactNative.Text>
-      </ReactNative.TouchableOpacity>
+      <TouchableOpacity>
+        <Text style={[{ color: "blue", marginTop: 15 }]}>Forgot Password</Text>
+      </TouchableOpacity>
 
       <StatusBar style="auto" />
-    </ReactNative.View>
+    </View>
   );
-}
+};
 
-const styles = ReactNative.StyleSheet.create({
+export default LoginPage;
+
+const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "white",

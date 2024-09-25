@@ -1,7 +1,14 @@
-import { useState } from "react";
-import * as ReactNative from "react-native";
+import React, { useState } from "react";
+import {
+  View,
+  Image,
+  TextInput,
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+} from "react-native";
 
-export default function SignUp(navigation) {
+export default function SignUpPage(navigation) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -10,26 +17,22 @@ export default function SignUp(navigation) {
   const [confPassword, setConfPassword] = useState("");
   const [accessCode, setAccessCode] = useState("");
   return (
-    <ReactNative.View style={styles.container}>
-      <ReactNative.Image
-        style={styles.logoImage}
-        source={require("../assets/vicoLogoPrimary.png")}
-      />
-      <ReactNative.TextInput
+    <View style={styles.container}>
+      <TextInput
         style={styles.textInput}
         placeholder="First Name:"
         onChangeText={(newFirstName) => setFirstName(newFirstName)}
         value={firstName}
         autoCorrect={false}
       />
-      <ReactNative.TextInput
+      <TextInput
         style={styles.textInput}
         placeholder="Last Name:"
         onChangeText={(newLastName) => setLastName(newLastName)}
         value={lastName}
         autoCorrect={false}
       />
-      <ReactNative.TextInput
+      <TextInput
         style={styles.textInput}
         placeholder="Email:"
         onChangeText={(newEmail) => setEmail(newEmail)}
@@ -37,14 +40,14 @@ export default function SignUp(navigation) {
         autoCorrect={false}
         autoCapitalize="none"
       />
-      <ReactNative.TextInput
+      <TextInput
         style={styles.textInput}
         placeholder="Phone Number:"
         onChangeText={(newPhoneNumber) => setPhoneNumber(newPhoneNumber)}
         value={phoneNumber}
         keyboardType="number-pad"
       />
-      <ReactNative.TextInput
+      <TextInput
         style={styles.textInput}
         placeholder="Password:"
         onChangeText={(newPassword) => setPassword(newPassword)}
@@ -53,7 +56,7 @@ export default function SignUp(navigation) {
         autoCapitalize="none"
         secureTextEntry={true}
       />
-      <ReactNative.TextInput
+      <TextInput
         style={styles.textInput}
         placeholder="Confirm Password:"
         onChangeText={(newConfPassword) => setConfPassword(newConfPassword)}
@@ -62,24 +65,25 @@ export default function SignUp(navigation) {
         autoCapitalize="none"
         secureTextEntry={true}
       />
-      <ReactNative.TextInput
+      <TextInput
         style={styles.textInput}
-        placeholder="Access Code:"
+        placeholder="Company Code:"
         onChangeText={(newAccessCode) => setAccessCode(newAccessCode)}
         value={accessCode}
         autoCapitalize="none"
         autoCorrect={false}
       />
-      <ReactNative.TouchableOpacity style={styles.roundButton}>
-        <ReactNative.Text style={{ color: "white" }}>Sign Up</ReactNative.Text>
-      </ReactNative.TouchableOpacity>
-    </ReactNative.View>
+      <TouchableOpacity style={styles.roundButton}>
+        <Text style={{ color: "white" }}>Sign Up</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
-const styles = ReactNative.StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingTop: 50,
     //justifyContent: "center",
     alignItems: "center",
   },
