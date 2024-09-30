@@ -6,7 +6,7 @@ import {
   CalendarProvider,
   WeekCalendar,
 } from "react-native-calendars";
-import { agendaItems, getMarkedDates } from "../data/agendaItems";
+import { agendaItems, getMarkedDates } from "../models/Calendar/agendaItems";
 import AgendaItem from "../models/Calendar/AgendaItem";
 import { getTheme, themeColor, lightThemeColor } from "../themes/theme";
 import Constants from "expo-constants";
