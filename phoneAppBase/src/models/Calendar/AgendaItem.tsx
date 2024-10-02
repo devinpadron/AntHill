@@ -9,8 +9,6 @@ import {
   Button,
 } from "react-native";
 
-import User from "../../data/users";
-
 interface ItemProps {
   item: any;
 }
@@ -19,8 +17,7 @@ const AgendaItem = (props: ItemProps) => {
   const { item } = props;
 
   const buttonPressed = useCallback(() => {
-    const testUser = new User();
-    Alert.alert("");
+    Alert.alert("More Info!");
   }, []);
 
   const itemPressed = useCallback(() => {
