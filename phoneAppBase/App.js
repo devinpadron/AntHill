@@ -15,7 +15,7 @@ import AuthStack from "./src/routes/authStack";
 export default function App() {
   return (
     <NavigationContainer>
-      <HomeTabs />
+      <AuthStack />
     </NavigationContainer>
   );
 }

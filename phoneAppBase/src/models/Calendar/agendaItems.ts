@@ -1,7 +1,7 @@
 import isEmpty from "lodash/isEmpty";
 import { MarkedDates } from "react-native-calendars/src/types";
 
-const today = new Date().toISOString().split("T")[0];
+export const today = new Date().toISOString().split("T")[0];
 // const pastDate = getPastDate(3);
 // const futureDates = getFutureDates(12);
 // const dates = [pastDate, today].concat(futureDates);
