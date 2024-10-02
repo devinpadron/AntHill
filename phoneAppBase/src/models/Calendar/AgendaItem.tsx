@@ -17,7 +17,7 @@ const AgendaItem = (props: ItemProps) => {
   const { item } = props;
 
   const buttonPressed = useCallback(() => {
-    Alert.alert("Show me more");
+    Alert.alert("More Info!");
   }, []);
 
   const itemPressed = useCallback(() => {
