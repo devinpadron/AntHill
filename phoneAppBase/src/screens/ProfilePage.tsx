@@ -1,0 +1,106 @@
+import React, { useState } from 'react';
+import { View, Text, TextInput, Button, Alert, StyleSheet, ScrollView, Dimensions } from 'react-native';
+
+const { width, height } = Dimensions.get('window');
+
+const ProfilePage = () => {
+  const [phoneNumber, setPhoneNumber] = useState<string>('123-456-7890');
+  const [password, setPassword] = useState<string>('');
+
+  const handlePhoneChange = (newPhone: string) => {
+    setPhoneNumber(newPhone);
+  };
+
+  const handlePasswordChange = (newPassword: string) => {
+    setPassword(newPassword);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to delete your account?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        // Add account deletion functionality
+      ]
+    );
+  };
+
+  const handleSignOut = () => {
+    // Add sign-out functionality
+  };
+
+  const handleSaveChanges = () => {
+    // Add phone number update functionality
+    // Add password change functionality
+  };
+
+  return (
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text style={styles.label}>Name</Text>
+        <TextInput style={styles.input} value="Test Name" editable={false} />
+
+        <Text style={styles.label}>Email</Text>
+        <TextInput style={styles.input} value="testemail@gmail.com" editable={false} />
+
+        <Text style={styles.label}>Company</Text>
+        <TextInput style={styles.input} value="TEST COMPANY" editable={false} />
+
+        <Text style={styles.label}>Phone Number</Text>
+        <TextInput
+          style={styles.input}
+          value={phoneNumber}
+          onChangeText={handlePhoneChange}
+          keyboardType="phone-pad"
+        />
+
+        <Text style={styles.label}>Password</Text>
+        <TextInput
+          style={styles.input}
+          value={password}
+          onChangeText={handlePasswordChange}
+          secureTextEntry
+          placeholder="Enter new password"
+        />
+
+        <Button title="Save Changes" onPress={handleSaveChanges} />
+        <Button title="Sign Out" color="gray" onPress={handleSignOut} />
+      </ScrollView>
+
+      <View style={styles.deleteButtonContainer}>
+        <Button title="Delete Account" color="red" onPress={handleDeleteAccount} />
+      </View>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: width * 0.05,
+  },
+  content: {
+    flexGrow: 1,
+    justifyContent: 'flex-start',
+    paddingTop: height * 0.08,
+  },
+  label: {
+    fontSize: height * 0.02,
+    marginBottom: height * 0.01,
+    fontWeight: 'bold',
+  },
+  input: {
+    borderColor: '#ccc',
+    borderWidth: 1,
+    padding: width * 0.04,
+    marginBottom: height * 0.02,
+    borderRadius: width * 0.02,
+  },
+  deleteButtonContainer: {
+    justifyContent: 'flex-end',
+    paddingBottom: height * 0.01,
+  },
+});
+
+export default ProfilePage;

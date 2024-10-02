@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 // Import your screen components
 import Calendar from "../screens/Calendar";
-import FormPage from "../screens/FormPage";
+import ProfilePage from "../screens/ProfilePage";
 
 const Tab = createBottomTabNavigator();
 
@@ -18,7 +18,7 @@ const HomeTabs = () => {
       />
       <Tab.Screen
         name="Profile"
-        component={FormPage}
+        component={ProfilePage}
         options={{ headerShown: false, gestureEnabled: false }}
       />
     </Tab.Navigator>
