@@ -19,29 +19,16 @@ const FormPage: React.FC = () => {
   const [hours, setHours] = useState("");
   const [worker, setWorker] = useState("");
   const [notes, setNotes] = useState("");
-  const [document, setDocument] =
-    useState<DocumentPicker.DocumentResult | null>(null);
-
+  
   const handleDateChange = (_event: any, selectedDate?: Date) => {
     setDate(selectedDate);
-  };
-
-  const handleDocumentUpload = async () => {
-    const result = await DocumentPicker.getDocumentAsync({});
-    if (result.type === "success") {
-      setDocument(result);
-    } else {
-      Alert.alert("Document upload canceled");
-    }
   };
 
   const handleSubmit = () => {
     // Handle the form submission
     Alert.alert(
       "Form Submitted",
-      `Name: ${name}\nDate: ${date?.toDateString()}\nLocation: ${location}\nHours: ${hours}\nWorker: ${worker}\nNotes: ${notes}\nDocument: ${
-        document?.name
-      }`
+      'Name: ${name}\nDate: ${date?.toDateString()}\nLocation: ${location}\nHours: ${hours}\nWorker: ${worker}\nNotes: ${notes}\n'
     );
   };
 
@@ -96,15 +83,6 @@ const FormPage: React.FC = () => {
         onChangeText={setNotes}
         multiline={true}
       />
-
-      <TouchableOpacity
-        style={styles.uploadButton}
-        onPress={handleDocumentUpload}
-      >
-        <Text style={styles.uploadButtonText}>
-          {document ? "Document: ${document.name}" : "Upload Document"}
-        </Text>
-      </TouchableOpacity>
 
       <Button title="Submit" onPress={handleSubmit} />
     </ScrollView>
