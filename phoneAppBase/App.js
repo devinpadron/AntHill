@@ -2,15 +2,8 @@ import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 
 //Navigation Control
-import HomeTabs from "./src/routes/homeTabs";
-import AuthStack from "./src/routes/authStack";
-
-// const [isLoggedIn, setIsLoggedIn] = useState(false);
-
-// const handleSetIsLoggedIn = useCallback((value) => {
-//   console.log("App.js: Setting isLoggedIn to", value);
-//   setIsLoggedIn(value);
-// }, []);
+import HomeTabs from "./src/routes/HomeTabs";
+import AuthStack from "./src/routes/AuthStack";
 
 export default function App() {
   return (
