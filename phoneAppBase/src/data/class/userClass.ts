@@ -1,4 +1,4 @@
-import uuid from 'react-native-uuid'
+import { v4 as uuidv4 } from 'uuid';
 /* A User class that contains:
  - DB object ID
  - First Name
@@ -11,7 +11,7 @@ import uuid from 'react-native-uuid'
  - A setter function for each var
 */
 export default class User {
-  private userID: string = uuid.v4().toString();
+  private userID: string = uuidv4();
   private firstName: string = "";
   private lastName: string = "";
   private email: string = "";
