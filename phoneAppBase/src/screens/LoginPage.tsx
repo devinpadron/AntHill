@@ -1,5 +1,6 @@
 import { StatusBar } from "expo-status-bar";
 import React, { useState } from "react";
+import { createTestUser } from "../utils/userUtils";
 import {
   View,
   Text,
@@ -9,9 +10,13 @@ import {
   StyleSheet,
   Alert,
 } from "react-native";
+
+import { useUser } from '../contexts/UserContext';
+
 //import { genSalt } from "bcryptjs";
 
 const LoginPage = ({ navigation }) => {
+  const { login } = useUser();
   //Check if user exists in database
   // ----
   //
@@ -32,8 +37,9 @@ const LoginPage = ({ navigation }) => {
   const signup = () => {
     navigation.navigate("Sign Up");
   };
-  const login = () => {
-    Alert.alert("Login");
+  const handleLogin = () => {
+    createTestUser();
+    login();
   };
   const [uname, setUname] = useState("");
   const [pass, setPass] = useState("");
@@ -70,7 +76,7 @@ const LoginPage = ({ navigation }) => {
       {/* Login Button */}
       <TouchableOpacity
         style={[styles.roundButton, { height: 45, marginTop: 40 }]}
-        onPress={login}
+        onPress={handleLogin}
       >
         <Text style={[styles.buttonText, { color: "white" }]}>Login</Text>
       </TouchableOpacity>
