@@ -8,7 +8,7 @@ import {
   StyleSheet,
 } from "react-native";
 
-export default function SignUpPage(navigation) {
+const SignUpPage = ({navigation}) => {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -71,6 +71,8 @@ export default function SignUpPage(navigation) {
     </View>
   );
 }
+
+export default SignUpPage
 
 const styles = StyleSheet.create({
   container: {

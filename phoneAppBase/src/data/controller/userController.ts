@@ -1,5 +1,5 @@
-import { usersCollection } from "../../../config";
-import { doc, setDoc, deleteDoc, getDoc, addDoc, updateDoc} from 'firebase/firestore';
+import { testdb } from "../../../config";
+import { doc, setDoc, deleteDoc, getDoc, addDoc, updateDoc, collection} from 'firebase/firestore';
 import User from "../class/userClass";
 
 /* A UserController that contains:
@@ -14,7 +14,7 @@ class UserControllerStruct {
   public getUser = async (userID:string) => {
     try {
       //Retrieve user data
-      const userEntry = await getDoc(doc(usersCollection, userID));
+      const userEntry = await getDoc(doc(testdb, 'users' , userID));
       if (userEntry.exists()) {
         const dbData = userEntry.data()
         const foundUser = new User;
@@ -37,7 +37,7 @@ class UserControllerStruct {
   public deleteUser = async (userID:string) => {
     // Delete an existing user
     try {
-      await deleteDoc(doc(usersCollection, userID));
+      await deleteDoc(doc(testdb, 'users' , userID));
       console.log("User successfully deleted");
       return true;
     } catch (e) {
@@ -56,7 +56,7 @@ class UserControllerStruct {
       privilege: newUser.getPrivilege()
     }
     try {
-      const entry = await addDoc(usersCollection, userData);
+      const entry = await addDoc(collection(testdb, 'users'), userData);
       const entryid = entry.id;
 
       const userWithId = {
@@ -64,9 +64,6 @@ class UserControllerStruct {
         userID: entryid
       };
       newUser.setUserID(entryid)
-  
-      // Update the document with the new data
-      await setDoc(doc(usersCollection, entryid), userWithId);
       return entryid;
     } catch (e) {
       console.error("Error adding user:", e);
@@ -76,7 +73,7 @@ class UserControllerStruct {
 
   public updateUser = async (userID: string, userData: object) => {
     try {
-      const userEntry = doc(usersCollection, userID);
+      const userEntry = doc(testdb, 'users' , userID);
       await updateDoc(userEntry, userData);
       console.log("User successfully updated");
       return true;
