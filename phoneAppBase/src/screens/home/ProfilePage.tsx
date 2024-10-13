@@ -1,15 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, Alert, StyleSheet, ScrollView, Dimensions } from 'react-native';
-
+import { View, Text, TextInput, Button, Alert, StyleSheet, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
+import { useUser } from "../../data/context/UserContext";
 const { width, height } = Dimensions.get('window');
 
 const ProfilePage = () => {
-  const [phoneNumber, setPhoneNumber] = useState<string>('123-456-7890');
   const [password, setPassword] = useState<string>('');
-
-  const handlePhoneChange = (newPhone: string) => {
-    setPhoneNumber(newPhone);
-  };
+  const { user, isLoading } = useUser();
 
   const handlePasswordChange = (newPassword: string) => {
     setPassword(newPassword);
@@ -35,25 +31,34 @@ const ProfilePage = () => {
     // Add password change functionality
   };
 
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  if (!user) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Text>No user data available. Please log in.</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
+        
         <Text style={styles.label}>Name</Text>
-        <TextInput style={styles.input} value="Test Name" editable={false} />
+        <TextInput style={styles.input} value={user ? user.firstName : 'No Name Found'} editable={false} />
 
         <Text style={styles.label}>Email</Text>
-        <TextInput style={styles.input} value="testemail@gmail.com" editable={false} />
+        <TextInput style={styles.input} value={user ? user.email : 'No Email Found'} editable={false} />
 
         <Text style={styles.label}>Company</Text>
-        <TextInput style={styles.input} value="TEST COMPANY" editable={false} />
-
-        <Text style={styles.label}>Phone Number</Text>
-        <TextInput
-          style={styles.input}
-          value={phoneNumber}
-          onChangeText={handlePhoneChange}
-          keyboardType="phone-pad"
-        />
+        <TextInput style={styles.input} value={user ? user.getCompany() : 'No Company Found'} editable={false} />
 
         <Text style={styles.label}>Password</Text>
         <TextInput
@@ -100,6 +105,10 @@ const styles = StyleSheet.create({
   deleteButtonContainer: {
     justifyContent: 'flex-end',
     paddingBottom: height * 0.01,
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

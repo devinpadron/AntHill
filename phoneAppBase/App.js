@@ -1,14 +1,24 @@
-import React from "react";
-import { NavigationContainer } from "@react-navigation/native";
-
-//Navigation Control
+import { NavigationContainer } from '@react-navigation/native';
+import React from 'react';
+import { UserProvider, useUser } from './src/data/context/UserContext';
+import AuthStack from './src/routes/AuthStack';
 import HomeTabs from "./src/routes/HomeTabs";
-import AuthStack from "./src/routes/AuthStack";
 
-export default function App() {
+function AppNavigator() {
+  const { isLoggedIn } = useUser(); 
   return (
     <NavigationContainer>
-      <AuthStack />
+      {isLoggedIn ? <HomeTabs /> : <AuthStack />}
     </NavigationContainer>
   );
 }
+
+function App() {
+  return (
+    <UserProvider>
+      <AppNavigator />
+    </UserProvider>
+  );
+};
+
+export default App;

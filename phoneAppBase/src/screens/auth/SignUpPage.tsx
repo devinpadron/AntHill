@@ -8,11 +8,10 @@ import {
   StyleSheet,
 } from "react-native";
 
-export default function SignUpPage(navigation) {
+const SignUpPage = ({navigation}) => {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
   const [confPassword, setConfPassword] = useState("");
   const [accessCode, setAccessCode] = useState("");
@@ -39,13 +38,6 @@ export default function SignUpPage(navigation) {
         value={email}
         autoCorrect={false}
         autoCapitalize="none"
-      />
-      <TextInput
-        style={styles.textInput}
-        placeholder="Phone Number:"
-        onChangeText={(newPhoneNumber) => setPhoneNumber(newPhoneNumber)}
-        value={phoneNumber}
-        keyboardType="number-pad"
       />
       <TextInput
         style={styles.textInput}
@@ -79,6 +71,8 @@ export default function SignUpPage(navigation) {
     </View>
   );
 }
+
+export default SignUpPage
 
 const styles = StyleSheet.create({
   container: {

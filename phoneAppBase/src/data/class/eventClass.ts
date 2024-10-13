@@ -1,7 +1,7 @@
-import { v4 as uuidv4 } from 'uuid'
+
 
 export default class Event {
-    private eventID:string = uuidv4()// This is used for database storage
+    private eventID:string = ""// This is used for database storage
     private title:string = "" // This is the title displayed in the agenda
     private date:string = "" //In the form of "yyyy-MM-dd"
     private hour:string = "" //This is what will be displayed in the agenda view

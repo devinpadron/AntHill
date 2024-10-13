@@ -1,12 +1,11 @@
-import { db } from "../../../config";
+import { testdb } from "../../../config";
 import { doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore'
 import Event from '../class/eventClass'
 
 class EventControllerStruct {
-  
     public getEvent = async (eventID:string) => {
       // Retrieve event data
-      const docSnap = await getDoc(doc(db, "events", eventID));
+      const docSnap = await getDoc(doc(testdb, "events", eventID));
       if (docSnap.exists()) {
         const dbEvent = docSnap.data()
         const foundEvent = new Event
@@ -26,7 +25,7 @@ class EventControllerStruct {
   
     public deleteEvent = async (eventID:string) => {
       // Delete an existing user
-      await deleteDoc(doc(db, "events", eventID))
+      await deleteDoc(doc(testdb, "events", eventID))
     }
   
     public setEvent = async (newEvent:Event) => {
@@ -39,7 +38,7 @@ class EventControllerStruct {
         company: newEvent.getCompany(),
         jsonData: newEvent.getJSON()
       }
-      await setDoc(doc(db, 'events', newEvent.getEventID()), data);
+      await setDoc(doc(testdb, 'events', newEvent.getEventID()), data);
     }
     
   }

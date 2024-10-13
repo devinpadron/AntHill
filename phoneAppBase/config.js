@@ -1,8 +1,5 @@
-import Constants from "expo-constants";
-import { initializeApp } from "firebase/app";
-import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
-// import { getAnalytics } from "firebase/analytics";
-// import { getMessaging } from "firebase/messaging";
+import { initializeApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAqrSwFQ0sNcaULNxZfpiYyu0cTY5jKZIQ",
@@ -14,12 +11,9 @@ const firebaseConfig = {
   measurementId: "G-L277WJJVVV",
 };
 
-const fbApp = initializeApp(firebaseConfig);
-const db = getFirestore(fbApp);
-
-if (__DEV__){
-  connectFirestoreEmulator(db, Constants.expoConfig?.hostUri?.split(":").shift(), 8080);
-}
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app)
+const testdb = getFirestore(app, 'test');
 
 
-export { db };
+export { testdb};
