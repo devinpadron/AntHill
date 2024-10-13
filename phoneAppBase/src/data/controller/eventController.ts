@@ -1,4 +1,4 @@
-import { testdb } from "../../../config";
+import { testdb } from "../../../firebaseConfig";
 import { doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore'
 import Event from '../class/eventClass'
 

@@ -16,4 +16,4 @@ const db = getFirestore(app)
 const testdb = getFirestore(app, 'test');
 
 
-export { testdb};
+export { testdb };

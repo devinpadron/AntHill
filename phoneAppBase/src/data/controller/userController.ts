@@ -1,4 +1,4 @@
-import { testdb } from "../../../config";
+import { testdb } from "../../../firebaseConfig";
 import { doc, setDoc, deleteDoc, getDoc, addDoc, updateDoc, collection} from 'firebase/firestore';
 import User from "../class/userClass";
 
