@@ -1,6 +1,6 @@
 import { StatusBar } from "expo-status-bar";
 import React, { useState } from "react";
-import { createTestUser } from "../utils/userUtils";
+import { createTestUser } from "../../utils/userUtils";
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   Alert,
 } from "react-native";
 
-import { useUser } from '../contexts/UserContext';
+import { useUser } from "../../data/context/UserContext";
 
 //import { genSalt } from "bcryptjs";
 
@@ -19,7 +19,7 @@ const LoginPage = ({ navigation }) => {
   const { login } = useUser();
   //Check if user exists in database
   // ----
-  //
+  // 
   //Check if password is correct
   // hashPass = Password from database
   // bcrypt.compare(pass, hashPass, function (err, result) {
@@ -37,8 +37,8 @@ const LoginPage = ({ navigation }) => {
   const signup = () => {
     navigation.navigate("Sign Up");
   };
-  const handleLogin = () => {
-    createTestUser();
+  const handleLogin = async () => {
+    //await createTestUser();
     login();
   };
   const [uname, setUname] = useState("");
@@ -49,7 +49,7 @@ const LoginPage = ({ navigation }) => {
       {/* Logo */}
       <Image
         style={styles.logoImage}
-        source={require("../../assets/DolceNGelato/vicoLogoPrimary.png")}
+        source={require("../../../assets/DolceNGelato/vicoLogoPrimary.png")}
       />
 
       {/* Username Textbox */}

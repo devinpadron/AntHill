@@ -1,5 +1,5 @@
-import isEmpty from "lodash/isEmpty";
 import { MarkedDates } from "react-native-calendars/src/types";
+import isEmpty from "lodash/isEmpty";
 
 export const today = new Date().toISOString().split("T")[0];
 // const pastDate = getPastDate(3);

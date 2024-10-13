@@ -1,15 +1,14 @@
-import { User } from '../data/users';
-import { UserController } from '../controllers/UserController';
+import User from '../data/class/userClass'
+import UserController from '../data/controller/userController';
 
-function createTestUser(){
+async function createTestUser(){
     const newUser = new User;
-    newUser.setUserID("testUserID");
-    newUser.setFirstName("testFireName");
+    newUser.setFirstName("testFirstName");
     newUser.setLastName("testLastName");
     newUser.setEmail("testemail@gmail.com");
     newUser.setCompany("testCompany");
     newUser.setPrivilege("testPrivilege");
-    UserController.setUser(newUser);
+    await UserController.addUser(newUser);
 }
 
 export { createTestUser }

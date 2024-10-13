@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, Alert, StyleSheet, ScrollView, Dimensions } from 'react-native';
-import { useUser } from '../contexts/UserContext';
+import { View, Text, TextInput, Button, Alert, StyleSheet, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
+import { useUser } from "../../data/context/UserContext";
 const { width, height } = Dimensions.get('window');
 
 const ProfilePage = () => {
   const [password, setPassword] = useState<string>('');
-  const { user } = useUser();
+  const { user, isLoading } = useUser();
 
   const handlePasswordChange = (newPassword: string) => {
     setPassword(newPassword);
@@ -30,6 +30,22 @@ const ProfilePage = () => {
     // Add phone number update functionality
     // Add password change functionality
   };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  if (!user) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Text>No user data available. Please log in.</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -89,6 +105,10 @@ const styles = StyleSheet.create({
   deleteButtonContainer: {
     justifyContent: 'flex-end',
     paddingBottom: height * 0.01,
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

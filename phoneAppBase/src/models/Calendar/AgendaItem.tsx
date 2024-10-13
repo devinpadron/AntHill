@@ -1,5 +1,5 @@
 import isEmpty from "lodash/isEmpty";
-import React, { useCallback } from "react";
+import { useCallback , memo } from "react";
 import {
   StyleSheet,
   Alert,
@@ -46,7 +46,7 @@ const AgendaItem = (props: ItemProps) => {
   );
 };
 
-export default React.memo(AgendaItem);
+export default memo(AgendaItem);
 
 const styles = StyleSheet.create({
   item: {
