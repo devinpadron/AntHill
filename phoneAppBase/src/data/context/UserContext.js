@@ -10,7 +10,7 @@ export const UserProvider = ({ children }) => {
   
   const login = async () => {
     try {
-      setUser(await UserController.getUser("jltq3bIySj070uboGDBy")); //testUserID
+      setUser(await UserController.getUser("P2Yd4iOUGskJSTYM7paG")); //testUserID
       setIsLoggedIn(true);
     } catch (error) {
       console.error("Error logging in:", error);

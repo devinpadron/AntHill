@@ -1,6 +1,7 @@
 import { StatusBar } from "expo-status-bar";
 import React, { useState } from "react";
 import { createTestUser } from "../../utils/userUtils";
+import { createTestEvent } from "../../utils/eventUtils";
 import {
   View,
   Text,
@@ -39,6 +40,7 @@ const LoginPage = ({ navigation }) => {
   };
   const handleLogin = async () => {
     //await createTestUser();
+    //await createTestEvent();
     login();
   };
   const [uname, setUname] = useState("");

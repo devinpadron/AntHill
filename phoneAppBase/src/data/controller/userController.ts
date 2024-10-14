@@ -16,17 +16,17 @@ class UserControllerStruct {
       //Retrieve user data
       const userEntry = await getDoc(doc(testdb, 'users' , userID));
       if (userEntry.exists()) {
-        const dbData = userEntry.data()
+        const dbData = userEntry.data();
         const foundUser = new User;
+        foundUser.setUserID(userID);
         foundUser.setFirstName(dbData.firstName);
         foundUser.setLastName(dbData.lastName);
         foundUser.setEmail(dbData.email);
         foundUser.setCompany(dbData.company);
         foundUser.setPrivilege(dbData.privilege);
-        foundUser.setUserID(userID);
         return foundUser;
       } else {
-        console.log("No such document")
+        console.log("No such document");
         return null
       }
     } catch (e) {
@@ -48,7 +48,6 @@ class UserControllerStruct {
 
   public addUser = async (newUser:User) => {
     const userData = {
-      userID: newUser.getUserID(),
       firstName: newUser.getFirstName(),
       lastName: newUser.getLastName(),
       email: newUser.getEmail(),

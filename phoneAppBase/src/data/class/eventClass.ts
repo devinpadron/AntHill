@@ -1,5 +1,3 @@
-
-
 export default class Event {
     private eventID:string = ""// This is used for database storage
     private title:string = "" // This is the title displayed in the agenda
