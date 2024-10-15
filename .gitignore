@@ -70,3 +70,10 @@ node_modules/
 
 # Expo generated files
 .expo/
+
+# google service files
+.plist
+phoneAppBase/SoBridalSocial Firebase config.json
+
+# vscode files
+.vscode/
