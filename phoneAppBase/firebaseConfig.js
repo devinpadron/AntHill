@@ -1,19 +1,10 @@
-import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import firebase from '@react-native-firebase/app';
+import { getFirestore } from '@react-native-firebase/firestore/';
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAqrSwFQ0sNcaULNxZfpiYyu0cTY5jKZIQ",
-  authDomain: "sobridalsocial-dabcd.firebaseapp.com",
-  projectId: "sobridalsocial-dabcd",
-  storageBucket: "sobridalsocial-dabcd.appspot.com",
-  messagingSenderId: "824611477611",
-  appId: "1:824611477611:web:dac0a698277844e539392e",
-  measurementId: "G-L277WJJVVV",
-};
+const cateringApp = firebase.app();
+var db = getFirestore(cateringApp);
+if (__DEV__ == true){
+  db = getFirestore(cateringApp, 'test');
+}
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app)
-const testdb = getFirestore(app, 'test');
-
-
-export { testdb };
+export default db ;

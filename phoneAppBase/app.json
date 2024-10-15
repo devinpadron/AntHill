@@ -12,19 +12,43 @@
       "backgroundColor": "#ffffff"
     },
     "jsEngine": "jsc",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
-      "jsEngine": "jsc"
+      "jsEngine": "jsc",
+      "googleServicesFile": "./SoBridalSocial Firebase.plist",
+      "bundleIdentifier": "com.devinpadrom.CateringApp"
     },
     "android": {
+      "googleServicesFile": "./SoBridalSocial Firebase config.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.devinpadrom.CateringApp"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "4ef49dfe-f855-4574-8f5c-99fc18a6b094"
+      }
+    },
+    "plugins": [
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      "@react-native-firebase/crashlytics",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ]
+    ]
   }
 }
