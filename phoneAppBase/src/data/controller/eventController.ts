@@ -1,6 +1,3 @@
-import firebase from '@react-native-firebase/app'
-import { getFirestore } from '@react-native-firebase/firestore/';
-import firestore from '@react-native-firebase/firestore'; //eventully for default db
 import Event from '../class/eventClass'
 import db from '../../../firebaseConfig';
 

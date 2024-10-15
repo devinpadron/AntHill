@@ -1,6 +1,3 @@
-import firebase from '@react-native-firebase/app';
-import firestore from '@react-native-firebase/firestore';
-import { getFirestore } from '@react-native-firebase/firestore/';
 import db from '../../../firebaseConfig';
 import User from "../class/userClass";
 
