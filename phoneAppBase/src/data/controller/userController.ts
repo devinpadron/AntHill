@@ -1,5 +1,7 @@
-import { testdb } from "../../../firebaseConfig";
-import { doc, setDoc, deleteDoc, getDoc, addDoc, updateDoc, collection} from 'firebase/firestore';
+import firebase from '@react-native-firebase/app';
+import firestore from '@react-native-firebase/firestore';
+import { getFirestore } from '@react-native-firebase/firestore/';
+import db from '../../../firebaseConfig';
 import User from "../class/userClass";
 
 /* A UserController that contains:
@@ -9,26 +11,31 @@ import User from "../class/userClass";
   - A function that creates a new User and puts it into Firestore
 */
 
+
 class UserControllerStruct {
-  
   public getUser = async (userID:string) => {
     try {
       //Retrieve user data
-      const userEntry = await getDoc(doc(testdb, 'users' , userID));
-      if (userEntry.exists()) {
+      const userEntry = await db.collection('users').doc(userID).get();
+      if (userEntry.exists) {
         const dbData = userEntry.data();
-        const foundUser = new User;
-        foundUser.setUserID(userID);
-        foundUser.setFirstName(dbData.firstName);
-        foundUser.setLastName(dbData.lastName);
-        foundUser.setEmail(dbData.email);
-        foundUser.setCompany(dbData.company);
-        foundUser.setPrivilege(dbData.privilege);
-        return foundUser;
+        if (dbData) {
+          const foundUser = new User;
+          foundUser.setUserID(userID);
+          foundUser.setFirstName(dbData.firstName);
+          foundUser.setLastName(dbData.lastName);
+          foundUser.setEmail(dbData.email);
+          foundUser.setCompany(dbData.company);
+          foundUser.setPrivilege(dbData.privilege);
+          return foundUser;
+        } else {
+          console.log("Document exists but data is undefined");
+          return null;
+        }
       } else {
         console.log("No such document");
         return null
-      }
+    }
     } catch (e) {
       console.log("Error getting user", e);
     }
@@ -37,7 +44,7 @@ class UserControllerStruct {
   public deleteUser = async (userID:string) => {
     // Delete an existing user
     try {
-      await deleteDoc(doc(testdb, 'users' , userID));
+      await db.collection('users').doc(userID).delete();
       console.log("User successfully deleted");
       return true;
     } catch (e) {
@@ -55,13 +62,8 @@ class UserControllerStruct {
       privilege: newUser.getPrivilege()
     }
     try {
-      const entry = await addDoc(collection(testdb, 'users'), userData);
+      const entry = await db.collection('users').add(userData);
       const entryid = entry.id;
-
-      const userWithId = {
-        ...userData,
-        userID: entryid
-      };
       newUser.setUserID(entryid)
       return entryid;
     } catch (e) {
@@ -72,8 +74,7 @@ class UserControllerStruct {
 
   public updateUser = async (userID: string, userData: object) => {
     try {
-      const userEntry = doc(testdb, 'users' , userID);
-      await updateDoc(userEntry, userData);
+      await db.collection('users').doc(userID).update(userData);
       console.log("User successfully updated");
       return true;
     } catch (e) {

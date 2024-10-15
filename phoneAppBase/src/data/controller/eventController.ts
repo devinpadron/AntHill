@@ -1,26 +1,32 @@
-import { testdb } from "../../../firebaseConfig";
-import { doc, setDoc, deleteDoc, getDoc, collection , addDoc, updateDoc } from 'firebase/firestore'
+import firebase from '@react-native-firebase/app'
+import { getFirestore } from '@react-native-firebase/firestore/';
+import firestore from '@react-native-firebase/firestore'; //eventully for default db
 import Event from '../class/eventClass'
+import db from '../../../firebaseConfig';
 
 class EventControllerStruct {
   public getEvent = async (eventID:string) => {
     try {
       //Retrieve event data
-      const eventEntry = await getDoc(doc(testdb, 'events' , eventID));
-      if (eventEntry.exists()) {
+      const eventEntry = await db.collection('events').doc(eventID).get();
+      if (eventEntry.exists) {
         const dbData = eventEntry.data();
-        const foundEvent = new Event;
-        foundEvent.setEventID(eventID);
-        foundEvent.setTitle(dbData.title);
-        foundEvent.setDate(dbData.date);
-        foundEvent.setHour(dbData.hour);
-        foundEvent.setDuration(dbData.duration);
-        foundEvent.setCompany(dbData.company);
-        foundEvent.setJSON(dbData.jsonData);
-        return foundEvent;
-      } else {
-        console.log("No such document");
+        if (dbData) {
+          const foundEvent = new Event;
+          foundEvent.setEventID(eventID);
+          foundEvent.setTitle(dbData.title);
+          foundEvent.setDate(dbData.date);
+          foundEvent.setHour(dbData.hour);
+          foundEvent.setDuration(dbData.duration);
+          foundEvent.setCompany(dbData.company);
+          foundEvent.setJSON(dbData.jsonData);
+          return foundEvent;
+        } else {
+        console.log("Document exists but data is undefined");
         return null
+        }
+      } else {
+        console.log("No such document")
       }
     } catch (e) {
       console.log("Error getting event", e);
@@ -35,15 +41,11 @@ class EventControllerStruct {
         duration: newEvent.getDuration(),
         company: newEvent.getCompany(),
         jsonData: newEvent.getJSON(),
-      }
+      };
       try {
-        const entry = await addDoc(collection(testdb, 'events'), eventData);
+        const entry = await db.collection('events').add(eventData);
         const entryid = entry.id;
-  
-        const eventWithId = {
-          ...eventData,
-          eventID: entryid
-        };
+
         newEvent.setEventID(entryid)
         return entryid;
       } catch (e) {
@@ -55,7 +57,7 @@ class EventControllerStruct {
     public deleteEvent = async (eventID:string) => {
       // Delete an existing user
       try {
-        await deleteDoc(doc(testdb, 'events' , eventID));
+        await db.collection('events').doc(eventID).delete();
         console.log("Event successfully deleted");
         return true;
       } catch (e) {
@@ -66,8 +68,7 @@ class EventControllerStruct {
   
     public updateEvent = async (eventID: string, eventData: object) => {
       try {
-        const userEntry = doc(testdb, 'events' , eventID);
-        await updateDoc(userEntry, eventData);
+        await db.collection('events').doc(eventID).update(eventData);
         console.log("Event successfully updated");
         return true;
       } catch (e) {
