@@ -10,8 +10,9 @@ import {
   StyleSheet,
   Alert,
 } from "react-native";
+import { NativeStackNavigatorProps } from "react-native-screens/lib/typescript/native-stack/types";
 
-const LoginPage = ({ navigation } : any) => {
+const LoginPage = ({ navigation }: any) => {
   const { login } = useUser();
   const signup = () => {
     navigation.navigate("Sign Up");

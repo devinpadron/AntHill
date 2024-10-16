@@ -10,9 +10,8 @@ import {
   Alert,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import * as DocumentPicker from "expo-document-picker";
 
-const FormPage: React.FC = () => {
+const EventSubmit: React.FC = () => {
   const [name, setName] = useState("");
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [location, setLocation] = useState("");
@@ -43,12 +42,6 @@ const FormPage: React.FC = () => {
       />
 
       <Text style={styles.label}>Date</Text>
-      <DateTimePicker
-        value={date || new Date()}
-        mode="date"
-        display="default"
-        onChange={handleDateChange}
-      />
 
       <Text style={styles.label}>Location</Text>
       <TextInput
@@ -123,4 +116,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default FormPage;
+export default EventSubmit;

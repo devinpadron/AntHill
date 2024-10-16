@@ -3,7 +3,7 @@ import { View, Text, TextInput, Button, Alert, StyleSheet, ScrollView, Dimension
 import { useUser } from "../../data/context/UserContext";
 const { width, height } = Dimensions.get('window');
 
-const ProfilePage = () => {
+const ProfilePage = ({navigation}: any) => {
   const [password, setPassword] = useState<string>('');
   const { user, isLoading } = useUser();
 
