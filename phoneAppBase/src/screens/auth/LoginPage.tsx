@@ -1,4 +1,5 @@
 import { StatusBar } from "expo-status-bar";
+import { useUser } from "../../data/context/UserContext";
 import React, { useState } from "react";
 import {
   View,
@@ -10,29 +11,8 @@ import {
   Alert,
 } from "react-native";
 
-import { useUser } from "../../data/context/UserContext";
-
-//import { genSalt } from "bcryptjs";
-
-const LoginPage = ({ navigation }) => {
+const LoginPage = ({ navigation } : any) => {
   const { login } = useUser();
-  //Check if user exists in database
-  // ----
-  // 
-  //Check if password is correct
-  // hashPass = Password from database
-  // bcrypt.compare(pass, hashPass, function (err, result) {
-  //   if (err != null) {
-  //     print(err);
-  //     //Throw a notification for this error
-  //   }
-  //   if (result == true) {
-  //     navigation.push("Home");
-  //   } else if (result == false) {
-  //     //Throw a notification explaining why
-  //   }
-  // });
-
   const signup = () => {
     navigation.navigate("Sign Up");
   };

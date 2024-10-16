@@ -1,14 +1,13 @@
 import React, { useState } from "react";
 import {
   View,
-  Image,
   TextInput,
   TouchableOpacity,
   Text,
   StyleSheet,
 } from "react-native";
 
-const SignUpPage = ({navigation}) => {
+const SignUpPage = ({ navigation }: any) => {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
