@@ -1,10 +1,9 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { Ionicons } from "@expo/vector-icons";
 
 // Import your screen components
-import Calendar from "../screens/Calendar";
-import FormPage from "../screens/FormPage";
+import Calendar from "../screens/home/Calendar";
+import ProfilePage from "../screens/home/ProfilePage";
 
 const Tab = createBottomTabNavigator();
 
@@ -14,12 +13,12 @@ const HomeTabs = () => {
       <Tab.Screen
         name="Calendar"
         component={Calendar}
-        options={{ headerShown: false, gestureEnabled: false }}
+        options={{ headerShown: false}}
       />
       <Tab.Screen
         name="Profile"
-        component={FormPage}
-        options={{ headerShown: false, gestureEnabled: false }}
+        component={ProfilePage}
+        options={{ headerShown: false}}
       />
     </Tab.Navigator>
   );

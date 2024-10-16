@@ -6,13 +6,13 @@ import {
   CalendarProvider,
   WeekCalendar,
 } from "react-native-calendars";
-import { agendaItems, getMarkedDates } from "../data/agendaItems";
-import AgendaItem from "../models/Calendar/AgendaItem";
-import { getTheme, themeColor, lightThemeColor } from "../themes/theme";
+import { agendaItems, getMarkedDates, today } from "../../models/Calendar/agendaItems";
+import AgendaItem from "../../models/Calendar/AgendaItem";
+import { getTheme, themeColor, lightThemeColor } from "../../themes/theme";
 import Constants from "expo-constants";
 
-const leftArrowIcon = require("../../assets/previous.png");
-const rightArrowIcon = require("../../assets/next.png");
+const leftArrowIcon = require("../../../assets/next.png");
+const rightArrowIcon = require("../../../assets/next.png");
 const ITEMS: any[] = agendaItems;
 
 interface Props {
@@ -35,10 +35,10 @@ const ExpandableCalendarScreen = (props: Props) => {
   return (
     <View style={styles.container}>
       <CalendarProvider
-        date={ITEMS[0]?.title}
+        date={today}
         // onDateChanged={onDateChanged}
         // onMonthChange={onMonthChange}
-        //showTodayButton
+        showTodayButton
         // disabledOpacity={0.6}
         //theme={todayBtnTheme.current}
         // todayBottomMargin={16}

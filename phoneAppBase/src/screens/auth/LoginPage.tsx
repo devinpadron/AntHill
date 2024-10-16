@@ -1,4 +1,5 @@
 import { StatusBar } from "expo-status-bar";
+import { useUser } from "../../data/context/UserContext";
 import React, { useState } from "react";
 import {
   View,
@@ -9,31 +10,14 @@ import {
   StyleSheet,
   Alert,
 } from "react-native";
-//import { genSalt } from "bcryptjs";
 
-const LoginPage = ({ navigation }) => {
-  //Check if user exists in database
-  // ----
-  //
-  //Check if password is correct
-  // hashPass = Password from database
-  // bcrypt.compare(pass, hashPass, function (err, result) {
-  //   if (err != null) {
-  //     print(err);
-  //     //Throw a notification for this error
-  //   }
-  //   if (result == true) {
-  //     navigation.push("Home");
-  //   } else if (result == false) {
-  //     //Throw a notification explaining why
-  //   }
-  // });
-
+const LoginPage = ({ navigation } : any) => {
+  const { login } = useUser();
   const signup = () => {
     navigation.navigate("Sign Up");
   };
-  const login = () => {
-    Alert.alert("Login");
+  const handleLogin = async () => {
+    login();
   };
   const [uname, setUname] = useState("");
   const [pass, setPass] = useState("");
@@ -43,7 +27,7 @@ const LoginPage = ({ navigation }) => {
       {/* Logo */}
       <Image
         style={styles.logoImage}
-        source={require("../../assets/DolceNGelato/vicoLogoPrimary.png")}
+        source={require("../../../assets/DolceNGelato/vicoLogoPrimary.png")}
       />
 
       {/* Username Textbox */}
@@ -70,7 +54,7 @@ const LoginPage = ({ navigation }) => {
       {/* Login Button */}
       <TouchableOpacity
         style={[styles.roundButton, { height: 45, marginTop: 40 }]}
-        onPress={login}
+        onPress={handleLogin}
       >
         <Text style={[styles.buttonText, { color: "white" }]}>Login</Text>
       </TouchableOpacity>
