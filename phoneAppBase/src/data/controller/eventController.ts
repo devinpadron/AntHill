@@ -30,51 +30,82 @@ class EventControllerStruct {
     }
   }
 
-    public addEvent = async (newEvent:Event) => {
-      const eventData = {
-        title: newEvent.getTitle(),
-        date: newEvent.getDate(),
-        hour: newEvent.getHour(),
-        duration: newEvent.getDuration(),
-        company: newEvent.getCompany(),
-        jsonData: newEvent.getJSON(),
-      };
-      try {
-        const entry = await db.collection('events').add(eventData);
-        const entryid = entry.id;
-
-        newEvent.setEventID(entryid)
-        return entryid;
-      } catch (e) {
-        console.error("Error adding event:", e);
-        throw e;
-      }
-    }
-  
-    public deleteEvent = async (eventID:string) => {
-      // Delete an existing user
-      try {
-        await db.collection('events').doc(eventID).delete();
-        console.log("Event successfully deleted");
-        return true;
-      } catch (e) {
-        console.error("Error deleting event:", e);
-        throw e;
-      }
-    }
-  
-    public updateEvent = async (eventID: string, eventData: object) => {
-      try {
-        await db.collection('events').doc(eventID).update(eventData);
-        console.log("Event successfully updated");
-        return true;
-      } catch (e) {
-        console.error("Error updating event:", e);
-        throw e;
-      }
-    };
-  }
+  private isValidDateFormat(date: string): boolean {
+    const dateFormatRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateFormatRegex.test(date)) return false;
     
-  const EventController = new EventControllerStruct;
+    const parsedDate = new Date(date);
+    return !isNaN(parsedDate.getTime());
+  }
+
+
+  //eventually also gotta get events using user and company
+  public getEventsByDate = async (date: string): Promise<Event[]> => {
+    if (!this.isValidDateFormat(date)) {
+      throw new Error("Invalid date format. Please use YYYY-MM-DD.");
+    }
+
+    try {
+      const res: Event[] = [];
+      const eventsSnapshot = await db.collection('events').where('date', '==', date).get();
+      for (const doc of eventsSnapshot.docs) {
+        const eventData = await this.getEvent(doc.id);
+        if (eventData) {
+          res.push(eventData);
+        }
+      }
+      return res;
+    } catch (e) {
+      console.error(`Failed to get events for ${date}:`, e);
+      throw e;
+    }
+  }
+
+
+  public addEvent = async (newEvent:Event) => {
+    const eventData = {
+      title: newEvent.getTitle(),
+      date: newEvent.getDate(),
+      hour: newEvent.getHour(),
+      duration: newEvent.getDuration(),
+      company: newEvent.getCompany(),
+      jsonData: newEvent.getJSON(),
+    };
+    try {
+      const entry = await db.collection('events').add(eventData);
+      const entryid = entry.id;
+      newEvent.setEventID(entryid)
+      return entryid;
+    } catch (e) {
+      console.error("Error adding event:", e);
+      throw e;
+    }
+  }
   
-  export default EventController;
+  public deleteEvent = async (eventID:string) => {
+    // Delete an existing user
+    try {
+      await db.collection('events').doc(eventID).delete();
+      console.log("Event successfully deleted");
+      return true;
+    } catch (e) {
+      console.error("Error deleting event:", e);
+      throw e;
+    }
+  }
+  
+  public updateEvent = async (eventID: string, eventData: object) => {
+    try {
+      await db.collection('events').doc(eventID).update(eventData);
+      console.log("Event successfully updated");
+      return true;
+    } catch (e) {
+      console.error("Error updating event:", e);
+      throw e;
+    }
+  };
+}
+    
+const EventController = new EventControllerStruct;
+  
+export default EventController;
