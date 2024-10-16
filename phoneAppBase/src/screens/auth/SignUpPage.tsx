@@ -6,43 +6,82 @@ import {
   TouchableOpacity,
   Text,
   StyleSheet,
+  Alert,
 } from "react-native";
+import { useUser } from "../../data/context/UserContext";
+import UserController from "../../data/controller/userController";
+import User from "../../data/class/userClass";
+
 
 const SignUpPage = ({navigation}) => {
+  const { signUp } = useUser();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confPassword, setConfPassword] = useState("");
   const [accessCode, setAccessCode] = useState("");
+
+  //add error checking later
+  const createAndAddNewUser = async () => {
+    const newUser = new User;
+    newUser.setFirstName(firstName);
+    newUser.setLastName(lastName);
+    newUser.setEmail(email);
+    newUser.setPrivilege("user");
+    await UserController.addUser(newUser);
+  };
+
+  const handleSignUp = async () => {
+    if (password != confPassword) {
+      Alert.alert("Error", "Passwords do not match");
+      return;
+    }
+
+    try {
+      await signUp(email, password);
+      Alert.alert("Success", "Account Created Successfully", [
+        { text: "OK", onPress: () => navigation.navigate("Login") }
+      ]);
+      await createAndAddNewUser();
+    } catch (error) {
+      let errorMessage = "An unexpected error occurred";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      Alert.alert("Sign Up Failed", errorMessage);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <TextInput
         style={styles.textInput}
         placeholder="First Name:"
-        onChangeText={(newFirstName) => setFirstName(newFirstName)}
+        onChangeText={setFirstName}
         value={firstName}
         autoCorrect={false}
       />
       <TextInput
         style={styles.textInput}
         placeholder="Last Name:"
-        onChangeText={(newLastName) => setLastName(newLastName)}
+        onChangeText={setLastName}
         value={lastName}
         autoCorrect={false}
       />
       <TextInput
         style={styles.textInput}
         placeholder="Email:"
-        onChangeText={(newEmail) => setEmail(newEmail)}
+        onChangeText={setEmail}
         value={email}
         autoCorrect={false}
         autoCapitalize="none"
+        keyboardType="email-address"
       />
       <TextInput
         style={styles.textInput}
         placeholder="Password:"
-        onChangeText={(newPassword) => setPassword(newPassword)}
+        onChangeText={setPassword}
         value={password}
         autoCorrect={false}
         autoCapitalize="none"
@@ -51,7 +90,7 @@ const SignUpPage = ({navigation}) => {
       <TextInput
         style={styles.textInput}
         placeholder="Confirm Password:"
-        onChangeText={(newConfPassword) => setConfPassword(newConfPassword)}
+        onChangeText={setConfPassword}
         value={confPassword}
         autoCorrect={false}
         autoCapitalize="none"
@@ -60,12 +99,12 @@ const SignUpPage = ({navigation}) => {
       <TextInput
         style={styles.textInput}
         placeholder="Company Code:"
-        onChangeText={(newAccessCode) => setAccessCode(newAccessCode)}
+        onChangeText={setAccessCode}
         value={accessCode}
         autoCapitalize="none"
         autoCorrect={false}
       />
-      <TouchableOpacity style={styles.roundButton}>
+      <TouchableOpacity style={styles.roundButton} onPress={handleSignUp}>
         <Text style={{ color: "white" }}>Sign Up</Text>
       </TouchableOpacity>
     </View>

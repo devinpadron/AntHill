@@ -58,7 +58,7 @@ const ProfilePage = () => {
         <TextInput style={styles.input} value={user ? user.email : 'No Email Found'} editable={false} />
 
         <Text style={styles.label}>Company</Text>
-        <TextInput style={styles.input} value={user ? user.getCompany() : 'No Company Found'} editable={false} />
+        <TextInput style={styles.input} value={user ? user.company : 'No Company Found'} editable={false} />
 
         <Text style={styles.label}>Password</Text>
         <TextInput

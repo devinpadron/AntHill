@@ -1158,7 +1158,7 @@ PODS:
   - EXJSONUtils (0.13.1)
   - EXManifests (0.14.3):
     - ExpoModulesCore
-  - Expo (51.0.37):
+  - Expo (51.0.38):
     - ExpoModulesCore
   - expo-dev-client (4.0.28):
     - EXManifests
@@ -1377,7 +1377,7 @@ PODS:
     - ExpoModulesCore
   - ExpoKeepAwake (13.0.2):
     - ExpoModulesCore
-  - ExpoModulesCore (1.12.25):
+  - ExpoModulesCore (1.12.26):
     - DoubleConversion
     - glog
     - RCT-Folly (= 2024.01.01.00)
@@ -3087,7 +3087,7 @@ SPEC CHECKSUMS:
   EXConstants: 409690fbfd5afea964e5e9d6c4eb2c2b59222c59
   EXJSONUtils: 30c17fd9cc364d722c0946a550dfbf1be92ef6a4
   EXManifests: c1fab4c3237675e7b0299ea8df0bcb14baca4f42
-  Expo: 67b60b3b80a3c8e9f3bcaaa84d06d140229a246d
+  Expo: 9b6666ef2fedcfc89c5b9be2aa1ce12b81f9e7f5
   expo-dev-client: e25e1c63686cc097d9701354e475b2b60038b83b
   expo-dev-launcher: f560d7445eaa7ee18d6df9a86a7e92ab2463b838
   expo-dev-menu: 869920372719b5a71809ba8ce4de27ca03f82078
@@ -3097,7 +3097,7 @@ SPEC CHECKSUMS:
   ExpoFileSystem: 80bfe850b1f9922c16905822ecbf97acd711dc51
   ExpoFont: 00756e6c796d8f7ee8d211e29c8b619e75cbf238
   ExpoKeepAwake: 3b8815d9dd1d419ee474df004021c69fdd316d08
-  ExpoModulesCore: a61f49cc977f932a8716dfaab8552d29f0fb03ae
+  ExpoModulesCore: 86d4b467037caa6906582c3f597e4c67d742a4f0
   EXUpdatesInterface: 996527fd7d1a5d271eb523258d603f8f92038f24
   FBLazyVector: ac12dc084d1c8ec4cc4d7b3cf1b0ebda6dab85af
   Firebase: 98e6bf5278170668a7983e12971a66b2cd57fc8c

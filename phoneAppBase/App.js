@@ -1,22 +1,40 @@
-import { NavigationContainer } from '@react-navigation/native';
 import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
 import { UserProvider, useUser } from './src/data/context/UserContext';
-import AuthStack from './src/routes/AuthStack';
-import HomeTabs from "./src/routes/HomeTabs";
 
-function AppNavigator() {
-  const { isLoggedIn } = useUser(); 
+// Import your screens
+import HomeTabs from './src/routes/HomeTabs';
+import AuthStack from './src/routes/AuthStack';
+
+const Stack = createStackNavigator();
+
+// This component will handle the conditional rendering based on auth state
+const AppNavigator = () => {
+  const { user, initializing } = useUser();
+
+  // Show a loading screen if we're still checking the authentication state
+  /*if (initializing) {
+    return <LoadingScreen />;  // You'll need to create this component
+  }*/
+
   return (
     <NavigationContainer>
-      {isLoggedIn ? <HomeTabs /> : <AuthStack />}
+      {user ? (
+        // User is signed in
+        <HomeTabs/>
+      ) : (
+        // No user is signed in
+          <AuthStack/>
+      )}
     </NavigationContainer>
   );
-}
+};
 
-function App() {
+const App = () => {
   return (
     <UserProvider>
-      <AppNavigator />
+        <AppNavigator />
     </UserProvider>
   );
 };
