@@ -1,5 +1,5 @@
 import Event from '../data/class/eventClass';
-import EventController from '../data/controller/eventController';
+import EventController from '../controller/eventController';
 
 async function createTestEvent(){
     const newEvent = new Event;
