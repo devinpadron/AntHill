@@ -1,5 +1,5 @@
 import User from '../data/class/userClass'
-import UserController from '../data/controller/userController';
+import UserController from '../controller/userController';
 
 async function createTestUser(){
     const newUser = new User;

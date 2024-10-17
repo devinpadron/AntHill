@@ -2,6 +2,7 @@ import { MarkedDates } from "react-native-calendars/src/types";
 import isEmpty from "lodash/isEmpty";
 
 export const today = new Date().toISOString().split("T")[0];
+
 // List of items from DB
 export const agendaItems = [
   {
