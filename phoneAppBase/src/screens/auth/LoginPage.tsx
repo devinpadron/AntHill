@@ -1,4 +1,5 @@
 import { StatusBar } from "expo-status-bar";
+import { useUser } from "../../data/context/UserContext";
 import React, { useState } from "react";
 import {
   View,
@@ -13,7 +14,7 @@ import auth from '@react-native-firebase/auth';
 
 //import { genSalt } from "bcryptjs";
 
-const LoginPage = ({ navigation }) => {
+const LoginPage = ({ navigation } : any) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 

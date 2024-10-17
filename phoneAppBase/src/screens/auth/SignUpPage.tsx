@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import {
   View,
-  Image,
   TextInput,
   TouchableOpacity,
   Text,
@@ -12,7 +11,7 @@ import UserController from "../../controller/userController";
 import auth from '@react-native-firebase/auth';
 
 
-const SignUpPage = ({navigation}) => {
+const SignUpPage = ({ navigation }: any) => {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -71,10 +70,6 @@ const SignUpPage = ({navigation}) => {
         };
         
       });
-
-      
-      
-      
     }
 
   return (

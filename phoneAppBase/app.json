@@ -4,13 +4,7 @@
     "slug": "customAppIdea",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "jsEngine": "jsc",
     "assetBundlePatterns": [
       "**/*"
@@ -23,14 +17,7 @@
     },
     "android": {
       "googleServicesFile": "./SoBridalSocial Firebase config.json",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
       "package": "com.devinpadrom.CateringApp"
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
     },
     "extra": {
       "eas": {
