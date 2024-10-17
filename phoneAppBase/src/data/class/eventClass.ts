@@ -3,7 +3,6 @@ export default class Event {
     private title:string = "" // This is the title displayed in the agenda
     private date:string = "" //In the form of "yyyy-MM-dd"
     private hour:string = "" //This is what will be displayed in the agenda view
-    private duration:string = "" //This is also displayed in the agenda view
     private company:string = "" //To keep track of what company this is meant for
     private jsonData:string = "{}"
 
@@ -37,14 +36,6 @@ export default class Event {
 
     public setHour(newHour:string){
         this.hour = newHour;
-    }
-
-    public getDuration(){
-        return this.duration;
-    }
-
-    public setDuration(newDuration:string){
-        this.duration = newDuration;
     }
 
     public getCompany(){

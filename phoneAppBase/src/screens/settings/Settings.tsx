@@ -7,7 +7,7 @@ const Settings = ({ navigation }: any) => {
   const SettingsItem: React.FC<{ title: string; isAction?: boolean; onPress: () => void}> = ({ title, isAction = false, onPress}) => (
     <TouchableOpacity style={styles.settingsItem} onPress={onPress}>
       <Text style={[styles.settingsItemText, isAction && styles.actionText]}>{title}</Text>
-      {!isAction && <Ionicons name="chevron-forward" size={20} color="#888" />}
+      {!isAction && <Ionicons name="chevron-forward-outline" size={20} color="#888" />}
     </TouchableOpacity>
   );
 
@@ -18,6 +18,10 @@ const Settings = ({ navigation }: any) => {
   const pushEventSubmit = () => {
     navigation.push("EventSubmit");
   }
+
+  const pushEmployeeList = () => {
+    navigation.push("EmployeeList");
+  };
 
   const handleLogout = () => {
     Alert.alert("Working.")
@@ -44,6 +48,7 @@ const Settings = ({ navigation }: any) => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>ADMIN</Text>
         <SettingsItem title="Create New Event" onPress={pushEventSubmit}/>
+        <SettingsItem title="Employee List" onPress={pushEmployeeList}/>
       </View>
       
       <View style={styles.section}>

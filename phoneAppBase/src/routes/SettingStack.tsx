@@ -16,12 +16,12 @@ const SettingStack = () => {
         <Stack.Screen
           name="Profile"
           component={ProfilePage}
-          options={{ headerShown: true, gestureEnabled: true }}
+          options={{ headerShown: false, gestureEnabled: true }}
         />
         <Stack.Screen
             name="EventSubmit"
             component={EventSubmit}
-            options={{ headerShown: true, gestureEnabled: true }}/>
+            options={{ headerShown: false, gestureEnabled: true }}/>
       </Stack.Navigator>
     );
   };
