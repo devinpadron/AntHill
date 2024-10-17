@@ -1,11 +1,25 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, Alert, StyleSheet, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
-import { useUser } from "../../data/context/UserContext";
+import { 
+  View, 
+  Text, 
+  TextInput, 
+  Button, 
+  Alert, 
+  StyleSheet, 
+  ScrollView, 
+  Dimensions, 
+  ActivityIndicator 
+} from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../../auth/AuthProvider';
+import User from '../../data/class/userClass';
+
 const { width, height } = Dimensions.get('window');
 
 const ProfilePage = () => {
   const [password, setPassword] = useState<string>('');
-  const { user, isLoading } = useUser();
+  const { user, signOut, firestoreData, isLoading } = useAuth();
+  const navigation = useNavigation();
 
   const handlePasswordChange = (newPassword: string) => {
     setPassword(newPassword);
@@ -23,7 +37,25 @@ const ProfilePage = () => {
   };
 
   const handleSignOut = () => {
-    // Add sign-out functionality
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Sign Out', 
+          onPress: async () => {
+            try {
+              await signOut();
+              // Navigation should be handled by the auth state listener in UserContext
+            } catch (error) {
+              console.error('Error signing out:', error);
+              Alert.alert('Sign Out Failed', 'An error occurred while signing out. Please try again.');
+            }
+          } 
+        },
+      ]
+    );
   };
 
   const handleSaveChanges = () => {
@@ -31,13 +63,13 @@ const ProfilePage = () => {
     // Add password change functionality
   };
 
-  if (isLoading) {
+  /*if (isLoading) {
     return (
       <View style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" />
       </View>
     );
-  }
+  }*/
 
   if (!user) {
     return (
@@ -52,13 +84,13 @@ const ProfilePage = () => {
       <ScrollView contentContainerStyle={styles.content}>
         
         <Text style={styles.label}>Name</Text>
-        <TextInput style={styles.input} value={user ? user.firstName : 'No Name Found'} editable={false} />
+        <TextInput style={styles.input} value={`${firestoreData.getFirstName()} ${firestoreData.getLastName()}`} editable={false} />
 
         <Text style={styles.label}>Email</Text>
-        <TextInput style={styles.input} value={user ? user.email : 'No Email Found'} editable={false} />
+        <TextInput style={styles.input} value={firestoreData.getEmail()} editable={false} />
 
         <Text style={styles.label}>Company</Text>
-        <TextInput style={styles.input} value={user ? user.company : 'No Company Found'} editable={false} />
+        <TextInput style={styles.input} value={firestoreData.getCompany()} editable={false} />
 
         <Text style={styles.label}>Password</Text>
         <TextInput

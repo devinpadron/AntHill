@@ -1,17 +1,18 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { UserProvider, useUser } from './src/data/context/UserContext';
+import { UserProvider, useUser } from './src/auth/UserContext';
 
 // Import your screens
 import HomeTabs from './src/routes/HomeTabs';
 import AuthStack from './src/routes/AuthStack';
+import { AuthProvider, useAuth } from './src/auth/AuthProvider';
 
 const Stack = createStackNavigator();
 
 // This component will handle the conditional rendering based on auth state
 const AppNavigator = () => {
-  const { user, initializing } = useUser();
+  const { user } = useAuth();
 
   // Show a loading screen if we're still checking the authentication state
   /*if (initializing) {
@@ -33,9 +34,11 @@ const AppNavigator = () => {
 
 const App = () => {
   return (
-    <UserProvider>
-        <AppNavigator />
-    </UserProvider>
+    <AuthProvider>
+      <UserProvider>
+          <AppNavigator />
+      </UserProvider>
+    </AuthProvider>
   );
 };
 

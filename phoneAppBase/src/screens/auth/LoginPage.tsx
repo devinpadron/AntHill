@@ -10,12 +10,12 @@ import {
   Alert,
 } from "react-native";
 
-import { useUser } from "../../data/context/UserContext";
+import { useAuth } from "../../auth/AuthProvider";
 
 //import { genSalt } from "bcryptjs";
 
 const LoginPage = ({ navigation }) => {
-  const { signIn } = useUser();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 

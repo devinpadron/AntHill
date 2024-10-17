@@ -8,13 +8,13 @@ import {
   StyleSheet,
   Alert,
 } from "react-native";
-import { useUser } from "../../data/context/UserContext";
 import UserController from "../../data/controller/userController";
 import User from "../../data/class/userClass";
+import { useAuth } from "../../auth/AuthProvider";
 
 
 const SignUpPage = ({navigation}) => {
-  const { signUp } = useUser();
+  const { signUp } = useAuth();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -32,18 +32,47 @@ const SignUpPage = ({navigation}) => {
     await UserController.addUser(newUser);
   };
 
-  const handleSignUp = async () => {
-    if (password != confPassword) {
-      Alert.alert("Error", "Passwords do not match");
-      return;
+  const validateFields = () => {
+    if (!firstName.trim()) {
+      return "First name is required.";
     }
+    if (!lastName.trim()) {
+      return "Last name is required.";
+    }
+    if (!email.trim()) {
+      return "Email is required.";
+    }
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      return "Email is invalid.";
+    }
+    if (!password) {
+      return "Password is required.";
+    }
+    if (password.length < 6) {
+      return "Password must be at least 6 characters long.";
+    }
+    if (password !== confPassword) {
+      return "Passwords do not match.";
+    }
+    // Add any other validation rules here (e.g., for accessCode if it's required)
+    return null; // No errors
+  };
 
+  const handleSignUp = async () => {
     try {
+      const validationError = validateFields();
+      if (validationError) {
+        throw new Error(validationError);
+      }
+
       await signUp(email, password);
+
+      await createAndAddNewUser();
+
       Alert.alert("Success", "Account Created Successfully", [
         { text: "OK", onPress: () => navigation.navigate("Login") }
       ]);
-      await createAndAddNewUser();
+      
     } catch (error) {
       let errorMessage = "An unexpected error occurred";
       if (error instanceof Error) {
