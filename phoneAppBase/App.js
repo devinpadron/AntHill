@@ -1,24 +1,56 @@
+import React, {useState, useEffect} from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import React from 'react';
-import { UserProvider, useUser } from './src/data/context/UserContext';
-import AuthStack from './src/routes/AuthStack';
-import HomeTabs from "./src/routes/HomeTabs";
+import auth from '@react-native-firebase/auth';
 
-function AppNavigator() {
-  const { isLoggedIn } = useUser(); 
+// Import your screens
+import HomeTabs from './src/routes/HomeTabs';
+import AuthStack from './src/routes/AuthStack';
+
+// This component will handle the conditional rendering based on auth state
+const AppNavigator = () => {
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect (() => {
+      const subscriber = auth().onAuthStateChanged(async user => {
+          if (user) {
+              try {
+                  setLoggedIn(true);                  
+              } catch (error) {
+                  console.error("Error getting user data:", error);
+              }
+          } else {
+              setLoggedIn(false);
+          }
+          setIsLoading(false);
+      });
+
+      return subscriber;
+  }, []);
+
+  // Show a loading screen if we're still checking the authentication state
+  /*if (initializing) {
+    return <LoadingScreen />;  // You'll need to create this component
+  }*/
+
   return (
     <NavigationContainer>
-      {isLoggedIn ? <HomeTabs /> : <AuthStack />}
+      {loggedIn ? (
+        // User is signed in
+        <HomeTabs/>
+      ) : (
+        // No user is signed in
+          <AuthStack/>
+      )}
     </NavigationContainer>
   );
-}
+};
 
-function App() {
+const App = () => {
   return (
-    <UserProvider>
-      <AppNavigator />
-    </UserProvider>
+      <AppNavigator/>
   );
 };
+
 
 export default App;

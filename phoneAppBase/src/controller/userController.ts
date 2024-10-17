@@ -1,5 +1,4 @@
-import db from '../../../firebaseConfig';
-import User from "../class/userClass";
+import db from '../../firebaseConfig';
 
 /* A UserController that contains:
   - A function that uses a userID to pull from Firestore and returns a User class
@@ -8,6 +7,11 @@ import User from "../class/userClass";
   - A function that creates a new User and puts it into Firestore
 */
 
+export interface User {
+  firstName: string;
+  lastName: string;
+  email: string;
+}
 
 class UserControllerStruct {
   public getUser = async (userID:string) => {
@@ -17,21 +21,14 @@ class UserControllerStruct {
       if (userEntry.exists) {
         const dbData = userEntry.data();
         if (dbData) {
-          const foundUser = new User;
-          foundUser.setUserID(userID);
-          foundUser.setFirstName(dbData.firstName);
-          foundUser.setLastName(dbData.lastName);
-          foundUser.setEmail(dbData.email);
-          foundUser.setCompany(dbData.company);
-          foundUser.setPrivilege(dbData.privilege);
-          return foundUser;
+          return dbData;
         } else {
           console.log("Document exists but data is undefined");
           return null;
         }
       } else {
         console.log("No such document");
-        return null
+        return null;
     }
     } catch (e) {
       console.log("Error getting user", e);
@@ -50,26 +47,17 @@ class UserControllerStruct {
     }
   }
 
-  public addUser = async (newUser:User) => {
-    const userData = {
-      firstName: newUser.getFirstName(),
-      lastName: newUser.getLastName(),
-      email: newUser.getEmail(),
-      company: newUser.getCompany(),
-      privilege: newUser.getPrivilege()
-    }
+  public addUser = async (newUser:User, userID:string) => {
     try {
-      const entry = await db.collection('users').add(userData);
-      const entryid = entry.id;
-      newUser.setUserID(entryid)
-      return entryid;
+      const entry = await db.collection('users').doc(userID).set(newUser);
     } catch (e) {
       console.error("Error adding user:", e);
       throw e;
     }
+    
   }
 
-  public updateUser = async (userID: string, userData: object) => {
+  public updateUser = async (userID: string, userData: User) => {
     try {
       await db.collection('users').doc(userID).update(userData);
       console.log("User successfully updated");

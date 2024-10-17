@@ -1,5 +1,4 @@
 import { StatusBar } from "expo-status-bar";
-import { useUser } from "../../data/context/UserContext";
 import React, { useState } from "react";
 import {
   View,
@@ -10,17 +9,31 @@ import {
   StyleSheet,
   Alert,
 } from "react-native";
+import auth from '@react-native-firebase/auth';
+
+//import { genSalt } from "bcryptjs";
 
 const LoginPage = ({ navigation } : any) => {
-  const { login } = useUser();
-  const signup = () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleLogin = async () => {
+      await auth().signInWithEmailAndPassword(email, password)
+      .then((userCredential) => {
+          const user = userCredential.user;
+          console.log('User account signed in!');
+        }).catch ((error) => {
+        if (error.code === 'auth/invalid-email') {
+          Alert.alert('That email address is invalid!');
+        }
+        Alert.alert('Login error', error.message);
+        });
+  };
+  
+
+  const pushSignup = () => {
     navigation.navigate("Sign Up");
   };
-  const handleLogin = async () => {
-    login();
-  };
-  const [uname, setUname] = useState("");
-  const [pass, setPass] = useState("");
 
   return (
     <View style={styles.container}>
@@ -33,25 +46,24 @@ const LoginPage = ({ navigation } : any) => {
       {/* Username Textbox */}
       <TextInput
         style={[styles.textInput, { marginTop: -20 }]}
-        placeholder="Username:"
-        onChangeText={(newUname) => setUname(newUname)}
-        value={uname}
+        placeholder="Email:"
+        onChangeText={setEmail}
+        value={email}
         autoCapitalize="none"
         autoCorrect={false}
+        keyboardType="email-address"
       />
 
-      {/* Password Textbox */}
       <TextInput
         style={styles.textInput}
         placeholder="Password:"
-        onChangeText={(newPass) => setPass(newPass)}
+        onChangeText={setPassword}
         secureTextEntry={true}
-        value={pass}
+        value={password}
         autoCapitalize="none"
         autoCorrect={false}
       />
 
-      {/* Login Button */}
       <TouchableOpacity
         style={[styles.roundButton, { height: 45, marginTop: 40 }]}
         onPress={handleLogin}
@@ -59,15 +71,13 @@ const LoginPage = ({ navigation } : any) => {
         <Text style={[styles.buttonText, { color: "white" }]}>Login</Text>
       </TouchableOpacity>
 
-      {/* Signup Button */}
       <TouchableOpacity
         style={[styles.roundButton, { height: 35 }]}
-        onPress={signup}
+        onPress={pushSignup}
       >
         <Text style={[styles.buttonText, { color: "white" }]}>Signup</Text>
       </TouchableOpacity>
 
-      {/* Forgot Password Button */}
       <TouchableOpacity>
         <Text style={[{ color: "blue", marginTop: 15 }]}>Forgot Password</Text>
       </TouchableOpacity>

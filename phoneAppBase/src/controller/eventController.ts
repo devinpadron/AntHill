@@ -1,5 +1,13 @@
-import Event from '../class/eventClass'
-import db from '../../../firebaseConfig';
+import db from '../../firebaseConfig';
+
+interface Event{
+  title:string // This is the title displayed in the agenda
+  date:string //In the form of "yyyy-MM-dd"
+  hour:string //This is what will be displayed in the agenda view
+  duration:string  //This is also displayed in the agenda view
+  company:string  //To keep track of what company this is meant for
+  jsonData:string 
+}
 
 class EventControllerStruct {
   public getEvent = async (eventID:string) => {
@@ -9,18 +17,10 @@ class EventControllerStruct {
       if (eventEntry.exists) {
         const dbData = eventEntry.data();
         if (dbData) {
-          const foundEvent = new Event;
-          foundEvent.setEventID(eventID);
-          foundEvent.setTitle(dbData.title);
-          foundEvent.setDate(dbData.date);
-          foundEvent.setHour(dbData.hour);
-          foundEvent.setDuration(dbData.duration);
-          foundEvent.setCompany(dbData.company);
-          foundEvent.setJSON(dbData.jsonData);
-          return foundEvent;
+          return dbData;
         } else {
-        console.log("Document exists but data is undefined");
-        return null
+          console.log("Document exists but data is undefined");
+          return null;
         }
       } else {
         console.log("No such document")
@@ -31,19 +31,9 @@ class EventControllerStruct {
   }
 
     public addEvent = async (newEvent:Event) => {
-      const eventData = {
-        title: newEvent.getTitle(),
-        date: newEvent.getDate(),
-        hour: newEvent.getHour(),
-        duration: newEvent.getDuration(),
-        company: newEvent.getCompany(),
-        jsonData: newEvent.getJSON(),
-      };
       try {
-        const entry = await db.collection('events').add(eventData);
+        const entry = await db.collection('events').add(newEvent);
         const entryid = entry.id;
-
-        newEvent.setEventID(entryid)
         return entryid;
       } catch (e) {
         console.error("Error adding event:", e);
@@ -52,7 +42,7 @@ class EventControllerStruct {
     }
   
     public deleteEvent = async (eventID:string) => {
-      // Delete an existing user
+      // Delete an existing event
       try {
         await db.collection('events').doc(eventID).delete();
         console.log("Event successfully deleted");
@@ -63,7 +53,7 @@ class EventControllerStruct {
       }
     }
   
-    public updateEvent = async (eventID: string, eventData: object) => {
+    public updateEvent = async (eventID: string, eventData: Event) => {
       try {
         await db.collection('events').doc(eventID).update(eventData);
         console.log("Event successfully updated");
