@@ -1,5 +1,4 @@
 import { StatusBar } from "expo-status-bar";
-import { useUser } from "../../data/context/UserContext";
 import React, { useState } from "react";
 import {
   View,
