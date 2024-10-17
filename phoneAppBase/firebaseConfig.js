@@ -7,4 +7,4 @@ if (__DEV__ == true){
   db = getFirestore(cateringApp, 'test');
 }
 
-export default db ;
+export default db;

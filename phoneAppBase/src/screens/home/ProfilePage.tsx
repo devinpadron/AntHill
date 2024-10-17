@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   View, 
   Text, 
@@ -10,16 +10,16 @@ import {
   Dimensions, 
   ActivityIndicator 
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { useAuth } from '../../auth/AuthProvider';
-import User from '../../data/class/userClass';
+import auth from '@react-native-firebase/auth';
+import UserController from '../../controller/userController';
+import { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 
 const { width, height } = Dimensions.get('window');
 
 const ProfilePage = () => {
+  
+  const [userData, setUserData] = useState<FirebaseFirestoreTypes.DocumentData>();
   const [password, setPassword] = useState<string>('');
-  const { user, signOut, firestoreData, isLoading } = useAuth();
-  const navigation = useNavigation();
 
   const handlePasswordChange = (newPassword: string) => {
     setPassword(newPassword);
@@ -46,11 +46,10 @@ const ProfilePage = () => {
           text: 'Sign Out', 
           onPress: async () => {
             try {
-              await signOut();
-              // Navigation should be handled by the auth state listener in UserContext
+              await auth().signOut()
+              .then(() => console.log('User signed out!'));
             } catch (error) {
-              console.error('Error signing out:', error);
-              Alert.alert('Sign Out Failed', 'An error occurred while signing out. Please try again.');
+              console.error('Signout Error', error);
             }
           } 
         },
@@ -61,6 +60,7 @@ const ProfilePage = () => {
   const handleSaveChanges = () => {
     // Add phone number update functionality
     // Add password change functionality
+    console.log(userData);
   };
 
   /*if (isLoading) {
@@ -70,46 +70,62 @@ const ProfilePage = () => {
       </View>
     );
   }*/
+  
+  useEffect(() => {
+    async function getDetails() {
+      try{
+        const user = await UserController.getUser(auth().currentUser!.uid);
+        if (user){
+          setUserData(user);
+        }
+        else{
+          Alert.alert("Data could not be retrieved.")
+        }
+      }catch(e){
+        Alert.alert("Error: " + e);
+      };
+    };
+    getDetails();
+  }, []);
 
-  if (!user) {
+  if (!userData) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <Text>No user data available. Please log in.</Text>
+        <Text>Loading....</Text>
       </View>
     );
   }
+    return (
+      <View style={styles.container}>
+        <ScrollView contentContainerStyle={styles.content}>
+          
+          <Text style={styles.label}>Name</Text>
+          <TextInput style={styles.input} value={`${userData.firstName} ${userData.lastName}`} editable={false} />
 
-  return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        
-        <Text style={styles.label}>Name</Text>
-        <TextInput style={styles.input} value={`${firestoreData.getFirstName()} ${firestoreData.getLastName()}`} editable={false} />
+          <Text style={styles.label}>Email</Text>
+          <TextInput style={styles.input} value={userData.email} editable={false} />
 
-        <Text style={styles.label}>Email</Text>
-        <TextInput style={styles.input} value={firestoreData.getEmail()} editable={false} />
+          <Text style={styles.label}>Company</Text>
+          <TextInput style={styles.input} value={userData.company} editable={false} />
 
-        <Text style={styles.label}>Company</Text>
-        <TextInput style={styles.input} value={firestoreData.getCompany()} editable={false} />
+          <Text style={styles.label}>Password</Text>
+          <TextInput
+            style={styles.input}
+            value={password}
+            onChangeText={handlePasswordChange}
+            secureTextEntry
+            placeholder="Enter new password"
+          />
 
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={styles.input}
-          value={password}
-          onChangeText={handlePasswordChange}
-          secureTextEntry
-          placeholder="Enter new password"
-        />
+          <Button title="Save Changes" onPress={handleSaveChanges} />
+          <Button title="Sign Out" color="gray" onPress={handleSignOut} />
+        </ScrollView>
 
-        <Button title="Save Changes" onPress={handleSaveChanges} />
-        <Button title="Sign Out" color="gray" onPress={handleSignOut} />
-      </ScrollView>
-
-      <View style={styles.deleteButtonContainer}>
-        <Button title="Delete Account" color="red" onPress={handleDeleteAccount} />
+        <View style={styles.deleteButtonContainer}>
+          <Button title="Delete Account" color="red" onPress={handleDeleteAccount} />
+        </View>
       </View>
-    </View>
-  );
+    );
 };
 
 const styles = StyleSheet.create({

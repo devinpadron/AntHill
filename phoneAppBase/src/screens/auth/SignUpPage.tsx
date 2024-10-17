@@ -8,29 +8,17 @@ import {
   StyleSheet,
   Alert,
 } from "react-native";
-import UserController from "../../data/controller/userController";
-import User from "../../data/class/userClass";
-import { useAuth } from "../../auth/AuthProvider";
+import UserController from "../../controller/userController";
+import auth from '@react-native-firebase/auth';
 
 
 const SignUpPage = ({navigation}) => {
-  const { signUp } = useAuth();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confPassword, setConfPassword] = useState("");
   const [accessCode, setAccessCode] = useState("");
-
-  //add error checking later
-  const createAndAddNewUser = async () => {
-    const newUser = new User;
-    newUser.setFirstName(firstName);
-    newUser.setLastName(lastName);
-    newUser.setEmail(email);
-    newUser.setPrivilege("user");
-    await UserController.addUser(newUser);
-  };
 
   const validateFields = () => {
     if (!firstName.trim()) {
@@ -59,28 +47,35 @@ const SignUpPage = ({navigation}) => {
   };
 
   const handleSignUp = async () => {
-    try {
-      const validationError = validateFields();
-      if (validationError) {
-        throw new Error(validationError);
-      }
+    const userData = {
+      firstName: firstName,
+      lastName: lastName,
+      email: email
+    };
 
-      await signUp(email, password);
+    await auth().createUserWithEmailAndPassword(email, password)
+    .then((userCredential) => {
+        const user = userCredential.user;
+        user.updateProfile({displayName: firstName + ' ' + lastName});
+        UserController.addUser(userData, user.uid);
+        console.log('User account created & signed in!');
+      })
+      .catch((error) => {
+        if (error.code === 'auth/email-already-in-use') {
+            Alert.alert('That email address is already in use!');
+        }  
+        else if (error.code === 'auth/invalid-email') {
+          Alert.alert('That email address is invalid!');
+        }else{
+          Alert.alert('Signup error', error.message);
+        };
+        
+      });
 
-      await createAndAddNewUser();
-
-      Alert.alert("Success", "Account Created Successfully", [
-        { text: "OK", onPress: () => navigation.navigate("Login") }
-      ]);
       
-    } catch (error) {
-      let errorMessage = "An unexpected error occurred";
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      Alert.alert("Sign Up Failed", errorMessage);
+      
+      
     }
-  };
 
   return (
     <View style={styles.container}>

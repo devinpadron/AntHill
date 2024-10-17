@@ -9,31 +9,29 @@ import {
   StyleSheet,
   Alert,
 } from "react-native";
-
-import { useAuth } from "../../auth/AuthProvider";
+import auth from '@react-native-firebase/auth';
 
 //import { genSalt } from "bcryptjs";
 
 const LoginPage = ({ navigation }) => {
-  const { signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const handleLogin = async () => {
-    try {
-      await signIn(email, password);
-
-    }catch (error) {
-      let errorMessage = "An unexpected error occured";
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      Alert.alert("Login Failed", errorMessage);
-    }
+      await auth().signInWithEmailAndPassword(email, password)
+      .then((userCredential) => {
+          const user = userCredential.user;
+          console.log('User account signed in!');
+        }).catch ((error) => {
+        if (error.code === 'auth/invalid-email') {
+          Alert.alert('That email address is invalid!');
+        }
+        Alert.alert('Login error', error.message);
+        });
   };
   
 
-  const handleSignup = () => {
+  const pushSignup = () => {
     navigation.navigate("Sign Up");
   };
 
@@ -75,7 +73,7 @@ const LoginPage = ({ navigation }) => {
 
       <TouchableOpacity
         style={[styles.roundButton, { height: 35 }]}
-        onPress={handleSignup}
+        onPress={pushSignup}
       >
         <Text style={[styles.buttonText, { color: "white" }]}>Signup</Text>
       </TouchableOpacity>
