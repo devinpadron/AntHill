@@ -1,5 +1,5 @@
-import React, { useRef, useCallback, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import React, { useRef, useCallback, useState, useEffect } from "react";
+import { Alert, StyleSheet, View } from "react-native";
 import {
   ExpandableCalendar,
   AgendaList,
@@ -10,6 +10,9 @@ import { agendaItems, getMarkedDates, today } from "../../models/Calendar/agenda
 import AgendaItem from "../../models/Calendar/AgendaItem";
 import { getTheme, themeColor, lightThemeColor } from "../../themes/theme";
 import Constants from "expo-constants";
+import EventController from "../../controller/eventController";
+import UserController from "../../controller/userController";
+import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
 
 const leftArrowIcon = require("../../../assets/next.png");
 const rightArrowIcon = require("../../../assets/next.png");
@@ -27,6 +30,21 @@ const ExpandableCalendarScreen = (props: Props) => {
   const todayBtnTheme = useRef({
     todayButtonTextColor: themeColor,
   });
+
+  const [events, setEvents] = useState<FirebaseFirestoreTypes.DocumentData[]>([]);
+  // useEffect(() => {
+  //   const fetchEvents = async () => {
+  //       const fetchedEvents = await EventController.getEventsByDate("2024-11-25");
+  //       setEvents(fetchedEvents);
+  //       fetchedEvents.forEach(event => {
+  //         Alert.alert(event.id);
+  //       });
+  //   };
+
+  //   fetchEvents();
+  // }, []); 
+
+
 
   const renderItem = useCallback(({ item }: any) => {
     return <AgendaItem item={item} />;

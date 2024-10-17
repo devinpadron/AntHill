@@ -1,3 +1,4 @@
+import { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 import db from '../../firebaseConfig';
 
 interface Event{
@@ -27,6 +28,32 @@ class EventControllerStruct {
       }
     } catch (e) {
       console.log("Error getting event", e);
+    }
+  }
+
+  private isValidDateFormat(date: string): boolean {
+    const dateFormatRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateFormatRegex.test(date)) return false;
+    const parsedDate = new Date(date);
+    return !isNaN(parsedDate.getTime());
+  }
+
+  public getEventsByDate = async (date: string): Promise<FirebaseFirestoreTypes.DocumentData[]> => {
+    if (!this.isValidDateFormat(date)) {
+      throw new Error("Invalid date format. Please use YYYY-MM-DD.");
+    }
+    try {
+      const res: FirebaseFirestoreTypes.DocumentData[] = [];
+      const eventsFromDB = await db.collection('events').where('date', '==', date).get();
+
+      eventsFromDB.forEach(event => {
+        res.push(event)
+      })
+      
+      return res;
+    } catch (e) {
+      console.error(`Failed to get events for ${date}:`);
+      throw e;
     }
   }
 
