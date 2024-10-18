@@ -7,7 +7,7 @@ interface Event{
   hour:string //This is what will be displayed in the agenda view
   duration:string  //This is also displayed in the agenda view
   company:string  //To keep track of what company this is meant for
-  jsonData:string 
+  //jsonData:string 
 }
 
 class EventControllerStruct {
@@ -47,7 +47,8 @@ class EventControllerStruct {
       const eventsFromDB = await db.collection('events').where('date', '==', date).get();
 
       eventsFromDB.forEach(event => {
-        res.push(event)
+        const eventData = event.data() as Event;
+        res.push(eventData);
       })
       
       return res;

@@ -1,69 +1,159 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Calendar as RNCalendar } from 'react-native-calendars';
-import { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
-import EventController from '../../controller/eventController';
-import AgendaItem from '../../models/Calendar/AgendaItem';
+import React, { useRef, useCallback, useState, useEffect } from "react";
+import { StyleSheet, View, Text } from "react-native";
+import {
+  ExpandableCalendar,
+  AgendaList,
+  CalendarProvider,
+  WeekCalendar,
+} from "react-native-calendars";
+import AgendaItem, { AgendaItemData, getAgendaItems } from "../../models/Calendar/AgendaItem";
+import { getTheme, themeColor, lightThemeColor } from "../../themes/theme";
+import Constants from "expo-constants";
 
-const Calendar = () => {
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [events, setEvents] = useState<FirebaseFirestoreTypes.DocumentData[]>([]);
-  const [markedDates, setMarkedDates] = useState({});
+const leftArrowIcon = require("../../../assets/next.png");
+const rightArrowIcon = require("../../../assets/next.png");
+const today = new Date().toISOString().split("T")[0];
 
-  const fetchEvents = useCallback(async (date: string) => {
+interface Props {
+  weekView?: boolean;
+}
+
+const ExpandableCalendarScreen: React.FC<Props> = ({ weekView }) => {
+  const [agendaItems, setAgendaItems] = useState<AgendaItemData[]>([]);
+  const [selectedDate, setSelectedDate] = useState(today);
+  const [loading, setLoading] = useState(false);
+  const theme = useRef(getTheme());
+  const todayBtnTheme = useRef({
+    todayButtonTextColor: themeColor,
+  });
+
+  useEffect(() => {
+    fetchAgendaItems(selectedDate);
+  }, [selectedDate]);
+
+  const fetchAgendaItems = async (date: string) => {
+    setLoading(true);
     try {
-      const fetchedEvents = await EventController.getEventsByDate(date);
-      setEvents(fetchedEvents);
+      const items = await getAgendaItems(date);
+      setAgendaItems(items);
     } catch (error) {
-      console.error('Error fetching events:', error);
+      console.error("Error fetching agenda items:", error);
+      setAgendaItems([]);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const onDateChanged = useCallback((date: string) => {
+    setSelectedDate(date);
   }, []);
 
-  useEffect(() => {
-    fetchEvents(selectedDate);
-  }, [selectedDate, fetchEvents]);
-
-  useEffect(() => {
-    const updateMarkedDates = async () => {
-      const marked = {};
-      const allDates = await EventController.getEventsByDat // You'll need to implement this method
-      allDates.forEach(date => {
-        marked[date] = { marked: true };
-      });
-      setMarkedDates(marked);
-    };
-    updateMarkedDates();
+  const renderItem = useCallback(({ item }: { item: AgendaItemData }) => {
+    return <AgendaItem item={item} />;
   }, []);
 
-  const onDayPress = (day) => {
-    setSelectedDate(day.dateString);
+  const marked = useRef({
+    [selectedDate]: { marked: true, dotColor: themeColor }
+  });
+
+  const renderList = () => {
+    if (loading) {
+      return (
+        <View style={styles.noEventsContainer}>
+          <Text style={styles.noEventsText}>Loading...</Text>
+        </View>
+      );
+    }
+
+    if (agendaItems.length === 0) {
+      return (
+        <View style={styles.noEventsContainer}>
+          <Text style={styles.noEventsText}>No events planned for this date</Text>
+        </View>
+      );
+    }
+
+    return (
+      <AgendaList
+        sections={[{ 
+          title: selectedDate,
+          data: agendaItems,
+        }]}
+        renderItem={renderItem}
+        sectionStyle={styles.section}
+        // renderSectionHeader={({ section: { title } }) => (
+        //   <Text style={styles.sectionHeader}>{title}</Text>
+        // )}
+      />
+    );
   };
 
   return (
     <View style={styles.container}>
-      <RNCalendar
-        onDayPress={onDayPress}
-        markedDates={{
-          ...markedDates,
-          [selectedDate]: { selected: true, marked: markedDates[selectedDate]?.marked }
-        }}
-      />
-      <View style={styles.agendaList}>
-        {events.map((event, index) => (
-          <AgendaItem key={index} item={event} />
-        ))}
-      </View>
+      <CalendarProvider
+        date={selectedDate}
+        onDateChanged={onDateChanged}
+        showTodayButton
+        theme={todayBtnTheme.current}
+      >
+        {weekView ? (
+          <WeekCalendar
+            firstDay={1}
+            markedDates={marked.current}
+          />
+        ) : (
+          <ExpandableCalendar
+            horizontal={true}
+            pagingEnabled={true}
+            initialPosition={ExpandableCalendar.positions.OPEN}
+            calendarStyle={styles.calendar}
+            headerStyle={styles.header}
+            theme={theme.current}
+            firstDay={1}
+            markedDates={marked.current}
+            leftArrowImageSource={leftArrowIcon}
+            rightArrowImageSource={rightArrowIcon}
+            closeOnDayPress={false}
+          />
+        )}
+        {renderList()}
+      </CalendarProvider>
     </View>
   );
 };
 
+export default ExpandableCalendarScreen;
+
 const styles = StyleSheet.create({
+  calendar: {
+    paddingLeft: 20,
+    paddingRight: 20,
+  },
+  header: {},
+  section: {
+    backgroundColor: lightThemeColor,
+    color: "grey",
+    textTransform: "capitalize",
+  },
+  sectionHeader: {
+    backgroundColor: lightThemeColor,
+    color: 'black',
+    fontSize: 14,
+    fontWeight: 'bold',
+    padding: 10,
+  },
   container: {
     flex: 1,
+    justifyContent: "flex-end",
+    marginTop: Constants.statusBarHeight,
   },
-  agendaList: {
+  noEventsContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  noEventsText: {
+    fontSize: 16,
+    color: 'gray',
   },
 });
-
-export default Calendar;

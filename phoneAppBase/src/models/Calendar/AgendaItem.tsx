@@ -1,5 +1,4 @@
-import isEmpty from "lodash/isEmpty";
-import { useCallback, memo } from "react";
+import React, { useCallback, memo } from "react";
 import {
   StyleSheet,
   Alert,
@@ -8,42 +7,34 @@ import {
   TouchableOpacity,
   Button,
 } from "react-native";
+import EventController from "../../controller/eventController";
 
-export interface ItemProps {
-  item: {
-    title: string;
-    date: string;
-    hour: string;
-    duration: string;
-    company: string;
-    jsonData: string;
-  };
+export interface AgendaItemData {
+  title: string;
+  date: string;
+  hour: string;
+  duration: string;
+  company: string;
 }
 
-const AgendaItem = (props: ItemProps) => {
-  const { item } = props;
+export interface AgendaItemProps {
+  item: AgendaItemData;
+}
 
+export const AgendaItem: React.FC<AgendaItemProps> = memo(({ item }) => {
   const buttonPressed = useCallback(() => {
-    Alert.alert("More Info!", item.jsonData);
-  }, [item.jsonData]);
+    Alert.alert("More Info!", `Company: ${item.company}`);
+  }, [item.company]);
 
   const itemPressed = useCallback(() => {
-    Alert.alert(item.title);
+    Alert.alert(item.title || "No title available");
   }, [item.title]);
-
-  if (!item || isEmpty(item.title)) {
-    return (
-      <View style={styles.emptyItem}>
-        <Text style={styles.emptyItemText}>No Events Planned</Text>
-      </View>
-    );
-  }
 
   return (
     <TouchableOpacity onPress={itemPressed} style={styles.item}>
       <View>
-        <Text style={styles.itemHourText}>{item.hour}</Text>
-        <Text style={styles.itemDurationText}>{item.duration}</Text>
+        <Text style={styles.itemHourText}>{item.hour || "No time set"}</Text>
+        <Text style={styles.itemDurationText}>{item.duration || "Duration not specified"}</Text>
       </View>
       <Text style={styles.itemTitleText}>{item.title}</Text>
       <View style={styles.itemButtonContainer}>
@@ -51,9 +42,7 @@ const AgendaItem = (props: ItemProps) => {
       </View>
     </TouchableOpacity>
   );
-};
-
-export default memo(AgendaItem);
+});
 
 const styles = StyleSheet.create({
   item: {
@@ -82,15 +71,23 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "flex-end",
   },
-  emptyItem: {
-    paddingLeft: 20,
-    height: 52,
-    justifyContent: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: "lightgrey",
-  },
-  emptyItemText: {
-    color: "lightgrey",
-    fontSize: 14,
-  },
 });
+
+export default AgendaItem;
+
+export async function getAgendaItems(date: string): Promise<AgendaItemData[]> {
+  const res:AgendaItemData[] = [];
+  const events = await EventController.getEventsByDate(date);
+  
+  events.forEach(event =>{
+    res.push({
+      title: event.title,
+      date: event.date,
+      hour: event.hour,
+      duration: event.duration,
+      company: event.company,
+    });
+  });
+
+  return res
+};
