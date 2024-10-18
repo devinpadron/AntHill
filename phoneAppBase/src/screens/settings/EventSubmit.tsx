@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import moment from "moment";
 import DropDownPicker from 'react-native-dropdown-picker';
 
-const EventSubmit: React.FC = () => {
+const EventSubmit = () => {
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(new Date());
   const [worker, setWorker] = useState([]);
