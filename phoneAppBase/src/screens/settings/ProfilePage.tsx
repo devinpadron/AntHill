@@ -7,12 +7,12 @@ import {
   Alert, 
   StyleSheet, 
   ScrollView, 
-  Dimensions, 
-  ActivityIndicator 
+  Dimensions,
 } from 'react-native';
 import auth from '@react-native-firebase/auth';
 import UserController from '../../controller/userController';
 import { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
+import LoadingScreen from '../LoadingScreen';
 
 const { width, height } = Dimensions.get('window');
 
@@ -32,44 +32,25 @@ const ProfilePage = ({navigation}: any) => {
       [
         { text: 'Cancel', style: 'cancel' },
         // Add account deletion functionality
+        { text: 'DELETE', style:'destructive', onPress: async () =>{
+          await UserController.deleteUser(auth().currentUser!.uid).catch((error) =>{
+            Alert.alert("Error: " + error.message)
+          })
+          await auth().currentUser?.delete().catch((error) => {
+            Alert.alert("Error: " + error.message)
+          })
+        }}
       ]
     );
   };
 
-  const handleSignOut = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Sign Out', 
-          onPress: async () => {
-            try {
-              await auth().signOut()
-              .then(() => console.log('User signed out!'));
-            } catch (error) {
-              console.error('Signout Error', error);
-            }
-          } 
-        },
-      ]
-    );
-  };
+
 
   const handleSaveChanges = () => {
     // Add phone number update functionality
     // Add password change functionality
     console.log(userData);
   };
-
-  /*if (isLoading) {
-    return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }*/
   
   useEffect(() => {
     async function getDetails() {
@@ -90,9 +71,7 @@ const ProfilePage = ({navigation}: any) => {
 
   if (!userData) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <Text>Loading....</Text>
-      </View>
+      <LoadingScreen/>
     );
   }
     return (
@@ -118,7 +97,6 @@ const ProfilePage = ({navigation}: any) => {
           />
 
           <Button title="Save Changes" onPress={handleSaveChanges} />
-          <Button title="Sign Out" color="gray" onPress={handleSignOut} />
         </ScrollView>
 
         <View style={styles.deleteButtonContainer}>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, StatusBar, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import auth from '@react-native-firebase/auth';
 
 const Settings = ({ navigation }: any) => {
 
@@ -24,7 +25,24 @@ const Settings = ({ navigation }: any) => {
   };
 
   const handleLogout = () => {
-    Alert.alert("Working.")
+      Alert.alert(
+        'Logout',
+        'Are you sure you want to logout?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Logout', 
+            onPress: async () => {
+              try {
+                await auth().signOut()
+                .then(() => console.log('User signed out!'));
+              } catch (error) {
+                console.error('Signout Error', error);
+              }
+            } 
+          },
+        ]
+      );
   };
 
   return (
