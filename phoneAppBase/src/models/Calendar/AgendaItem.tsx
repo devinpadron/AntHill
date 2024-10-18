@@ -1,5 +1,5 @@
 import isEmpty from "lodash/isEmpty";
-import { useCallback , memo } from "react";
+import { useCallback, memo } from "react";
 import {
   StyleSheet,
   Alert,
@@ -9,25 +9,32 @@ import {
   Button,
 } from "react-native";
 
-interface ItemProps {
-  item: any;
+export interface ItemProps {
+  item: {
+    title: string;
+    date: string;
+    hour: string;
+    duration: string;
+    company: string;
+    jsonData: string;
+  };
 }
 
 const AgendaItem = (props: ItemProps) => {
   const { item } = props;
 
   const buttonPressed = useCallback(() => {
-    Alert.alert("More Info!");
-  }, []);
+    Alert.alert("More Info!", item.jsonData);
+  }, [item.jsonData]);
 
   const itemPressed = useCallback(() => {
     Alert.alert(item.title);
-  }, []);
+  }, [item.title]);
 
-  if (isEmpty(item)) {
+  if (!item || isEmpty(item.title)) {
     return (
       <View style={styles.emptyItem}>
-        <Text style={styles.emptyItemText}>No Events Planned Today</Text>
+        <Text style={styles.emptyItemText}>No Events Planned</Text>
       </View>
     );
   }
