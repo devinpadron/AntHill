@@ -81,9 +81,9 @@ const ExpandableCalendarScreen: React.FC<Props> = ({ weekView }) => {
         }]}
         renderItem={renderItem}
         sectionStyle={styles.section}
-        // renderSectionHeader={({ section: { title } }) => (
-        //   <Text style={styles.sectionHeader}>{title}</Text>
-        // )}
+        renderSectionHeader={() => (
+          <Text style={styles.sectionHeader}>{selectedDate}</Text>
+        )}
       />
     );
   };
