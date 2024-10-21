@@ -1,6 +1,7 @@
 import React, {useState, useEffect} from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import auth from '@react-native-firebase/auth';
+import LoadingScreen from './src/screens/LoadingScreen';
 
 // Import your screens
 import HomeTabs from './src/routes/HomeTabs';
@@ -8,7 +9,7 @@ import AuthStack from './src/routes/AuthStack';
 
 // This component will handle the conditional rendering based on auth state
 const AppNavigator = () => {
-  const [loggedIn, setLoggedIn] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect (() => {
@@ -29,9 +30,9 @@ const AppNavigator = () => {
   }, []);
 
   // Show a loading screen if we're still checking the authentication state
-  /*if (initializing) {
-    return <LoadingScreen />;  // You'll need to create this component
-  }*/
+  if (isLoading) {
+    return <LoadingScreen/>;  // You'll need to create this component
+  }
 
   return (
     <NavigationContainer>

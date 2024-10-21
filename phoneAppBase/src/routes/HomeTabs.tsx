@@ -3,9 +3,10 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 
 // Import your screen components
 import Calendar from "../screens/home/Calendar";
-import ProfilePage from "../screens/home/ProfilePage";
+import SettingStack from "./SettingStack";
 
 const Tab = createBottomTabNavigator();
+
 
 const HomeTabs = () => {
   return (
@@ -16,10 +17,9 @@ const HomeTabs = () => {
         options={{ headerShown: false}}
       />
       <Tab.Screen
-        name="Profile"
-        component={ProfilePage}
-        options={{ headerShown: false}}
-      />
+        name="SettingStack"
+        component={SettingStack}
+        options={{ headerShown: false, unmountOnBlur: true}}/>
     </Tab.Navigator>
   );
 };

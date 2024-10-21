@@ -36,7 +36,6 @@ const AgendaItem = (props: ItemProps) => {
     <TouchableOpacity onPress={itemPressed} style={styles.item}>
       <View>
         <Text style={styles.itemHourText}>{item.hour}</Text>
-        <Text style={styles.itemDurationText}>{item.duration}</Text>
       </View>
       <Text style={styles.itemTitleText}>{item.title}</Text>
       <View style={styles.itemButtonContainer}>

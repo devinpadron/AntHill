@@ -7,8 +7,8 @@ export const today = new Date().toISOString().split("T")[0];
 export const agendaItems = [
   {
     // 2024-09-27
-    title: "2024-09-25",
-    data: [{ hour: "12am", duration: "1h", title: "First Yoga" }],
+    date: "2024-09-25",
+    data: [{ hour: "12:15pm", title: "First Yoga" }],
   },
 ];
 
@@ -18,9 +18,9 @@ export function getMarkedDates() {
   agendaItems.forEach((item) => {
     // NOTE: only mark dates with data
     if (item.data && item.data.length > 0 && !isEmpty(item.data[0])) {
-      marked[item.title] = { marked: true };
+      marked[item.date] = { marked: true };
     } else {
-      marked[item.title] = { disabled: true };
+      marked[item.date] = { disabled: true };
     }
   });
   return marked;
