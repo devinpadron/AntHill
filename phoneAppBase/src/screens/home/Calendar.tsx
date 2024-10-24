@@ -1,5 +1,5 @@
 import React, { useRef, useCallback, useState, useEffect } from "react";
-import { StyleSheet, View, Text } from "react-native";
+import { StyleSheet, View, Text, TouchableOpacity } from "react-native";
 import {
   ExpandableCalendar,
   AgendaList,
@@ -56,19 +56,38 @@ const ExpandableCalendarScreen: React.FC<Props> = ({ weekView }) => {
     [selectedDate]: { marked: true, dotColor: themeColor }
   });
 
-  const renderList = () => {
+  const renderSectionHeader = () => (
+    <View style={styles.sectionHeaderContainer}>
+      <Text style={styles.sectionHeader}>{selectedDate}</Text>
+      {selectedDate !== today && (
+        <TouchableOpacity 
+          style={styles.todayButton}
+          onPress={() => onDateChanged(today)}
+        >
+          <Text style={styles.todayButtonText}>Today</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
+  const renderContent = () => {
     if (loading) {
       return (
-        <View style={styles.noEventsContainer}>
-          <Text style={styles.noEventsText}>Loading...</Text>
+        <View style={styles.contentContainer}>
+          {renderSectionHeader()}
+          <View style={styles.noEventsContainer}>
+          </View>
         </View>
       );
     }
 
     if (agendaItems.length === 0) {
       return (
-        <View style={styles.noEventsContainer}>
-          <Text style={styles.noEventsText}>No events planned for this date</Text>
+        <View style={styles.contentContainer}>
+          {renderSectionHeader()}
+          <View style={styles.noEventsContainer}>
+            <Text style={styles.noEventsText}>No events planned for this date</Text>
+          </View>
         </View>
       );
     }
@@ -81,9 +100,7 @@ const ExpandableCalendarScreen: React.FC<Props> = ({ weekView }) => {
         }]}
         renderItem={renderItem}
         sectionStyle={styles.section}
-        renderSectionHeader={() => (
-          <Text style={styles.sectionHeader}>{selectedDate}</Text>
-        )}
+        renderSectionHeader={renderSectionHeader}
       />
     );
   };
@@ -93,7 +110,7 @@ const ExpandableCalendarScreen: React.FC<Props> = ({ weekView }) => {
       <CalendarProvider
         date={selectedDate}
         onDateChanged={onDateChanged}
-        showTodayButton
+        showTodayButton={false}
         theme={todayBtnTheme.current}
       >
         {weekView ? (
@@ -116,7 +133,7 @@ const ExpandableCalendarScreen: React.FC<Props> = ({ weekView }) => {
             closeOnDayPress={false}
           />
         )}
-        {renderList()}
+        {renderContent()}
       </CalendarProvider>
     </View>
   );
@@ -135,17 +152,36 @@ const styles = StyleSheet.create({
     color: "grey",
     textTransform: "capitalize",
   },
-  sectionHeader: {
+  sectionHeaderContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     backgroundColor: lightThemeColor,
+    padding: 10,
+  },
+  sectionHeader: {
     color: 'black',
     fontSize: 14,
     fontWeight: 'bold',
-    padding: 10,
+  },
+  todayButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: themeColor,
+    borderRadius: 20,
+  },
+  todayButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '500',
   },
   container: {
     flex: 1,
     justifyContent: "flex-end",
     marginTop: Constants.statusBarHeight,
+  },
+  contentContainer: {
+    flex: 1,
   },
   noEventsContainer: {
     flex: 1,

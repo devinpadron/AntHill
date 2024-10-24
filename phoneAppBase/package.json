@@ -40,7 +40,8 @@
     "react-navigation": "^4.4.4",
     "react-navigation-stack": "^2.10.4",
     "webpack-config": "^7.5.0",
-    "yarn": "^1.22.19"
+    "yarn": "^1.22.19",
+    "@react-native-community/datetimepicker": "~8.2.0"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",

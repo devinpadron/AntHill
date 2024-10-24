@@ -10,7 +10,7 @@ import {
   Alert,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import * as DocumentPicker from "expo-document-picker";
+//import * as DocumentPicker from "expo-document-picker";
 
 const FormPage: React.FC = () => {
   const [name, setName] = useState("");

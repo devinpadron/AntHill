@@ -2,11 +2,12 @@ import { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 import db from '../../firebaseConfig';
 
 interface Event{
-  title:string // This is the title displayed in the agenda
-  date:string //In the form of "yyyy-MM-dd"
-  hour:string //This is what will be displayed in the agenda view
-  duration:string  //This is also displayed in the agenda view
-  company:string  //To keep track of what company this is meant for
+  title:string      // This is the title displayed in the agenda
+  date:string       //In the form of "yyyy-MM-dd"
+  startTime:string  //This is what will be displayed in the agenda view
+  endTime:string    //This is what will be displayed in the agenda view
+  duration:string   //This is also displayed in the agenda view
+  company:string    //To keep track of what company this is meant for
   //jsonData:string 
 }
 
@@ -20,11 +21,9 @@ class EventControllerStruct {
         if (dbData) {
           return dbData;
         } else {
-          console.log("Document exists but data is undefined");
           return null;
         }
       } else {
-        console.log("No such document")
       }
     } catch (e) {
       console.log("Error getting event", e);
