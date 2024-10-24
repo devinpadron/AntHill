@@ -25,12 +25,12 @@ export interface AgendaItemProps {
 
 export const AgendaItem: React.FC<AgendaItemProps> = memo(({ item }) => {
   const buttonPressed = useCallback(() => {
-    Alert.alert("More Info!", `Company: ${item.company}`);
-  }, [item.company]);
+    //still to do
+  }, []);
 
   const itemPressed = useCallback(() => {
-    Alert.alert(item.title || "No title available");
-  }, [item.title]);
+    //add expanded view of all event info
+  }, []);
 
   return (
     <TouchableOpacity onPress={itemPressed} style={styles.item}>
