@@ -11,8 +11,6 @@ import {
 } from "react-native";
 import auth from '@react-native-firebase/auth';
 
-//import { genSalt } from "bcryptjs";
-
 const LoginPage = ({ navigation } : any) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
