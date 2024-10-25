@@ -1,5 +1,4 @@
-import isEmpty from "lodash/isEmpty";
-import { useCallback , memo } from "react";
+import React, { useCallback, memo } from "react";
 import {
   StyleSheet,
   Alert,
@@ -8,81 +7,136 @@ import {
   TouchableOpacity,
   Button,
 } from "react-native";
+import EventController from "../../controller/eventController";
 
-interface ItemProps {
-  item: any;
+export interface AgendaItemData {
+  title: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  duration: string;
+  company: string;
+  //jsonData: string;
 }
 
-const AgendaItem = (props: ItemProps) => {
-  const { item } = props;
+export interface AgendaItemProps {
+  item: AgendaItemData;
+}
 
+export const AgendaItem: React.FC<AgendaItemProps> = memo(({ item }) => {
   const buttonPressed = useCallback(() => {
-    Alert.alert("More Info!");
+    //still to do
   }, []);
 
   const itemPressed = useCallback(() => {
-    Alert.alert(item.title);
+    //add expanded view of all event info
   }, []);
-
-  if (isEmpty(item)) {
-    return (
-      <View style={styles.emptyItem}>
-        <Text style={styles.emptyItemText}>No Events Planned Today</Text>
-      </View>
-    );
-  }
 
   return (
     <TouchableOpacity onPress={itemPressed} style={styles.item}>
-      <View>
-        <Text style={styles.itemHourText}>{item.hour}</Text>
+      <View style={styles.timeContainer}>
+        <View style={styles.timeRow}>
+          <Text style={styles.timeText}>
+            {item.startTime || "No start time set"}
+            {item.endTime !== "" && (
+              <Text>
+                <Text style={styles.timeSeparator}> - </Text>
+                {item.endTime}
+              </Text>
+            )}
+          </Text>
+        </View>
+        {item.duration && (
+          <Text style={styles.duration}>{item.duration} hours</Text>
+        )}
       </View>
-      <Text style={styles.itemTitleText}>{item.title}</Text>
-      <View style={styles.itemButtonContainer}>
-        <Button color={"grey"} title={"Info"} onPress={buttonPressed} />
+      <View style={styles.contentContainer}>
+        <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+      </View>
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity 
+          onPress={buttonPressed}
+          style={styles.infoButton}
+        >
+          <Text style={styles.infoButtonText}>Info</Text>
+        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
-};
-
-export default memo(AgendaItem);
+});
 
 const styles = StyleSheet.create({
   item: {
-    padding: 20,
-    backgroundColor: "white",
+    flexDirection: 'row',
+    padding: 16,
+    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: "lightgrey",
-    flexDirection: "row",
+    borderBottomColor: '#eee',
+    alignItems: 'center',
   },
-  itemHourText: {
-    color: "black",
+  timeContainer: {
+    width: 100,
+    marginRight: 16,
   },
-  itemDurationText: {
-    color: "grey",
-    fontSize: 12,
-    marginTop: 4,
-    marginLeft: 4,
+  timeRow: {
+    flexDirection: 'row',
   },
-  itemTitleText: {
-    color: "black",
-    marginLeft: 16,
-    fontWeight: "bold",
+  timeText: {
     fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
   },
-  itemButtonContainer: {
-    flex: 1,
-    alignItems: "flex-end",
+  timeSeparator: {
+    color: '#666',
   },
-  emptyItem: {
-    paddingLeft: 20,
-    height: 52,
-    justifyContent: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: "lightgrey",
-  },
-  emptyItemText: {
-    color: "lightgrey",
+  duration: {
     fontSize: 14,
+    color: '#888',
+    marginTop: 4,
+  },
+  contentContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+    textAlign: 'center',
+  },
+  buttonContainer: {
+    marginLeft: 16,
+  },
+  infoButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    backgroundColor: '#f0f0f0',
+  },
+  infoButtonText: {
+    color: '#666',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
+
+export default AgendaItem;
+
+export async function getAgendaItems(date: string): Promise<AgendaItemData[]> {
+  const res:AgendaItemData[] = [];
+  const events = await EventController.getEventsByDate(date);
+  
+  events.forEach(event =>{
+    res.push({
+      title: event.title,
+      date: event.date,
+      startTime: event.startTime,
+      endTime: event.endTime,
+      duration: event.duration,
+      company: event.company,
+    });
+  });
+
+  return res
+};

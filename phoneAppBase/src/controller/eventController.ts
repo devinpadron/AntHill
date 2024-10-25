@@ -1,12 +1,21 @@
+import { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 import db from '../../firebaseConfig';
 
 interface Event{
-  title:string // This is the title displayed in the agenda
-  date:string //In the form of "yyyy-MM-dd"
-  hour:string //This is what will be displayed in the agenda view
-  duration:string  //This is also displayed in the agenda view
-  company:string  //To keep track of what company this is meant for
-  jsonData:string 
+  title:string      // This is the title displayed in the agenda
+  date:string       //In the form of "yyyy-MM-dd"
+  startTime:string  //This is what will be displayed in the agenda view
+  endTime:string    //This is what will be displayed in the agenda view
+  duration:string   //This is also displayed in the agenda view
+  company:string    //To keep track of what company this is meant for
+  //jsonData:string 
+}
+
+const isValidDateFormat = (date: string): boolean => {
+  const dateFormatRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateFormatRegex.test(date)) return false;
+  const parsedDate = new Date(date);
+  return !isNaN(parsedDate.getTime());
 }
 
 class EventControllerStruct {
@@ -19,14 +28,32 @@ class EventControllerStruct {
         if (dbData) {
           return dbData;
         } else {
-          console.log("Document exists but data is undefined");
           return null;
         }
       } else {
-        console.log("No such document")
       }
     } catch (e) {
       console.log("Error getting event", e);
+    }
+  }
+
+  public getEventsByDate = async (date: string): Promise<FirebaseFirestoreTypes.DocumentData[]> => {
+    if (!isValidDateFormat(date)) {
+      throw new Error("Invalid date format. Please use YYYY-MM-DD.");
+    }
+    try {
+      const res: FirebaseFirestoreTypes.DocumentData[] = [];
+      const eventsFromDB = await db.collection('events').where('date', '==', date).get();
+
+      eventsFromDB.forEach(event => {
+        const eventData = event.data() as Event;
+        res.push(eventData);
+      })
+      
+      return res;
+    } catch (e) {
+      console.error(`Failed to get events for ${date}:`);
+      throw e;
     }
   }
 
