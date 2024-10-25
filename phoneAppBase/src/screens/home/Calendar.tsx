@@ -15,7 +15,7 @@ const leftArrowIcon = require("../../../assets/next.png");
 const rightArrowIcon = require("../../../assets/next.png");
 const ITEMS: any[] = agendaItems;
 
-interface Props {
+interface   s {
   weekView?: boolean;
 }
 
