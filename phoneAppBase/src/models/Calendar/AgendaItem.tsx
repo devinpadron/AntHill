@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
   },
-  // Add this:
+
   emptyItem: {
     padding: 16,
     backgroundColor: "#f9f9f9",
