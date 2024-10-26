@@ -1,4 +1,5 @@
-import React, { useCallback, memo } from "react";
+import isEmpty from "lodash/isEmpty";
+import { useCallback, memo } from "react";
 import {
   StyleSheet,
   Alert,
@@ -7,31 +8,29 @@ import {
   TouchableOpacity,
   Button,
 } from "react-native";
-import EventController from "../../controller/eventController";
 
-export interface AgendaItemData {
-  title: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  duration: string;
-  company: string;
-  //jsonData: string;
+interface ItemProps {
+  item: any;
 }
 
-export interface AgendaItemProps {
-  item: AgendaItemData;
-}
+const AgendaItem = (props: ItemProps) => {
+  const { item } = props;
 
-export const AgendaItem: React.FC<AgendaItemProps> = memo(({ item }) => {
   const buttonPressed = useCallback(() => {
-    //still to do
+    Alert.alert("More Info!");
   }, []);
 
   const itemPressed = useCallback(() => {
-    //add expanded view of all event info
+    Alert.alert(item.title);
   }, []);
 
+  if (isEmpty(item)) {
+    return (
+      <View style={styles.emptyItem}>
+        <Text style={styles.emptyItemText}>No Events Planned Today</Text>
+      </View>
+    );
+  }
   return (
     <TouchableOpacity onPress={itemPressed} style={styles.item}>
       <View style={styles.timeContainer}>
@@ -51,59 +50,60 @@ export const AgendaItem: React.FC<AgendaItemProps> = memo(({ item }) => {
         )}
       </View>
       <View style={styles.contentContainer}>
-        <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+        <Text style={styles.title} numberOfLines={1}>
+          {item.title}
+        </Text>
       </View>
       <View style={styles.buttonContainer}>
-        <TouchableOpacity 
-          onPress={buttonPressed}
-          style={styles.infoButton}
-        >
+        <TouchableOpacity onPress={buttonPressed} style={styles.infoButton}>
           <Text style={styles.infoButtonText}>Info</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
-});
+};
+
+export default memo(AgendaItem);
 
 const styles = StyleSheet.create({
   item: {
-    flexDirection: 'row',
+    flexDirection: "row",
     padding: 16,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    alignItems: 'center',
+    borderBottomColor: "#eee",
+    alignItems: "center",
   },
   timeContainer: {
     width: 100,
     marginRight: 16,
   },
   timeRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
   },
   timeText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
   },
   timeSeparator: {
-    color: '#666',
+    color: "#666",
   },
   duration: {
     fontSize: 14,
-    color: '#888',
+    color: "#888",
     marginTop: 4,
   },
   contentContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   title: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-    textAlign: 'center',
+    fontWeight: "500",
+    color: "#333",
+    textAlign: "center",
   },
   buttonContainer: {
     marginLeft: 16,
@@ -112,31 +112,24 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 6,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: "#f0f0f0",
   },
   infoButtonText: {
-    color: '#666',
+    color: "#666",
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
+  },
+  // Add this:
+  emptyItem: {
+    padding: 16,
+    backgroundColor: "#f9f9f9",
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyItemText: {
+    fontSize: 16,
+    color: "#888",
   },
 });
-
-export default AgendaItem;
-
-export async function getAgendaItems(date: string): Promise<AgendaItemData[]> {
-  const res:AgendaItemData[] = [];
-  const events = await EventController.getEventsByDate(date);
-  
-  events.forEach(event =>{
-    res.push({
-      title: event.title,
-      date: event.date,
-      startTime: event.startTime,
-      endTime: event.endTime,
-      duration: event.duration,
-      company: event.company,
-    });
-  });
-
-  return res
-};
