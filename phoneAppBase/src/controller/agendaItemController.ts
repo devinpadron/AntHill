@@ -7,9 +7,17 @@ import {
   TouchableOpacity,
   Button,
 } from "react-native";
-import EventController from "../../controller/eventController";
+import EventController from "./eventController";
 import { MarkedDates } from "react-native-calendars/src/types";
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
+
+/* An AgendaItem controller that conatains:
+  - An AgendaItemData interface that provides the structure of AgendaItem data
+  - A function that uses a single event entry and transforms its data into AgendaItemData
+  - A function that uses data from all events in Firestore and creates an AgendaItem for each event
+  - A function that takes uses a list of AgendaItems and uses their dates to return a list of marked dates
+  - A stylesheet object that contains the style data for each part of the AgendaItem component
+*/
 
 export interface AgendaItemData {
   date: string;
@@ -52,7 +60,6 @@ function isEmpty(obj: any): boolean {
 export function getMarkedDates(items: AgendaItemData[]): MarkedDates {
   const marked: MarkedDates = {};
   items.forEach((item) => {
-    // Check if item.data exists and has elements
     if (item.data && item.data.length > 0 && !isEmpty(item.data[0])) {
       marked[item.date] = { marked: true };
     } else {
@@ -62,9 +69,6 @@ export function getMarkedDates(items: AgendaItemData[]): MarkedDates {
   return marked;
 }
 
-export interface AgendaItemProps {
-  item: AgendaItemData;
-}
 const styles = StyleSheet.create({
   item: {
     flexDirection: "row",

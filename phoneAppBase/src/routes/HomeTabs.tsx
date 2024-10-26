@@ -7,19 +7,19 @@ import SettingStack from "./SettingStack";
 
 const Tab = createBottomTabNavigator();
 
-
 const HomeTabs = () => {
   return (
     <Tab.Navigator>
       <Tab.Screen
         name="Calendar"
         component={Calendar}
-        options={{ headerShown: false}}
+        options={{ headerShown: false }}
       />
       <Tab.Screen
-        name="SettingStack"
+        name="Settings"
         component={SettingStack}
-        options={{ headerShown: false, unmountOnBlur: true}}/>
+        options={{ headerShown: false, unmountOnBlur: true }}
+      />
     </Tab.Navigator>
   );
 };

@@ -1,13 +1,30 @@
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
 import db from "../../firebaseConfig";
 
+/*
+  STILL NEED TO DO:
+  - Integrate user, user privilege, and company logic into events.
+  - Add jsonData logic for event-specific details
+  - For non admins, hide past events from agenda items
+*/
+
+/* An EventController that contains:
+  - An event interface that provides the structure of event data
+  - A function that uses an eventID to pull from Firestore and retrieve the event entry
+  - A function that uses a eventID to update exisiting event data
+  - A function that uses a eventID to delete an event from Firestore
+  - A function that creates a new event entry and adds it into Firestore
+  - A function that uses a date string to retrieve all events for a given date
+  - A function that retrieves all of the events stored in Firestore.
+*/
+
 interface Event {
-  title: string; // This is the title displayed in the agenda
-  date: string; //In the form of "yyyy-MM-dd"
-  startTime: string; //This is what will be displayed in the agenda view
-  endTime: string; //This is what will be displayed in the agenda view
-  duration: string; //This is also displayed in the agenda view
-  company: string; //To keep track of what company this is meant for
+  title: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  duration: string;
+  company: string;
   //jsonData:string
 }
 
