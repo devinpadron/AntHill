@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useState } from "react";
+import React, { useRef, useCallback, useState, useEffect } from "react";
 import { StyleSheet, View } from "react-native";
 import {
   ExpandableCalendar,
@@ -6,76 +6,68 @@ import {
   CalendarProvider,
   WeekCalendar,
 } from "react-native-calendars";
-import { agendaItems, getMarkedDates, today } from "../../models/Calendar/agendaItems";
+import {
+  getAgendaItems,
+  getMarkedDates,
+  AgendaItemData,
+} from "../../models/Calendar/agendaItems";
 import AgendaItem from "../../models/Calendar/AgendaItem";
 import { getTheme, themeColor, lightThemeColor } from "../../themes/theme";
 import Constants from "expo-constants";
 
+const today = new Date().toISOString().split("T")[0];
 const leftArrowIcon = require("../../../assets/next.png");
 const rightArrowIcon = require("../../../assets/next.png");
-const ITEMS: any[] = agendaItems;
 
-interface   s {
-  weekView?: boolean;
-}
-
-const ExpandableCalendarScreen = (props: Props) => {
-  //CALENDER
+const ExpandableCalendarScreen = (props: { weekView: any }) => {
   const { weekView } = props;
-  const marked = useRef(getMarkedDates());
+  const [agendaItems, setAgendaItems] = useState<AgendaItemData[]>([]);
+  const marked = useRef({});
   const theme = useRef(getTheme());
   const todayBtnTheme = useRef({
     todayButtonTextColor: themeColor,
   });
 
-  const renderItem = useCallback(({ item }: any) => {
+  useEffect(() => {
+    const fetchData = async () => {
+      const items = await getAgendaItems();
+      setAgendaItems(items);
+      marked.current = getMarkedDates(items);
+    };
+    fetchData();
+  }, []);
+
+  const renderItem = useCallback(({ item }: { item: AgendaItemData }) => {
     return <AgendaItem item={item} />;
   }, []);
 
   return (
     <View style={styles.container}>
-      <CalendarProvider
-        date={today}
-        // onDateChanged={onDateChanged}
-        // onMonthChange={onMonthChange}
-        showTodayButton
-        // disabledOpacity={0.6}
-        //theme={todayBtnTheme.current}
-        // todayBottomMargin={16}
-      >
+      <CalendarProvider date={today} showTodayButton>
         {weekView ? (
-          <WeekCalendar
-            //testID={testIDs.weekCalendar.CONTAINER}
-            firstDay={1}
-            markedDates={marked.current}
-          />
+          <WeekCalendar firstDay={1} markedDates={marked.current} />
         ) : (
           <ExpandableCalendar
-            horizontal={true}
-            pagingEnabled={true}
-            // hideArrows
-            // disablePan
-            // hideKnob
+            horizontal
+            pagingEnabled
             initialPosition={ExpandableCalendar.positions.OPEN}
             calendarStyle={styles.calendar}
-            headerStyle={styles.header} // for horizontal only
-            //disableWeekScroll
+            headerStyle={styles.header}
             theme={theme.current}
-            //disableAllTouchEventsForDisabledDays={true}
             firstDay={1}
             markedDates={marked.current}
             leftArrowImageSource={leftArrowIcon}
             rightArrowImageSource={rightArrowIcon}
-            // animateScroll
             closeOnDayPress={false}
           />
         )}
         <AgendaList
-          sections={ITEMS}
+          sections={agendaItems.map((item) => ({
+            title: item.date,
+            data: item.data,
+          }))}
           renderItem={renderItem}
-          // scrollToNextEvent
           sectionStyle={styles.section}
-          // dayFormat={'yyyy-MM-d'}
         />
       </CalendarProvider>
     </View>
