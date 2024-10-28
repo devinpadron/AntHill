@@ -18,6 +18,8 @@ const SignUpPage = ({ navigation }: any) => {
   const [password, setPassword] = useState("");
   const [confPassword, setConfPassword] = useState("");
   const [accessCode, setAccessCode] = useState("");
+  //HARD CODED COMPANY PLEASE REPLACE!!!!
+  const userController = new UserController("SoBridalSocial");
 
   const validateFields = () => {
     if (!firstName.trim()) {
@@ -56,7 +58,7 @@ const SignUpPage = ({ navigation }: any) => {
     .then((userCredential) => {
         const user = userCredential.user;
         user.updateProfile({displayName: firstName + ' ' + lastName});
-        UserController.addUser(userData, user.uid);
+        userController.addUser(userData, user.uid);
         console.log('User account created & signed in!');
       })
       .catch((error) => {

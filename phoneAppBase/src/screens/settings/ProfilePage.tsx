@@ -17,9 +17,10 @@ import LoadingScreen from '../LoadingScreen';
 const { width, height } = Dimensions.get('window');
 
 const ProfilePage = ({navigation}: any) => {
-  
   const [userData, setUserData] = useState<FirebaseFirestoreTypes.DocumentData>();
   const [password, setPassword] = useState<string>('');
+  // HARD CODED COMPANY PLEASE REPLACE!!!
+  const userController = new UserController('SoBridalSocial');
 
   const handlePasswordChange = (newPassword: string) => {
     setPassword(newPassword);
@@ -33,7 +34,7 @@ const ProfilePage = ({navigation}: any) => {
         { text: 'Cancel', style: 'cancel' },
         // Add account deletion functionality
         { text: 'DELETE', style:'destructive', onPress: async () =>{
-          await UserController.deleteUser(auth().currentUser!.uid).catch((error) =>{
+          await userController.deleteUser(auth().currentUser!.uid).catch((error) =>{
             Alert.alert("Error: " + error.message)
           })
           await auth().currentUser?.delete().catch((error) => {
@@ -55,7 +56,7 @@ const ProfilePage = ({navigation}: any) => {
   useEffect(() => {
     async function getDetails() {
       try{
-        const user = await UserController.getUser(auth().currentUser!.uid);
+        const user = await userController.getUser(auth().currentUser!.uid);
         if (user){
           setUserData(user);
         }

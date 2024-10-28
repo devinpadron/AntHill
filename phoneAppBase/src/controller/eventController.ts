@@ -35,11 +35,17 @@ const isValidDateFormat = (date: string): boolean => {
   return !isNaN(parsedDate.getTime());
 };
 
-class EventControllerStruct {
+export default class EventController {
+  private company = "";
+
+  constructor(company:string) {
+    this.company = company;
+  }
+
   public getEvent = async (eventID: string) => {
     try {
       //Retrieve event data
-      const eventEntry = await db.collection("events").doc(eventID).get();
+      const eventEntry = await db.collection("companies").doc(this.company).collection("Events").doc(eventID).get();
       if (eventEntry.exists) {
         const dbData = eventEntry.data();
         if (dbData) {
@@ -62,8 +68,7 @@ class EventControllerStruct {
     }
     try {
       const res: FirebaseFirestoreTypes.DocumentData[] = [];
-      const eventsFromDB = await db
-        .collection("events")
+      const eventsFromDB = await db.collection("companies").doc(this.company).collection("Events")
         .where("date", "==", date)
         .get();
 
@@ -84,7 +89,7 @@ class EventControllerStruct {
   > => {
     try {
       const res: FirebaseFirestoreTypes.DocumentData[] = [];
-      const eventsFromDB = await db.collection("events").get();
+      const eventsFromDB = await db.collection("companies").doc(this.company).collection("Events").get();
       eventsFromDB.forEach((event) => {
         const eventData = event.data() as Event;
         res.push(eventData);
@@ -99,7 +104,7 @@ class EventControllerStruct {
 
   public addEvent = async (newEvent: Event) => {
     try {
-      const entry = await db.collection("events").add(newEvent);
+      const entry = await db.collection("companies").doc(this.company).collection("Events").add(newEvent);
       const entryid = entry.id;
       return entryid;
     } catch (e) {
@@ -111,7 +116,7 @@ class EventControllerStruct {
   public deleteEvent = async (eventID: string) => {
     // Delete an existing event
     try {
-      await db.collection("events").doc(eventID).delete();
+      await db.collection("companies").doc(this.company).collection("Events").doc(eventID).delete();
       console.log("Event successfully deleted");
       return true;
     } catch (e) {
@@ -122,7 +127,7 @@ class EventControllerStruct {
 
   public updateEvent = async (eventID: string, eventData: Event) => {
     try {
-      await db.collection("events").doc(eventID).update(eventData);
+      await db.collection("companies").doc(this.company).collection("Events").doc(eventID).update(eventData);
       console.log("Event successfully updated");
       return true;
     } catch (e) {
@@ -130,8 +135,4 @@ class EventControllerStruct {
       throw e;
     }
   };
-}
-
-const EventController = new EventControllerStruct();
-
-export default EventController;
+};
