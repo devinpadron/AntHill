@@ -131,7 +131,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
   },
-
   emptyItem: {
     padding: 16,
     backgroundColor: "#f9f9f9",
