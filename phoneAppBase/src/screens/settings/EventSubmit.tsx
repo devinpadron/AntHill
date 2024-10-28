@@ -10,10 +10,16 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import DatePicker from 'react-native-date-picker'
-import { Ionicons } from '@expo/vector-icons';
+import DatePicker from "react-native-date-picker";
+import { Ionicons } from "@expo/vector-icons";
 import moment from "moment";
-import DropDownPicker from 'react-native-dropdown-picker';
+import DropDownPicker from "react-native-dropdown-picker";
+
+/*
+  STILL NEED TO DO:
+  - Add optional end time for events
+  - time conversions?
+*/
 
 const EventSubmit = () => {
   const [title, setTitle] = useState("");
@@ -25,47 +31,46 @@ const EventSubmit = () => {
   const [openDate, setOpenDate] = useState(false);
 
   const [items, setItems] = useState([
-    {label: 'Devin', value:'devin'},
-    {label: 'Bakos', value:'bakos'},
-    {label: 'Billy', value:'billy'}
+    { label: "Devin", value: "devin" },
+    { label: "Bakos", value: "bakos" },
+    { label: "Billy", value: "billy" },
   ]);
 
   const handleSubmit = () => {
     // Handle the form submission
-    console.log('Form submitted');
+    console.log("Form submitted");
   };
 
   const formatDate = (date: Date) => {
-    if (allDay){
-      return moment(date).format('dddd, MMMM Do YYYY');
-    }
-    else{
-      return moment(date).format('dddd, MMMM Do YYYY, h:mm a');
+    if (allDay) {
+      return moment(date).format("dddd, MMMM Do YYYY");
+    } else {
+      return moment(date).format("dddd, MMMM Do YYYY, h:mm a");
     }
   };
 
   const checkDateOpen = () => {
-    setOpenDate(!openDate)
-    if (openSelect){
-      setOpenSelect(false)
+    setOpenDate(!openDate);
+    if (openSelect) {
+      setOpenSelect(false);
     }
   };
 
   const checkSelectOpen = () => {
-    setOpenSelect(!openSelect)
-    if (openDate){
-      setOpenDate(false)
+    setOpenSelect(!openSelect);
+    if (openDate) {
+      setOpenDate(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <Text style={styles.heading}>Submit New Event</Text>
-        
+
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Title</Text>
           <TextInput
@@ -86,11 +91,11 @@ const EventSubmit = () => {
             open={openDate}
             date={date}
             onConfirm={(date) => {
-              setOpenDate(false)
-              setDate(date)
+              setOpenDate(false);
+              setDate(date);
             }}
             onCancel={() => {
-              setOpenDate(false)
+              setOpenDate(false);
             }}
             mode={allDay ? "date" : "datetime"}
           />
@@ -125,9 +130,10 @@ const EventSubmit = () => {
             items={items}
             open={openSelect}
             setOpen={checkSelectOpen}
-            mode={'BADGE'}
-            listMode='SCROLLVIEW'
-            searchable={true}/>
+            mode={"BADGE"}
+            listMode="SCROLLVIEW"
+            searchable={true}
+          />
         </View>
 
         <View style={styles.inputContainer}>
@@ -154,7 +160,7 @@ const EventSubmit = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: "#f5f5f5",
   },
   scrollContainer: {
     padding: 20,
@@ -162,10 +168,10 @@ const styles = StyleSheet.create({
   },
   heading: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 20,
-    color: '#333',
-    textAlign: 'center',
+    color: "#333",
+    textAlign: "center",
   },
   inputContainer: {
     marginBottom: 20,
@@ -173,8 +179,8 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     marginBottom: 8,
-    color: '#555',
-    fontWeight: '600',
+    color: "#555",
+    fontWeight: "600",
   },
   input: {
     height: 50,
@@ -183,42 +189,42 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 15,
     fontSize: 16,
-    backgroundColor: 'white',
+    backgroundColor: "white",
   },
   notesInput: {
     height: 120,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
     paddingTop: 15,
   },
   switchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 20,
   },
   dateButton: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     padding: 15,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: "#ccc",
   },
   dateButtonText: {
     fontSize: 16,
-    color: '#333',
+    color: "#333",
   },
   submitButton: {
     backgroundColor: "#007AFF",
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
   },
   submitButtonText: {
     color: "#fff",
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginRight: 10,
   },
 });
