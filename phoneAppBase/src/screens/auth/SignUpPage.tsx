@@ -8,6 +8,7 @@ import {
   Alert,
 } from "react-native";
 import UserController from "../../controller/userController";
+import CompanyController from "../../controller/companyController";
 import auth from '@react-native-firebase/auth';
 
 
@@ -18,8 +19,7 @@ const SignUpPage = ({ navigation }: any) => {
   const [password, setPassword] = useState("");
   const [confPassword, setConfPassword] = useState("");
   const [accessCode, setAccessCode] = useState("");
-  //HARD CODED COMPANY PLEASE REPLACE!!!!
-  const userController = new UserController("SoBridalSocial");
+  const companyController = new CompanyController;
 
   const validateFields = () => {
     if (!firstName.trim()) {
@@ -48,12 +48,20 @@ const SignUpPage = ({ navigation }: any) => {
   };
 
   const handleSignUp = async () => {
+
+    const foundCompany = await companyController.compareAccessCode(accessCode)
+    if(foundCompany == null){
+      Alert.alert('Invalid Access Code');
+      return 
+    }
+    const userController = new UserController(foundCompany);
+
     const userData = {
       firstName: firstName,
       lastName: lastName,
-      email: email
+      email: email,
+      privilege: "User"
     };
-
     await auth().createUserWithEmailAndPassword(email, password)
     .then((userCredential) => {
         const user = userCredential.user;

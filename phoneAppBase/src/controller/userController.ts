@@ -13,10 +13,11 @@ import db from "../../firebaseConfig";
   - A function that creates a new user entry and puts it into Firestore
 */
 
-export interface User {
+interface User {
   firstName: string;
   lastName: string;
   email: string;
+  privilege: string;
 }
 
 // I HARD CODED SOBRIDALSOCIAL AS THE ONLY COMPANY. THIS WILL CHANGE IN THE FUTURE.

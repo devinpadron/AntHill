@@ -24,7 +24,6 @@ interface Event {
   startTime: string;
   endTime: string;
   duration: string;
-  company: string;
   //jsonData:string
 }
 
