@@ -45,7 +45,7 @@ export default class EventController {
   public getEvent = async (eventID: string) => {
     try {
       //Retrieve event data
-      const eventEntry = await db.collection("companies").doc(this.company).collection("Events").doc(eventID).get();
+      const eventEntry = await db.collection("Companies").doc(this.company).collection("Events").doc(eventID).get();
       if (eventEntry.exists) {
         const dbData = eventEntry.data();
         if (dbData) {
@@ -68,7 +68,7 @@ export default class EventController {
     }
     try {
       const res: FirebaseFirestoreTypes.DocumentData[] = [];
-      const eventsFromDB = await db.collection("companies").doc(this.company).collection("Events")
+      const eventsFromDB = await db.collection("Companies").doc(this.company).collection("Events")
         .where("date", "==", date)
         .get();
 
@@ -89,7 +89,7 @@ export default class EventController {
   > => {
     try {
       const res: FirebaseFirestoreTypes.DocumentData[] = [];
-      const eventsFromDB = await db.collection("companies").doc(this.company).collection("Events").get();
+      const eventsFromDB = await db.collection("Companies").doc(this.company).collection("Events").get();
       eventsFromDB.forEach((event) => {
         const eventData = event.data() as Event;
         res.push(eventData);
@@ -104,7 +104,7 @@ export default class EventController {
 
   public addEvent = async (newEvent: Event) => {
     try {
-      const entry = await db.collection("companies").doc(this.company).collection("Events").add(newEvent);
+      const entry = await db.collection("Companies").doc(this.company).collection("Events").add(newEvent);
       const entryid = entry.id;
       return entryid;
     } catch (e) {
@@ -116,7 +116,7 @@ export default class EventController {
   public deleteEvent = async (eventID: string) => {
     // Delete an existing event
     try {
-      await db.collection("companies").doc(this.company).collection("Events").doc(eventID).delete();
+      await db.collection("Companies").doc(this.company).collection("Events").doc(eventID).delete();
       console.log("Event successfully deleted");
       return true;
     } catch (e) {
@@ -127,7 +127,7 @@ export default class EventController {
 
   public updateEvent = async (eventID: string, eventData: Event) => {
     try {
-      await db.collection("companies").doc(this.company).collection("Events").doc(eventID).update(eventData);
+      await db.collection("Companies").doc(this.company).collection("Events").doc(eventID).update(eventData);
       console.log("Event successfully updated");
       return true;
     } catch (e) {

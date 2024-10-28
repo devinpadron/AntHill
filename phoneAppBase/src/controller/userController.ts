@@ -31,7 +31,7 @@ export default class UserControllerStruct {
   public getUser = async (userID: string) => {
     try {
       //Retrieve user data
-      const userEntry = await db.collection("companies").doc(this.company).collection("Users").doc(userID).get();
+      const userEntry = await db.collection("Companies").doc(this.company).collection("Users").doc(userID).get();
       if (userEntry.exists) {
         const dbData = userEntry.data();
         if (dbData) {
@@ -52,7 +52,7 @@ export default class UserControllerStruct {
   public deleteUser = async (userID: string) => {
     // Delete an existing user
     try {
-      await await db.collection("companies").doc(this.company).collection("Users").doc(userID).delete();
+      await await db.collection("Companies").doc(this.company).collection("Users").doc(userID).delete();
       console.log("User successfully deleted");
       return true;
     } catch (e) {
@@ -63,7 +63,7 @@ export default class UserControllerStruct {
 
   public addUser = async (newUser: User, userID: string) => {
     try {
-      const entry = await db.collection("companies").doc(this.company).collection("Users").doc(userID).set(newUser);
+      const entry = await db.collection("Companies").doc(this.company).collection("Users").doc(userID).set(newUser);
     } catch (e) {
       console.error("Error adding user:", e);
       throw e;
@@ -72,7 +72,7 @@ export default class UserControllerStruct {
 
   public updateUser = async (userID: string, userData: User) => {
     try {
-      await db.collection("companies").doc(this.company).collection("Users").doc(userID).update(userData);
+      await db.collection("Companies").doc(this.company).collection("Users").doc(userID).update(userData);
       console.log("User successfully updated");
       return true;
     } catch (e) {
