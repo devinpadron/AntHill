@@ -2,6 +2,11 @@ import EventController from "./eventController";
 import { MarkedDates } from "react-native-calendars/src/types";
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
 
+/*
+  STILL NEED TO DO:
+  - Add logic so that events on same day will be under same title
+*/
+
 /* An AgendaItem controller that conatains:
   - An AgendaItemData interface that provides the structure of AgendaItem data
   - A function that uses a single event entry and transforms its data into AgendaItemData

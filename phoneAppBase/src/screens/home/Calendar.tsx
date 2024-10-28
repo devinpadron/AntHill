@@ -24,6 +24,7 @@ import Constants from "expo-constants";
 /*
   STILL NEED TO DO:
   - Adjust Today Button spacing
+  - Ensure Today Button appears correctly when swiping through months/weeks
 */
 
 /* An ExpanableCalendar that:
