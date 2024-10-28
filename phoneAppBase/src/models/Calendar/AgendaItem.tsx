@@ -9,6 +9,18 @@ import {
   Button,
 } from "react-native";
 
+/*
+  STILL NEED TO DO:
+  - Add functionality for AgendaItem button press
+  - Add functionality for the 'More Info' button.
+*/
+
+/* An AgendaItem component that is part of the AgendaList that displays information such as:
+  - event title
+  - event start and end time
+  - event duration
+*/
+
 interface ItemProps {
   item: any;
 }
@@ -119,7 +131,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
   },
-  // Add this:
   emptyItem: {
     padding: 16,
     backgroundColor: "#f9f9f9",
