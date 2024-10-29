@@ -50,7 +50,7 @@ const SignUpPage = ({ navigation }: any) => {
   const handleSignUp = async () => {
 
     const foundCompany = await companyController.compareAccessCode(accessCode)
-    if(foundCompany == null){
+    if(foundCompany == ""){
       Alert.alert('Invalid Access Code');
       return 
     }
