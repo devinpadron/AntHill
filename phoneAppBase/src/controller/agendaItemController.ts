@@ -38,9 +38,10 @@ function createAgendaItem(
   };
 }
 
-export async function getAgendaItems(): Promise<AgendaItemData[]> {
+export async function getAgendaItems(company:string): Promise<AgendaItemData[]> {
   const res: AgendaItemData[] = [];
-  const events = await EventController.getAllEvents();
+  const eventController = new EventController(company);
+  const events = await eventController.getAllEvents();
 
   events.forEach((event) => {
     res.push(createAgendaItem(event));

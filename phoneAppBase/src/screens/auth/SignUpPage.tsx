@@ -8,6 +8,7 @@ import {
   Alert,
 } from "react-native";
 import UserController from "../../controller/userController";
+import CompanyController from "../../controller/companyController";
 import auth from '@react-native-firebase/auth';
 
 
@@ -18,6 +19,7 @@ const SignUpPage = ({ navigation }: any) => {
   const [password, setPassword] = useState("");
   const [confPassword, setConfPassword] = useState("");
   const [accessCode, setAccessCode] = useState("");
+  const companyController = new CompanyController;
 
   const validateFields = () => {
     if (!firstName.trim()) {
@@ -46,17 +48,25 @@ const SignUpPage = ({ navigation }: any) => {
   };
 
   const handleSignUp = async () => {
+
+    const foundCompany = await companyController.compareAccessCode(accessCode)
+    if(foundCompany == ""){
+      Alert.alert('Invalid Access Code');
+      return 
+    }
+    const userController = new UserController(foundCompany);
+
     const userData = {
       firstName: firstName,
       lastName: lastName,
-      email: email
+      email: email,
+      privilege: "User"
     };
-
     await auth().createUserWithEmailAndPassword(email, password)
     .then((userCredential) => {
         const user = userCredential.user;
         user.updateProfile({displayName: firstName + ' ' + lastName});
-        UserController.addUser(userData, user.uid);
+        userController.addUser(userData, user.uid);
         console.log('User account created & signed in!');
       })
       .catch((error) => {

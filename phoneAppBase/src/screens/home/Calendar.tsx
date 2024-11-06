@@ -49,7 +49,8 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 
   useEffect(() => {
     const fetchData = async () => {
-      const items = await getAgendaItems();
+      //HARD CODED COMPANY. PLEASE REPLACE!!!!
+      const items = await getAgendaItems('SoBridalSocial');
       setAgendaItems(items);
       marked.current = getMarkedDates(items);
     };
