@@ -47,8 +47,9 @@ const SignUpPage = ({ navigation }: any) => {
 	};
 
 	const handleSignUp = async () => {
-		const foundCompany =
-			await companyController.compareAccessCode(accessCode);
+		const foundCompany = await companyController.compareAccessCode(
+			accessCode
+		);
 		if (foundCompany == "") {
 			Alert.alert("Invalid Access Code");
 			return;
@@ -70,12 +71,28 @@ const SignUpPage = ({ navigation }: any) => {
 				console.log("User account created & signed in!");
 			})
 			.catch((error) => {
-				if (error.code === "auth/email-already-in-use") {
-					Alert.alert("That email address is already in use!");
-				} else if (error.code === "auth/invalid-email") {
-					Alert.alert("That email address is invalid!");
-				} else {
-					Alert.alert("Signup error", error.message);
+				switch (error.code) {
+					case "auth/email-already-in-use":
+						Alert.alert("That email address is already in use!");
+						break;
+					case "auth/invalid-email":
+						Alert.alert("That email address is invalid!");
+						break;
+					case "auth/weak-password":
+						Alert.alert(
+							"Weak password",
+							"You must include atleast:\n8 characters\n1 uppercase character\n1 lowercase character\n1 number\n1 special character"
+						);
+						break;
+					case "auth/password-does":
+						Alert.alert(
+							"Weak password",
+							"You must include atleast:\n\n8 characters\n1 uppercase character\n1 lowercase character\n1 number\n1 special character"
+						);
+						break;
+					default:
+						Alert.alert("Signup error", error.message);
+						console.log(error.code);
 				}
 			});
 	};

@@ -15,7 +15,6 @@ import CompanyController from "../../controller/companyController";
 const LoginPage = ({ navigation }: any) => {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
-	const companyController = new CompanyController();
 
 	const handleLogin = async () => {
 		await auth()
@@ -36,19 +35,31 @@ const LoginPage = ({ navigation }: any) => {
 		navigation.navigate("Sign Up");
 	};
 
-	const handleForgotPassword = async () => {
+	const handleForgotPassword = async (text: string | undefined) => {
 		//auth().sendPasswordResetEmail()
-
-		Alert.prompt("Reset your password", "Reset your password");
-
-		const searchId = await companyController.searchUserByEmail(
-			"devinpadron@outlook.com"
-		);
-
-		if (searchId == "") {
-			Alert.alert("No user found with that email.");
+		if (!text) {
+			console.log("Cancel");
 			return;
 		}
+		await auth()
+			.sendPasswordResetEmail(text)
+			.then(() => {
+				Alert.alert(
+					"Please check your email to finish resetting your password"
+				);
+			})
+			.catch((error) => {
+				switch (error.code) {
+					case "auth/user-not-found":
+						Alert.alert("User not found");
+						break;
+					case "auth/invalid-email":
+						Alert.alert("Invalid email");
+						break;
+					default:
+						Alert.alert("Error sending request: ", error);
+				}
+			});
 	};
 
 	return (
@@ -98,7 +109,25 @@ const LoginPage = ({ navigation }: any) => {
 				</Text>
 			</TouchableOpacity>
 
-			<TouchableOpacity onPress={handleForgotPassword}>
+			<TouchableOpacity
+				onPress={() => {
+					Alert.prompt(
+						"Forgot Password",
+						"Please enter your email:",
+						[
+							{
+								text: "Cancel",
+								onPress: () => console.log("Cancel"),
+							},
+							{
+								text: "Submit",
+								onPress: (text) => handleForgotPassword(text),
+							},
+						],
+						"plain-text"
+					);
+				}}
+			>
 				<Text style={[{ color: "blue", marginTop: 15 }]}>
 					Forgot Password
 				</Text>
