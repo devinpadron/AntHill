@@ -18,43 +18,64 @@ const SignUpPage = ({ navigation }: any) => {
 	const [password, setPassword] = useState("");
 	const [confPassword, setConfPassword] = useState("");
 	const [accessCode, setAccessCode] = useState("");
+	const [company, setCompany] = useState("");
 	const companyController = new CompanyController();
 
-	const validateFields = () => {
+	const validateFields = async () => {
 		if (!firstName.trim()) {
-			return "First name is required.";
+			Alert.alert("First name is required.");
+			return false;
 		}
 		if (!lastName.trim()) {
-			return "Last name is required.";
+			Alert.alert("Last name is required.");
+			return false;
 		}
 		if (!email.trim()) {
-			return "Email is required.";
-		}
-		if (!/\S+@\S+\.\S+/.test(email)) {
-			return "Email is invalid.";
+			Alert.alert("Email is required.");
+			return false;
 		}
 		if (!password) {
-			return "Password is required.";
-		}
-		if (password.length < 6) {
-			return "Password must be at least 6 characters long.";
+			Alert.alert("Password is required.");
+			return false;
 		}
 		if (password !== confPassword) {
-			return "Passwords do not match.";
+			Alert.alert("Passwords do not match.");
+			return false;
 		}
-		// Add any other validation rules here (e.g., for accessCode if it's required)
-		return null; // No errors
-	};
 
-	const handleSignUp = async () => {
+		// Password must be 8 characters long, include atleast 1 uppercase char, 1 lowercase char, 1 number, and 1 special char.
+		// The reason for the tight restrictions is due to the amount of personal data being saved, and how this is tied directly to their job.
+		const regexp = new RegExp(
+			"^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$"
+		);
+		console.log(password);
+		if (regexp.test(password) == false) {
+			Alert.alert(
+				"Weak password",
+				"Your password must include atleast:\n\n8 characters\n1 uppercase character\n1 lowercase character\n1 number\n1 special character"
+			);
+			return false;
+		}
+
 		const foundCompany = await companyController.compareAccessCode(
 			accessCode
 		);
 		if (foundCompany == "") {
 			Alert.alert("Invalid Access Code");
+			return false;
+		} else {
+			setCompany(foundCompany);
+		}
+		// Add any other validation rules here (e.g., for accessCode if it's required)
+		return true; // No errors
+	};
+
+	const handleSignUp = async () => {
+		if (!(await validateFields())) {
 			return;
 		}
-		const userController = new UserController(foundCompany);
+
+		const userController = new UserController(company);
 
 		const userData = {
 			firstName: firstName,
@@ -68,6 +89,9 @@ const SignUpPage = ({ navigation }: any) => {
 				const user = userCredential.user;
 				user.updateProfile({ displayName: firstName + " " + lastName });
 				userController.addUser(userData, user.uid);
+				user.sendEmailVerification();
+				navigation.pop();
+				//Alert.alert("Check your email to complete verification!");
 				console.log("User account created & signed in!");
 			})
 			.catch((error) => {
@@ -78,21 +102,9 @@ const SignUpPage = ({ navigation }: any) => {
 					case "auth/invalid-email":
 						Alert.alert("That email address is invalid!");
 						break;
-					case "auth/weak-password":
-						Alert.alert(
-							"Weak password",
-							"You must include atleast:\n8 characters\n1 uppercase character\n1 lowercase character\n1 number\n1 special character"
-						);
-						break;
-					case "auth/password-does":
-						Alert.alert(
-							"Weak password",
-							"You must include atleast:\n\n8 characters\n1 uppercase character\n1 lowercase character\n1 number\n1 special character"
-						);
-						break;
 					default:
-						Alert.alert("Signup error", error.message);
-						console.log(error.code);
+						Alert.alert("Error logging in");
+						console.error(error);
 				}
 			});
 	};

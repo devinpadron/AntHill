@@ -8,15 +8,18 @@ import {
 	TouchableOpacity,
 	StyleSheet,
 	Alert,
+	Platform,
 } from "react-native";
 import auth from "@react-native-firebase/auth";
-import CompanyController from "../../controller/companyController";
+import prompt from "react-native-prompt-android";
 
 const LoginPage = ({ navigation }: any) => {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 
 	const handleLogin = async () => {
+		console.log("Hello");
+		console.log(auth().currentUser);
 		await auth()
 			.signInWithEmailAndPassword(email, password)
 			.then((userCredential) => {
@@ -24,10 +27,29 @@ const LoginPage = ({ navigation }: any) => {
 				console.log("User account signed in!");
 			})
 			.catch((error) => {
-				if (error.code === "auth/invalid-email") {
-					Alert.alert("That email address is invalid!");
+				switch (error.code) {
+					case "auth/invalid-email":
+						Alert.alert("Invalid email");
+						break;
+					case "auth/wrong-password":
+						Alert.alert("Invalid password");
+						break;
+					case "auth/user-not-found":
+						Alert.alert("User not found");
+						break;
+					case "auth/invalid-credential":
+						Alert.alert("Invalid credentials");
+						break;
+					case "auth/too-many-requests":
+						Alert.alert(
+							"Too many attempts have been made",
+							"Please try again later, or reset your password"
+						);
+						break;
+					default:
+						Alert.alert("Error logging in");
+						console.error(error);
 				}
-				Alert.alert("Login error", error.message);
 			});
 	};
 
@@ -57,7 +79,8 @@ const LoginPage = ({ navigation }: any) => {
 						Alert.alert("Invalid email");
 						break;
 					default:
-						Alert.alert("Error sending request: ", error);
+						Alert.alert("Error sending request");
+						console.error(error);
 				}
 			});
 	};
@@ -111,17 +134,40 @@ const LoginPage = ({ navigation }: any) => {
 
 			<TouchableOpacity
 				onPress={() => {
+					if (Platform.OS == "android") {
+						prompt(
+							"Forgot Password",
+							"Please enter your account email:",
+							[
+								{
+									text: "Cancel",
+									onPress: () => console.log("Cancel"),
+									style: "cancel",
+								},
+								{
+									text: "Submit",
+									onPress: (text) =>
+										handleForgotPassword(text),
+								},
+							],
+							{
+								type: "plain-text",
+							}
+						);
+					}
 					Alert.prompt(
 						"Forgot Password",
-						"Please enter your email:",
+						"Please enter your account email:",
 						[
 							{
 								text: "Cancel",
 								onPress: () => console.log("Cancel"),
+								style: "cancel",
 							},
 							{
 								text: "Submit",
 								onPress: (text) => handleForgotPassword(text),
+								isPreferred: true,
 							},
 						],
 						"plain-text"

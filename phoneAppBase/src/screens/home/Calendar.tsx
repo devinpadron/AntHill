@@ -20,6 +20,7 @@ import {
 import AgendaItem from "../../models/Calendar/AgendaItem";
 import { getTheme, themeColor, lightThemeColor } from "../../themes/theme";
 import Constants from "expo-constants";
+import moment from "moment";
 
 /*
   STILL NEED TO DO:
@@ -33,7 +34,7 @@ import Constants from "expo-constants";
   - View dates in a "month view" and "week view"
 */
 
-const today = new Date().toISOString().split("T")[0];
+const today = moment().format("YYYY-MM-DD");
 const leftArrowIcon = require("../../../assets/next.png");
 const rightArrowIcon = require("../../../assets/next.png");
 
@@ -63,6 +64,7 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 
 	const handleTodayPress = () => {
 		setSelectedDate(today);
+		console.log(today);
 	};
 
 	const TodayButton = () => {
