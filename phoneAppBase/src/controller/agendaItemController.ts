@@ -16,52 +16,54 @@ import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
 */
 
 export interface AgendaItemData {
-  date: string;
-  data: [
-    { title: string; startTime: string; endTime: string; duration: string }
-  ];
+	date: string;
+	data: [
+		{ title: string; startTime: string; endTime: string; duration: string },
+	];
 }
 
 function createAgendaItem(
-  docRef: FirebaseFirestoreTypes.DocumentData
+	docRef: FirebaseFirestoreTypes.DocumentData,
 ): AgendaItemData {
-  return {
-    date: docRef.date,
-    data: [
-      {
-        title: docRef.title,
-        startTime: docRef.startTime,
-        endTime: docRef.endTime,
-        duration: docRef.duration,
-      },
-    ],
-  };
+	return {
+		date: docRef.date,
+		data: [
+			{
+				title: docRef.title,
+				startTime: docRef.startTime,
+				endTime: docRef.endTime,
+				duration: docRef.duration,
+			},
+		],
+	};
 }
 
-export async function getAgendaItems(company:string): Promise<AgendaItemData[]> {
-  const res: AgendaItemData[] = [];
-  const eventController = new EventController(company);
-  const events = await eventController.getAllEvents();
+export async function getAgendaItems(
+	company: string,
+): Promise<AgendaItemData[]> {
+	const res: AgendaItemData[] = [];
+	const eventController = new EventController(company);
+	const events = await eventController.getAllEvents();
 
-  events.forEach((event) => {
-    res.push(createAgendaItem(event));
-  });
+	events.forEach((event) => {
+		res.push(createAgendaItem(event));
+	});
 
-  return res;
+	return res;
 }
 
 function isEmpty(obj: any): boolean {
-  return Object.keys(obj).length === 0;
+	return Object.keys(obj).length === 0;
 }
 
 export function getMarkedDates(items: AgendaItemData[]): MarkedDates {
-  const marked: MarkedDates = {};
-  items.forEach((item) => {
-    if (item.data && item.data.length > 0 && !isEmpty(item.data[0])) {
-      marked[item.date] = { marked: true };
-    } else {
-      marked[item.date] = { disabled: true };
-    }
-  });
-  return marked;
+	const marked: MarkedDates = {};
+	items.forEach((item) => {
+		if (item.data && item.data.length > 0 && !isEmpty(item.data[0])) {
+			marked[item.date] = { marked: true };
+		} else {
+			marked[item.date] = { disabled: true };
+		}
+	});
+	return marked;
 }
