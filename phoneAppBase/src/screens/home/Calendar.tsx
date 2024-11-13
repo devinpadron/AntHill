@@ -107,10 +107,15 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 
         <View style={styles.agendaContainer}>
           <AgendaList
-            sections={agendaItems.map((item) => ({
-              title: item.date,
-              data: item.data,
-            }))}
+            sections={agendaItems.reduce((acc, item) => {
+              const existing = acc.find((x) => x.title === item.date);
+              if (existing) {
+                existing.data.push(...item.data);
+              } else {
+                acc.push({ title: item.date, data: [...item.data] });
+              }
+              return acc;
+            }, [] as { title: string; data: any[] }[])}
             renderItem={renderItem}
             sectionStyle={styles.section}
           />
