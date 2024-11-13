@@ -19,7 +19,7 @@ export default class CompanyController {
 				}
 			});
 		} catch (e) {
-			console.log("Error getting company", e);
+			console.error("Error getting company", e);
 		}
 		return id;
 	};
@@ -37,7 +37,7 @@ export default class CompanyController {
 				}
 			});
 		} catch (e) {
-			console.log("Error finding user", e);
+			console.error("Error finding user", e);
 		}
 		return id;
 	};

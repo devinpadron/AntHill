@@ -60,12 +60,12 @@ export default class EventController {
 			} else {
 			}
 		} catch (e) {
-			console.log("Error getting event", e);
+			console.error("Error getting event", e);
 		}
 	};
 
 	public getEventsByDate = async (
-		date: string,
+		date: string
 	): Promise<FirebaseFirestoreTypes.DocumentData[]> => {
 		if (!isValidDateFormat(date)) {
 			throw new Error("Invalid date format. Please use YYYY-MM-DD.");

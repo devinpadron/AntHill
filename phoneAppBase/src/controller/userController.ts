@@ -51,7 +51,7 @@ export default class UserControllerStruct {
 				return null;
 			}
 		} catch (e) {
-			console.log("Error getting user", e);
+			console.error("Error getting user", e);
 		}
 	};
 

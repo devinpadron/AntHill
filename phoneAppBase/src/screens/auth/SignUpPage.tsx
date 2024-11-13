@@ -18,7 +18,6 @@ const SignUpPage = ({ navigation }: any) => {
 	const [password, setPassword] = useState("");
 	const [confPassword, setConfPassword] = useState("");
 	const [accessCode, setAccessCode] = useState("");
-	const [company, setCompany] = useState("");
 	const companyController = new CompanyController();
 
 	const validateFields = async () => {
@@ -48,7 +47,6 @@ const SignUpPage = ({ navigation }: any) => {
 		const regexp = new RegExp(
 			"^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$"
 		);
-		console.log(password);
 		if (regexp.test(password) == false) {
 			Alert.alert(
 				"Weak password",
@@ -56,25 +54,19 @@ const SignUpPage = ({ navigation }: any) => {
 			);
 			return false;
 		}
-
-		const foundCompany = await companyController.compareAccessCode(
-			accessCode
-		);
-		if (foundCompany == "") {
-			Alert.alert("Invalid Access Code");
-			return false;
-		} else {
-			setCompany(foundCompany);
-		}
 		// Add any other validation rules here (e.g., for accessCode if it's required)
 		return true; // No errors
 	};
 
 	const handleSignUp = async () => {
-		if (!(await validateFields())) {
+		if (!validateFields()) {
 			return;
 		}
-
+		const company = await companyController.compareAccessCode(accessCode);
+		if (company == "") {
+			Alert.alert("Invalid Access Code");
+			return;
+		}
 		const userController = new UserController(company);
 
 		const userData = {

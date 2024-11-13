@@ -21,6 +21,7 @@ import AgendaItem from "../../models/Calendar/AgendaItem";
 import { getTheme, themeColor, lightThemeColor } from "../../themes/theme";
 import Constants from "expo-constants";
 import moment from "moment";
+import LoadingScreen from "../LoadingScreen";
 
 /*
   STILL NEED TO DO:
@@ -45,15 +46,25 @@ type CalendarProps = {
 const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 	const [agendaItems, setAgendaItems] = useState<AgendaItemData[]>([]);
 	const [selectedDate, setSelectedDate] = useState(today);
-	const marked = useRef({});
+	const [markedDates, setMarkedDates] = useState({});
+	const [isLoading, setIsLoading] = useState(false);
 	const theme = useRef(getTheme());
 
 	useEffect(() => {
 		const fetchData = async () => {
-			//HARD CODED COMPANY. PLEASE REPLACE!!!!
-			const items = await getAgendaItems("SoBridalSocial");
-			setAgendaItems(items);
-			marked.current = getMarkedDates(items);
+			try {
+				setIsLoading(true);
+				// HARD CODED COMPANY ID, PLEASE FIX!!!!!
+				const items = await getAgendaItems("SoBridalSocial");
+				const marks = getMarkedDates(items);
+
+				setAgendaItems(items);
+				setMarkedDates(marks);
+			} catch (error) {
+				console.error("Error fetching agenda items:", error);
+			} finally {
+				setIsLoading(false);
+			}
 		};
 		fetchData();
 	}, []);
@@ -64,7 +75,6 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 
 	const handleTodayPress = () => {
 		setSelectedDate(today);
-		console.log(today);
 	};
 
 	const TodayButton = () => {
@@ -81,55 +91,58 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 			</TouchableOpacity>
 		);
 	};
-
-	return (
-		<View style={styles.container}>
-			<CalendarProvider date={selectedDate} showTodayButton={false}>
-				<View style={styles.calendarContainer}>
-					{weekView ? (
-						<WeekCalendar
-							firstDay={1}
-							markedDates={marked.current}
-						/>
-					) : (
-						<>
-							<ExpandableCalendar
-								horizontal
-								pagingEnabled
-								initialPosition={
-									ExpandableCalendar.positions.OPEN
-								}
-								calendarStyle={styles.calendar}
-								headerStyle={styles.header}
-								theme={theme.current}
+	if (isLoading) {
+		return <LoadingScreen />;
+	} else {
+		return (
+			<View style={styles.container}>
+				<CalendarProvider date={selectedDate} showTodayButton={false}>
+					<View style={styles.calendarContainer}>
+						{weekView ? (
+							<WeekCalendar
 								firstDay={1}
-								markedDates={marked.current}
-								leftArrowImageSource={leftArrowIcon}
-								rightArrowImageSource={rightArrowIcon}
-								closeOnDayPress={false}
-								date={selectedDate}
-								onDayPress={(day) =>
-									setSelectedDate(day.dateString)
-								}
+								markedDates={markedDates}
 							/>
-							<TodayButton />
-						</>
-					)}
-				</View>
+						) : (
+							<>
+								<ExpandableCalendar
+									horizontal
+									pagingEnabled
+									initialPosition={
+										ExpandableCalendar.positions.OPEN
+									}
+									calendarStyle={styles.calendar}
+									headerStyle={styles.header}
+									theme={theme.current}
+									firstDay={1}
+									markedDates={markedDates}
+									leftArrowImageSource={leftArrowIcon}
+									rightArrowImageSource={rightArrowIcon}
+									closeOnDayPress={false}
+									date={selectedDate}
+									onDayPress={(day) =>
+										setSelectedDate(day.dateString)
+									}
+								/>
+								<TodayButton />
+							</>
+						)}
+					</View>
 
-				<View style={styles.agendaContainer}>
-					<AgendaList
-						sections={agendaItems.map((item) => ({
-							title: item.date,
-							data: item.data,
-						}))}
-						renderItem={renderItem}
-						sectionStyle={styles.section}
-					/>
-				</View>
-			</CalendarProvider>
-		</View>
-	);
+					<View style={styles.agendaContainer}>
+						<AgendaList
+							sections={agendaItems.map((item) => ({
+								title: item.date,
+								data: item.data,
+							}))}
+							renderItem={renderItem}
+							sectionStyle={styles.section}
+						/>
+					</View>
+				</CalendarProvider>
+			</View>
+		);
+	}
 };
 
 export default ExpandableCalendarScreen;
