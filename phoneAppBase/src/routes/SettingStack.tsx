@@ -6,24 +6,25 @@ import EventSubmit from "../screens/settings/EventSubmit";
 const Stack = createNativeStackNavigator();
 
 const SettingStack = () => {
-    return (
-      <Stack.Navigator>
-        <Stack.Screen
-          name="Settings"
-          component={Settings}
-          options={{ headerShown: false }}
-        ></Stack.Screen>
-        <Stack.Screen
-          name="Profile"
-          component={ProfilePage}
-          options={{ headerShown: false, gestureEnabled: true }}
-        />
-        <Stack.Screen
-            name="EventSubmit"
-            component={EventSubmit}
-            options={{ headerShown: false, gestureEnabled: true }}/>
-      </Stack.Navigator>
-    );
-  };
-  
-  export default SettingStack;
+	return (
+		<Stack.Navigator>
+			<Stack.Screen
+				name="Settings"
+				component={Settings}
+				options={{ headerShown: false }}
+			></Stack.Screen>
+			<Stack.Screen
+				name="Profile"
+				component={ProfilePage}
+				options={{ headerShown: false, gestureEnabled: true }}
+			/>
+			<Stack.Screen
+				name="EventSubmit"
+				component={EventSubmit}
+				options={{ headerShown: false, gestureEnabled: true }}
+			/>
+		</Stack.Navigator>
+	);
+};
+
+export default SettingStack;
