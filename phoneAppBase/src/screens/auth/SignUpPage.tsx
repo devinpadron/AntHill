@@ -20,7 +20,7 @@ const SignUpPage = ({ navigation }: any) => {
 	const [accessCode, setAccessCode] = useState("");
 	const companyController = new CompanyController();
 
-	const validateFields = async () => {
+	const validateFields = () => {
 		if (!firstName.trim()) {
 			Alert.alert("First name is required.");
 			return false;
