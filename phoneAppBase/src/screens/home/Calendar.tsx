@@ -36,8 +36,8 @@ import LoadingScreen from "../LoadingScreen";
 */
 
 const today = moment().format("YYYY-MM-DD");
-const leftArrowIcon = require("../../../assets/next.png");
-const rightArrowIcon = require("../../../assets/next.png");
+const leftArrowIcon = require("../../assets/next.png");
+const rightArrowIcon = require("../../assets/next.png");
 
 type CalendarProps = {
 	weekView?: any;

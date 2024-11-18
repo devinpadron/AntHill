@@ -90,7 +90,7 @@ const LoginPage = ({ navigation }: any) => {
 			{/* Logo */}
 			<Image
 				style={styles.logoImage}
-				source={require("../../../assets/DolceNGelato/vicoLogoPrimary.png")}
+				source={require("../../assets/DolceNGelato/vicoLogoPrimary.png")}
 			/>
 
 			{/* Username Textbox */}
