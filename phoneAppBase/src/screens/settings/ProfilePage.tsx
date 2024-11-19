@@ -13,8 +13,11 @@ import auth from "@react-native-firebase/auth";
 import UserController from "../../controller/userController";
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
 import LoadingScreen from "../LoadingScreen";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width, height } = Dimensions.get("window");
+
+// TODO: Fix hardcoded company name
 
 const ProfilePage = ({ navigation }: any) => {
 	const [userData, setUserData] =
@@ -50,7 +53,7 @@ const ProfilePage = ({ navigation }: any) => {
 							});
 					},
 				},
-			],
+			]
 		);
 	};
 
@@ -64,7 +67,7 @@ const ProfilePage = ({ navigation }: any) => {
 		async function getDetails() {
 			try {
 				const user = await userController.getUser(
-					auth().currentUser!.uid,
+					auth().currentUser!.uid
 				);
 				if (user) {
 					setUserData(user);
@@ -82,7 +85,7 @@ const ProfilePage = ({ navigation }: any) => {
 		return <LoadingScreen />;
 	}
 	return (
-		<View style={styles.container}>
+		<SafeAreaView style={styles.container}>
 			<ScrollView contentContainerStyle={styles.content}>
 				<Text style={styles.label}>Name</Text>
 				<TextInput
@@ -124,7 +127,7 @@ const ProfilePage = ({ navigation }: any) => {
 					onPress={handleDeleteAccount}
 				/>
 			</View>
-		</View>
+		</SafeAreaView>
 	);
 };
 
@@ -136,7 +139,6 @@ const styles = StyleSheet.create({
 	content: {
 		flexGrow: 1,
 		justifyContent: "flex-start",
-		paddingTop: height * 0.08,
 	},
 	label: {
 		fontSize: height * 0.02,

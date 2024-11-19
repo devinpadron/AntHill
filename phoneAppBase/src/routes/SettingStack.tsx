@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import Settings from "../screens/settings/Settings";
 import ProfilePage from "../screens/settings/ProfilePage";
 import EventSubmit from "../screens/settings/EventSubmit";
+import EmployeeList from "../screens/settings/EmployeeList";
 
 const Stack = createNativeStackNavigator();
 
@@ -12,7 +13,7 @@ const SettingStack = () => {
 				name="Settings"
 				component={Settings}
 				options={{ headerShown: false }}
-			></Stack.Screen>
+			/>
 			<Stack.Screen
 				name="Profile"
 				component={ProfilePage}
@@ -21,6 +22,11 @@ const SettingStack = () => {
 			<Stack.Screen
 				name="EventSubmit"
 				component={EventSubmit}
+				options={{ headerShown: false, gestureEnabled: true }}
+			/>
+			<Stack.Screen
+				name="EmployeeList"
+				component={EmployeeList}
 				options={{ headerShown: false, gestureEnabled: true }}
 			/>
 		</Stack.Navigator>

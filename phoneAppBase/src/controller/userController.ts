@@ -20,7 +20,8 @@ interface User {
 	privilege: string;
 }
 
-// I HARD CODED SOBRIDALSOCIAL AS THE ONLY COMPANY. THIS WILL CHANGE IN THE FUTURE.
+// TODO: Add company to user data
+// TODO: Add a way to search for current users info quickly
 
 export default class UserControllerStruct {
 	private company = "";

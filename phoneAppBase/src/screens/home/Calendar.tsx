@@ -1,11 +1,5 @@
 import React, { useRef, useCallback, useState, useEffect } from "react";
-import {
-	StyleSheet,
-	View,
-	Platform,
-	TouchableOpacity,
-	Text,
-} from "react-native";
+import { StyleSheet, View, TouchableOpacity, Text } from "react-native";
 import {
 	ExpandableCalendar,
 	AgendaList,
@@ -19,9 +13,9 @@ import {
 } from "../../controller/agendaItemController";
 import AgendaItem from "../../models/Calendar/AgendaItem";
 import { getTheme, themeColor, lightThemeColor } from "../../themes/theme";
-import Constants from "expo-constants";
 import moment from "moment";
 import LoadingScreen from "../LoadingScreen";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 /*
   STILL NEED TO DO:
@@ -36,7 +30,7 @@ import LoadingScreen from "../LoadingScreen";
 */
 
 const today = moment().format("YYYY-MM-DD");
-const leftArrowIcon = require("../../assets/next.png");
+const leftArrowIcon = require("../../assets/previous.png");
 const rightArrowIcon = require("../../assets/next.png");
 
 type CalendarProps = {
@@ -77,6 +71,10 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 		setSelectedDate(today);
 	};
 
+	useEffect(() => {
+		TodayButton;
+	}, [selectedDate]);
+
 	const TodayButton = () => {
 		if (selectedDate === today) {
 			return null;
@@ -95,8 +93,8 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 		return <LoadingScreen />;
 	} else {
 		return (
-			<View style={styles.container}>
-				<CalendarProvider date={selectedDate} showTodayButton={false}>
+			<SafeAreaView style={styles.container}>
+				<CalendarProvider date={selectedDate} showTodayButton={true}>
 					<View style={styles.calendarContainer}>
 						{weekView ? (
 							<WeekCalendar
@@ -124,7 +122,6 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 										setSelectedDate(day.dateString)
 									}
 								/>
-								<TodayButton />
 							</>
 						)}
 					</View>
@@ -150,7 +147,7 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 						/>
 					</View>
 				</CalendarProvider>
-			</View>
+			</SafeAreaView>
 		);
 	}
 };
@@ -170,7 +167,6 @@ const styles = StyleSheet.create({
 	},
 	container: {
 		flex: 1,
-		marginTop: Constants.statusBarHeight,
 	},
 	calendarContainer: {
 		position: "relative",

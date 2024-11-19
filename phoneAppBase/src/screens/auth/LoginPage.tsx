@@ -1,7 +1,5 @@
-import { StatusBar } from "expo-status-bar";
 import React, { useState } from "react";
 import {
-	View,
 	Text,
 	Image,
 	TextInput,
@@ -12,13 +10,13 @@ import {
 } from "react-native";
 import auth from "@react-native-firebase/auth";
 import prompt from "react-native-prompt-android";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const LoginPage = ({ navigation }: any) => {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 
 	const handleLogin = async () => {
-		console.log("Hello");
 		console.log(auth().currentUser);
 		await auth()
 			.signInWithEmailAndPassword(email, password)
@@ -86,7 +84,7 @@ const LoginPage = ({ navigation }: any) => {
 	};
 
 	return (
-		<View style={styles.container}>
+		<SafeAreaView style={styles.container}>
 			{/* Logo */}
 			<Image
 				style={styles.logoImage}
@@ -178,9 +176,7 @@ const LoginPage = ({ navigation }: any) => {
 					Forgot Password
 				</Text>
 			</TouchableOpacity>
-
-			<StatusBar style="auto" />
-		</View>
+		</SafeAreaView>
 	);
 };
 
@@ -191,7 +187,6 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: "white",
 		alignItems: "center",
-		//justifyContent: 'center',
 	},
 	textInput: {
 		width: 350,
@@ -207,7 +202,6 @@ const styles = StyleSheet.create({
 	logoImage: {
 		width: 450,
 		height: 300,
-		marginTop: 120,
 	},
 	roundButton: {
 		width: 350,

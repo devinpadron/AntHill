@@ -10,6 +10,7 @@ import {
 import UserController from "../../controller/userController";
 import CompanyController from "../../controller/companyController";
 import auth from "@react-native-firebase/auth";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const SignUpPage = ({ navigation }: any) => {
 	const [firstName, setFirstName] = useState("");
@@ -102,7 +103,7 @@ const SignUpPage = ({ navigation }: any) => {
 	};
 
 	return (
-		<View style={styles.container}>
+		<SafeAreaView style={styles.container}>
 			<TextInput
 				style={styles.textInput}
 				placeholder="First Name:"
@@ -155,7 +156,7 @@ const SignUpPage = ({ navigation }: any) => {
 			<TouchableOpacity style={styles.roundButton} onPress={handleSignUp}>
 				<Text style={{ color: "white" }}>Sign Up</Text>
 			</TouchableOpacity>
-		</View>
+		</SafeAreaView>
 	);
 };
 
@@ -164,8 +165,6 @@ export default SignUpPage;
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		paddingTop: 50,
-		//justifyContent: "center",
 		alignItems: "center",
 	},
 	textInput: {
@@ -178,12 +177,6 @@ const styles = StyleSheet.create({
 		borderColor: "rgba(211,211,211,0.5)",
 		borderWidth: 1,
 		borderRadius: 5,
-	},
-	logoImage: {
-		width: 350,
-		height: 200,
-		marginTop: 100,
-		marginBottom: -25,
 	},
 	roundButton: {
 		width: 350,
