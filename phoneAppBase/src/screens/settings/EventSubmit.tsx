@@ -14,6 +14,7 @@ import DatePicker from "react-native-date-picker";
 import { Ionicons } from "@expo/vector-icons";
 import moment from "moment";
 import DropDownPicker from "react-native-dropdown-picker";
+import { times } from "lodash";
 
 /*
   STILL NEED TO DO:
@@ -24,12 +25,18 @@ import DropDownPicker from "react-native-dropdown-picker";
 const EventSubmit = () => {
 	const [title, setTitle] = useState("");
 	const [date, setDate] = useState(new Date());
+	const [startTime, setStartTime] = useState(
+		new Date(new Date().setHours(0, 0, 0, 0))
+	);
+	const [endTime, setEndTime] = useState(
+		new Date(new Date().setHours(23, 59, 59, 0))
+	);
 	const [worker, setWorker] = useState([]);
 	const [notes, setNotes] = useState("");
-	const [allDay, setAllDay] = useState(false);
 	const [openSelect, setOpenSelect] = useState(false);
 	const [openDate, setOpenDate] = useState(false);
-
+	const [openStartTime, setOpenStartTime] = useState(false);
+	const [openEndTime, setOpenEndTime] = useState(false);
 	const [items, setItems] = useState([
 		{ label: "Devin", value: "devin" },
 		{ label: "Bakos", value: "bakos" },
@@ -42,11 +49,11 @@ const EventSubmit = () => {
 	};
 
 	const formatDate = (date: Date) => {
-		if (allDay) {
-			return moment(date).format("dddd, MMMM Do YYYY");
-		} else {
-			return moment(date).format("dddd, MMMM Do YYYY, h:mm a");
-		}
+		return moment(date).format("dddd, MMMM Do YYYY");
+	};
+
+	const formatTime = (time: Date) => {
+		return moment(time).format("h:mm A");
 	};
 
 	const checkDateOpen = () => {
@@ -56,10 +63,31 @@ const EventSubmit = () => {
 		}
 	};
 
+	const checkStartTimeOpen = () => {
+		setOpenStartTime(!openStartTime);
+		if (openSelect) {
+			setOpenSelect(false);
+		}
+	};
+
+	const checkEndTimeOpen = () => {
+		setOpenEndTime(!openEndTime);
+		if (openSelect) {
+			setOpenSelect(false);
+		}
+	};
+
 	const checkSelectOpen = () => {
 		setOpenSelect(!openSelect);
 		if (openDate) {
 			setOpenDate(false);
+		}
+		if (openStartTime) {
+			setOpenStartTime(false);
+		}
+
+		if (openEndTime) {
+			setOpenEndTime(false);
 		}
 	};
 
@@ -95,32 +123,58 @@ const EventSubmit = () => {
 						modal
 						open={openDate}
 						date={date}
+						mode="date"
 						onConfirm={(date) => {
 							setOpenDate(false);
 							setDate(date);
 						}}
-						onCancel={() => {
-							setOpenDate(false);
-						}}
-						mode={allDay ? "date" : "datetime"}
+						onCancel={() => {}}
 					/>
 				</View>
 
-				<View style={styles.switchContainer}>
-					<Text style={styles.label}>All Day</Text>
-					<Switch
-						value={allDay}
-						onValueChange={(value) => {
-							setAllDay(value);
-							if (value) {
-								// If switching to all-day, reset the time to midnight
-								const newDate = new Date(date);
-								newDate.setHours(0, 0, 0, 0);
-								setDate(newDate);
-							}
+				<View style={styles.inputContainer}>
+					<Text style={styles.label}>Start Time</Text>
+					<TouchableOpacity
+						onPress={checkStartTimeOpen}
+						style={styles.dateButton}
+					>
+						<Text style={styles.dateButtonText}>
+							{formatTime(startTime)}
+						</Text>
+					</TouchableOpacity>
+					<DatePicker
+						modal
+						open={openStartTime}
+						date={startTime}
+						mode="time"
+						onConfirm={(date) => {
+							setOpenStartTime(false);
+							setStartTime(date);
 						}}
-						trackColor={{ false: "#767577", true: "#81b0ff" }}
-						thumbColor={allDay ? "#f5dd4b" : "#f4f3f4"}
+						onCancel={() => {}}
+					/>
+				</View>
+
+				<View style={styles.inputContainer}>
+					<Text style={styles.label}>End Time</Text>
+					<TouchableOpacity
+						onPress={checkEndTimeOpen}
+						style={styles.dateButton}
+					>
+						<Text style={styles.dateButtonText}>
+							{formatTime(endTime)}
+						</Text>
+					</TouchableOpacity>
+					<DatePicker
+						modal
+						open={openEndTime}
+						date={endTime}
+						mode="time"
+						onConfirm={(date) => {
+							setOpenEndTime(false);
+							setEndTime(date);
+						}}
+						onCancel={() => {}}
 					/>
 				</View>
 
