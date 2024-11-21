@@ -18,10 +18,8 @@ interface User {
 	lastName: string;
 	email: string;
 	privilege: string;
+	company: string;
 }
-
-// TODO: Add company to user data
-// TODO: Add a way to search for current users info quickly
 
 export default class UserControllerStruct {
 	private company = "";

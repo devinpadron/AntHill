@@ -75,6 +75,7 @@ const SignUpPage = ({ navigation }: any) => {
 			lastName: lastName,
 			email: email,
 			privilege: "User",
+			company: company,
 		};
 		await auth()
 			.createUserWithEmailAndPassword(email, password)

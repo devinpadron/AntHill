@@ -8,20 +8,23 @@ import {
 	Alert,
 	Platform,
 } from "react-native";
-import auth from "@react-native-firebase/auth";
+import auth, { FirebaseAuthTypes } from "@react-native-firebase/auth";
 import prompt from "react-native-prompt-android";
 import { SafeAreaView } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import CompanyController from "../../controller/companyController";
 
 const LoginPage = ({ navigation }: any) => {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
+	const companyController = new CompanyController();
 
 	const handleLogin = async () => {
-		console.log(auth().currentUser);
 		await auth()
 			.signInWithEmailAndPassword(email, password)
-			.then((userCredential) => {
+			.then(async (userCredential) => {
 				const user = userCredential.user;
+				await setUserData(user);
 				console.log("User account signed in!");
 			})
 			.catch((error) => {
@@ -51,12 +54,20 @@ const LoginPage = ({ navigation }: any) => {
 			});
 	};
 
+	const setUserData = async (user: FirebaseAuthTypes.User) => {
+		if (user) {
+			const data = await companyController.searchUserByEmail(user.email);
+			if (data) {
+				await AsyncStorage.setItem("userData", JSON.stringify(data));
+			}
+		}
+	};
+
 	const pushSignup = () => {
 		navigation.navigate("Sign Up");
 	};
 
 	const handleForgotPassword = async (text: string | undefined) => {
-		//auth().sendPasswordResetEmail()
 		if (!text) {
 			console.log("Cancel");
 			return;

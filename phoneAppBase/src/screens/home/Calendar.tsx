@@ -16,6 +16,7 @@ import { getTheme, themeColor, lightThemeColor } from "../../themes/theme";
 import moment from "moment";
 import LoadingScreen from "../LoadingScreen";
 import { SafeAreaView } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 /*
   STILL NEED TO DO:
@@ -42,18 +43,23 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 	const [selectedDate, setSelectedDate] = useState(today);
 	const [markedDates, setMarkedDates] = useState({});
 	const [isLoading, setIsLoading] = useState(false);
+	const [company, setCompany] = useState("");
 	const theme = useRef(getTheme());
 
 	useEffect(() => {
 		const fetchData = async () => {
 			try {
 				setIsLoading(true);
-				// HARD CODED COMPANY ID, PLEASE FIX!!!!!
-				const items = await getAgendaItems("SoBridalSocial");
-				const marks = getMarkedDates(items);
-
-				setAgendaItems(items);
-				setMarkedDates(marks);
+				await AsyncStorage.getItem("userData").then(async (data) => {
+					console.log(data);
+					if (data) {
+						const userData = JSON.parse(data);
+						const items = await getAgendaItems(userData.company);
+						const marks = getMarkedDates(items);
+						setAgendaItems(items);
+						setMarkedDates(marks);
+					}
+				});
 			} catch (error) {
 				console.error("Error fetching agenda items:", error);
 			} finally {
@@ -67,28 +73,28 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 		return <AgendaItem item={item} />;
 	}, []);
 
-	const handleTodayPress = () => {
-		setSelectedDate(today);
-	};
+	// const handleTodayPress = () => {
+	// 	setSelectedDate(today);
+	// };
 
-	useEffect(() => {
-		TodayButton;
-	}, [selectedDate]);
+	// useEffect(() => {
+	// 	TodayButton;
+	// }, [selectedDate]);
 
-	const TodayButton = () => {
-		if (selectedDate === today) {
-			return null;
-		}
+	// const TodayButton = () => {
+	// 	if (selectedDate === today) {
+	// 		return null;
+	// 	}
 
-		return (
-			<TouchableOpacity
-				style={styles.todayButton}
-				onPress={handleTodayPress}
-			>
-				<Text style={styles.todayButtonText}>Today</Text>
-			</TouchableOpacity>
-		);
-	};
+	// 	return (
+	// 		<TouchableOpacity
+	// 			style={styles.todayButton}
+	// 			onPress={handleTodayPress}
+	// 		>
+	// 			<Text style={styles.todayButtonText}>Today</Text>
+	// 		</TouchableOpacity>
+	// 	);
+	// };
 	if (isLoading) {
 		return <LoadingScreen />;
 	} else {

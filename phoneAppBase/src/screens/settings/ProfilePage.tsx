@@ -14,17 +14,15 @@ import UserController from "../../controller/userController";
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
 import LoadingScreen from "../LoadingScreen";
 import { SafeAreaView } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { width, height } = Dimensions.get("window");
-
-// TODO: Fix hardcoded company name
 
 const ProfilePage = ({ navigation }: any) => {
 	const [userData, setUserData] =
 		useState<FirebaseFirestoreTypes.DocumentData>();
 	const [password, setPassword] = useState<string>("");
-	// HARD CODED COMPANY PLEASE REPLACE!!!
-	const userController = new UserController("SoBridalSocial");
+	const [userController, setController] = useState<UserController>();
 
 	const handlePasswordChange = (newPassword: string) => {
 		setPassword(newPassword);
@@ -64,20 +62,28 @@ const ProfilePage = ({ navigation }: any) => {
 	};
 
 	useEffect(() => {
-		async function getDetails() {
-			try {
-				const user = await userController.getUser(
-					auth().currentUser!.uid
-				);
-				if (user) {
-					setUserData(user);
-				} else {
-					Alert.alert("Data could not be retrieved.");
+		const getDetails = async () => {
+			await AsyncStorage.getItem("userData").then(async (data) => {
+				if (data) {
+					const userData = JSON.parse(data);
+					const company = userData.company;
+					const userController = new UserController(company);
+					setController(userController);
+					try {
+						const user = await userController.getUser(
+							auth().currentUser!.uid
+						);
+						if (user) {
+							setUserData(user);
+						} else {
+							Alert.alert("Data could not be retrieved.");
+						}
+					} catch (e) {
+						Alert.alert("Error: " + e);
+					}
 				}
-			} catch (e) {
-				Alert.alert("Error: " + e);
-			}
-		}
+			});
+		};
 		getDetails();
 	}, []);
 
