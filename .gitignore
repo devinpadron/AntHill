@@ -16,7 +16,7 @@ ios/
 .vscode/
 .vscode
 .vs
-.swp
+*.swp
 
 # Expo generated files
 .expo/
