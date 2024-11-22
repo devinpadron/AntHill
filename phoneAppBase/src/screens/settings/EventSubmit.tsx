@@ -6,15 +6,14 @@ import {
 	TouchableOpacity,
 	StyleSheet,
 	ScrollView,
-	Switch,
-	KeyboardAvoidingView,
 	Platform,
+	KeyboardAvoidingView,
 } from "react-native";
 import DatePicker from "react-native-date-picker";
 import { Ionicons } from "@expo/vector-icons";
 import moment from "moment";
 import DropDownPicker from "react-native-dropdown-picker";
-import { times } from "lodash";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 /*
   STILL NEED TO DO:
@@ -44,7 +43,6 @@ const EventSubmit = () => {
 	]);
 
 	const handleSubmit = () => {
-		// Handle the form submission
 		console.log("Form submitted");
 	};
 
@@ -96,125 +94,150 @@ const EventSubmit = () => {
 			behavior={Platform.OS === "ios" ? "padding" : "height"}
 			style={styles.container}
 		>
-			<ScrollView contentContainerStyle={styles.scrollContainer}>
-				<Text style={styles.heading}>Submit New Event</Text>
+			<SafeAreaView>
+				<ScrollView contentContainerStyle={styles.scrollContainer}>
+					<Text style={styles.heading}>Submit New Event</Text>
 
-				<View style={styles.inputContainer}>
-					<Text style={styles.label}>Title</Text>
-					<TextInput
-						style={styles.input}
-						placeholder="Enter Title"
-						value={title}
-						onChangeText={setTitle}
-					/>
-				</View>
+					<View style={styles.inputContainer}>
+						<Text style={styles.label}>Title</Text>
+						<TextInput
+							style={styles.input}
+							placeholder="Enter Title"
+							value={title}
+							onChangeText={setTitle}
+						/>
+					</View>
 
-				<View style={styles.inputContainer}>
-					<Text style={styles.label}>Date</Text>
+					<View style={styles.inputContainer}>
+						<Text style={styles.label}>Date</Text>
+						<TouchableOpacity
+							onPress={checkDateOpen}
+							style={styles.dateButton}
+						>
+							<Text style={styles.dateButtonText}>
+								{formatDate(date)}
+							</Text>
+						</TouchableOpacity>
+						<DatePicker
+							modal
+							open={openDate}
+							date={date}
+							mode="date"
+							onConfirm={(date) => {
+								setOpenDate(false);
+								setDate(date);
+							}}
+							onCancel={() => {}}
+						/>
+					</View>
+
+					<View style={styles.inputContainer}>
+						<Text style={styles.label}>Start Time</Text>
+						<TouchableOpacity
+							onPress={checkStartTimeOpen}
+							style={styles.dateButton}
+						>
+							<Text style={styles.dateButtonText}>
+								{formatTime(startTime)}
+							</Text>
+						</TouchableOpacity>
+						<DatePicker
+							modal
+							open={openStartTime}
+							date={startTime}
+							mode="time"
+							onConfirm={(date) => {
+								setOpenStartTime(false);
+								setStartTime(date);
+							}}
+							onCancel={() => {}}
+						/>
+					</View>
+					<View style={styles.inputContainer}>
+						<Text style={styles.label}>Date</Text>
+						<TouchableOpacity
+							onPress={checkDateOpen}
+							style={styles.dateButton}
+						>
+							<Text style={styles.dateButtonText}>
+								{formatDate(date)}
+							</Text>
+						</TouchableOpacity>
+						<DatePicker
+							modal
+							open={openDate}
+							date={date}
+							onConfirm={(date) => {
+								setOpenDate(false);
+								setDate(date);
+							}}
+							onCancel={() => {
+								setOpenDate(false);
+							}}
+						/>
+					</View>
+
+					<View style={styles.inputContainer}>
+						<Text style={styles.label}>End Time</Text>
+						<TouchableOpacity
+							onPress={checkEndTimeOpen}
+							style={styles.dateButton}
+						>
+							<Text style={styles.dateButtonText}>
+								{formatTime(endTime)}
+							</Text>
+						</TouchableOpacity>
+						<DatePicker
+							modal
+							open={openEndTime}
+							date={endTime}
+							mode="time"
+							onConfirm={(date) => {
+								setOpenEndTime(false);
+								setEndTime(date);
+							}}
+							onCancel={() => {}}
+						/>
+					</View>
+
+					<View style={styles.inputContainer}>
+						<Text style={styles.label}>Assigned Worker</Text>
+						<DropDownPicker
+							multiple={true}
+							min={0}
+							max={5}
+							value={worker}
+							setValue={setWorker}
+							items={items}
+							open={openSelect}
+							setOpen={checkSelectOpen}
+							mode={"BADGE"}
+							listMode="SCROLLVIEW"
+							searchable={true}
+						/>
+					</View>
+
+					<View style={styles.inputContainer}>
+						<Text style={styles.label}>Notes</Text>
+						<TextInput
+							style={[styles.input, styles.notesInput]}
+							placeholder="Enter notes"
+							value={notes}
+							onChangeText={setNotes}
+							multiline={true}
+							textAlignVertical="top"
+						/>
+					</View>
+
 					<TouchableOpacity
-						onPress={checkDateOpen}
-						style={styles.dateButton}
+						style={styles.submitButton}
+						onPress={handleSubmit}
 					>
-						<Text style={styles.dateButtonText}>
-							{formatDate(date)}
-						</Text>
+						<Text style={styles.submitButtonText}>Submit</Text>
+						<Ionicons name="send" size={24} color="white" />
 					</TouchableOpacity>
-					<DatePicker
-						modal
-						open={openDate}
-						date={date}
-						mode="date"
-						onConfirm={(date) => {
-							setOpenDate(false);
-							setDate(date);
-						}}
-						onCancel={() => {}}
-					/>
-				</View>
-
-				<View style={styles.inputContainer}>
-					<Text style={styles.label}>Start Time</Text>
-					<TouchableOpacity
-						onPress={checkStartTimeOpen}
-						style={styles.dateButton}
-					>
-						<Text style={styles.dateButtonText}>
-							{formatTime(startTime)}
-						</Text>
-					</TouchableOpacity>
-					<DatePicker
-						modal
-						open={openStartTime}
-						date={startTime}
-						mode="time"
-						onConfirm={(date) => {
-							setOpenStartTime(false);
-							setStartTime(date);
-						}}
-						onCancel={() => {}}
-					/>
-				</View>
-
-				<View style={styles.inputContainer}>
-					<Text style={styles.label}>End Time</Text>
-					<TouchableOpacity
-						onPress={checkEndTimeOpen}
-						style={styles.dateButton}
-					>
-						<Text style={styles.dateButtonText}>
-							{formatTime(endTime)}
-						</Text>
-					</TouchableOpacity>
-					<DatePicker
-						modal
-						open={openEndTime}
-						date={endTime}
-						mode="time"
-						onConfirm={(date) => {
-							setOpenEndTime(false);
-							setEndTime(date);
-						}}
-						onCancel={() => {}}
-					/>
-				</View>
-
-				<View style={styles.inputContainer}>
-					<Text style={styles.label}>Assigned Worker</Text>
-					<DropDownPicker
-						multiple={true}
-						min={0}
-						max={5}
-						value={worker}
-						setValue={setWorker}
-						items={items}
-						open={openSelect}
-						setOpen={checkSelectOpen}
-						mode={"BADGE"}
-						listMode="SCROLLVIEW"
-						searchable={true}
-					/>
-				</View>
-
-				<View style={styles.inputContainer}>
-					<Text style={styles.label}>Notes</Text>
-					<TextInput
-						style={[styles.input, styles.notesInput]}
-						placeholder="Enter notes"
-						value={notes}
-						onChangeText={setNotes}
-						multiline={true}
-						textAlignVertical="top"
-					/>
-				</View>
-
-				<TouchableOpacity
-					style={styles.submitButton}
-					onPress={handleSubmit}
-				>
-					<Text style={styles.submitButtonText}>Submit</Text>
-					<Ionicons name="send" size={24} color="white" />
-				</TouchableOpacity>
-			</ScrollView>
+				</ScrollView>
+			</SafeAreaView>
 		</KeyboardAvoidingView>
 	);
 };
@@ -257,12 +280,6 @@ const styles = StyleSheet.create({
 		height: 120,
 		textAlignVertical: "top",
 		paddingTop: 15,
-	},
-	switchContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		marginBottom: 20,
 	},
 	dateButton: {
 		backgroundColor: "white",

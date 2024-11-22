@@ -18,9 +18,8 @@ interface User {
 	lastName: string;
 	email: string;
 	privilege: string;
+	company: string;
 }
-
-// I HARD CODED SOBRIDALSOCIAL AS THE ONLY COMPANY. THIS WILL CHANGE IN THE FUTURE.
 
 export default class UserControllerStruct {
 	private company = "";

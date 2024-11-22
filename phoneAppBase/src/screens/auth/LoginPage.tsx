@@ -1,7 +1,5 @@
-import { StatusBar } from "expo-status-bar";
 import React, { useState } from "react";
 import {
-	View,
 	Text,
 	Image,
 	TextInput,
@@ -10,20 +8,23 @@ import {
 	Alert,
 	Platform,
 } from "react-native";
-import auth from "@react-native-firebase/auth";
+import auth, { FirebaseAuthTypes } from "@react-native-firebase/auth";
 import prompt from "react-native-prompt-android";
+import { SafeAreaView } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import CompanyController from "../../controller/companyController";
 
 const LoginPage = ({ navigation }: any) => {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
+	const companyController = new CompanyController();
 
 	const handleLogin = async () => {
-		console.log("Hello");
-		console.log(auth().currentUser);
 		await auth()
 			.signInWithEmailAndPassword(email, password)
-			.then((userCredential) => {
+			.then(async (userCredential) => {
 				const user = userCredential.user;
+				await setUserData(user);
 				console.log("User account signed in!");
 			})
 			.catch((error) => {
@@ -53,12 +54,20 @@ const LoginPage = ({ navigation }: any) => {
 			});
 	};
 
+	const setUserData = async (user: FirebaseAuthTypes.User) => {
+		if (user) {
+			const data = await companyController.searchUserByEmail(user.email);
+			if (data) {
+				await AsyncStorage.setItem("userData", JSON.stringify(data));
+			}
+		}
+	};
+
 	const pushSignup = () => {
 		navigation.navigate("Sign Up");
 	};
 
 	const handleForgotPassword = async (text: string | undefined) => {
-		//auth().sendPasswordResetEmail()
 		if (!text) {
 			console.log("Cancel");
 			return;
@@ -86,11 +95,11 @@ const LoginPage = ({ navigation }: any) => {
 	};
 
 	return (
-		<View style={styles.container}>
+		<SafeAreaView style={styles.container}>
 			{/* Logo */}
 			<Image
 				style={styles.logoImage}
-				source={require("../../../assets/DolceNGelato/vicoLogoPrimary.png")}
+				source={require("../../assets/DolceNGelato/vicoLogoPrimary.png")}
 			/>
 
 			{/* Username Textbox */}
@@ -178,9 +187,7 @@ const LoginPage = ({ navigation }: any) => {
 					Forgot Password
 				</Text>
 			</TouchableOpacity>
-
-			<StatusBar style="auto" />
-		</View>
+		</SafeAreaView>
 	);
 };
 
@@ -191,7 +198,6 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: "white",
 		alignItems: "center",
-		//justifyContent: 'center',
 	},
 	textInput: {
 		width: 350,
@@ -207,7 +213,6 @@ const styles = StyleSheet.create({
 	logoImage: {
 		width: 450,
 		height: 300,
-		marginTop: 120,
 	},
 	roundButton: {
 		width: 350,
