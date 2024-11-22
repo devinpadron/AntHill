@@ -24,6 +24,8 @@ export default class CompanyController {
 		return null;
 	};
 
+	//Return first instance of user with matching email.
+	//Used when we need to find a user by email but don't yet know their company.
 	public searchUserByEmail = async (email: string) => {
 		var data;
 		try {
@@ -40,11 +42,11 @@ export default class CompanyController {
 
 	// The reason for this is because it may be possible to have a single user appear multiple times in the database
 	// if they work for multiple companies. This will help mass update data across all companies when they request to change it.
-	public getAllUsersByID = async (id: string) => {
+	public getAllUsersByEmail = async (email: string) => {
 		try {
 			const userEntries = await db
 				.collectionGroup("Users")
-				.where("id", "==", id)
+				.where("email", "==", email)
 				.get();
 			return userEntries;
 		} catch (e) {
