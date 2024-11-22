@@ -1,11 +1,5 @@
 import React, { useRef, useCallback, useState, useEffect } from "react";
-import {
-	StyleSheet,
-	View,
-	Platform,
-	TouchableOpacity,
-	Text,
-} from "react-native";
+import { StyleSheet, View, TouchableOpacity, Text } from "react-native";
 import {
 	ExpandableCalendar,
 	AgendaList,
@@ -19,9 +13,10 @@ import {
 } from "../../controller/agendaItemController";
 import AgendaItem from "../../models/Calendar/AgendaItem";
 import { getTheme, themeColor, lightThemeColor } from "../../themes/theme";
-import Constants from "expo-constants";
 import moment from "moment";
 import LoadingScreen from "../LoadingScreen";
+import { SafeAreaView } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 /*
   STILL NEED TO DO:
@@ -36,8 +31,8 @@ import LoadingScreen from "../LoadingScreen";
 */
 
 const today = moment().format("YYYY-MM-DD");
-const leftArrowIcon = require("../../../assets/next.png");
-const rightArrowIcon = require("../../../assets/next.png");
+const leftArrowIcon = require("../../assets/previous.png");
+const rightArrowIcon = require("../../assets/next.png");
 
 type CalendarProps = {
 	weekView?: any;
@@ -48,18 +43,23 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 	const [selectedDate, setSelectedDate] = useState(today);
 	const [markedDates, setMarkedDates] = useState({});
 	const [isLoading, setIsLoading] = useState(false);
+	const [company, setCompany] = useState("");
 	const theme = useRef(getTheme());
 
 	useEffect(() => {
 		const fetchData = async () => {
 			try {
 				setIsLoading(true);
-				// HARD CODED COMPANY ID, PLEASE FIX!!!!!
-				const items = await getAgendaItems("SoBridalSocial");
-				const marks = getMarkedDates(items);
-
-				setAgendaItems(items);
-				setMarkedDates(marks);
+				await AsyncStorage.getItem("userData").then(async (data) => {
+					console.log(data);
+					if (data) {
+						const userData = JSON.parse(data);
+						const items = await getAgendaItems(userData.company);
+						const marks = getMarkedDates(items);
+						setAgendaItems(items);
+						setMarkedDates(marks);
+					}
+				});
 			} catch (error) {
 				console.error("Error fetching agenda items:", error);
 			} finally {
@@ -73,30 +73,34 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 		return <AgendaItem item={item} />;
 	}, []);
 
-	const handleTodayPress = () => {
-		setSelectedDate(today);
-	};
+	// const handleTodayPress = () => {
+	// 	setSelectedDate(today);
+	// };
 
-	const TodayButton = () => {
-		if (selectedDate === today) {
-			return null;
-		}
+	// useEffect(() => {
+	// 	TodayButton;
+	// }, [selectedDate]);
 
-		return (
-			<TouchableOpacity
-				style={styles.todayButton}
-				onPress={handleTodayPress}
-			>
-				<Text style={styles.todayButtonText}>Today</Text>
-			</TouchableOpacity>
-		);
-	};
+	// const TodayButton = () => {
+	// 	if (selectedDate === today) {
+	// 		return null;
+	// 	}
+
+	// 	return (
+	// 		<TouchableOpacity
+	// 			style={styles.todayButton}
+	// 			onPress={handleTodayPress}
+	// 		>
+	// 			<Text style={styles.todayButtonText}>Today</Text>
+	// 		</TouchableOpacity>
+	// 	);
+	// };
 	if (isLoading) {
 		return <LoadingScreen />;
 	} else {
 		return (
-			<View style={styles.container}>
-				<CalendarProvider date={selectedDate} showTodayButton={false}>
+			<SafeAreaView style={styles.container}>
+				<CalendarProvider date={selectedDate} showTodayButton={true}>
 					<View style={styles.calendarContainer}>
 						{weekView ? (
 							<WeekCalendar
@@ -124,7 +128,6 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 										setSelectedDate(day.dateString)
 									}
 								/>
-								<TodayButton />
 							</>
 						)}
 					</View>
@@ -150,7 +153,7 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 						/>
 					</View>
 				</CalendarProvider>
-			</View>
+			</SafeAreaView>
 		);
 	}
 };
@@ -170,7 +173,6 @@ const styles = StyleSheet.create({
 	},
 	container: {
 		flex: 1,
-		marginTop: Constants.statusBarHeight,
 	},
 	calendarContainer: {
 		position: "relative",

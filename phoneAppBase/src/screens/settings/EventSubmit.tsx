@@ -14,6 +14,7 @@ import DatePicker from "react-native-date-picker";
 import { Ionicons } from "@expo/vector-icons";
 import moment from "moment";
 import DropDownPicker from "react-native-dropdown-picker";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 /*
   STILL NEED TO DO:
@@ -68,99 +69,101 @@ const EventSubmit = () => {
 			behavior={Platform.OS === "ios" ? "padding" : "height"}
 			style={styles.container}
 		>
-			<ScrollView contentContainerStyle={styles.scrollContainer}>
-				<Text style={styles.heading}>Submit New Event</Text>
+			<SafeAreaView>
+				<ScrollView contentContainerStyle={styles.scrollContainer}>
+					<Text style={styles.heading}>Submit New Event</Text>
 
-				<View style={styles.inputContainer}>
-					<Text style={styles.label}>Title</Text>
-					<TextInput
-						style={styles.input}
-						placeholder="Enter Title"
-						value={title}
-						onChangeText={setTitle}
-					/>
-				</View>
+					<View style={styles.inputContainer}>
+						<Text style={styles.label}>Title</Text>
+						<TextInput
+							style={styles.input}
+							placeholder="Enter Title"
+							value={title}
+							onChangeText={setTitle}
+						/>
+					</View>
 
-				<View style={styles.inputContainer}>
-					<Text style={styles.label}>Date</Text>
+					<View style={styles.inputContainer}>
+						<Text style={styles.label}>Date</Text>
+						<TouchableOpacity
+							onPress={checkDateOpen}
+							style={styles.dateButton}
+						>
+							<Text style={styles.dateButtonText}>
+								{formatDate(date)}
+							</Text>
+						</TouchableOpacity>
+						<DatePicker
+							modal
+							open={openDate}
+							date={date}
+							onConfirm={(date) => {
+								setOpenDate(false);
+								setDate(date);
+							}}
+							onCancel={() => {
+								setOpenDate(false);
+							}}
+							mode={allDay ? "date" : "datetime"}
+						/>
+					</View>
+
+					<View style={styles.switchContainer}>
+						<Text style={styles.label}>All Day</Text>
+						<Switch
+							value={allDay}
+							onValueChange={(value) => {
+								setAllDay(value);
+								if (value) {
+									// If switching to all-day, reset the time to midnight
+									const newDate = new Date(date);
+									newDate.setHours(0, 0, 0, 0);
+									setDate(newDate);
+								}
+							}}
+							trackColor={{ false: "#767577", true: "#81b0ff" }}
+							thumbColor={allDay ? "#f5dd4b" : "#f4f3f4"}
+						/>
+					</View>
+
+					<View style={styles.inputContainer}>
+						<Text style={styles.label}>Assigned Worker</Text>
+						<DropDownPicker
+							multiple={true}
+							min={0}
+							max={5}
+							value={worker}
+							setValue={setWorker}
+							items={items}
+							open={openSelect}
+							setOpen={checkSelectOpen}
+							mode={"BADGE"}
+							listMode="SCROLLVIEW"
+							searchable={true}
+						/>
+					</View>
+
+					<View style={styles.inputContainer}>
+						<Text style={styles.label}>Notes</Text>
+						<TextInput
+							style={[styles.input, styles.notesInput]}
+							placeholder="Enter notes"
+							value={notes}
+							onChangeText={setNotes}
+							multiline={true}
+							textAlignVertical="top"
+						/>
+					</View>
+
 					<TouchableOpacity
-						onPress={checkDateOpen}
-						style={styles.dateButton}
+						style={styles.submitButton}
+						onPress={handleSubmit}
 					>
-						<Text style={styles.dateButtonText}>
-							{formatDate(date)}
-						</Text>
+						<Text style={styles.submitButtonText}>Submit</Text>
+						<Ionicons name="send" size={24} color="white" />
 					</TouchableOpacity>
-					<DatePicker
-						modal
-						open={openDate}
-						date={date}
-						onConfirm={(date) => {
-							setOpenDate(false);
-							setDate(date);
-						}}
-						onCancel={() => {
-							setOpenDate(false);
-						}}
-						mode={allDay ? "date" : "datetime"}
-					/>
-				</View>
-
-				<View style={styles.switchContainer}>
-					<Text style={styles.label}>All Day</Text>
-					<Switch
-						value={allDay}
-						onValueChange={(value) => {
-							setAllDay(value);
-							if (value) {
-								// If switching to all-day, reset the time to midnight
-								const newDate = new Date(date);
-								newDate.setHours(0, 0, 0, 0);
-								setDate(newDate);
-							}
-						}}
-						trackColor={{ false: "#767577", true: "#81b0ff" }}
-						thumbColor={allDay ? "#f5dd4b" : "#f4f3f4"}
-					/>
-				</View>
-
-				<View style={styles.inputContainer}>
-					<Text style={styles.label}>Assigned Worker</Text>
-					<DropDownPicker
-						multiple={true}
-						min={0}
-						max={5}
-						value={worker}
-						setValue={setWorker}
-						items={items}
-						open={openSelect}
-						setOpen={checkSelectOpen}
-						mode={"BADGE"}
-						listMode="SCROLLVIEW"
-						searchable={true}
-					/>
-				</View>
-
-				<View style={styles.inputContainer}>
-					<Text style={styles.label}>Notes</Text>
-					<TextInput
-						style={[styles.input, styles.notesInput]}
-						placeholder="Enter notes"
-						value={notes}
-						onChangeText={setNotes}
-						multiline={true}
-						textAlignVertical="top"
-					/>
-				</View>
-
-				<TouchableOpacity
-					style={styles.submitButton}
-					onPress={handleSubmit}
-				>
-					<Text style={styles.submitButtonText}>Submit</Text>
-					<Ionicons name="send" size={24} color="white" />
-				</TouchableOpacity>
-			</ScrollView>
+				</ScrollView>
+			</SafeAreaView>
 		</KeyboardAvoidingView>
 	);
 };

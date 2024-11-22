@@ -7,6 +7,7 @@ import LoadingScreen from "./src/screens/LoadingScreen";
 import HomeTabs from "./src/routes/HomeTabs";
 import AuthStack from "./src/routes/AuthStack";
 import { Alert } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 // This component will handle the conditional rendering based on auth state
 const AppNavigator = () => {
@@ -97,15 +98,17 @@ const AppNavigator = () => {
 	}
 
 	return (
-		<NavigationContainer>
-			{loggedIn ? (
-				// User is signed in
-				<HomeTabs />
-			) : (
-				// No user is signed in
-				<AuthStack />
-			)}
-		</NavigationContainer>
+		<GestureHandlerRootView style={{ flex: 1 }}>
+			<NavigationContainer>
+				{loggedIn ? (
+					// User is signed in
+					<HomeTabs />
+				) : (
+					// No user is signed in
+					<AuthStack />
+				)}
+			</NavigationContainer>
+		</GestureHandlerRootView>
 	);
 };
 
