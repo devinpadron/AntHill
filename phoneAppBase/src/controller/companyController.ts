@@ -7,6 +7,7 @@ interface Company {
 
 export default class CompanyController {
 	public compareAccessCode = async (accessCode: string) => {
+		let data = null;
 		try {
 			//Retrieve event data
 			const companyEntry = await db
@@ -15,19 +16,20 @@ export default class CompanyController {
 				.get();
 			companyEntry.forEach((doc) => {
 				if (doc.data().accessCode == accessCode) {
-					return doc.id;
+					data = doc.id;
 				}
 			});
 		} catch (e) {
 			console.error("Error getting company", e);
+			return null;
 		}
-		return null;
+		return data;
 	};
 
 	//Return first instance of user with matching email.
 	//Used when we need to find a user by email but don't yet know their company.
 	public searchUserByEmail = async (email: string) => {
-		var data;
+		let data = null;
 		try {
 			const userEntry = await db
 				.collectionGroup("Users")
@@ -36,6 +38,7 @@ export default class CompanyController {
 			data = userEntry.docs.at(0).data();
 		} catch (e) {
 			console.error("Error finding user ", e);
+			return null;
 		}
 		return data;
 	};
@@ -51,8 +54,19 @@ export default class CompanyController {
 			return userEntries;
 		} catch (e) {
 			console.error("Error finding users ", e);
+			return null;
 		}
-		return null;
+	};
+
+	public updateAllUsersByEmail = async (email: string, data: any) => {
+		try {
+			const userEntries = await this.getAllUsersByEmail(email);
+			userEntries.forEach((doc) => {
+				doc.ref.update(data);
+			});
+		} catch (e) {
+			console.error("Error updating users ", e);
+		}
 	};
 
 	public getAllUsersInCompany = async (company: string) => {
@@ -69,7 +83,7 @@ export default class CompanyController {
 			return employees;
 		} catch (e) {
 			console.error("Error finding users ", e);
+			return null;
 		}
-		return null;
 	};
 }

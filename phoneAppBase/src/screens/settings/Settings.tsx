@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import auth from "@react-native-firebase/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const Settings = ({ navigation }: any) => {
 	const SettingsItem: React.FC<{
@@ -54,7 +55,10 @@ const Settings = ({ navigation }: any) => {
 					try {
 						await auth()
 							.signOut()
-							.then(() => console.log("User signed out!"));
+							.then(async () => {
+								console.log("User signed out!")
+								await AsyncStorage.removeItem("userData");
+							});
 					} catch (error) {
 						console.error("Signout Error", error);
 					}

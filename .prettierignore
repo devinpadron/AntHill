@@ -1,0 +1,29 @@
+# Android
+android/
+
+# Node
+node_modules/
+*.log
+.nvm
+package-lock.json
+
+# iOS / CocoaPods
+ios/
+
+# Visual Studio Code (config dir - if present, this merges user defined
+# workspace settings on top of react-native.code-workspace)
+/.vscode
+.vscode/
+.vscode
+.vs
+*.swp
+
+# Expo generated files
+.expo/
+
+# Google service files
+google-services.json
+GoogleService-Info.plist
+
+# Whatever this is wants to update which is weird
+.DS_Store

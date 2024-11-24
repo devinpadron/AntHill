@@ -45,6 +45,7 @@ const AppNavigator = () => {
 										"Failed to send verification email. Please try again."
 									);
 								}
+								auth().signOut();
 							},
 						},
 						{
