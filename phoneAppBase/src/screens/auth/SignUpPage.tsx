@@ -72,20 +72,20 @@ const SignUpPage = ({ navigation }: any) => {
 			return;
 		}
 		const userController = new UserController(company);
-
-		const userData = {
-			firstName: firstName,
-			lastName: lastName,
-			email: email,
-			privilege: "User",
-			company: company,
-		};
 		setIsLoading(true);
 		await auth()
 			.createUserWithEmailAndPassword(email, password)
 			.then(async (userCredential) => {
 				const user = userCredential.user;
 				user.updateProfile({ displayName: firstName + " " + lastName });
+				const userData = {
+					id: user.uid,
+					firstName: firstName,
+					lastName: lastName,
+					email: email,
+					privilege: "User",
+					company: company,
+				};
 				await userController.addUser(userData, user.uid);
 				await user.sendEmailVerification();
 				navigation.pop();

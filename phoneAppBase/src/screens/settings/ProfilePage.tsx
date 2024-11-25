@@ -8,11 +8,12 @@ import {
 	Platform,
 } from "react-native";
 import { Dropdown } from "react-native-element-dropdown";
-import auth, { updateEmail } from "@react-native-firebase/auth";
+import auth from "@react-native-firebase/auth";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import LoadingScreen from "../LoadingScreen";
 import CompanyController from "../../controller/companyController";
+import UserController from "../../controller/userController";
 import prompt from "react-native-prompt-android";
 
 const ProfilePage = () => {
@@ -52,7 +53,41 @@ const ProfilePage = () => {
 		fillCompanyData();
 	}, [userData]);
 
-	const handleEmailChange = () => {
+	const reAuthenticatePrompt = async () => {
+		const reAuth = async (password: string) => {
+			const user = auth().currentUser;
+			if (!user?.email) {
+				Alert.alert("Error", "No user is currently signed in");
+				return;
+			}
+
+			// Reauthenticate with current credentials
+			const credential = auth.EmailAuthProvider.credential(
+				user.email,
+				password
+			);
+			await user
+				.reauthenticateWithCredential(credential)
+				.catch((error) => {
+					switch (error.code) {
+						case "auth/wrong-password":
+							Alert.alert(
+								"Error",
+								"Incorrect password. Please try again."
+							);
+							break;
+						case "auth/invalid-credential":
+							Alert.alert(
+								"Error",
+								"Invalid credentials. Please try again."
+							);
+							break;
+						default:
+							console.error("Reauthentication error:", error);
+					}
+				});
+		};
+
 		if (Platform.OS === "android") {
 			prompt(
 				"Current Password",
@@ -61,7 +96,7 @@ const ProfilePage = () => {
 					{ text: "Cancel", style: "cancel" },
 					{
 						text: "Continue",
-						onPress: (password) => validateAndChangeEmail(password),
+						onPress: async (password) => await reAuth(password),
 					},
 				],
 				{ type: "secure-text" }
@@ -74,7 +109,7 @@ const ProfilePage = () => {
 					{ text: "Cancel", style: "cancel" },
 					{
 						text: "Continue",
-						onPress: (password) => validateAndChangeEmail(password),
+						onPress: async (password) => await reAuth(password),
 					},
 				],
 				"secure-text"
@@ -82,36 +117,13 @@ const ProfilePage = () => {
 		}
 	};
 
-	const validateAndChangeEmail = async (password: string) => {
-		const user = auth().currentUser;
-		if (!user?.email) {
-			Alert.alert("Error", "No user is currently signed in");
+	const handleEmailChange = () => {
+		try {
+			reAuthenticatePrompt();
+		} catch (e) {
+			console.error(e);
 			return;
 		}
-
-		// Reauthenticate with current credentials
-		const credential = auth.EmailAuthProvider.credential(
-			user.email,
-			password
-		);
-		await user.reauthenticateWithCredential(credential).catch((error) => {
-			switch (error.code) {
-				case "auth/wrong-password":
-					Alert.alert(
-						"Error",
-						"Incorrect password. Please try again."
-					);
-					break;
-				case "auth/invalid-credential":
-					Alert.alert(
-						"Error",
-						"Invalid credentials. Please try again."
-					);
-					break;
-				default:
-					console.error("Reauthentication error:", error);
-			}
-		});
 
 		const confirmEmail = (email: string) => {
 			Alert.alert(
@@ -159,8 +171,6 @@ const ProfilePage = () => {
 		}
 	};
 
-	// for some reason this doesnt work
-	// there is something wrong with the listener but i cant figure it out; enjoy this shit.
 	const changeEmail = async (newEmail: string) => {
 		const user = auth().currentUser;
 		if (!user) {
@@ -224,7 +234,11 @@ const ProfilePage = () => {
 				{
 					text: "Reset",
 					onPress: () => {
-						// Implement password reset logic here
+						auth().sendPasswordResetEmail(userData.email);
+						Alert.alert(
+							"Reset Password",
+							"Check your email to reset your password."
+						);
 					},
 				},
 			]
@@ -233,15 +247,33 @@ const ProfilePage = () => {
 
 	const handleDeleteAccount = () => {
 		Alert.alert(
-			"Delete Account",
-			"Are you sure you want to delete your account? This action cannot be undone.",
+			"Delete " + companyData.selectedCompany + " Data?",
+			"Are you sure you want to delete your company account? This action cannot be undone.",
 			[
 				{ text: "Cancel", style: "cancel" },
 				{
 					text: "Delete",
 					style: "destructive",
-					onPress: () => {
-						// Implement account deletion logic here
+					onPress: async () => {
+						try {
+							await reAuthenticatePrompt();
+						} catch (e) {
+							console.error(e);
+							Alert.alert(
+								"Error",
+								"An error occurred. Please try again."
+							);
+							return;
+						}
+						const userController = new UserController(
+							companyData.selectedCompany
+						);
+						await userController.deleteUser(userData);
+						if (companyData.companies.length > 1) {
+							//TODO: Implement switch company logic here
+						} else {
+							await auth().currentUser.delete();
+						}
 					},
 				},
 			]
@@ -308,7 +340,7 @@ const ProfilePage = () => {
 						onPress={handleDeleteAccount}
 					>
 						<Text style={styles.deleteButtonText}>
-							Delete Account
+							Delete Company Profile
 						</Text>
 					</TouchableOpacity>
 				</View>
