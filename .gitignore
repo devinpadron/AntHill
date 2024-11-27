@@ -28,6 +28,3 @@ GoogleService-Info.plist
 # Environment variables
 .env
 .env.*
-
-# TypeScript declaration files for env
-env.d.ts
