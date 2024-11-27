@@ -24,3 +24,10 @@ ios/
 # Google service files
 google-services.json
 GoogleService-Info.plist
+
+# Environment variables
+.env
+.env.*
+
+# TypeScript declaration files for env
+env.d.ts
