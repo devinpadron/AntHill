@@ -10,8 +10,11 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import auth from "@react-native-firebase/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const Settings = ({ navigation }: any) => {
+	//TODO: Implement isAdmin check to hide/show admin settings
+	const [isAdmin, setIsAdmin] = React.useState(true);
 	const SettingsItem: React.FC<{
 		title: string;
 		isAction?: boolean;
@@ -54,7 +57,10 @@ const Settings = ({ navigation }: any) => {
 					try {
 						await auth()
 							.signOut()
-							.then(() => console.log("User signed out!"));
+							.then(async () => {
+								console.log("User signed out!");
+								await AsyncStorage.removeItem("userData");
+							});
 					} catch (error) {
 						console.error("Signout Error", error);
 					}
@@ -81,17 +87,19 @@ const Settings = ({ navigation }: any) => {
 				<SettingsItem title="Profile" onPress={pushProfile} />
 			</View>
 
-			<View style={styles.section}>
-				<Text style={styles.sectionTitle}>ADMIN</Text>
-				<SettingsItem
-					title="Create New Event"
-					onPress={pushEventSubmit}
-				/>
-				<SettingsItem
-					title="Employee List"
-					onPress={pushEmployeeList}
-				/>
-			</View>
+			{isAdmin ? (
+				<View style={styles.section}>
+					<Text style={styles.sectionTitle}>ADMIN</Text>
+					<SettingsItem
+						title="Create New Event"
+						onPress={pushEventSubmit}
+					/>
+					<SettingsItem
+						title="Employee List"
+						onPress={pushEmployeeList}
+					/>
+				</View>
+			) : null}
 
 			<View style={styles.section}>
 				<Text style={styles.sectionTitle}>ACTIONS</Text>

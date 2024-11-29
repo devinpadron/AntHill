@@ -8,7 +8,7 @@ import {
 	Alert,
 	Platform,
 } from "react-native";
-import auth, { FirebaseAuthTypes } from "@react-native-firebase/auth";
+import auth from "@react-native-firebase/auth";
 import prompt from "react-native-prompt-android";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -24,7 +24,7 @@ const LoginPage = ({ navigation }: any) => {
 			.signInWithEmailAndPassword(email, password)
 			.then(async (userCredential) => {
 				const user = userCredential.user;
-				await setUserData(user);
+				await setUserData(user.email);
 				console.log("User account signed in!");
 			})
 			.catch((error) => {
@@ -54,12 +54,10 @@ const LoginPage = ({ navigation }: any) => {
 			});
 	};
 
-	const setUserData = async (user: FirebaseAuthTypes.User) => {
-		if (user) {
-			const data = await companyController.searchUserByEmail(user.email);
-			if (data) {
-				await AsyncStorage.setItem("userData", JSON.stringify(data));
-			}
+	const setUserData = async (email: string) => {
+		const data = await companyController.searchUserByEmail(email);
+		if (data) {
+			await AsyncStorage.setItem("userData", JSON.stringify(data));
 		}
 	};
 

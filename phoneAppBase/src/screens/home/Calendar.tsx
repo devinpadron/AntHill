@@ -43,7 +43,6 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 	const [selectedDate, setSelectedDate] = useState(today);
 	const [markedDates, setMarkedDates] = useState({});
 	const [isLoading, setIsLoading] = useState(false);
-	const [company, setCompany] = useState("");
 	const theme = useRef(getTheme());
 
 	useEffect(() => {
@@ -51,7 +50,6 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 			try {
 				setIsLoading(true);
 				await AsyncStorage.getItem("userData").then(async (data) => {
-					console.log(data);
 					if (data) {
 						const userData = JSON.parse(data);
 						const items = await getAgendaItems(userData.company);

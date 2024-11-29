@@ -28,3 +28,6 @@ GoogleService-Info.plist
 # Environment variables
 .env
 .env.*
+
+# macOS
+.DS_Store
