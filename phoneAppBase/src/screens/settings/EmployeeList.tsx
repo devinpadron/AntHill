@@ -24,52 +24,6 @@ if (
 	UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// TODO: Gather a list of employees from Firebase
-//const employees = companyController.getAllUsersInCompany();
-
-// const employees = [
-// 	{
-// 		id: 1,
-// 		name: "John Doe",
-// 		privilege: "Owner",
-// 		email: "john.doe@example.com",
-// 		phone: "123-456-7890",
-// 	},
-// 	{
-// 		id: 2,
-// 		name: "Jane Smith",
-// 		privilege: "Admin",
-// 		email: "jane.smith@example.com",
-// 		phone: "123-456-7891",
-// 	},
-// 	{
-// 		id: 3,
-// 		name: "Alice Johnson",
-// 		privilege: "User",
-// 		email: "alice.johnson@example.com",
-// 		phone: "123-456-7892",
-// 	},
-// 	{
-// 		id: 4,
-// 		name: "Bob Brown",
-// 		privilege: "Admin",
-// 		email: "bob.brown@example.com",
-// 		phone: "123-456-7893",
-// 	},
-// 	{
-// 		name: "Charlie Davis",
-// 		privilege: "Owner",
-// 		email: "charlie.davis@example.com",
-// 		phone: "123-456-7894",
-// 	},
-// 	{
-// 		name: "Eve White",
-// 		privilege: "User",
-// 		email: "eve.white@example.com",
-// 		phone: "123-456-7895",
-// 	},
-// ];
-
 const EmployeeList = () => {
 	const [expandedIndex, setExpandedIndex] = useState(null);
 	const companyController = new CompanyController();

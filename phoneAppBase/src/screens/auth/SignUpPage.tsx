@@ -6,11 +6,13 @@ import {
 	Text,
 	StyleSheet,
 	Alert,
+	ActivityIndicator,
 } from "react-native";
 import UserController from "../../controller/userController";
 import CompanyController from "../../controller/companyController";
 import auth from "@react-native-firebase/auth";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { set } from "lodash";
 
 const SignUpPage = ({ navigation }: any) => {
 	const [firstName, setFirstName] = useState("");
@@ -19,6 +21,7 @@ const SignUpPage = ({ navigation }: any) => {
 	const [password, setPassword] = useState("");
 	const [confPassword, setConfPassword] = useState("");
 	const [accessCode, setAccessCode] = useState("");
+	const [isLoading, setIsLoading] = useState(false);
 	const companyController = new CompanyController();
 
 	const validateFields = () => {
@@ -69,21 +72,22 @@ const SignUpPage = ({ navigation }: any) => {
 			return;
 		}
 		const userController = new UserController(company);
-
-		const userData = {
-			firstName: firstName,
-			lastName: lastName,
-			email: email,
-			privilege: "User",
-			company: company,
-		};
+		setIsLoading(true);
 		await auth()
 			.createUserWithEmailAndPassword(email, password)
-			.then((userCredential) => {
+			.then(async (userCredential) => {
 				const user = userCredential.user;
 				user.updateProfile({ displayName: firstName + " " + lastName });
-				userController.addUser(userData, user.uid);
-				user.sendEmailVerification();
+				const userData = {
+					id: user.uid,
+					firstName: firstName,
+					lastName: lastName,
+					email: email,
+					privilege: "User",
+					company: company,
+				};
+				await userController.addUser(userData, user.uid);
+				await user.sendEmailVerification();
 				navigation.pop();
 				//Alert.alert("Check your email to complete verification!");
 				console.log("User account created & signed in!");
@@ -101,6 +105,7 @@ const SignUpPage = ({ navigation }: any) => {
 						console.error(error);
 				}
 			});
+		setIsLoading(false);
 	};
 
 	return (
@@ -157,6 +162,9 @@ const SignUpPage = ({ navigation }: any) => {
 			<TouchableOpacity style={styles.roundButton} onPress={handleSignUp}>
 				<Text style={{ color: "white" }}>Sign Up</Text>
 			</TouchableOpacity>
+			{isLoading ? (
+				<ActivityIndicator size="small" color="#0000ff" />
+			) : null}
 		</SafeAreaView>
 	);
 };

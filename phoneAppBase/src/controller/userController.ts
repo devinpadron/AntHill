@@ -14,6 +14,7 @@ import db from "../../firebaseConfig";
 */
 
 interface User {
+	id: string;
 	firstName: string;
 	lastName: string;
 	email: string;
@@ -21,7 +22,7 @@ interface User {
 	company: string;
 }
 
-export default class UserControllerStruct {
+export default class UserController {
 	private company = "";
 
 	constructor(company: string) {

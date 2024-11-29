@@ -24,3 +24,6 @@ ios/
 # Google service files
 google-services.json
 GoogleService-Info.plist
+
+# Whatever this is wants to update which is weird
+.DS_Store
