@@ -8,11 +8,6 @@ const Stack = createNativeStackNavigator();
 const AuthStack = () => {
 	return (
 		<Stack.Navigator>
-			{/* <Stack.Screen
-          name="Initializer"
-          component={Initializer}
-          options={{ headerShown: false, gestureEnabled: false }}
-        /> */}
 			<Stack.Screen
 				name="Login"
 				component={LoginPage}

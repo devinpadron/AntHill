@@ -9,6 +9,7 @@ import HomeTabs from "./src/routes/HomeTabs";
 import AuthStack from "./src/routes/AuthStack";
 import { Alert } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { signOut, currentUser } from "./src/controllers/auth/authController";
 
 // This component will handle the conditional rendering based on auth state
 const AppNavigator = () => {
@@ -28,9 +29,9 @@ const AppNavigator = () => {
 							text: "Resend Email",
 							onPress: async () => {
 								try {
-									const currentUser = auth().currentUser;
-									if (currentUser) {
-										await currentUser.sendEmailVerification();
+									const user = currentUser;
+									if (user) {
+										await user.sendEmailVerification();
 										Alert.alert(
 											"Success",
 											"Verification email sent!"
@@ -46,14 +47,14 @@ const AppNavigator = () => {
 										"Failed to send verification email. Please try again."
 									);
 								}
-								auth().signOut();
+								signOut();
 							},
 						},
 						{
 							text: "OK",
 							onPress: () => {
 								// Optionally sign out the user if they haven't verified their email
-								auth().signOut();
+								signOut();
 							},
 						},
 					]

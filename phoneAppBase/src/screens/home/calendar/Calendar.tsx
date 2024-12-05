@@ -1,5 +1,5 @@
 import React, { useRef, useCallback, useState, useEffect } from "react";
-import { StyleSheet, View, TouchableOpacity, Text } from "react-native";
+import { StyleSheet, View } from "react-native";
 import {
 	ExpandableCalendar,
 	AgendaList,
@@ -10,17 +10,17 @@ import {
 	getAgendaItems,
 	getMarkedDates,
 	AgendaItemData,
-} from "../../controller/agendaItemController";
-import AgendaItem from "../../models/Calendar/AgendaItem";
-import { getTheme, themeColor, lightThemeColor } from "../../themes/theme";
+} from "./models/agendaItemController";
+import AgendaItem from "./models/AgendaItem";
+import { getTheme, themeColor, lightThemeColor } from "./theme";
 import moment from "moment";
-import LoadingScreen from "../LoadingScreen";
+import LoadingScreen from "../../LoadingScreen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 /*
-  STILL NEED TO DO:
-  - Adjust Today Button spacing
+  TODO:
+  - Custom Today Button
   - Ensure Today Button appears correctly when swiping through months/weeks
 */
 
@@ -71,28 +71,6 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 		return <AgendaItem item={item} />;
 	}, []);
 
-	// const handleTodayPress = () => {
-	// 	setSelectedDate(today);
-	// };
-
-	// useEffect(() => {
-	// 	TodayButton;
-	// }, [selectedDate]);
-
-	// const TodayButton = () => {
-	// 	if (selectedDate === today) {
-	// 		return null;
-	// 	}
-
-	// 	return (
-	// 		<TouchableOpacity
-	// 			style={styles.todayButton}
-	// 			onPress={handleTodayPress}
-	// 		>
-	// 			<Text style={styles.todayButtonText}>Today</Text>
-	// 		</TouchableOpacity>
-	// 	);
-	// };
 	if (isLoading) {
 		return <LoadingScreen />;
 	} else {

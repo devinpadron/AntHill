@@ -1,13 +1,6 @@
 import isEmpty from "lodash/isEmpty";
 import { useCallback, memo } from "react";
-import {
-	StyleSheet,
-	Alert,
-	View,
-	Text,
-	TouchableOpacity,
-	Button,
-} from "react-native";
+import { StyleSheet, Alert, View, Text, TouchableOpacity } from "react-native";
 
 /*
   STILL NEED TO DO:

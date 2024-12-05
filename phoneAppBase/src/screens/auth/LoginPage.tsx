@@ -8,57 +8,19 @@ import {
 	Alert,
 	Platform,
 } from "react-native";
-import auth from "@react-native-firebase/auth";
+import {
+	sendResetPassword,
+	login,
+} from "../../controllers/auth/authController";
 import prompt from "react-native-prompt-android";
 import { SafeAreaView } from "react-native-safe-area-context";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import CompanyController from "../../controller/companyController";
 
 const LoginPage = ({ navigation }: any) => {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
-	const companyController = new CompanyController();
 
 	const handleLogin = async () => {
-		await auth()
-			.signInWithEmailAndPassword(email, password)
-			.then(async (userCredential) => {
-				const user = userCredential.user;
-				await setUserData(user.email);
-				console.log("User account signed in!");
-			})
-			.catch((error) => {
-				switch (error.code) {
-					case "auth/invalid-email":
-						Alert.alert("Invalid email");
-						break;
-					case "auth/wrong-password":
-						Alert.alert("Invalid password");
-						break;
-					case "auth/user-not-found":
-						Alert.alert("User not found");
-						break;
-					case "auth/invalid-credential":
-						Alert.alert("Invalid credentials");
-						break;
-					case "auth/too-many-requests":
-						Alert.alert(
-							"Too many attempts have been made",
-							"Please try again later, or reset your password"
-						);
-						break;
-					default:
-						Alert.alert("Error logging in");
-						console.error(error);
-				}
-			});
-	};
-
-	const setUserData = async (email: string) => {
-		const data = await companyController.searchUserByEmail(email);
-		if (data) {
-			await AsyncStorage.setItem("userData", JSON.stringify(data));
-		}
+		login(email, password);
 	};
 
 	const pushSignup = () => {
@@ -70,26 +32,7 @@ const LoginPage = ({ navigation }: any) => {
 			console.log("Cancel");
 			return;
 		}
-		await auth()
-			.sendPasswordResetEmail(text)
-			.then(() => {
-				Alert.alert(
-					"Please check your email to finish resetting your password"
-				);
-			})
-			.catch((error) => {
-				switch (error.code) {
-					case "auth/user-not-found":
-						Alert.alert("User not found");
-						break;
-					case "auth/invalid-email":
-						Alert.alert("Invalid email");
-						break;
-					default:
-						Alert.alert("Error sending request");
-						console.error(error);
-				}
-			});
+		sendResetPassword(text);
 	};
 
 	return (

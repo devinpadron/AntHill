@@ -8,86 +8,39 @@ import {
 	Platform,
 } from "react-native";
 import { Dropdown } from "react-native-element-dropdown";
-import auth from "@react-native-firebase/auth";
+import {
+	reAuth,
+	changeEmail,
+	deleteCurrentUser,
+} from "../../controllers/auth/authController";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import LoadingScreen from "../LoadingScreen";
-import CompanyController from "../../controller/companyController";
-import UserController from "../../controller/userController";
+import UserController from "../../controllers/data/userController";
 import prompt from "react-native-prompt-android";
 
 const ProfilePage = () => {
 	const [isLoading, setIsLoading] = useState(true);
 	const [userData, setUserData] = useState(null);
-	const [companyData, setCompanyData] = useState(null);
 	useEffect(() => {
 		const fetchUserData = async () => {
+			setIsLoading(true);
 			const user = await AsyncStorage.getItem("userData");
 			if (user) {
 				// Fetch user data from the server
 				setUserData(JSON.parse(user));
 			}
+			setIsLoading(false);
 		};
 		fetchUserData();
 	}, []);
 
-	useEffect(() => {
-		const fillCompanyData = async () => {
-			if (userData) {
-				const companyController = new CompanyController();
-				await companyController
-					.getAllUsersByEmail(userData.email)
-					.then((users) => {
-						const companies = [];
-						users.forEach((user) => {
-							companies.push(user.data().company);
-						});
-						setCompanyData({
-							companies: companies,
-							selectedCompany: userData.company,
-						});
-					});
-				setIsLoading(false);
-			}
-		};
-		fillCompanyData();
-	}, [userData]);
+	const handleCompanyChange = async (selectedCompany: any) => {
+		console.log("Company change to " + selectedCompany);
+		return;
+	};
 
 	const reAuthenticatePrompt = async () => {
-		const reAuth = async (password: string) => {
-			const user = auth().currentUser;
-			if (!user?.email) {
-				Alert.alert("Error", "No user is currently signed in");
-				return;
-			}
-
-			// Reauthenticate with current credentials
-			const credential = auth.EmailAuthProvider.credential(
-				user.email,
-				password
-			);
-			await user
-				.reauthenticateWithCredential(credential)
-				.catch((error) => {
-					switch (error.code) {
-						case "auth/wrong-password":
-							Alert.alert(
-								"Error",
-								"Incorrect password. Please try again."
-							);
-							break;
-						case "auth/invalid-credential":
-							Alert.alert(
-								"Error",
-								"Invalid credentials. Please try again."
-							);
-							break;
-						default:
-							console.error("Reauthentication error:", error);
-					}
-				});
-		};
-
 		if (Platform.OS === "android") {
 			prompt(
 				"Current Password",
@@ -171,60 +124,6 @@ const ProfilePage = () => {
 		}
 	};
 
-	const changeEmail = async (newEmail: string) => {
-		const user = auth().currentUser;
-		if (!user) {
-			return;
-		}
-		// send email to update
-		await user.updateEmail(newEmail).catch((error) => {
-			switch (error.code) {
-				case "auth/invalid-email":
-					Alert.alert("The email address is invalid");
-					break;
-				case "auth/email-already-in-use":
-					Alert.alert(
-						"This email is already in use by another account"
-					);
-					break;
-				case "auth/requires-recent-login":
-					Alert.alert(
-						"For security, please sign out and sign in again to change your email"
-					);
-					break;
-				default:
-					console.error("Email update error:", error);
-			}
-		});
-		await user.sendEmailVerification();
-		try {
-			const companyController = new CompanyController();
-
-			// update all instances of user data in every company
-			await companyController.updateAllUsersByEmail(userData.email, {
-				...userData,
-				email: newEmail,
-			});
-		} catch (error) {
-			console.error("Error updating email in database:", error);
-		}
-		console.log("User email changed");
-		Alert.alert(
-			"Verification Email Sent",
-			"Please check your new email address and verify the change. For security purposes, please login again.",
-			[
-				{
-					text: "Logout",
-					style: "default",
-					onPress: async () => {
-						await AsyncStorage.removeItem("userData");
-						auth().signOut();
-					},
-				},
-			]
-		);
-	};
-
 	const handlePasswordReset = () => {
 		Alert.alert(
 			"Reset Password",
@@ -233,13 +132,7 @@ const ProfilePage = () => {
 				{ text: "Cancel", style: "cancel" },
 				{
 					text: "Reset",
-					onPress: () => {
-						auth().sendPasswordResetEmail(userData.email);
-						Alert.alert(
-							"Reset Password",
-							"Check your email to reset your password."
-						);
-					},
+					onPress: () => {},
 				},
 			]
 		);
@@ -247,7 +140,7 @@ const ProfilePage = () => {
 
 	const handleDeleteAccount = () => {
 		Alert.alert(
-			"Delete " + companyData.selectedCompany + " Data?",
+			"Delete " + userData.selectedCompany + " Data?",
 			"Are you sure you want to delete your company account? This action cannot be undone.",
 			[
 				{ text: "Cancel", style: "cancel" },
@@ -265,14 +158,12 @@ const ProfilePage = () => {
 							);
 							return;
 						}
-						const userController = new UserController(
-							companyData.selectedCompany
-						);
+						const userController = new UserController();
 						await userController.deleteUser(userData);
-						if (companyData.companies.length > 1) {
+						if (userData.companies.length > 1) {
 							//TODO: Implement switch company logic here
 						} else {
-							await auth().currentUser.delete();
+							deleteCurrentUser();
 						}
 					},
 				},
@@ -302,26 +193,21 @@ const ProfilePage = () => {
 
 				<View style={styles.section}>
 					<Text style={styles.label}>Company</Text>
-					{companyData.companies.length > 1 ? (
+					{userData.companies.length > 1 ? (
 						<Dropdown
-							data={companyData.companies.map((company) => ({
+							data={userData.companies.map((company) => ({
 								label: company,
 								value: company,
 							}))}
-							value={companyData.selectedCompany}
-							onChange={(item) =>
-								setCompanyData({
-									...companyData,
-									selectedCompany: item.value,
-								})
-							}
+							value={userData.selectedCompany}
+							onChange={(item) => handleCompanyChange(item.value)}
 							labelField="label"
 							valueField="value"
 							style={styles.dropdown}
 						/>
 					) : (
 						<Text style={styles.value}>
-							{companyData.selectedCompany}
+							{userData.selectedCompany}
 						</Text>
 					)}
 				</View>

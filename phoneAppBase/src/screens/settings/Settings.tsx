@@ -9,8 +9,7 @@ import {
 	Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import auth from "@react-native-firebase/auth";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { signOut } from "../../controllers/auth/authController";
 
 const Settings = ({ navigation }: any) => {
 	//TODO: Implement isAdmin check to hide/show admin settings
@@ -55,12 +54,7 @@ const Settings = ({ navigation }: any) => {
 				text: "Logout",
 				onPress: async () => {
 					try {
-						await auth()
-							.signOut()
-							.then(async () => {
-								console.log("User signed out!");
-								await AsyncStorage.removeItem("userData");
-							});
+						signOut();
 					} catch (error) {
 						console.error("Signout Error", error);
 					}

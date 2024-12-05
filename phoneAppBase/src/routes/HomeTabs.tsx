@@ -1,8 +1,6 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-
-// Import your screen components
-import Calendar from "../screens/home/Calendar";
+import Calendar from "../screens/home/calendar/Calendar";
 import SettingStack from "./SettingStack";
 
 const Tab = createBottomTabNavigator();

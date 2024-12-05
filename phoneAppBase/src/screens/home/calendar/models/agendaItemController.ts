@@ -1,4 +1,4 @@
-import EventController from "./eventController";
+import EventController from "../../../../controllers/data/eventController";
 import { MarkedDates } from "react-native-calendars/src/types";
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
 
@@ -18,12 +18,12 @@ import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
 export interface AgendaItemData {
 	date: string;
 	data: [
-		{ title: string; startTime: string; endTime: string; duration: string },
+		{ title: string; startTime: string; endTime: string; duration: string }
 	];
 }
 
 function createAgendaItem(
-	docRef: FirebaseFirestoreTypes.DocumentData,
+	docRef: FirebaseFirestoreTypes.DocumentData
 ): AgendaItemData {
 	return {
 		date: docRef.date,
@@ -39,7 +39,7 @@ function createAgendaItem(
 }
 
 export async function getAgendaItems(
-	company: string,
+	company: string
 ): Promise<AgendaItemData[]> {
 	const res: AgendaItemData[] = [];
 	const eventController = new EventController(company);

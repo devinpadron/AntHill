@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
 import { LongPressGestureHandler, State } from "react-native-gesture-handler";
-import CompanyController from "../../controller/companyController";
+import CompanyController from "../../controllers/data/companyController";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Enable LayoutAnimation on Android

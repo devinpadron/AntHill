@@ -9,7 +9,6 @@ import {
 	ScrollView,
 	Platform,
 	KeyboardAvoidingView,
-	Image,
 } from "react-native";
 import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
 import DatePicker from "react-native-date-picker";

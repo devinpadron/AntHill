@@ -1,4 +1,4 @@
-import db from "../../firebaseConfig";
+import db from "../../../firebaseConfig";
 
 /*
   STILL NEED TO DO:
@@ -19,25 +19,15 @@ interface User {
 	lastName: string;
 	email: string;
 	privilege: string;
-	company: string;
+	selectedCompany: string;
+	companies: string[];
 }
 
 export default class UserController {
-	private company = "";
-
-	constructor(company: string) {
-		this.company = company;
-	}
-
 	public getUser = async (userID: string) => {
 		try {
 			//Retrieve user data
-			const userEntry = await db
-				.collection("Companies")
-				.doc(this.company)
-				.collection("Users")
-				.doc(userID)
-				.get();
+			const userEntry = await db.collection("Users").doc(userID).get();
 			if (userEntry.exists) {
 				const dbData = userEntry.data();
 				if (dbData) {
@@ -58,12 +48,7 @@ export default class UserController {
 	public deleteUser = async (userID: string) => {
 		// Delete an existing user
 		try {
-			await await db
-				.collection("Companies")
-				.doc(this.company)
-				.collection("Users")
-				.doc(userID)
-				.delete();
+			await await db.collection("Users").doc(userID).delete();
 			console.log("User successfully deleted");
 			return true;
 		} catch (e) {
@@ -74,12 +59,7 @@ export default class UserController {
 
 	public addUser = async (newUser: User, userID: string) => {
 		try {
-			const entry = await db
-				.collection("Companies")
-				.doc(this.company)
-				.collection("Users")
-				.doc(userID)
-				.set(newUser);
+			const entry = await db.collection("Users").doc(userID).set(newUser);
 		} catch (e) {
 			console.error("Error adding user:", e);
 			throw e;
@@ -88,12 +68,7 @@ export default class UserController {
 
 	public updateUser = async (userID: string, userData: User) => {
 		try {
-			await db
-				.collection("Companies")
-				.doc(this.company)
-				.collection("Users")
-				.doc(userID)
-				.update(userData);
+			await db.collection("Users").doc(userID).update(userData);
 			console.log("User successfully updated");
 			return true;
 		} catch (e) {

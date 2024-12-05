@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-	View,
 	TextInput,
 	TouchableOpacity,
 	Text,
@@ -8,11 +7,9 @@ import {
 	Alert,
 	ActivityIndicator,
 } from "react-native";
-import UserController from "../../controller/userController";
-import CompanyController from "../../controller/companyController";
-import auth from "@react-native-firebase/auth";
+import CompanyController from "../../controllers/data/companyController";
+import { signUp } from "../../controllers/auth/authController";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { set } from "lodash";
 
 const SignUpPage = ({ navigation }: any) => {
 	const [firstName, setFirstName] = useState("");
@@ -71,40 +68,13 @@ const SignUpPage = ({ navigation }: any) => {
 			Alert.alert("Invalid Access Code");
 			return;
 		}
-		const userController = new UserController(company);
 		setIsLoading(true);
-		await auth()
-			.createUserWithEmailAndPassword(email, password)
-			.then(async (userCredential) => {
-				const user = userCredential.user;
-				user.updateProfile({ displayName: firstName + " " + lastName });
-				const userData = {
-					id: user.uid,
-					firstName: firstName,
-					lastName: lastName,
-					email: email,
-					privilege: "User",
-					company: company,
-				};
-				await userController.addUser(userData, user.uid);
-				await user.sendEmailVerification();
-				navigation.pop();
-				//Alert.alert("Check your email to complete verification!");
-				console.log("User account created & signed in!");
-			})
-			.catch((error) => {
-				switch (error.code) {
-					case "auth/email-already-in-use":
-						Alert.alert("That email address is already in use!");
-						break;
-					case "auth/invalid-email":
-						Alert.alert("That email address is invalid!");
-						break;
-					default:
-						Alert.alert("Error logging in");
-						console.error(error);
-				}
-			});
+		try {
+			signUp(email, password, firstName, lastName, company);
+			navigation.pop();
+		} catch (error) {
+			console.error("Error signing up: ", error);
+		}
 		setIsLoading(false);
 	};
 
