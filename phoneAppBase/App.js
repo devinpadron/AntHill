@@ -3,19 +3,21 @@ import React, { useState, useEffect, useRef } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import auth from "@react-native-firebase/auth";
 import LoadingScreen from "./src/screens/LoadingScreen";
+import UserController from "./src/controllers/data/userController";
 
 // Import your screens
 import HomeTabs from "./src/routes/HomeTabs";
 import AuthStack from "./src/routes/AuthStack";
 import { Alert } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { signOut, currentUser } from "./src/controllers/auth/authController";
+import { signOut, setUserData } from "./src/controllers/auth/authController";
 
 // This component will handle the conditional rendering based on auth state
 const AppNavigator = () => {
 	const [loggedIn, setLoggedIn] = useState(true);
 	const [isLoading, setIsLoading] = useState(true);
 	const hasShownAlert = useRef(false);
+	const userController = new UserController();
 
 	useEffect(() => {
 		const showVerificationAlert = () => {
@@ -71,6 +73,7 @@ const AppNavigator = () => {
 
 					if (refreshedUser?.emailVerified) {
 						hasShownAlert.current = false; // Reset for next session
+						await setUserData(user.uid);
 						setLoggedIn(true);
 					} else {
 						setLoggedIn(false);

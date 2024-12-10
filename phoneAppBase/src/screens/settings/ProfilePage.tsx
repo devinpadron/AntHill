@@ -10,14 +10,16 @@ import {
 import { Dropdown } from "react-native-element-dropdown";
 import {
 	reAuth,
-	changeEmail,
+	signOut,
+	sendResetPassword,
+	getUserData,
 	deleteCurrentUser,
 } from "../../controllers/auth/authController";
 import { SafeAreaView } from "react-native-safe-area-context";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import LoadingScreen from "../LoadingScreen";
 import UserController from "../../controllers/data/userController";
 import prompt from "react-native-prompt-android";
+import auth from "@react-native-firebase/auth";
 
 const ProfilePage = () => {
 	const [isLoading, setIsLoading] = useState(true);
@@ -25,10 +27,10 @@ const ProfilePage = () => {
 	useEffect(() => {
 		const fetchUserData = async () => {
 			setIsLoading(true);
-			const user = await AsyncStorage.getItem("userData");
-			if (user) {
+			const userData = await getUserData();
+			if (userData) {
 				// Fetch user data from the server
-				setUserData(JSON.parse(user));
+				setUserData(userData);
 			}
 			setIsLoading(false);
 		};
@@ -40,43 +42,49 @@ const ProfilePage = () => {
 		return;
 	};
 
-	const reAuthenticatePrompt = async () => {
-		if (Platform.OS === "android") {
-			prompt(
-				"Current Password",
-				"Please enter your current password to continue:",
-				[
-					{ text: "Cancel", style: "cancel" },
-					{
-						text: "Continue",
-						onPress: async (password) => await reAuth(password),
-					},
-				],
-				{ type: "secure-text" }
-			);
-		} else {
-			Alert.prompt(
-				"Current Password",
-				"Please enter your current password to continue:",
-				[
-					{ text: "Cancel", style: "cancel" },
-					{
-						text: "Continue",
-						onPress: async (password) => await reAuth(password),
-					},
-				],
-				"secure-text"
-			);
-		}
-	};
+	const reAuthenticatePrompt = async () =>
+		new Promise((resolve, reject) => {
+			const handlePress = async (password: string) => {
+				if (await reAuth(password)) {
+					resolve("Success");
+				} else {
+					reject("Error");
+				}
+			};
+			if (Platform.OS === "android") {
+				prompt(
+					"Current Password",
+					"Please enter your current password to continue:",
+					[
+						{ text: "Cancel", style: "cancel" },
+						{
+							text: "Continue",
+							onPress: handlePress,
+						},
+					],
+					{ type: "secure-text" }
+				);
+			} else {
+				Alert.prompt(
+					"Current Password",
+					"Please enter your current password to continue:",
+					[
+						{ text: "Cancel", style: "cancel" },
+						{
+							text: "Continue",
+							onPress: handlePress,
+						},
+					],
+					"secure-text"
+				);
+			}
+		});
 
-	const handleEmailChange = () => {
-		try {
-			reAuthenticatePrompt();
-		} catch (e) {
-			console.error(e);
+	const handleEmailChange = async () => {
+		await reAuthenticatePrompt().catch((error) => {
+			console.error(error);
 			return;
-		}
+		});
 
 		const confirmEmail = (email: string) => {
 			Alert.alert(
@@ -124,6 +132,45 @@ const ProfilePage = () => {
 		}
 	};
 
+	const changeEmail = async (newEmail: string) => {
+		const userData = await getUserData();
+		const user = auth().currentUser;
+		if (!user) {
+			return;
+		}
+		// send email to update
+		await user.verifyBeforeUpdateEmail(newEmail).catch((error) => {
+			switch (error.code) {
+				case "auth/invalid-email":
+					Alert.alert("The email address is invalid");
+					break;
+				case "auth/email-already-in-use":
+					Alert.alert(
+						"This email is already in use by another account"
+					);
+					break;
+				case "auth/requires-recent-login":
+					Alert.alert(
+						"For security, please sign out and sign in again to change your email"
+					);
+					break;
+				default:
+					console.error("Email update error:", error);
+			}
+		});
+		Alert.alert(
+			"Verification Email Sent",
+			"Please check your new email address and verify the change. For security purposes, please login again.",
+			[
+				{
+					text: "Logout",
+					style: "default",
+					onPress: async () => signOut(),
+				},
+			]
+		);
+	};
+
 	const handlePasswordReset = () => {
 		Alert.alert(
 			"Reset Password",
@@ -132,7 +179,9 @@ const ProfilePage = () => {
 				{ text: "Cancel", style: "cancel" },
 				{
 					text: "Reset",
-					onPress: () => {},
+					onPress: () => {
+						sendResetPassword(userData.email);
+					},
 				},
 			]
 		);
@@ -159,11 +208,11 @@ const ProfilePage = () => {
 							return;
 						}
 						const userController = new UserController();
-						await userController.deleteUser(userData);
+						await userController.deleteUser(userData.id);
 						if (userData.companies.length > 1) {
 							//TODO: Implement switch company logic here
 						} else {
-							deleteCurrentUser();
+							await deleteCurrentUser();
 						}
 					},
 				},

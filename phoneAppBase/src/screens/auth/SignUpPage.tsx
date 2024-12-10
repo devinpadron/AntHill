@@ -8,8 +8,10 @@ import {
 	ActivityIndicator,
 } from "react-native";
 import CompanyController from "../../controllers/data/companyController";
-import { signUp } from "../../controllers/auth/authController";
+import auth from "@react-native-firebase/auth";
 import { SafeAreaView } from "react-native-safe-area-context";
+import UserController from "../../controllers/data/userController";
+import { capitalize } from "lodash";
 
 const SignUpPage = ({ navigation }: any) => {
 	const [firstName, setFirstName] = useState("");
@@ -69,12 +71,42 @@ const SignUpPage = ({ navigation }: any) => {
 			return;
 		}
 		setIsLoading(true);
-		try {
-			signUp(email, password, firstName, lastName, company);
-			navigation.pop();
-		} catch (error) {
-			console.error("Error signing up: ", error);
-		}
+		const userController = new UserController();
+		await auth()
+			.createUserWithEmailAndPassword(email, password)
+			.then(async (userCredential) => {
+				const user = userCredential.user;
+				await user.updateProfile({
+					displayName:
+						capitalize(firstName) + " " + capitalize(lastName),
+				});
+				const userData = {
+					firstName: capitalize(firstName),
+					lastName: capitalize(lastName),
+					email: email,
+					selectedCompany: company,
+					companies: [company],
+				};
+				console.log(userData);
+				await userController.addUser(userData, user.uid);
+				await companyController.addUserToCompany(company, user.uid);
+				await user.sendEmailVerification();
+				console.log("User account created & signed in!");
+			})
+			.catch((error) => {
+				switch (error.code) {
+					case "auth/email-already-in-use":
+						Alert.alert("That email address is already in use!");
+						break;
+					case "auth/invalid-email":
+						Alert.alert("That email address is invalid!");
+						break;
+					default:
+						Alert.alert("Error during sign up, please try again");
+						console.error(error);
+				}
+			});
+		navigation.pop();
 		setIsLoading(false);
 	};
 

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
 	View,
 	Text,
@@ -9,11 +9,13 @@ import {
 	Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { signOut } from "../../controllers/auth/authController";
+import { getUserData, signOut } from "../../controllers/auth/authController";
+import CompanyController from "../../controllers/data/companyController";
+import auth from "@react-native-firebase/auth";
 
 const Settings = ({ navigation }: any) => {
-	//TODO: Implement isAdmin check to hide/show admin settings
-	const [isAdmin, setIsAdmin] = React.useState(true);
+	const [isAdmin, setIsAdmin] = React.useState(false);
+	const companyController = new CompanyController();
 	const SettingsItem: React.FC<{
 		title: string;
 		isAction?: boolean;
@@ -34,6 +36,20 @@ const Settings = ({ navigation }: any) => {
 			)}
 		</TouchableOpacity>
 	);
+
+	useEffect(() => {
+		const fetchUserData = async () => {
+			const userData = await getUserData();
+			if (userData) {
+				const userPriv = await companyController.getUserPrivilege(
+					userData.selectedCompany,
+					auth().currentUser.uid
+				);
+				setIsAdmin(userPriv === "Admin" || userPriv === "Owner");
+			}
+		};
+		fetchUserData();
+	}, []);
 
 	const pushProfile = () => {
 		navigation.push("Profile");
@@ -71,9 +87,7 @@ const Settings = ({ navigation }: any) => {
 					<Ionicons name="chevron-back" size={28} color="#000" />
 				</TouchableOpacity>
 				<Text style={styles.headerTitle}>Settings</Text>
-				<TouchableOpacity>
-					<Ionicons name="search" size={28} color="#000" />
-				</TouchableOpacity>
+				<View style={{ width: 28 }} />
 			</View>
 
 			<View style={styles.section}>
@@ -120,6 +134,7 @@ const styles = StyleSheet.create({
 	headerTitle: {
 		fontSize: 20,
 		fontWeight: "bold",
+		textAlign: "center",
 	},
 	section: {
 		marginTop: 24,

@@ -13,12 +13,10 @@ import db from "../../../firebaseConfig";
   - A function that creates a new user entry and puts it into Firestore
 */
 
-interface User {
-	id: string;
+export interface User {
 	firstName: string;
 	lastName: string;
 	email: string;
-	privilege: string;
 	selectedCompany: string;
 	companies: string[];
 }
@@ -31,7 +29,7 @@ export default class UserController {
 			if (userEntry.exists) {
 				const dbData = userEntry.data();
 				if (dbData) {
-					return dbData;
+					return dbData as User;
 				} else {
 					console.log("Document exists but data is undefined");
 					return null;
@@ -48,7 +46,7 @@ export default class UserController {
 	public deleteUser = async (userID: string) => {
 		// Delete an existing user
 		try {
-			await await db.collection("Users").doc(userID).delete();
+			await db.collection("Users").doc(userID).delete();
 			console.log("User successfully deleted");
 			return true;
 		} catch (e) {
@@ -59,7 +57,7 @@ export default class UserController {
 
 	public addUser = async (newUser: User, userID: string) => {
 		try {
-			const entry = await db.collection("Users").doc(userID).set(newUser);
+			await db.collection("Users").doc(userID).set(newUser);
 		} catch (e) {
 			console.error("Error adding user:", e);
 			throw e;

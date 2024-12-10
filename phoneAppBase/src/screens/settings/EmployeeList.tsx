@@ -14,7 +14,7 @@ import {
 import { FontAwesome } from "@expo/vector-icons";
 import { LongPressGestureHandler, State } from "react-native-gesture-handler";
 import CompanyController from "../../controllers/data/companyController";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getUserData } from "../../controllers/auth/authController";
 
 // Enable LayoutAnimation on Android
 if (
@@ -27,17 +27,26 @@ if (
 const EmployeeList = () => {
 	const [expandedIndex, setExpandedIndex] = useState(null);
 	const companyController = new CompanyController();
-	const [employees, setEmployees] = useState([]);
+	const [employees, setEmployees] = useState<
+		Record<
+			string,
+			{
+				privilege: string;
+				firstName: string;
+				lastName: string;
+				email: string;
+			}
+		>
+	>({});
 	const [company, setCompany] = useState("");
 	const [user, setUser] = useState(null);
 
 	useEffect(() => {
 		const fetchData = async () => {
-			const userData = await AsyncStorage.getItem("userData");
+			const userData = await getUserData();
 			if (userData) {
-				const parsedData = JSON.parse(userData);
-				setUser(parsedData);
-				setCompany(parsedData.company);
+				setUser(userData);
+				setCompany(userData.selectedCompany);
 			}
 		};
 		fetchData();
@@ -46,18 +55,17 @@ const EmployeeList = () => {
 	useEffect(() => {
 		const fetchEmployees = async () => {
 			if (company) {
-				const employees = await companyController.getAllUsersInCompany(
-					company
-				);
-				setEmployees(employees);
+				const employeeData =
+					await companyController.getAllUsersInCompany(company);
+				setEmployees(employeeData);
 			}
 		};
 		fetchEmployees();
 	}, [company]);
 
-	const sortedEmployees = employees
+	const sortedEmployees = Object.values(employees)
 		.filter(
-			(employee) => employee && employee.privilege && employee.lastName
+			(employee) => employee && employee.privilege && employee.firstName
 		) // Filter out invalid entries
 		.sort((a, b) => {
 			const privilegeOrder = { Owner: 0, Admin: 1, User: 2 };
@@ -66,8 +74,8 @@ const EmployeeList = () => {
 					privilegeOrder[a.privilege] - privilegeOrder[b.privilege]
 				);
 			}
-			//Sorted by last name if same privilege
-			return a.lastName.localeCompare(b.lastName);
+			// Sorted by first name if same privilege
+			return a.firstName.localeCompare(b.firstName);
 		});
 
 	const handlePress = (index) => {
@@ -80,7 +88,7 @@ const EmployeeList = () => {
 		// Owners cannot be demoted, and only owners can promote users to admin
 		if (employee.privilege != "Owner" && user.privilege === "Owner") {
 			Alert.alert(
-				employee.firstName + " " + employee.lastName,
+				employee.data.firstName + " " + employee.data.lastName,
 				"What would you like to do?",
 				[
 					employee.privilege === "Admin"
@@ -89,7 +97,8 @@ const EmployeeList = () => {
 								onPress: () => {
 									console.log(
 										"Demoted",
-										employee.firstName + employee.lastName
+										employee.data.firstName +
+											employee.data.lastName
 									);
 								},
 						  }

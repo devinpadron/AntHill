@@ -16,7 +16,7 @@ import { getTheme, themeColor, lightThemeColor } from "./theme";
 import moment from "moment";
 import LoadingScreen from "../../LoadingScreen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getUserData } from "../../../controllers/auth/authController";
 
 /*
   TODO:
@@ -31,8 +31,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 */
 
 const today = moment().format("YYYY-MM-DD");
-const leftArrowIcon = require("../../assets/previous.png");
-const rightArrowIcon = require("../../assets/next.png");
+const leftArrowIcon = require("../../../assets/previous.png");
+const rightArrowIcon = require("../../../assets/next.png");
 
 type CalendarProps = {
 	weekView?: any;
@@ -49,15 +49,15 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 		const fetchData = async () => {
 			try {
 				setIsLoading(true);
-				await AsyncStorage.getItem("userData").then(async (data) => {
-					if (data) {
-						const userData = JSON.parse(data);
-						const items = await getAgendaItems(userData.company);
-						const marks = getMarkedDates(items);
-						setAgendaItems(items);
-						setMarkedDates(marks);
-					}
-				});
+				const userData = await getUserData();
+				if (userData) {
+					const items = await getAgendaItems(
+						userData.selectedCompany
+					);
+					const marks = getMarkedDates(items);
+					setAgendaItems(items);
+					setMarkedDates(marks);
+				}
 			} catch (error) {
 				console.error("Error fetching agenda items:", error);
 			} finally {
