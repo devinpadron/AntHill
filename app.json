@@ -1,7 +1,7 @@
 {
 	"expo": {
-		"name": "customAppIdea",
-		"slug": "customAppIdea",
+		"name": "AntHill",
+		"slug": "AntHill",
 		"version": "1.0.0",
 		"orientation": "portrait",
 		"userInterfaceStyle": "light",
@@ -9,11 +9,11 @@
 		"ios": {
 			"supportsTablet": true,
 			"googleServicesFile": "./GoogleService-Info.plist",
-			"bundleIdentifier": "com.devinpadrom.CateringApp"
+			"bundleIdentifier": "com.anthillapp.anthill"
 		},
 		"android": {
 			"googleServicesFile": "./google-services.json",
-			"package": "com.devinpadrom.CateringApp"
+			"package": "com.anthillapp.anthill"
 		},
 		"extra": {
 			"eas": {
