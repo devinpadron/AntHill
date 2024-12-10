@@ -18,12 +18,6 @@ import LoadingScreen from "../../LoadingScreen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getUserData } from "../../../controllers/auth/authController";
 
-/*
-  TODO:
-  - Custom Today Button
-  - Ensure Today Button appears correctly when swiping through months/weeks
-*/
-
 /* An ExpanableCalendar that:
   - Allows the user to view their events in a scrollable AgendaList
   - View and select specific dates

@@ -8,10 +8,7 @@ import {
 	Alert,
 	Platform,
 } from "react-native";
-import {
-	sendResetPassword,
-	setUserData,
-} from "../../controllers/auth/authController";
+import { sendResetPassword } from "../../controllers/auth/authController";
 import prompt from "react-native-prompt-android";
 import { SafeAreaView } from "react-native-safe-area-context";
 import auth from "@react-native-firebase/auth";

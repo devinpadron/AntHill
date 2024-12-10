@@ -23,14 +23,14 @@ import auth from "@react-native-firebase/auth";
 
 const ProfilePage = () => {
 	const [isLoading, setIsLoading] = useState(true);
-	const [userData, setUserData] = useState(null);
+	const [userData, setData] = useState(null);
 	useEffect(() => {
 		const fetchUserData = async () => {
 			setIsLoading(true);
 			const userData = await getUserData();
 			if (userData) {
 				// Fetch user data from the server
-				setUserData(userData);
+				setData(userData);
 			}
 			setIsLoading(false);
 		};
