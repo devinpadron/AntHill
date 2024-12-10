@@ -76,7 +76,6 @@ export default class CompanyController {
 				.collection("Users")
 				.doc(userID)
 				.get();
-			console.log(company, userID);
 			if (userEntry.exists) {
 				const dbData = userEntry.data();
 				if (dbData) {

@@ -87,7 +87,6 @@ const SignUpPage = ({ navigation }: any) => {
 					selectedCompany: company,
 					companies: [company],
 				};
-				console.log(userData);
 				await userController.addUser(userData, user.uid);
 				await companyController.addUserToCompany(company, user.uid);
 				await user.sendEmailVerification();

@@ -52,7 +52,6 @@ const EventSubmit = () => {
 				type: [DocumentPicker.types.images, DocumentPicker.types.pdf],
 				allowMultiSelection: true,
 			});
-			console.log(results);
 		} catch (err) {
 			if (!DocumentPicker.isCancel(err)) {
 				console.error(err);
@@ -69,7 +68,6 @@ const EventSubmit = () => {
 
 		try {
 			const response = await ImagePicker.launchImageLibrary(options);
-			console.log(response);
 		} catch (err) {
 			console.error(err);
 		}
