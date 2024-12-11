@@ -1,6 +1,4 @@
-# CateringApp
-
-AntHill
+# AntHill
 
 ## Our Team
 
