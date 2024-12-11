@@ -68,7 +68,7 @@ const SignUpPage = ({ navigation }: any) => {
 			return;
 		}
 		const company = await compareAccessCode(accessCode);
-		if (company == "") {
+		if (company == "" || company == null) {
 			Alert.alert("Invalid Access Code");
 			return;
 		}
