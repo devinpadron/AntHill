@@ -20,7 +20,7 @@ import DocumentPicker from "react-native-document-picker";
 import * as ImagePicker from "react-native-image-picker";
 
 /*
-  STILL NEED TO DO:
+  TODO:
   - full event submission backend
   - populate workers from company's users
   - image/document storage in firebase

@@ -1,10 +1,5 @@
 import db from "../../../firebaseConfig";
 
-/*
-  STILL NEED TO DO:
-  - Integrate user privilege and company logic into users.
-*/
-
 /* A UserController that contains:
   - A user interface that provides the structure of user data
   - A function that uses a userID to pull from Firestore and retrieve the user entry

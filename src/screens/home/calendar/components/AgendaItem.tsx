@@ -3,7 +3,7 @@ import { useCallback, memo } from "react";
 import { StyleSheet, Alert, View, Text, TouchableOpacity } from "react-native";
 
 /*
-  STILL NEED TO DO:
+  TODO:
   - Add functionality for AgendaItem button press
   - Add functionality for the 'More Info' button.
 */

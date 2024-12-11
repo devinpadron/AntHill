@@ -1,13 +1,6 @@
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
 import db from "../../../firebaseConfig";
 
-/*
-  STILL NEED TO DO:
-  - Integrate user, user privilege, and company logic into events.
-  - Add jsonData logic for event-specific details
-  - For non admins, hide past events from agenda items
-*/
-
 /* An EventController that contains:
   - An event interface that provides the structure of event data
   - A function that uses an eventID to pull from Firestore and retrieve the event entry
