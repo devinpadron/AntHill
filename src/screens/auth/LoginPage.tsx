@@ -12,14 +12,13 @@ import { sendResetPassword } from "../../controllers/auth/authController";
 import prompt from "react-native-prompt-android";
 import { SafeAreaView } from "react-native-safe-area-context";
 import auth from "@react-native-firebase/auth";
-import UserController from "../../controllers/data/userController";
+import { getUser, updateUser } from "../../controllers/data/userController";
 
 const LoginPage = ({ navigation }: any) => {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 
 	const handleLogin = async () => {
-		const userController = new UserController();
 		const userCredential = await auth()
 			.signInWithEmailAndPassword(email, password)
 			.catch((error) => {
@@ -50,11 +49,11 @@ const LoginPage = ({ navigation }: any) => {
 			});
 		if (userCredential) {
 			const user = userCredential.user;
-			const userData = await userController.getUser(user.uid);
+			const userData = await getUser(user.uid);
 			if (user.email != userData.email) {
 				try {
 					// update all instances of user data in every company
-					await userController.updateUser(user.uid, {
+					await updateUser(user.uid, {
 						...userData,
 						email: user.email,
 					});

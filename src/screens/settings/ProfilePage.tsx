@@ -17,9 +17,9 @@ import {
 } from "../../controllers/auth/authController";
 import { SafeAreaView } from "react-native-safe-area-context";
 import LoadingScreen from "../LoadingScreen";
-import UserController from "../../controllers/data/userController";
 import prompt from "react-native-prompt-android";
 import auth from "@react-native-firebase/auth";
+import { deleteUser } from "../../controllers/data/userController";
 
 const ProfilePage = () => {
 	const [isLoading, setIsLoading] = useState(true);
@@ -207,8 +207,7 @@ const ProfilePage = () => {
 							);
 							return;
 						}
-						const userController = new UserController();
-						await userController.deleteUser(userData.id);
+						await deleteUser(userData.id);
 						if (userData.companies.length > 1) {
 							//TODO: Implement switch company logic here
 						} else {

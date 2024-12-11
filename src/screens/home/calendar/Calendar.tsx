@@ -10,8 +10,8 @@ import {
 	getAgendaItems,
 	getMarkedDates,
 	AgendaItemData,
-} from "./models/agendaItemController";
-import AgendaItem from "./models/AgendaItem";
+} from "./components/agendaItemController";
+import AgendaItem from "./components/AgendaItem";
 import { getTheme, themeColor, lightThemeColor } from "./theme";
 import moment from "moment";
 import LoadingScreen from "../../LoadingScreen";

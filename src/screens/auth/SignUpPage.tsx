@@ -7,11 +7,14 @@ import {
 	Alert,
 	ActivityIndicator,
 } from "react-native";
-import CompanyController from "../../controllers/data/companyController";
 import auth from "@react-native-firebase/auth";
 import { SafeAreaView } from "react-native-safe-area-context";
-import UserController from "../../controllers/data/userController";
 import { capitalize } from "lodash";
+import { addUser } from "../../controllers/data/userController";
+import {
+	addUserToCompany,
+	compareAccessCode,
+} from "../../controllers/data/companyController";
 
 const SignUpPage = ({ navigation }: any) => {
 	const [firstName, setFirstName] = useState("");
@@ -21,7 +24,6 @@ const SignUpPage = ({ navigation }: any) => {
 	const [confPassword, setConfPassword] = useState("");
 	const [accessCode, setAccessCode] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
-	const companyController = new CompanyController();
 
 	const validateFields = () => {
 		if (!firstName.trim()) {
@@ -65,13 +67,12 @@ const SignUpPage = ({ navigation }: any) => {
 		if (!validateFields()) {
 			return;
 		}
-		const company = await companyController.compareAccessCode(accessCode);
+		const company = await compareAccessCode(accessCode);
 		if (company == "") {
 			Alert.alert("Invalid Access Code");
 			return;
 		}
 		setIsLoading(true);
-		const userController = new UserController();
 		await auth()
 			.createUserWithEmailAndPassword(email, password)
 			.then(async (userCredential) => {
@@ -87,8 +88,8 @@ const SignUpPage = ({ navigation }: any) => {
 					selectedCompany: company,
 					companies: [company],
 				};
-				await userController.addUser(userData, user.uid);
-				await companyController.addUserToCompany(company, user.uid);
+				await addUser(userData, user.uid);
+				await addUserToCompany(company, user.uid);
 				await user.sendEmailVerification();
 				console.log("User account created & signed in!");
 			})

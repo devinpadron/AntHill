@@ -1,6 +1,6 @@
-import EventController from "../../../../controllers/data/eventController";
 import { MarkedDates } from "react-native-calendars/src/types";
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
+import { getAllEvents } from "../../../../controllers/data/eventController";
 
 /*
   STILL NEED TO DO:
@@ -42,8 +42,7 @@ export async function getAgendaItems(
 	company: string
 ): Promise<AgendaItemData[]> {
 	const res: AgendaItemData[] = [];
-	const eventController = new EventController(company);
-	const events = await eventController.getAllEvents();
+	const events = await getAllEvents(company);
 
 	events.forEach((event) => {
 		res.push(createAgendaItem(event));

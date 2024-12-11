@@ -13,8 +13,8 @@ import {
 } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
 import { LongPressGestureHandler, State } from "react-native-gesture-handler";
-import CompanyController from "../../controllers/data/companyController";
 import { getUserData } from "../../controllers/auth/authController";
+import { getAllUsersInCompany } from "../../controllers/data/companyController";
 
 // Enable LayoutAnimation on Android
 if (
@@ -26,7 +26,6 @@ if (
 
 const EmployeeList = () => {
 	const [expandedIndex, setExpandedIndex] = useState(null);
-	const companyController = new CompanyController();
 	const [employees, setEmployees] = useState<
 		Record<
 			string,
@@ -55,8 +54,7 @@ const EmployeeList = () => {
 	useEffect(() => {
 		const fetchEmployees = async () => {
 			if (company) {
-				const employeeData =
-					await companyController.getAllUsersInCompany(company);
+				const employeeData = await getAllUsersInCompany(company);
 				setEmployees(employeeData);
 			}
 		};
