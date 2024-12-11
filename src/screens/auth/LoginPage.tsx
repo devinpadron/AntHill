@@ -13,6 +13,7 @@ import prompt from "react-native-prompt-android";
 import { SafeAreaView } from "react-native-safe-area-context";
 import auth from "@react-native-firebase/auth";
 import { getUser, updateUser } from "../../controllers/data/userController";
+import { AntHill } from "../../global/colors";
 
 const LoginPage = ({ navigation }: any) => {
 	const [email, setEmail] = useState("");
@@ -82,7 +83,7 @@ const LoginPage = ({ navigation }: any) => {
 			{/* Logo */}
 			<Image
 				style={styles.logoImage}
-				source={require("../../assets/DolceNGelato/vicoLogoPrimary.png")}
+				source={require("../../assets/AntHill/Full_Black.png")}
 			/>
 
 			{/* Username Textbox */}
@@ -166,7 +167,7 @@ const LoginPage = ({ navigation }: any) => {
 					);
 				}}
 			>
-				<Text style={[{ color: "blue", marginTop: 15 }]}>
+				<Text style={[{ color: AntHill.Black, marginTop: 15 }]}>
 					Forgot Password
 				</Text>
 			</TouchableOpacity>
@@ -179,30 +180,33 @@ export default LoginPage;
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: "white",
+		backgroundColor: AntHill.White,
 		alignItems: "center",
+		justifyContent: "center", // Center content vertically
 	},
 	textInput: {
 		width: 350,
 		height: 40,
-		color: "black",
+		color: AntHill.Black,
 		margin: 10,
 		padding: 5,
 		fontSize: 16,
-		borderColor: "rgba(211,211,211,0.5)",
+		borderColor: AntHill.Black,
 		borderWidth: 1,
 		borderRadius: 5,
 	},
 	logoImage: {
-		width: 450,
-		height: 300,
+		width: 200, // Adjust width as needed
+		height: 150, // Adjust height as needed
+		resizeMode: "contain", // Ensure the image is not clipped
+		marginBottom: 80, // Add margin to separate from text inputs
 	},
 	roundButton: {
 		width: 350,
 		margin: 5,
 		alignItems: "center",
 		justifyContent: "center",
-		backgroundColor: "#1b2c3a",
+		backgroundColor: AntHill.Black,
 		borderRadius: 20,
 	},
 	buttonText: {
