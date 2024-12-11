@@ -47,7 +47,7 @@ const EmployeeList = () => {
 			const userData = await getUserData();
 			if (userData) {
 				setUser(userData);
-				setCompany(userData.selectedCompany);
+				setCompany(userData.loggedInCompany);
 			}
 		};
 		fetchData();

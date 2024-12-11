@@ -17,7 +17,7 @@ export interface User {
 	firstName: string;
 	lastName: string;
 	email: string;
-	selectedCompany: string;
+	loggedInCompany: string;
 	companies: string[];
 }
 

@@ -133,7 +133,6 @@ const ProfilePage = () => {
 	};
 
 	const changeEmail = async (newEmail: string) => {
-		const userData = await getUserData();
 		const user = auth().currentUser;
 		if (!user) {
 			return;
@@ -189,7 +188,7 @@ const ProfilePage = () => {
 
 	const handleDeleteAccount = () => {
 		Alert.alert(
-			"Delete " + userData.selectedCompany + " Data?",
+			"Delete " + userData.loggedInCompany + " Data?",
 			"Are you sure you want to delete your company account? This action cannot be undone.",
 			[
 				{ text: "Cancel", style: "cancel" },
@@ -247,7 +246,7 @@ const ProfilePage = () => {
 								label: company,
 								value: company,
 							}))}
-							value={userData.selectedCompany}
+							value={userData.loggedInCompany}
 							onChange={(item) => handleCompanyChange(item.value)}
 							labelField="label"
 							valueField="value"
@@ -255,7 +254,7 @@ const ProfilePage = () => {
 						/>
 					) : (
 						<Text style={styles.value}>
-							{userData.selectedCompany}
+							{userData.loggedInCompany}
 						</Text>
 					)}
 				</View>

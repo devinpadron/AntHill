@@ -46,7 +46,7 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 				const userData = await getUserData();
 				if (userData) {
 					const items = await getAgendaItems(
-						userData.selectedCompany
+						userData.loggedInCompany
 					);
 					const marks = getMarkedDates(items);
 					setAgendaItems(items);

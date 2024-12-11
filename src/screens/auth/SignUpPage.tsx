@@ -85,7 +85,7 @@ const SignUpPage = ({ navigation }: any) => {
 					firstName: capitalize(firstName),
 					lastName: capitalize(lastName),
 					email: email,
-					selectedCompany: company,
+					loggedInCompany: company,
 					companies: [company],
 				};
 				await addUser(userData, user.uid);

@@ -10,8 +10,6 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { getUserData, signOut } from "../../controllers/auth/authController";
-import auth from "@react-native-firebase/auth";
-import { getUserPrivilege } from "../../controllers/data/companyController";
 
 const Settings = ({ navigation }: any) => {
 	const [isAdmin, setIsAdmin] = React.useState(false);
@@ -40,11 +38,10 @@ const Settings = ({ navigation }: any) => {
 		const fetchUserData = async () => {
 			const userData = await getUserData();
 			if (userData) {
-				const userPriv = await getUserPrivilege(
-					userData.selectedCompany,
-					auth().currentUser.uid
+				setIsAdmin(
+					userData.privilege === "Admin" ||
+						userData.privilege === "Owner"
 				);
-				setIsAdmin(userPriv === "Admin" || userPriv === "Owner");
 			}
 		};
 		fetchUserData();

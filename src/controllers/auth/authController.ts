@@ -2,6 +2,7 @@ import { Alert } from "react-native";
 import auth from "@react-native-firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getUser } from "../data/userController";
+import { getUserPrivilege } from "../data/companyController";
 
 export async function reAuth(password: string) {
 	const user = auth().currentUser;
@@ -60,8 +61,14 @@ export async function sendResetPassword(email: string) {
 
 export async function setUserData(id: string) {
 	const data = await getUser(id);
-	if (data) {
-		await AsyncStorage.setItem("userData", JSON.stringify(data));
+	const userPriv = await getUserPrivilege(data.loggedInCompany, id);
+
+	if (data && userPriv) {
+		const userData = {
+			...data,
+			privilege: userPriv,
+		};
+		await AsyncStorage.setItem("userData", JSON.stringify(userData));
 		return true;
 	}
 	return false;
