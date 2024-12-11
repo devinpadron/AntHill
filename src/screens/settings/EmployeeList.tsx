@@ -10,6 +10,7 @@ import {
 	UIManager,
 	Platform,
 	Alert,
+	ActivityIndicator,
 } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
 import { LongPressGestureHandler, State } from "react-native-gesture-handler";
@@ -39,6 +40,7 @@ const EmployeeList = () => {
 	>({});
 	const [company, setCompany] = useState("");
 	const [user, setUser] = useState(null);
+	const [isLoading, setIsLoading] = useState(true);
 
 	useEffect(() => {
 		const fetchData = async () => {
@@ -57,6 +59,7 @@ const EmployeeList = () => {
 				const employeeData = await getAllUsersInCompany(company);
 				setEmployees(employeeData);
 			}
+			setIsLoading(false);
 		};
 		fetchEmployees();
 	}, [company]);
@@ -84,6 +87,7 @@ const EmployeeList = () => {
 	const handleLongPress = (employee) => {
 		// Must check to see if current user is an owner before allowing them to demote or promote another user
 		// Owners cannot be demoted, and only owners can promote users to admin
+		// TODO add functionality to demote/promote/delete
 		if (employee.privilege != "Owner" && user.privilege === "Owner") {
 			Alert.alert(
 				employee.data.firstName + " " + employee.data.lastName,
@@ -171,6 +175,7 @@ const EmployeeList = () => {
 				data={sortedEmployees}
 				renderItem={renderItem}
 				keyExtractor={(item) => item.lastName}
+				ListEmptyComponent={isLoading ? null : <ActivityIndicator />}
 			/>
 		</SafeAreaView>
 	);
