@@ -1,11 +1,7 @@
 export const Clock = {
-	ClockIn: {
-		color: "#30c24b",
-	},
+	ClockIn: "#30c24b",
 
-	ClockOut: {
-		color: "#ab0f12",
-	},
+	ClockOut: "#ab0f12",
 };
 
 export const AntHill = {

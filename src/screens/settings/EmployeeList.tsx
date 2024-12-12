@@ -90,7 +90,7 @@ const EmployeeList = () => {
 		// TODO add functionality to demote/promote/delete
 		if (employee.privilege != "Owner" && user.privilege === "Owner") {
 			Alert.alert(
-				employee.data.firstName + " " + employee.data.lastName,
+				employee.firstName + " " + employee.lastName,
 				"What would you like to do?",
 				[
 					employee.privilege === "Admin"
@@ -99,8 +99,7 @@ const EmployeeList = () => {
 								onPress: () => {
 									console.log(
 										"Demoted",
-										employee.data.firstName +
-											employee.data.lastName
+										employee.firstName + employee.lastName
 									);
 								},
 						  }
