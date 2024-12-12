@@ -25,9 +25,5 @@ ios/
 google-services.json
 GoogleService-Info.plist
 
-# Environment variables
-.env
-.env.*
-
-# macOS
+# Whatever this is wants to update which is weird
 .DS_Store

@@ -1,27 +1,25 @@
-<h1>CateringApp</h1>
-[Official name TBD]
+# AntHill
 
-<h4>Our Team:</h4>
-<p>
-  
-&ensp;**Owner/Creator:** Devin Padron
-  
-&ensp;**Developers:** Alex Bakos & William Dougherty
+## Our Team
 
-</p>
+**Owner:** Devin Padron
 
-<h4>Our Goals:</h4>
+**Developers:** Alex Bakos & William Dougherty
 
-  - A shared app between multiple catering companies
-  - A tiered hierarchy between Managers and Staff
-  - A way for management to track hours worked for each staff member
-  - A way for staff to revisit old events and their hours
-  - A way for management to schedule staff on events
-  - A way for staff to receive push notifications when they are put on new events
-  - A way for management to consistently update existing events and have those updates be sent to staff
-  - A checklist system that is tailored to each event and helps staff prepare for events that require prior setup
-  - A way for management to update the checklist at any point
-  - A way for each company to pick and choose which pages/features are available to its staff at any time
-  - Customization aspect that displays the correct company logo depending on when logged into their system
-  - A way for staff to swap between companies quick and easy when they work multiple jobs
-  - Many more to come...
+## Overview
+
+AntHill is designed for small businesses to efficiently organize and manage their employees. This application provides a structured way to handle various aspects of employee management, ensuring smooth operations and effective communication within catering companies.
+
+## Features
+
+-   Tiered hierarchy between Managers and Staff
+-   Management tools for tracking hours worked by staff
+-   Staff access to revisit old events and their hours
+-   Scheduling system for management to assign staff to events
+-   Push notifications for staff when assigned to new events
+-   Real-time updates for existing events sent to staff
+-   Customizable checklist system tailored to each event
+-   Management ability to update checklists at any time
+-   Customizable features and pages for each company
+-   Easy switching between companies for staff working multiple jobs
+-   And many more features to come...
