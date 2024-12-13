@@ -12,30 +12,36 @@ import {
 	reAuth,
 	signOut,
 	sendResetPassword,
-	getUserData,
 	deleteCurrentUser,
-} from "../../controllers/auth/authController";
+} from "../../controllers/authController";
 import { SafeAreaView } from "react-native-safe-area-context";
 import LoadingScreen from "../LoadingScreen";
 import prompt from "react-native-prompt-android";
 import auth from "@react-native-firebase/auth";
-import { deleteUser } from "../../controllers/data/userController";
+import {
+	deleteUser,
+	subscribeCurrentUser,
+} from "../../controllers/userController";
 
 const ProfilePage = () => {
 	const [isLoading, setIsLoading] = useState(true);
 	const [userData, setData] = useState(null);
+
 	useEffect(() => {
-		const fetchUserData = async () => {
-			setIsLoading(true);
-			const userData = await getUserData();
+		const subscriber = subscribeCurrentUser((user) => {
+			const userData = user.data();
 			if (userData) {
-				// Fetch user data from the server
 				setData(userData);
 			}
-			setIsLoading(false);
-		};
-		fetchUserData();
+		});
+		return () => subscriber();
 	}, []);
+
+	useEffect(() => {
+		if (userData) {
+			setIsLoading(false);
+		}
+	}, [userData]);
 
 	const handleCompanyChange = async (selectedCompany: any) => {
 		console.log("Company change to " + selectedCompany);

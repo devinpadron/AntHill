@@ -9,12 +9,12 @@ import {
 } from "react-native";
 import auth from "@react-native-firebase/auth";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { capitalize } from "lodash";
-import { addUser } from "../../controllers/data/userController";
+import { capitalize, lowerCase } from "lodash";
+import { addUser } from "../../controllers/userController";
 import {
 	addUserToCompany,
 	compareAccessCode,
-} from "../../controllers/data/companyController";
+} from "../../controllers/companyController";
 
 const SignUpPage = ({ navigation }: any) => {
 	const [firstName, setFirstName] = useState("");
@@ -84,9 +84,9 @@ const SignUpPage = ({ navigation }: any) => {
 				const userData = {
 					firstName: capitalize(firstName),
 					lastName: capitalize(lastName),
-					email: email,
+					email: lowerCase(email),
 					loggedInCompany: company,
-					companies: [company],
+					companies: { [company]: "User" },
 				};
 				await addUser(userData, user.uid);
 				await addUserToCompany(company, user.uid);

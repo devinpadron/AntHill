@@ -1,6 +1,6 @@
 import { MarkedDates } from "react-native-calendars/src/types";
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
-import { getAllEvents } from "../../../../controllers/data/eventController";
+import { getAllEvents } from "../../../../controllers/eventController";
 
 /* An AgendaItem controller that conatains:
   - An AgendaItemData interface that provides the structure of AgendaItem data

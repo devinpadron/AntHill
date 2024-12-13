@@ -1,4 +1,5 @@
-import db from "../../../firebaseConfig";
+import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
+import db from "../../firebaseConfig";
 import { getUser } from "./userController";
 
 export interface Company {
@@ -34,19 +35,31 @@ export async function getAllUsersInCompany(company: string) {
 			.collection("Users")
 			.get();
 		for (const doc of userEntries.docs) {
-			const privilege = doc.data().privilege;
 			const data = await getUser(doc.id);
-			const employeeJson = {
-				privilege: privilege,
-				...data,
-			};
-			employees[doc.id] = employeeJson;
+			if (data) {
+				employees[doc.id] = data;
+			} else {
+				throw new Error("User not found");
+			}
 		}
 	} catch (e) {
 		console.error("Error finding users ", e);
 		return null;
 	}
 	return employees;
+}
+
+export function subscribeAllUsersInCompany(
+	company: string,
+	onSnap: (
+		snapshot: FirebaseFirestoreTypes.QuerySnapshot<FirebaseFirestoreTypes.DocumentData>
+	) => void
+) {
+	return db
+		.collection("Companies")
+		.doc(company)
+		.collection("Users")
+		.onSnapshot(onSnap);
 }
 
 // A new user is added to the company with the default privilege of "User"
@@ -58,7 +71,7 @@ export async function addUserToCompany(company: string, userID: string) {
 			.doc(company)
 			.collection("Users")
 			.doc(userID)
-			.set({ privilege: "User" });
+			.set({});
 		return true;
 	} catch (e) {
 		console.error("Error adding user to company", e);
@@ -68,16 +81,11 @@ export async function addUserToCompany(company: string, userID: string) {
 
 export async function getUserPrivilege(company: string, userID: string) {
 	try {
-		const userEntry = await db
-			.collection("Companies")
-			.doc(company)
-			.collection("Users")
-			.doc(userID)
-			.get();
+		const userEntry = await db.collection("Users").doc(userID).get();
 		if (userEntry.exists) {
 			const dbData = userEntry.data();
 			if (dbData) {
-				return dbData.privilege;
+				return dbData.companies.get(company);
 			} else {
 				console.log("Document exists but data is undefined");
 				return null;

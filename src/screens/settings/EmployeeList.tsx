@@ -14,8 +14,11 @@ import {
 } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
 import { LongPressGestureHandler, State } from "react-native-gesture-handler";
-import { getUserData } from "../../controllers/auth/authController";
-import { getAllUsersInCompany } from "../../controllers/data/companyController";
+import {
+	getUser,
+	subscribeCurrentUser,
+} from "../../controllers/userController";
+import { subscribeAllUsersInCompany } from "../../controllers/companyController";
 
 // Enable LayoutAnimation on Android
 if (
@@ -38,31 +41,36 @@ const EmployeeList = () => {
 			}
 		>
 	>({});
-	const [company, setCompany] = useState("");
 	const [user, setUser] = useState(null);
-	const [isLoading, setIsLoading] = useState(true);
 
 	useEffect(() => {
-		const fetchData = async () => {
-			const userData = await getUserData();
-			if (userData) {
-				setUser(userData);
-				setCompany(userData.loggedInCompany);
-			}
-		};
-		fetchData();
-	}, []);
-
-	useEffect(() => {
-		const fetchEmployees = async () => {
-			if (company) {
-				const employeeData = await getAllUsersInCompany(company);
+		if (!user) return;
+		const subscriber = subscribeAllUsersInCompany(
+			user.loggedInCompany,
+			async (snapshot) => {
+				const employeeData = {};
+				for (const doc of snapshot.docs) {
+					const data = await getUser(doc.id);
+					const privilege = data.companies[user.loggedInCompany];
+					const employeeJson = {
+						privilege: privilege,
+						...data,
+					};
+					employeeData[doc.id] = employeeJson;
+				}
 				setEmployees(employeeData);
 			}
-			setIsLoading(false);
-		};
-		fetchEmployees();
-	}, [company]);
+		);
+		return () => subscriber();
+	}, [employees, user]);
+
+	useEffect(() => {
+		const subscriber = subscribeCurrentUser((snapshot) => {
+			const userData = snapshot.data();
+			setUser(userData);
+		});
+		return () => subscriber();
+	}, []);
 
 	const sortedEmployees = Object.values(employees)
 		.filter(
@@ -174,7 +182,7 @@ const EmployeeList = () => {
 				data={sortedEmployees}
 				renderItem={renderItem}
 				keyExtractor={(item) => item.lastName}
-				ListEmptyComponent={isLoading ? null : <ActivityIndicator />}
+				ListEmptyComponent={<ActivityIndicator />}
 			/>
 		</SafeAreaView>
 	);

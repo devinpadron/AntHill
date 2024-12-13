@@ -9,7 +9,8 @@ import {
 	Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { getUserData, signOut } from "../../controllers/auth/authController";
+import { signOut } from "../../controllers/authController";
+import { subscribeCurrentUser } from "../../controllers/userController";
 
 const Settings = ({ navigation }: any) => {
 	const [isAdmin, setIsAdmin] = React.useState(false);
@@ -35,16 +36,14 @@ const Settings = ({ navigation }: any) => {
 	);
 
 	useEffect(() => {
-		const fetchUserData = async () => {
-			const userData = await getUserData();
+		const subscriber = subscribeCurrentUser((user) => {
+			const userData = user.data();
 			if (userData) {
-				setIsAdmin(
-					userData.privilege === "Admin" ||
-						userData.privilege === "Owner"
-				);
+				const privilege = userData.companies[userData.loggedInCompany];
+				setIsAdmin(privilege === "Admin" || privilege === "Owner");
 			}
-		};
-		fetchUserData();
+		});
+		return () => subscriber();
 	}, []);
 
 	const pushProfile = () => {

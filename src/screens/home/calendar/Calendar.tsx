@@ -16,7 +16,7 @@ import { getTheme, themeColor, lightThemeColor } from "./theme";
 import moment from "moment";
 import LoadingScreen from "../../LoadingScreen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getUserData } from "../../../controllers/auth/authController";
+import { subscribeCurrentUser } from "../../../controllers/userController";
 
 /* An ExpanableCalendar that:
   - Allows the user to view their events in a scrollable AgendaList
@@ -36,30 +36,33 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 	const [agendaItems, setAgendaItems] = useState<AgendaItemData[]>([]);
 	const [selectedDate, setSelectedDate] = useState(today);
 	const [markedDates, setMarkedDates] = useState({});
-	const [isLoading, setIsLoading] = useState(false);
+	const [isLoading, setIsLoading] = useState(true);
+	const [user, setUser] = useState(null);
 	const theme = useRef(getTheme());
 
+	//TODO: This subsciption will be updated later to check for changes to assigned events rather than user data
 	useEffect(() => {
-		const fetchData = async () => {
+		const subscriber = subscribeCurrentUser(async (user) => {
 			try {
-				setIsLoading(true);
-				const userData = await getUserData();
-				if (userData) {
-					const items = await getAgendaItems(
-						userData.loggedInCompany
-					);
-					const marks = getMarkedDates(items);
-					setAgendaItems(items);
-					setMarkedDates(marks);
-				}
+				const userData = user.data();
+				if (!userData) return;
+				setUser(userData);
+				const items = await getAgendaItems(userData.loggedInCompany);
+				const marks = getMarkedDates(items);
+				setAgendaItems(items);
+				setMarkedDates(marks);
 			} catch (error) {
-				console.error("Error fetching agenda items:", error);
-			} finally {
-				setIsLoading(false);
+				console.error(error);
 			}
-		};
-		fetchData();
+		});
+		return () => subscriber();
 	}, []);
+
+	useEffect(() => {
+		if (user) {
+			setIsLoading(false);
+		}
+	}, [user]);
 
 	const renderItem = useCallback(({ item }: { item: AgendaItemData }) => {
 		return <AgendaItem item={item} />;

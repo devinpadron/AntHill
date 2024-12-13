@@ -9,7 +9,7 @@ import HomeTabs from "./src/routes/HomeTabs";
 import AuthStack from "./src/routes/AuthStack";
 import { Alert } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { signOut, setUserData } from "./src/controllers/auth/authController";
+import { signOut } from "./src/controllers/authController";
 
 // This component will handle the conditional rendering based on auth state
 const AppNavigator = () => {
@@ -71,7 +71,6 @@ const AppNavigator = () => {
 
 					if (refreshedUser?.emailVerified) {
 						hasShownAlert.current = false; // Reset for next session
-						await setUserData(user.uid);
 						setLoggedIn(true);
 					} else {
 						setLoggedIn(false);
