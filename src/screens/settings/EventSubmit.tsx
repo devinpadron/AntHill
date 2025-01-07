@@ -1,3 +1,4 @@
+import "react-native-get-random-values";
 import { GOOGLE_PLACES_API_KEY } from "@env";
 import React, { useState } from "react";
 import {

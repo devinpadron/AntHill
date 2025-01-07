@@ -1,5 +1,5 @@
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
-import db from "../../firebaseConfig";
+import db from "../../index";
 import { getUser } from "./userController";
 
 export interface Company {
