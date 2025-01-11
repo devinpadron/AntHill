@@ -35,9 +35,7 @@ const EventSubmit = () => {
 	const [startTime, setStartTime] = useState(new Date());
 	const [hasEndTime, setHasEndTime] = useState(false);
 	const [endTime, setEndTime] = useState(new Date());
-	const [locations, setLocations] = useState<
-		Record<string, { latitude: number; longitude: number }>[]
-	>([{}]);
+	const [locations, setLocations] = useState<Location>({});
 	const [assignedWorkers, setAssignedWorkers] = useState([]);
 	const [openSelect, setOpenSelect] = useState(false);
 	const [openDate, setOpenDate] = useState(false);
@@ -46,6 +44,14 @@ const EventSubmit = () => {
 	const [availableWorkers, setAvailableWorkers] = useState([]);
 	const [isLoading, setIsLoading] = useState(false);
 	const [currentCompany, setCurrentCompany] = useState<string>("");
+	const [locationCount, setLocationCount] = useState(0);
+
+	type Location = {
+		[address: string]: {
+			latitude: number;
+			longitude: number;
+		};
+	};
 
 	useEffect(() => {
 		const subscriber = subscribeCurrentUser((snapshot) => {
@@ -82,7 +88,7 @@ const EventSubmit = () => {
 			Alert.alert("Title is required.");
 			return false;
 		}
-		if (Object.keys(locations[0]).length === 0) {
+		if (Object.keys(locations).length === 0) {
 			Alert.alert("At least one location is required.");
 			return false;
 		}
@@ -99,16 +105,12 @@ const EventSubmit = () => {
 		return Number.isInteger(hours) ? hours.toFixed(1) : hours.toString();
 	};
 
-	const addLocation = () => {
-		setLocations([...locations, {}]);
-	};
-
-	const updateLocation = (index: number, details: any) => {
-		const newLocations = [...locations];
+	const updateLocation = (details: any) => {
 		const address = details.formatted_address;
 		const coords = details.geometry.location;
 
-		newLocations[index] = {
+		const newLocations = {
+			...locations,
 			[address]: {
 				latitude: coords.lat,
 				longitude: coords.lng,
@@ -146,6 +148,7 @@ const EventSubmit = () => {
 	};
 
 	const handleEventSubmission = async () => {
+		console.log("Submitting event...");
 		if (!validateFields()) {
 			return;
 		}
@@ -263,44 +266,49 @@ const EventSubmit = () => {
 
 					<View style={styles.inputContainer}>
 						<Text style={styles.label}>Location(s)</Text>
-						{locations.map((loc, index) => (
-							<View key={index} style={styles.locationContainer}>
-								<GooglePlacesAutocomplete
-									placeholder="Search for address"
-									onPress={(data, details = null) => {
-										if (details) {
-											updateLocation(index, details);
-										}
-									}}
-									fetchDetails={true}
-									query={{
-										key: GOOGLE_PLACES_API_KEY,
-										language: "en",
-									}}
-									styles={{
-										container: [
-											styles.placesContainer,
-											{ flex: 1 },
-										],
-										textInput: styles.placesTextInput,
-										listView: styles.placesListView,
-										row: styles.placesRow,
-									}}
-								/>
-								{index === locations.length - 1 && (
-									<TouchableOpacity
-										onPress={addLocation}
-										style={styles.addLocationButton}
-									>
-										<Ionicons
-											name="add-circle"
-											size={30}
-											color="#555"
-										/>
-									</TouchableOpacity>
-								)}
-							</View>
-						))}
+						{Array.from({ length: locationCount + 1 }).map(
+							(_, index) => (
+								<View
+									key={index}
+									style={styles.locationContainer}
+								>
+									<GooglePlacesAutocomplete
+										placeholder="Search for a location"
+										onPress={(data, details = null) => {
+											if (details) {
+												updateLocation(details);
+											}
+										}}
+										query={{
+											key: GOOGLE_PLACES_API_KEY,
+											language: "en",
+										}}
+										styles={{
+											textInput: styles.placesTextInput,
+											listView: styles.placesListView,
+											row: styles.placesRow,
+										}}
+										fetchDetails={true}
+									/>
+									{index === locationCount && (
+										<TouchableOpacity
+											style={styles.addLocationButton}
+											onPress={() =>
+												setLocationCount(
+													locationCount + 1
+												)
+											}
+										>
+											<Ionicons
+												name="add-circle-outline"
+												size={30}
+												color="#555"
+											/>
+										</TouchableOpacity>
+									)}
+								</View>
+							)
+						)}
 					</View>
 
 					<View style={styles.inputContainer}>

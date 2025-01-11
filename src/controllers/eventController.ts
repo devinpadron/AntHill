@@ -11,12 +11,19 @@ import db from "../../firebaseConfig";
   - A function that retrieves all of the events stored in Firestore.
 */
 
+type Location = {
+	[address: string]: {
+		latitude: number;
+		longitude: number;
+	};
+};
+
 export interface Event {
 	title: string;
 	date: string;
 	startTime: string;
 	endTime: string | null;
-	locations: Record<string, { latitude: number; longitude: number }>[];
+	locations: Location;
 	duration: string | null;
 	assignedWorkers: string[];
 }
