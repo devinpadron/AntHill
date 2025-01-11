@@ -9,6 +9,7 @@ import { TouchableOpacity } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 import moment from "moment";
 import MapView, { Marker } from "react-native-maps";
+import { set } from "lodash";
 
 type RootStackParamList = {
 	EventDetails: {
@@ -60,9 +61,38 @@ const EventDetails = ({ navigation }) => {
 				},
 			]);
 		}
-
-		//console.log(markers);
 	}, [event]);
+
+	const getRegionForMarkers = (markers) => {
+		if (!markers || markers.length === 0) return null;
+
+		// Initialize with first marker
+		let minLat = markers[0].latitude;
+		let maxLat = markers[0].latitude;
+		let minLng = markers[0].longitude;
+		let maxLng = markers[0].longitude;
+
+		// Find min/max values
+		markers.forEach((marker) => {
+			minLat = Math.min(minLat, marker.latitude);
+			maxLat = Math.max(maxLat, marker.latitude);
+			minLng = Math.min(minLng, marker.longitude);
+			maxLng = Math.max(maxLng, marker.longitude);
+		});
+
+		// Calculate center and deltas
+		const centerLat = (minLat + maxLat) / 2;
+		const centerLng = (minLng + maxLng) / 2;
+		const latDelta = (maxLat - minLat) * 1.5; // 1.5 adds 50% padding
+		const lngDelta = (maxLng - minLng) * 1.5;
+
+		return {
+			latitude: centerLat,
+			longitude: centerLng,
+			latitudeDelta: latDelta,
+			longitudeDelta: lngDelta,
+		};
+	};
 
 	if (!event) return <LoadingScreen />;
 
@@ -107,15 +137,9 @@ const EventDetails = ({ navigation }) => {
 				</View>
 
 				<View style={styles.detailsSection}>
-					<Text style={styles.label}>Location</Text>
 					<MapView
 						style={{ height: 300 }}
-						// initialRegion={{
-						// 	latitude: event.geo["latitude"],
-						// 	longitude: event.geo["longitude"],
-						// 	latitudeDelta: 0.00922,
-						// 	longitudeDelta: 0.00421,
-						// }}
+						initialRegion={getRegionForMarkers(markers)}
 					>
 						{markers.map((marker, index) => (
 							<Marker
