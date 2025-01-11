@@ -24,6 +24,7 @@ const EventDetails = ({ navigation }) => {
 
 	const [user, setUser] = useState(null);
 	const [event, setEvent] = useState(null);
+	const [markers, setMarkers] = useState([]);
 
 	useEffect(() => {
 		const subscriber = subscribeCurrentUser((user) => {
@@ -39,11 +40,29 @@ const EventDetails = ({ navigation }) => {
 			route.params.uid,
 			(event) => {
 				setEvent(event.data());
-				console.log(event.data().geo["latitude"]);
 			}
 		);
 		return () => subscriber();
 	}, [user]);
+
+	useEffect(() => {
+		if (!event) return;
+		const locations = event.locations;
+		if (!locations) return;
+		for (let location in locations) {
+			console.log(location);
+			setMarkers((prev) => [
+				...prev,
+				{
+					latitude: locations[location].latitude,
+					longitude: locations[location].longitude,
+					title: location,
+				},
+			]);
+		}
+
+		//console.log(markers);
+	}, [event]);
 
 	if (!event) return <LoadingScreen />;
 
@@ -91,20 +110,23 @@ const EventDetails = ({ navigation }) => {
 					<Text style={styles.label}>Location</Text>
 					<MapView
 						style={{ height: 300 }}
-						initialRegion={{
-							latitude: event.geo["latitude"],
-							longitude: event.geo["longitude"],
-							latitudeDelta: 0.00922,
-							longitudeDelta: 0.00421,
-						}}
+						// initialRegion={{
+						// 	latitude: event.geo["latitude"],
+						// 	longitude: event.geo["longitude"],
+						// 	latitudeDelta: 0.00922,
+						// 	longitudeDelta: 0.00421,
+						// }}
 					>
-						<Marker
-							coordinate={{
-								latitude: event.geo["latitude"],
-								longitude: event.geo["longitude"],
-							}}
-							title={event.title}
-						/>
+						{markers.map((marker, index) => (
+							<Marker
+								key={index}
+								coordinate={{
+									latitude: marker.latitude,
+									longitude: marker.longitude,
+								}}
+								title={marker.title}
+							/>
+						))}
 					</MapView>
 
 					{event.notes && (
