@@ -1,6 +1,10 @@
 import isEmpty from "lodash/isEmpty";
 import { useCallback, memo } from "react";
-import { StyleSheet, Alert, View, Text, TouchableOpacity } from "react-native";
+import { StyleSheet, View, Text, TouchableOpacity } from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
+import { AntHill } from "../../../../global/colors";
+import moment from "moment";
 
 /*
   TODO:
@@ -14,6 +18,12 @@ import { StyleSheet, Alert, View, Text, TouchableOpacity } from "react-native";
   - event duration
 */
 
+export type RootStackParamList = {
+	Details: {
+		uid: string;
+	};
+};
+
 interface ItemProps {
 	item: any;
 }
@@ -21,13 +31,16 @@ interface ItemProps {
 const AgendaItem = (props: ItemProps) => {
 	const { item } = props;
 
-	const buttonPressed = useCallback(() => {
-		Alert.alert("More Info!");
-	}, []);
+	const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+
+	// const buttonPressed = useCallback(() => {
+	// 	Alert.alert("More Info!");
+	// }, []);
 
 	const itemPressed = useCallback(() => {
-		Alert.alert(item.title);
-	}, []);
+		//console.log(item);
+		navigation.navigate("Details", { uid: item.eventUID });
+	}, [item, navigation]);
 
 	if (isEmpty(item)) {
 		return (
@@ -43,11 +56,11 @@ const AgendaItem = (props: ItemProps) => {
 			<View style={styles.timeContainer}>
 				<View style={styles.timeRow}>
 					<Text style={styles.timeText}>
-						{item.startTime || "No start time set"}
-						{item.endTime !== "" && (
+						{moment(item.startTime, "HH:mm").format("h:mma")}
+						{item.endTime && (
 							<Text>
 								<Text style={styles.timeSeparator}> - </Text>
-								{item.endTime}
+								{moment(item.endTime, "HH:mm").format("h:mma")}
 							</Text>
 						)}
 					</Text>
@@ -61,14 +74,16 @@ const AgendaItem = (props: ItemProps) => {
 					{item.title}
 				</Text>
 			</View>
-			<View style={styles.buttonContainer}>
+			{/* The Info Button, currently not being used. */}
+			{/* <View style={styles.buttonContainer}>
 				<TouchableOpacity
 					onPress={buttonPressed}
 					style={styles.infoButton}
 				>
 					<Text style={styles.infoButtonText}>Info</Text>
 				</TouchableOpacity>
-			</View>
+			</View> */}
+			<View style={{ paddingHorizontal: 0 }}></View>
 		</TouchableOpacity>
 	);
 };
@@ -85,7 +100,7 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 	},
 	timeContainer: {
-		width: 100,
+		maxWidth: 150,
 		marginRight: 16,
 	},
 	timeRow: {
@@ -112,7 +127,7 @@ const styles = StyleSheet.create({
 	title: {
 		fontSize: 16,
 		fontWeight: "500",
-		color: "#333",
+		color: AntHill.Black,
 		textAlign: "center",
 	},
 	buttonContainer: {

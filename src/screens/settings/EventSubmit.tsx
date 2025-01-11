@@ -4,12 +4,12 @@ import {
 	View,
 	Text,
 	TextInput,
-	TouchableOpacity,
 	StyleSheet,
 	ScrollView,
 	Platform,
 	KeyboardAvoidingView,
 } from "react-native";
+import { TouchableOpacity } from "react-native-gesture-handler";
 import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
 import DatePicker from "react-native-date-picker";
 import { Ionicons } from "@expo/vector-icons";
@@ -28,7 +28,7 @@ import * as ImagePicker from "react-native-image-picker";
   - time conversions?
 */
 
-const EventSubmit = () => {
+const EventSubmit = ({ navigation }) => {
 	const [title, setTitle] = useState("");
 	const [date, setDate] = useState(new Date());
 	const [startTime, setStartTime] = useState(new Date());
@@ -142,7 +142,25 @@ const EventSubmit = () => {
 					contentContainerStyle={styles.scrollContainer}
 					nestedScrollEnabled={true}
 				>
-					<Text style={styles.heading}>Submit New Event</Text>
+					<View style={styles.header}>
+						<TouchableOpacity
+							containerStyle={{
+								position: "absolute",
+								left: 20,
+								zIndex: 1,
+							}}
+							onPress={() => {
+								navigation.goBack();
+							}}
+						>
+							<Ionicons
+								name="chevron-back"
+								size={28}
+								color="#000"
+							/>
+						</TouchableOpacity>
+						<Text style={styles.headerTitle}>Submit New Event</Text>
+					</View>
 
 					<View style={styles.inputContainer}>
 						<Text style={styles.label}>Title</Text>
@@ -330,10 +348,14 @@ const styles = StyleSheet.create({
 		padding: 20,
 		paddingBottom: 40,
 	},
-	heading: {
+	header: {
+		display: "flex",
+		marginBottom: 20,
+		justifyContent: "center",
+	},
+	headerTitle: {
 		fontSize: 24,
 		fontWeight: "bold",
-		marginBottom: 20,
 		color: "#333",
 		textAlign: "center",
 	},

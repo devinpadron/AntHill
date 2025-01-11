@@ -1,13 +1,7 @@
 import React, { useEffect, useState } from "react";
-import {
-	View,
-	Text,
-	StyleSheet,
-	TouchableOpacity,
-	Alert,
-	Platform,
-} from "react-native";
+import { View, Text, StyleSheet, Alert, Platform } from "react-native";
 import { Dropdown } from "react-native-element-dropdown";
+import { TouchableOpacity } from "react-native-gesture-handler";
 import {
 	reAuth,
 	signOut,
@@ -18,12 +12,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import LoadingScreen from "../LoadingScreen";
 import prompt from "react-native-prompt-android";
 import auth from "@react-native-firebase/auth";
+import { Ionicons } from "@expo/vector-icons";
 import {
 	deleteUser,
 	subscribeCurrentUser,
 } from "../../controllers/userController";
 
-const ProfilePage = () => {
+const ProfilePage = ({ navigation }) => {
 	const [isLoading, setIsLoading] = useState(true);
 	const [userData, setData] = useState(null);
 
@@ -227,9 +222,23 @@ const ProfilePage = () => {
 	return !isLoading ? (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.content}>
-				<Text style={styles.header}>
-					{userData.firstName + " " + userData.lastName}
-				</Text>
+				<View style={styles.header}>
+					<TouchableOpacity
+						containerStyle={{
+							position: "absolute",
+							left: 20,
+							zIndex: 1,
+						}}
+						onPress={() => {
+							navigation.goBack();
+						}}
+					>
+						<Ionicons name="chevron-back" size={28} color="#000" />
+					</TouchableOpacity>
+					<Text style={styles.headerTitle}>
+						{userData.firstName + " " + userData.lastName}
+					</Text>
+				</View>
 
 				<View style={styles.section}>
 					<Text style={styles.label}>Email</Text>
@@ -297,9 +306,13 @@ const styles = StyleSheet.create({
 		backgroundColor: "#fff",
 	},
 	header: {
+		display: "flex",
+		marginBottom: 24,
+		justifyContent: "center",
+	},
+	headerTitle: {
 		fontSize: 24,
 		fontWeight: "bold",
-		marginBottom: 24,
 		textAlign: "center",
 	},
 	section: {

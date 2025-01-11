@@ -43,11 +43,25 @@ export async function getEvent(company: string, eventID: string) {
 			} else {
 				return null;
 			}
-		} else {
 		}
 	} catch (e) {
 		console.error("Error getting event", e);
 	}
+}
+
+export function subscribeEvent(
+	company: string,
+	eventID: string,
+	onSnap: (
+		snapshot: FirebaseFirestoreTypes.DocumentSnapshot<FirebaseFirestoreTypes.DocumentData>
+	) => void
+) {
+	return db
+		.collection("Companies")
+		.doc(company)
+		.collection("Events")
+		.doc(eventID)
+		.onSnapshot(onSnap);
 }
 
 export async function getEventsByDate(
@@ -82,18 +96,12 @@ export async function getAllEvents(
 	company: string
 ): Promise<FirebaseFirestoreTypes.DocumentData[]> {
 	try {
-		const res: FirebaseFirestoreTypes.DocumentData[] = [];
 		const eventsFromDB = await db
 			.collection("Companies")
 			.doc(company)
 			.collection("Events")
 			.get();
-		eventsFromDB.forEach((event) => {
-			const eventData = event.data() as Event;
-			res.push(eventData);
-		});
-
-		return res;
+		return eventsFromDB.docs;
 	} catch (e) {
 		console.error("Failed to get events", e);
 		throw e;

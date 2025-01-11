@@ -1,5 +1,5 @@
 import { MarkedDates } from "react-native-calendars/src/types";
-import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
+import { doc, FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
 import { getAllEvents } from "../../../../controllers/eventController";
 
 /* An AgendaItem controller that conatains:
@@ -13,13 +13,21 @@ import { getAllEvents } from "../../../../controllers/eventController";
 export interface AgendaItemData {
 	date: string;
 	data: [
-		{ title: string; startTime: string; endTime: string; duration: string }
+		{
+			title: string;
+			startTime: string;
+			endTime: string;
+			duration: string;
+			eventUID: string;
+		}
 	];
 }
 
 function createAgendaItem(
 	docRef: FirebaseFirestoreTypes.DocumentData
 ): AgendaItemData {
+	const id = docRef.id;
+	docRef = docRef.data();
 	return {
 		date: docRef.date,
 		data: [
@@ -28,6 +36,7 @@ function createAgendaItem(
 				startTime: docRef.startTime,
 				endTime: docRef.endTime,
 				duration: docRef.duration,
+				eventUID: id,
 			},
 		],
 	};

@@ -64,6 +64,23 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 		}
 	}, [user]);
 
+	const sortedSections = agendaItems
+		.reduce((acc, item) => {
+			const existing = acc.find((x) => x.title === item.date);
+			if (existing) {
+				existing.data.push(...item.data);
+			} else {
+				acc.push({
+					title: item.date,
+					data: [...item.data],
+				});
+			}
+			return acc;
+		}, [] as { title: string; data: any[] }[])
+		.sort((a, b) => {
+			return new Date(a.title).getTime() - new Date(b.title).getTime();
+		});
+
 	const renderItem = useCallback(({ item }: { item: AgendaItemData }) => {
 		return <AgendaItem item={item} />;
 	}, []);
@@ -89,7 +106,6 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 										ExpandableCalendar.positions.OPEN
 									}
 									calendarStyle={styles.calendar}
-									headerStyle={styles.header}
 									theme={theme.current}
 									firstDay={1}
 									markedDates={markedDates}
@@ -107,22 +123,12 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 
 					<View style={styles.agendaContainer}>
 						<AgendaList
-							sections={agendaItems.reduce((acc, item) => {
-								const existing = acc.find(
-									(x) => x.title === item.date
-								);
-								if (existing) {
-									existing.data.push(...item.data);
-								} else {
-									acc.push({
-										title: item.date,
-										data: [...item.data],
-									});
-								}
-								return acc;
-							}, [] as { title: string; data: any[] }[])}
+							sections={sortedSections}
 							renderItem={renderItem}
 							sectionStyle={styles.section}
+							ListFooterComponent={
+								<View style={{ paddingVertical: 150 }} />
+							}
 						/>
 					</View>
 				</CalendarProvider>
@@ -138,7 +144,6 @@ const styles = StyleSheet.create({
 		paddingLeft: 20,
 		paddingRight: 20,
 	},
-	header: {},
 	section: {
 		backgroundColor: lightThemeColor,
 		color: "grey",

@@ -5,14 +5,14 @@ import {
 	Text,
 	FlatList,
 	StyleSheet,
-	TouchableOpacity,
 	LayoutAnimation,
 	UIManager,
 	Platform,
 	Alert,
 	ActivityIndicator,
 } from "react-native";
-import { FontAwesome } from "@expo/vector-icons";
+import { TouchableOpacity } from "react-native-gesture-handler";
+import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import { LongPressGestureHandler, State } from "react-native-gesture-handler";
 import {
 	getUser,
@@ -28,7 +28,7 @@ if (
 	UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const EmployeeList = () => {
+const EmployeeList = ({ navigation }) => {
 	const [expandedIndex, setExpandedIndex] = useState(null);
 	const [employees, setEmployees] = useState<
 		Record<
@@ -176,6 +176,18 @@ const EmployeeList = () => {
 	return (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.titleBar}>
+				<TouchableOpacity
+					containerStyle={{
+						position: "absolute",
+						left: 20,
+						zIndex: 1,
+					}}
+					onPress={() => {
+						navigation.goBack();
+					}}
+				>
+					<Ionicons name="chevron-back" size={28} color="#000" />
+				</TouchableOpacity>
 				<Text style={styles.title}>Employees</Text>
 			</View>
 			<FlatList
@@ -194,6 +206,8 @@ const styles = StyleSheet.create({
 		marginTop: 20,
 	},
 	titleBar: {
+		display: "flex",
+		justifyContent: "center",
 		padding: 10,
 		backgroundColor: "#f8f8f8",
 		borderBottomWidth: 1,
@@ -202,6 +216,7 @@ const styles = StyleSheet.create({
 	title: {
 		fontSize: 24,
 		fontWeight: "bold",
+		textAlign: "center",
 	},
 	item: {
 		flexDirection: "row",
