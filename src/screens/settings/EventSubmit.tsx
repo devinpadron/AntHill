@@ -1,32 +1,33 @@
 import { GOOGLE_PLACES_API_KEY } from "@env";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
 	View,
 	Text,
 	TextInput,
 	TouchableOpacity,
 	StyleSheet,
+	Alert,
 	ScrollView,
 	Platform,
 	KeyboardAvoidingView,
+	ActivityIndicator,
 } from "react-native";
 import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
 import DatePicker from "react-native-date-picker";
 import { Ionicons } from "@expo/vector-icons";
+import { capitalize } from "lodash";
 import moment from "moment";
 import DropDownPicker from "react-native-dropdown-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import DocumentPicker from "react-native-document-picker";
 import * as ImagePicker from "react-native-image-picker";
-
-/*
-  TODO:
-  - full event submission backend
-  - populate workers from company's users
-  - image/document storage in firebase
-  - verify required sections are filled out before submitting
-  - time conversions?
-*/
+import { Event, addEvent } from "../../controllers/eventController";
+import {
+	subscribeCurrentUser,
+	getUser,
+	User,
+} from "../../controllers/userController";
+import { subscribeAllUsersInCompany } from "../../controllers/companyController";
 
 const EventSubmit = () => {
 	const [title, setTitle] = useState("");
@@ -34,17 +35,88 @@ const EventSubmit = () => {
 	const [startTime, setStartTime] = useState(new Date());
 	const [hasEndTime, setHasEndTime] = useState(false);
 	const [endTime, setEndTime] = useState(new Date());
-	const [location, setLocation] = useState("");
-	const [worker, setWorker] = useState([]);
+	const [locations, setLocations] = useState<
+		Record<string, { latitude: number; longitude: number }>[]
+	>([{}]);
+	const [assignedWorkers, setAssignedWorkers] = useState([]);
 	const [openSelect, setOpenSelect] = useState(false);
 	const [openDate, setOpenDate] = useState(false);
 	const [openStartTime, setOpenStartTime] = useState(false);
 	const [openEndTime, setOpenEndTime] = useState(false);
-	const [workers, setWorkers] = useState([
-		{ label: "Devin", value: "devin" },
-		{ label: "Bakos", value: "bakos" },
-		{ label: "Billy", value: "billy" },
-	]);
+	const [availableWorkers, setAvailableWorkers] = useState([]);
+	const [isLoading, setIsLoading] = useState(false);
+	const [currentCompany, setCurrentCompany] = useState<string>("");
+
+	useEffect(() => {
+		const subscriber = subscribeCurrentUser((snapshot) => {
+			if (snapshot.exists) {
+				const userData = snapshot.data() as User;
+				setCurrentCompany(userData.loggedInCompany);
+			}
+		});
+		return () => subscriber();
+	}, []);
+
+	useEffect(() => {
+		if (!currentCompany) return;
+		const subscriber = subscribeAllUsersInCompany(
+			currentCompany,
+			async (snapshot) => {
+				const workers = await Promise.all(
+					snapshot.docs.map(async (doc) => {
+						const userData = await getUser(doc.id);
+						return {
+							label: `${userData.firstName} ${userData.lastName}`,
+							value: doc.id,
+						};
+					})
+				);
+				setAvailableWorkers(workers);
+			}
+		);
+		return () => subscriber();
+	}, [currentCompany]);
+
+	const validateFields = () => {
+		if (!title.trim()) {
+			Alert.alert("Title is required.");
+			return false;
+		}
+		if (Object.keys(locations[0]).length === 0) {
+			Alert.alert("At least one location is required.");
+			return false;
+		}
+		if (hasEndTime && endTime <= startTime) {
+			Alert.alert("End time must be after start time.");
+			return false;
+		}
+		return true;
+	};
+
+	const calculateDuration = () => {
+		if (!hasEndTime) return null;
+		const hours = moment(endTime).diff(startTime, "minutes") / 60;
+		return Number.isInteger(hours) ? hours.toFixed(1) : hours.toString();
+	};
+
+	const addLocation = () => {
+		setLocations([...locations, {}]);
+	};
+
+	const updateLocation = (index: number, details: any) => {
+		const newLocations = [...locations];
+		const address = details.formatted_address;
+		const coords = details.geometry.location;
+
+		newLocations[index] = {
+			[address]: {
+				latitude: coords.lat,
+				longitude: coords.lng,
+			},
+		};
+
+		setLocations(newLocations);
+	};
 
 	const handleDocumentUpload = async () => {
 		try {
@@ -70,6 +142,41 @@ const EventSubmit = () => {
 			const response = await ImagePicker.launchImageLibrary(options);
 		} catch (err) {
 			console.error(err);
+		}
+	};
+
+	const handleEventSubmission = async () => {
+		if (!validateFields()) {
+			return;
+		}
+		try {
+			setIsLoading(true);
+			const eventData: Event = {
+				title: capitalize(title),
+				date: moment(date).format("YYYY-MM-DD"),
+				startTime: moment(startTime).format("HH:mm"),
+				endTime: hasEndTime ? moment(endTime).format("HH:mm") : null,
+				locations: locations,
+				duration: calculateDuration(),
+				assignedWorkers: assignedWorkers,
+			};
+
+			await addEvent(currentCompany, eventData);
+			console.log("Event successfully created!");
+			//navigation.pop();
+		} catch (error) {
+			switch (error.code) {
+				case "event/invalid-workers":
+					Alert.alert(
+						"One or more selected workers are not available!"
+					);
+					break;
+				default:
+					Alert.alert("Error creating event, please try again");
+					console.error(error);
+			}
+		} finally {
+			setIsLoading(false);
 		}
 	};
 
@@ -155,23 +262,45 @@ const EventSubmit = () => {
 					</View>
 
 					<View style={styles.inputContainer}>
-						<Text style={styles.label}>Location</Text>
-						<GooglePlacesAutocomplete
-							placeholder="Search for address"
-							onPress={(data) => {
-								setLocation(data.description);
-							}}
-							query={{
-								key: GOOGLE_PLACES_API_KEY,
-								language: "en",
-							}}
-							styles={{
-								container: styles.placesContainer,
-								textInput: styles.placesTextInput,
-								listView: styles.placesListView,
-								row: styles.placesRow,
-							}}
-						/>
+						<Text style={styles.label}>Location(s)</Text>
+						{locations.map((loc, index) => (
+							<View key={index} style={styles.locationContainer}>
+								<GooglePlacesAutocomplete
+									placeholder="Search for address"
+									onPress={(data, details = null) => {
+										if (details) {
+											updateLocation(index, details);
+										}
+									}}
+									fetchDetails={true}
+									query={{
+										key: GOOGLE_PLACES_API_KEY,
+										language: "en",
+									}}
+									styles={{
+										container: [
+											styles.placesContainer,
+											{ flex: 1 },
+										],
+										textInput: styles.placesTextInput,
+										listView: styles.placesListView,
+										row: styles.placesRow,
+									}}
+								/>
+								{index === locations.length - 1 && (
+									<TouchableOpacity
+										onPress={addLocation}
+										style={styles.addLocationButton}
+									>
+										<Ionicons
+											name="add-circle"
+											size={30}
+											color="#555"
+										/>
+									</TouchableOpacity>
+								)}
+							</View>
+						))}
 					</View>
 
 					<View style={styles.inputContainer}>
@@ -282,10 +411,10 @@ const EventSubmit = () => {
 							multiple={true}
 							min={0}
 							max={5}
-							value={worker}
-							setValue={setWorker}
-							items={workers}
-							setItems={setWorkers}
+							value={assignedWorkers}
+							setValue={setAssignedWorkers}
+							items={availableWorkers}
+							setItems={setAvailableWorkers}
 							open={openSelect}
 							setOpen={checkSelectOpen}
 							mode="BADGE"
@@ -295,10 +424,7 @@ const EventSubmit = () => {
 							style={styles.dropdown}
 							dropDownContainerStyle={[
 								styles.dropdownList,
-								{
-									position: "relative",
-									top: 0,
-								},
+								{ position: "relative", top: 0 },
 							]}
 							listItemContainerStyle={styles.dropdownItem}
 							zIndex={3000}
@@ -310,11 +436,14 @@ const EventSubmit = () => {
 
 					<TouchableOpacity
 						style={[styles.submitButton, { zIndex: 1 }]}
-						onPress={() => console.log("Form submitted")}
+						onPress={handleEventSubmission}
 					>
 						<Text style={styles.submitButtonText}>Submit</Text>
 						<Ionicons name="send" size={24} color="white" />
 					</TouchableOpacity>
+					{isLoading && (
+						<ActivityIndicator size="small" color="#0000ff" />
+					)}
 				</ScrollView>
 			</SafeAreaView>
 		</KeyboardAvoidingView>
@@ -339,6 +468,12 @@ const styles = StyleSheet.create({
 	},
 	inputContainer: {
 		marginBottom: 20,
+	},
+	locationContainer: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginBottom: 10,
+		gap: 10,
 	},
 	checkboxContainer: {
 		flexDirection: "row",
@@ -438,6 +573,9 @@ const styles = StyleSheet.create({
 		color: "#555",
 		fontSize: 16,
 		marginLeft: 8,
+	},
+	addLocationButton: {
+		padding: 5,
 	},
 	dropdownWrapper: {
 		zIndex: 2000,

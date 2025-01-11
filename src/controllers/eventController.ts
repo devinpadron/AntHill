@@ -15,9 +15,10 @@ export interface Event {
 	title: string;
 	date: string;
 	startTime: string;
-	endTime: string;
-	duration: string;
-	//jsonData:string
+	endTime: string | null;
+	locations: Record<string, { latitude: number; longitude: number }>[];
+	duration: string | null;
+	assignedWorkers: string[];
 }
 
 const isValidDateFormat = (date: string): boolean => {
