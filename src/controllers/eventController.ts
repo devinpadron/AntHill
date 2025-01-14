@@ -11,13 +11,21 @@ import db from "../../firebaseConfig";
   - A function that retrieves all of the events stored in Firestore.
 */
 
+type Location = {
+	[address: string]: {
+		latitude: number;
+		longitude: number;
+	};
+};
+
 export interface Event {
 	title: string;
 	date: string;
 	startTime: string;
-	endTime: string;
-	duration: string;
-	//jsonData:string
+	endTime: string | null;
+	locations: Location;
+	duration: string | null;
+	assignedWorkers: string[];
 }
 
 const isValidDateFormat = (date: string): boolean => {
