@@ -152,7 +152,7 @@ export async function updateEvent(
 			.collection("Events")
 			.doc(eventID)
 			.update(eventData);
-		console.log("Event successfully updated");
+		//console.log("Event successfully updated");
 		return true;
 	} catch (e) {
 		console.error("Error updating event:", e);

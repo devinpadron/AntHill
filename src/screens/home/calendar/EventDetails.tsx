@@ -1,15 +1,18 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { View, Text, StyleSheet, TextInput, ScrollView } from "react-native";
 import { RouteProp, useRoute } from "@react-navigation/native";
 import { subscribeCurrentUser } from "../../../controllers/userController";
-import { subscribeEvent } from "../../../controllers/eventController";
+import {
+	subscribeEvent,
+	updateEvent,
+} from "../../../controllers/eventController";
 import LoadingScreen from "../../LoadingScreen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TouchableOpacity } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 import moment from "moment";
 import MapView, { Marker } from "react-native-maps";
-import { set } from "lodash";
+import { getUser } from "../../../controllers/userController";
 
 type RootStackParamList = {
 	EventDetails: {
@@ -26,6 +29,7 @@ const EventDetails = ({ navigation }) => {
 	const [user, setUser] = useState(null);
 	const [event, setEvent] = useState(null);
 	const [markers, setMarkers] = useState([]);
+	const [workerList, setWorkerList] = useState("");
 
 	useEffect(() => {
 		const subscriber = subscribeCurrentUser((user) => {
@@ -51,7 +55,6 @@ const EventDetails = ({ navigation }) => {
 		const locations = event.locations;
 		if (!locations) return;
 		for (let location in locations) {
-			console.log(location);
 			setMarkers((prev) => [
 				...prev,
 				{
@@ -61,6 +64,21 @@ const EventDetails = ({ navigation }) => {
 				},
 			]);
 		}
+	}, [event]);
+
+	useEffect(() => {
+		if (!event) return;
+		const getWorkerList = async () => {
+			const assignedWorkers = event.assignedWorkers;
+			let workerList = "";
+			for (let i = 0; i < assignedWorkers.length; i++) {
+				const workerData = await getUser(assignedWorkers[i]);
+				workerList += workerData.firstName + " " + workerData.lastName;
+				if (i < assignedWorkers.length - 1) workerList += ", ";
+			}
+			setWorkerList(workerList);
+		};
+		getWorkerList();
 	}, [event]);
 
 	const getRegionForMarkers = (markers) => {
@@ -94,78 +112,133 @@ const EventDetails = ({ navigation }) => {
 		};
 	};
 
+	const scrollViewRef = useRef(null);
+
 	if (!event) return <LoadingScreen />;
 
 	return (
 		<SafeAreaView style={styles.container}>
-			<View style={styles.header}>
-				<TouchableOpacity
-					style={styles.backButton}
-					onPress={() => navigation.goBack()}
-				>
-					<Ionicons name="chevron-back" size={28} color="#000" />
-				</TouchableOpacity>
-				<Text style={styles.title}>{event.title}</Text>
-			</View>
-
-			<View style={styles.content}>
-				<View style={[styles.timeSection, { marginBottom: 10 }]}>
-					<Text style={styles.timeText}>
-						{moment(event.date).format("dddd, MMMM D, YYYY")}
-					</Text>
-				</View>
-				<View style={styles.timeSection}>
-					<Text style={styles.timeText}>
-						{moment(event.startTime, "HH:mm").format("h:mma")}
-					</Text>
-
-					{event.endTime && (
-						<>
-							<Text style={styles.timeText}>-</Text>
-							<Text style={styles.timeText}>
-								{moment(event.endTime, "HH:mm").format("h:mma")}
-							</Text>
-						</>
-					)}
-				</View>
-				<View style={styles.duration}>
-					{event.duration && (
-						<Text style={{ fontSize: 18 }}>
-							{event.duration} hours
-						</Text>
-					)}
-				</View>
-
-				<View style={styles.detailsSection}>
-					<MapView
-						style={{ height: 300 }}
-						initialRegion={getRegionForMarkers(markers)}
+			<ScrollView
+				ref={scrollViewRef}
+				contentContainerStyle={{ flexGrow: 1 }}
+			>
+				<View style={styles.header}>
+					<TouchableOpacity
+						style={styles.backButton}
+						onPress={() => navigation.goBack()}
 					>
-						{markers.map((marker, index) => (
-							<Marker
-								key={index}
-								coordinate={{
-									latitude: marker.latitude,
-									longitude: marker.longitude,
-								}}
-								title={marker.title}
-							/>
-						))}
-					</MapView>
-
-					{event.notes && (
-						<>
-							<Text style={styles.label}>Notes</Text>
-							<Text style={styles.text}>{event.notes}</Text>
-						</>
-					)}
+						<Ionicons name="chevron-back" size={28} color="#000" />
+					</TouchableOpacity>
+					<Text style={styles.title}>{event.title}</Text>
 				</View>
-			</View>
+
+				<View style={styles.content}>
+					<View style={[styles.timeSection, { marginBottom: 10 }]}>
+						<Text style={styles.timeText}>
+							{moment(event.date).format("dddd, MMMM D, YYYY")}
+						</Text>
+					</View>
+					<View style={styles.timeSection}>
+						<Text style={styles.timeText}>
+							{moment(event.startTime, "HH:mm").format("h:mma")}
+						</Text>
+
+						{event.endTime && (
+							<>
+								<Text style={styles.timeText}>-</Text>
+								<Text style={styles.timeText}>
+									{moment(event.endTime, "HH:mm").format(
+										"h:mma"
+									)}
+								</Text>
+							</>
+						)}
+					</View>
+					<View style={styles.duration}>
+						{event.duration && (
+							<Text style={{ fontSize: 18 }}>
+								{event.duration} hours
+							</Text>
+						)}
+					</View>
+
+					<View style={styles.detailsSection}>
+						{event.assignedWorkers && (
+							<>
+								<Text style={styles.label}>
+									Assigned Workers
+								</Text>
+								<Text style={styles.text}>{workerList}</Text>
+							</>
+						)}
+						{event.notes && (
+							<>
+								<Text style={styles.label}>Notes</Text>
+								<Text style={styles.text}>{event.notes}</Text>
+							</>
+						)}
+						{event.locations && (
+							<MapView
+								style={{ height: 300, marginBottom: 16 }}
+								initialRegion={getRegionForMarkers(markers)}
+							>
+								{markers.map((marker, index) => (
+									<Marker
+										key={index}
+										coordinate={{
+											latitude: marker.latitude,
+											longitude: marker.longitude,
+										}}
+										title={marker.title}
+									/>
+								))}
+							</MapView>
+						)}
+					</View>
+
+					<Text style={styles.label}>Your Notes</Text>
+					<TextInput
+						style={[
+							styles.text,
+							{
+								padding: 8,
+								minHeight: 150,
+							},
+						]}
+						multiline
+						editable
+						numberOfLines={5}
+						value={event.userNotes || ""}
+						onChangeText={(text) => {
+							const updatedEvent = {
+								...event,
+								userNotes: text,
+							};
+							updateEvent(
+								user.loggedInCompany,
+								route.params.uid,
+								updatedEvent
+							);
+							setEvent(updatedEvent);
+							scrollViewRef.current.scrollToEnd({
+								animated: true,
+							});
+						}}
+						placeholder="Add your personal notes here..."
+					/>
+				</View>
+			</ScrollView>
 		</SafeAreaView>
 	);
 };
 
 const styles = StyleSheet.create({
+	modalContainer: {
+		flex: 1,
+		justifyContent: "center",
+		alignItems: "center",
+		backgroundColor: "rgba(0, 0, 0, 0.5)",
+	},
 	container: {
 		flex: 1,
 		backgroundColor: "#fff",
@@ -216,11 +289,12 @@ const styles = StyleSheet.create({
 	},
 	label: {
 		fontSize: 14,
+		fontWeight: "500",
 		color: "#666",
-		marginBottom: 4,
 	},
 	text: {
 		fontSize: 16,
+		lineHeight: 20,
 		marginBottom: 12,
 	},
 });
