@@ -180,7 +180,7 @@ export default LoginPage;
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: AntHill.White,
+		backgroundColor: "white",
 		alignItems: "center",
 		justifyContent: "center", // Center content vertically
 	},
