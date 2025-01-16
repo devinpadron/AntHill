@@ -1,5 +1,5 @@
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
-import db from "../../firebaseConfig";
+import db from "../../index";
 
 /* An EventController that contains:
   - An event interface that provides the structure of event data

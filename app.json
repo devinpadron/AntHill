@@ -6,10 +6,18 @@
 		"orientation": "portrait",
 		"userInterfaceStyle": "light",
 		"assetBundlePatterns": ["**/*"],
+		"splash": {
+			"image": "./src/assets/AntHill/Full_Black.png",
+			"resizeMode": "contain",
+			"backgroundColor": "#ffffff"
+		},
 		"ios": {
 			"supportsTablet": true,
 			"googleServicesFile": "./GoogleService-Info.plist",
-			"bundleIdentifier": "com.anthillapp.anthill"
+			"bundleIdentifier": "com.anthillapp.anthill",
+			"entitlements": {
+				"aps-environment": "production"
+			}
 		},
 		"android": {
 			"googleServicesFile": "./google-services.json",
