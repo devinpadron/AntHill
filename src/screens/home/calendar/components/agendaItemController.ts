@@ -42,12 +42,8 @@ function createAgendaItem(
 	};
 }
 
-export async function getAgendaItems(
-	company: string
-): Promise<AgendaItemData[]> {
+export function getAgendaItems(events: any[]): AgendaItemData[] {
 	const res: AgendaItemData[] = [];
-	const events = await getAllEvents(company);
-
 	events.forEach((event) => {
 		res.push(createAgendaItem(event));
 	});

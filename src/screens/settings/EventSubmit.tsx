@@ -1,6 +1,6 @@
 import "react-native-get-random-values";
 import { GOOGLE_PLACES_API_KEY } from "@env";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
 	View,
 	Text,
@@ -13,7 +13,10 @@ import {
 	ActivityIndicator,
 } from "react-native";
 import { TouchableOpacity } from "react-native-gesture-handler";
-import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
+import {
+	GooglePlacesAutocomplete,
+	GooglePlacesAutocompleteRef,
+} from "react-native-google-places-autocomplete";
 import DatePicker from "react-native-date-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { capitalize } from "lodash";
@@ -45,14 +48,17 @@ const EventSubmit = ({ navigation }) => {
 	const [availableWorkers, setAvailableWorkers] = useState([]);
 	const [isLoading, setIsLoading] = useState(false);
 	const [currentCompany, setCurrentCompany] = useState<string>("");
-	const [locationCount, setLocationCount] = useState(0);
+	const [notes, setNotes] = useState("");
 
 	type Location = {
 		[address: string]: {
 			latitude: number;
 			longitude: number;
+			label: string;
 		};
 	};
+
+	const googlePlacesRef = useRef<GooglePlacesAutocompleteRef | null>(null);
 
 	useEffect(() => {
 		const subscriber = subscribeCurrentUser((snapshot) => {
@@ -89,10 +95,10 @@ const EventSubmit = ({ navigation }) => {
 			Alert.alert("Title is required.");
 			return false;
 		}
-		if (Object.keys(locations).length === 0) {
-			Alert.alert("At least one location is required.");
-			return false;
-		}
+		// if (Object.keys(locations).length === 0) {
+		// 	Alert.alert("At least one location is required.");
+		// 	return false;
+		// }
 		if (hasEndTime && endTime <= startTime) {
 			Alert.alert("End time must be after start time.");
 			return false;
@@ -153,6 +159,8 @@ const EventSubmit = ({ navigation }) => {
 		if (!validateFields()) {
 			return;
 		}
+
+		const validatedLocations = validateLocations(locations);
 		try {
 			setIsLoading(true);
 			const eventData: Event = {
@@ -160,8 +168,12 @@ const EventSubmit = ({ navigation }) => {
 				date: moment(date).format("YYYY-MM-DD"),
 				startTime: moment(startTime).format("HH:mm"),
 				endTime: hasEndTime ? moment(endTime).format("HH:mm") : null,
-				locations: locations,
+				locations:
+					Object.keys(validatedLocations).length > 0
+						? validatedLocations
+						: null,
 				duration: calculateDuration(),
+				notes: notes,
 				assignedWorkers: assignedWorkers,
 			};
 
@@ -182,6 +194,19 @@ const EventSubmit = ({ navigation }) => {
 		} finally {
 			setIsLoading(false);
 		}
+	};
+
+	const validateLocations = (locations: Location) => {
+		return Object.entries(locations).reduce(
+			(acc: Location, [key, value]) => {
+				// Check if location has valid coordinates
+				if (value.latitude && value.longitude) {
+					acc[key] = value;
+				}
+				return acc;
+			},
+			{}
+		);
 	};
 
 	const formatDate = (date: moment.MomentInput) =>
@@ -253,6 +278,7 @@ const EventSubmit = ({ navigation }) => {
 					contentContainerStyle={styles.scrollContainer}
 					nestedScrollEnabled={true}
 				>
+					{/* Header */}
 					<View style={styles.header}>
 						<TouchableOpacity
 							containerStyle={{
@@ -273,6 +299,7 @@ const EventSubmit = ({ navigation }) => {
 						<Text style={styles.headerTitle}>Submit New Event</Text>
 					</View>
 
+					{/* Title Section */}
 					<View style={styles.inputContainer}>
 						<Text style={styles.label}>Title</Text>
 						<TextInput
@@ -283,53 +310,126 @@ const EventSubmit = ({ navigation }) => {
 						/>
 					</View>
 
+					{/* Location Section */}
 					<View style={styles.inputContainer}>
 						<Text style={styles.label}>Location(s)</Text>
-						{Array.from({ length: locationCount + 1 }).map(
-							(_, index) => (
-								<View
-									key={index}
-									style={styles.locationContainer}
-								>
-									<GooglePlacesAutocomplete
-										placeholder="Search for a location"
-										onPress={(data, details = null) => {
-											if (details) {
-												updateLocation(details);
-											}
-										}}
-										query={{
-											key: GOOGLE_PLACES_API_KEY,
-											language: "en",
-										}}
-										styles={{
-											textInput: styles.placesTextInput,
-											listView: styles.placesListView,
-											row: styles.placesRow,
-										}}
-										fetchDetails={true}
-									/>
-									{index === locationCount && (
+						<View style={styles.locationContainer}>
+							<GooglePlacesAutocomplete
+								ref={googlePlacesRef}
+								placeholder="Search for a location"
+								onPress={(data, details = null) => {
+									if (details) {
+										updateLocation(details);
+									}
+									googlePlacesRef.current?.clear();
+								}}
+								query={{
+									key: GOOGLE_PLACES_API_KEY,
+									language: "en",
+								}}
+								styles={{
+									textInput: styles.placesTextInput,
+									listView: styles.placesListView,
+									row: styles.placesRow,
+								}}
+								fetchDetails={true}
+							/>
+						</View>
+						{Object.keys(locations).map((address) => (
+							<>
+								<View style={{ marginBottom: 10 }}>
+									<View
+										key={address}
+										style={styles.locationContainer}
+									>
+										<Text
+											style={[styles.label, { flex: 1 }]}
+										>
+											{address}
+										</Text>
 										<TouchableOpacity
+											onPress={() => {
+												Alert.prompt(
+													"Add Label",
+													"Enter a label for this location",
+													[
+														{
+															text: "Cancel",
+															style: "cancel",
+														},
+														{
+															text: "OK",
+															onPress: (
+																label
+															) => {
+																if (!label)
+																	return;
+																const newLocations =
+																	{
+																		...locations,
+																	};
+																newLocations[
+																	address
+																] = {
+																	...newLocations[
+																		address
+																	],
+																	label: label,
+																};
+																setLocations(
+																	newLocations
+																);
+															},
+														},
+													]
+												);
+											}}
 											style={styles.addLocationButton}
-											onPress={() =>
-												setLocationCount(
-													locationCount + 1
-												)
-											}
 										>
 											<Ionicons
-												name="add-circle-outline"
-												size={30}
+												name="pencil-outline"
+												size={24}
 												color="#555"
 											/>
 										</TouchableOpacity>
-									)}
+										<TouchableOpacity
+											onPress={() => {
+												const newLocations = {
+													...locations,
+												};
+												delete newLocations[address];
+												setLocations(newLocations);
+											}}
+											style={styles.deleteButton}
+										>
+											<Ionicons
+												name="trash-outline"
+												size={24}
+												color="red"
+											/>
+										</TouchableOpacity>
+									</View>
+									<View
+										key={address}
+										style={{ marginTop: -5 }}
+									>
+										{locations[address].label && (
+											<Text
+												style={[
+													styles.label,
+													{ flex: 1, fontSize: 14 },
+												]}
+											>
+												"{locations[address].label}"
+											</Text>
+										)}
+									</View>
 								</View>
-							)
-						)}
+							</>
+						))}
 					</View>
 
+					{/* Date Toggle */}
 					<View style={styles.inputContainer}>
 						<Text style={styles.label}>Date</Text>
 						<TouchableOpacity
@@ -353,6 +453,7 @@ const EventSubmit = ({ navigation }) => {
 						/>
 					</View>
 
+					{/* Start Time Section */}
 					<View style={styles.inputContainer}>
 						<Text style={styles.label}>Start Time</Text>
 						<TouchableOpacity
@@ -376,6 +477,7 @@ const EventSubmit = ({ navigation }) => {
 						/>
 					</View>
 
+					{/* End Time Toggle */}
 					<View style={styles.inputContainer}>
 						<TouchableOpacity
 							onPress={handleEndTimeToggle}
@@ -426,6 +528,7 @@ const EventSubmit = ({ navigation }) => {
 						)}
 					</View>
 
+					{/* Assigned Workers Section */}
 					<View
 						style={[
 							styles.inputContainer,
@@ -459,8 +562,25 @@ const EventSubmit = ({ navigation }) => {
 						/>
 					</View>
 
+					{/* Notes Section */}
+					<View style={[styles.inputContainer, { zIndex: 1 }]}>
+						<Text style={styles.label}>Notes</Text>
+						<TextInput
+							style={[
+								styles.input,
+								{ height: 100, textAlignVertical: "top" },
+							]}
+							placeholder="Add any additional notes"
+							multiline={true}
+							numberOfLines={4}
+							onChange={(text) => setNotes(text.nativeEvent.text)}
+						/>
+					</View>
+
+					{/* Attachments Section */}
 					{renderAttachmentsSection()}
 
+					{/* Submission Button */}
 					<TouchableOpacity
 						style={[styles.submitButton, { zIndex: 1 }]}
 						onPress={handleEventSubmission}
@@ -503,7 +623,6 @@ const styles = StyleSheet.create({
 	locationContainer: {
 		flexDirection: "row",
 		alignItems: "center",
-		marginBottom: 10,
 		gap: 10,
 	},
 	checkboxContainer: {
@@ -631,6 +750,13 @@ const styles = StyleSheet.create({
 		borderBottomColor: "#eee",
 		minHeight: 40,
 		justifyContent: "center",
+	},
+	locationInput: {
+		flex: 1,
+		marginRight: 10,
+	},
+	deleteButton: {
+		padding: 5,
 	},
 });
 

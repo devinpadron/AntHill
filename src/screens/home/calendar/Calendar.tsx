@@ -17,6 +17,7 @@ import moment from "moment";
 import LoadingScreen from "../../LoadingScreen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { subscribeCurrentUser } from "../../../controllers/userController";
+import { subscribeAllEvents } from "../../../controllers/eventController";
 
 /* An ExpanableCalendar that:
   - Allows the user to view their events in a scrollable AgendaList
@@ -47,16 +48,27 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 				const userData = user.data();
 				if (!userData) return;
 				setUser(userData);
-				const items = await getAgendaItems(userData.loggedInCompany);
-				const marks = getMarkedDates(items);
-				setAgendaItems(items);
-				setMarkedDates(marks);
 			} catch (error) {
 				console.error(error);
 			}
 		});
 		return () => subscriber();
 	}, []);
+
+	useEffect(() => {
+		if (!user) return;
+		const subscriber = subscribeAllEvents(
+			user.loggedInCompany,
+			(snapshot) => {
+				const events = snapshot.docs;
+				const items = getAgendaItems(events);
+				const marks = getMarkedDates(items);
+				setAgendaItems(items);
+				setMarkedDates(marks);
+			}
+		);
+		return () => subscriber();
+	}, [user]);
 
 	useEffect(() => {
 		if (user) {

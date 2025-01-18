@@ -61,6 +61,7 @@ const EventDetails = ({ navigation }) => {
 					latitude: locations[location].latitude,
 					longitude: locations[location].longitude,
 					title: location,
+					label: locations[location].label,
 				},
 			]);
 		}
@@ -189,7 +190,14 @@ const EventDetails = ({ navigation }) => {
 											latitude: marker.latitude,
 											longitude: marker.longitude,
 										}}
-										title={marker.title}
+										description={
+											marker.label ? marker.title : ""
+										}
+										title={
+											marker.label
+												? marker.label
+												: marker.title
+										}
 									/>
 								))}
 							</MapView>

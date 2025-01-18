@@ -25,6 +25,7 @@ export interface Event {
 	endTime: string | null;
 	locations: Location;
 	duration: string | null;
+	notes: string;
 	assignedWorkers: string[];
 }
 
@@ -114,6 +115,19 @@ export async function getAllEvents(
 		console.error("Failed to get events", e);
 		throw e;
 	}
+}
+
+export function subscribeAllEvents(
+	company: string,
+	onSnap: (
+		snapshot: FirebaseFirestoreTypes.QuerySnapshot<FirebaseFirestoreTypes.DocumentData>
+	) => void
+) {
+	return db
+		.collection("Companies")
+		.doc(company)
+		.collection("Events")
+		.onSnapshot(onSnap);
 }
 
 export async function addEvent(company: string, newEvent: Event) {
