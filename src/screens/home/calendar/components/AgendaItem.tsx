@@ -1,8 +1,16 @@
 import isEmpty from "lodash/isEmpty";
 import { useCallback, memo } from "react";
-import { StyleSheet, View, Text, TouchableOpacity } from "react-native";
+import {
+	StyleSheet,
+	View,
+	Text,
+	TouchableOpacity,
+	Linking,
+	Alert,
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
+import { Ionicons } from "@expo/vector-icons";
 import { AntHill } from "../../../../global/colors";
 import moment from "moment";
 
@@ -10,7 +18,6 @@ import moment from "moment";
   TODO:
   - Add functionality for AgendaItem button press
   - Add functionality for the 'More Info' button.
-*/
 
 /* An AgendaItem component that is part of the AgendaList that displays information such as:
   - event title
@@ -30,17 +37,61 @@ interface ItemProps {
 
 const AgendaItem = (props: ItemProps) => {
 	const { item } = props;
-
 	const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
-	// const buttonPressed = useCallback(() => {
-	// 	Alert.alert("More Info!");
-	// }, []);
-
 	const itemPressed = useCallback(() => {
-		//console.log(item);
 		navigation.navigate("Details", { uid: item.eventUID });
 	}, [item, navigation]);
+
+	const handleFilePress = async (file: {
+		url: string;
+		type: string;
+		filename: string;
+	}) => {
+		try {
+			const supported = await Linking.canOpenURL(file.url);
+
+			if (supported) {
+				await Linking.openURL(file.url);
+			} else {
+				Alert.alert(
+					"Cannot Open File",
+					"Your device doesn't support opening this type of file"
+				);
+			}
+		} catch (error) {
+			Alert.alert("Error", "There was a problem opening the file");
+		}
+	};
+
+	const renderAttachments = () => {
+		if (!item.attachments || item.attachments.length === 0) return null;
+
+		return (
+			<View style={styles.attachmentsContainer}>
+				{item.attachments.map((file, index) => (
+					<TouchableOpacity
+						key={index}
+						style={styles.attachmentItem}
+						onPress={() => handleFilePress(file)}
+					>
+						<Ionicons
+							name={
+								file.type.startsWith("image/")
+									? "image-outline"
+									: "document-outline"
+							}
+							size={20}
+							color="#666"
+						/>
+						<Text numberOfLines={1} style={styles.attachmentText}>
+							{file.filename}
+						</Text>
+					</TouchableOpacity>
+				))}
+			</View>
+		);
+	};
 
 	if (isEmpty(item)) {
 		return (
@@ -51,6 +102,7 @@ const AgendaItem = (props: ItemProps) => {
 			</View>
 		);
 	}
+
 	return (
 		<TouchableOpacity onPress={itemPressed} style={styles.item}>
 			<View style={styles.timeContainer}>
@@ -73,17 +125,8 @@ const AgendaItem = (props: ItemProps) => {
 				<Text style={styles.title} numberOfLines={1}>
 					{item.title}
 				</Text>
+				{renderAttachments()}
 			</View>
-			{/* The Info Button, currently not being used. */}
-			{/* <View style={styles.buttonContainer}>
-				<TouchableOpacity
-					onPress={buttonPressed}
-					style={styles.infoButton}
-				>
-					<Text style={styles.infoButtonText}>Info</Text>
-				</TouchableOpacity>
-			</View> */}
-			<View style={{ paddingHorizontal: 0 }}></View>
 		</TouchableOpacity>
 	);
 };
@@ -155,5 +198,26 @@ const styles = StyleSheet.create({
 	emptyItemText: {
 		fontSize: 16,
 		color: "#888",
+	},
+	attachmentsContainer: {
+		marginTop: 8,
+		flexDirection: "row",
+		flexWrap: "wrap",
+		gap: 8,
+		justifyContent: "center",
+	},
+	attachmentItem: {
+		flexDirection: "row",
+		alignItems: "center",
+		backgroundColor: "#f5f5f5",
+		padding: 6,
+		borderRadius: 4,
+		maxWidth: 150,
+	},
+	attachmentText: {
+		fontSize: 12,
+		color: "#666",
+		marginLeft: 4,
+		flex: 1,
 	},
 });
