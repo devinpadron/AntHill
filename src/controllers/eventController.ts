@@ -1,4 +1,5 @@
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
+import { UploadedFile } from "../screens/settings/EventSubmit";
 import db from "../../index";
 
 /* An EventController that contains:
@@ -27,6 +28,7 @@ export interface Event {
 	duration: string | null;
 	notes: string;
 	assignedWorkers: string[];
+	attachments?: UploadedFile[];
 }
 
 const isValidDateFormat = (date: string): boolean => {
