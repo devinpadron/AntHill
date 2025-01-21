@@ -6,12 +6,6 @@ import { StackNavigationProp } from "@react-navigation/stack";
 import { AntHill } from "../../../../global/colors";
 import moment from "moment";
 
-/*
-  TODO:
-  - Add functionality for AgendaItem button press
-  - Add functionality for the 'More Info' button.
-*/
-
 /* An AgendaItem component that is part of the AgendaList that displays information such as:
   - event title
   - event start and end time

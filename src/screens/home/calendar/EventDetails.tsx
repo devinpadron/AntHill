@@ -125,7 +125,7 @@ const EventDetails = ({ navigation }) => {
 			>
 				<View style={styles.header}>
 					<TouchableOpacity
-						style={styles.backButton}
+						containerStyle={styles.backButton}
 						onPress={() => navigation.goBack()}
 					>
 						<Ionicons name="chevron-back" size={28} color="#000" />
@@ -252,22 +252,26 @@ const styles = StyleSheet.create({
 		backgroundColor: "#fff",
 	},
 	header: {
-		flexDirection: "row",
-		alignItems: "center",
+		//flexDirection: "row",
+		display: "flex",
+		//alignItems: "center",
 		paddingHorizontal: 16,
 		paddingVertical: 12,
 		borderBottomWidth: 1,
 		borderBottomColor: "#eee",
+		justifyContent: "center",
 	},
 	backButton: {
-		padding: 8,
+		left: 20,
+		position: "absolute",
+		zIndex: 1,
 	},
 	title: {
 		flex: 1,
 		fontSize: 20,
 		fontWeight: "bold",
 		textAlign: "center",
-		marginRight: 44, // To center the title accounting for back button
+		//marginRight: 44, // To center the title accounting for back button
 	},
 	content: {
 		flex: 1,

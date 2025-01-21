@@ -95,7 +95,6 @@ const EmployeeList = ({ navigation }) => {
 	const handleLongPress = (employee) => {
 		// Must check to see if current user is an owner before allowing them to demote or promote another user
 		// Owners cannot be demoted, and only owners can promote users to admin
-		// TODO add functionality to demote/promote/delete
 		if (employee.privilege != "Owner" && user.privilege === "Owner") {
 			Alert.alert(
 				employee.firstName + " " + employee.lastName,
