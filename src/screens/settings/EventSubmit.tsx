@@ -32,6 +32,15 @@ import {
 	User,
 } from "../../controllers/userController";
 import { subscribeAllUsersInCompany } from "../../controllers/companyController";
+import storage from "@react-native-firebase/storage";
+
+export interface UploadedFile {
+	filename: string;
+	url: string;
+	type: string;
+	uploadTime: number;
+	path: string;
+}
 
 const EventSubmit = ({ navigation }) => {
 	const [title, setTitle] = useState("");
@@ -49,6 +58,8 @@ const EventSubmit = ({ navigation }) => {
 	const [isLoading, setIsLoading] = useState(false);
 	const [currentCompany, setCurrentCompany] = useState<string>("");
 	const [notes, setNotes] = useState("");
+	const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+	const [eventId] = useState(`temp_${Date.now()}`);
 
 	type Location = {
 		[address: string]: {
@@ -127,15 +138,68 @@ const EventSubmit = ({ navigation }) => {
 		setLocations(newLocations);
 	};
 
+	const uploadToFirebase = async (
+		uri: string,
+		filename: string,
+		type: string
+	): Promise<string> => {
+		try {
+			const fileCategory = type.startsWith("image/")
+				? "images"
+				: "documnets";
+			const storagePath = `companies/${currentCompany}/events/${eventId}/${fileCategory}/${filename}`;
+			const storageRef = storage().ref(storagePath);
+
+			const uploadUri =
+				Platform.OS === "ios" ? uri.replace("file://", "") : uri;
+
+			const task = storageRef.putFile(uploadUri);
+			task.on("state_changed", (snapshot) => {
+				const progress =
+					(snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+				console.log(`Upload is ${progress}% complete`);
+			});
+
+			await task;
+			const url = await storageRef.getDownloadURL();
+			return url;
+		} catch (error) {
+			console.error("Upload error:", error);
+			throw error;
+		}
+	};
+
 	const handleDocumentUpload = async () => {
 		try {
 			const results = await DocumentPicker.pick({
 				type: [DocumentPicker.types.images, DocumentPicker.types.pdf],
 				allowMultiSelection: true,
 			});
+
+			const uploadPromises = results.map(async (file) => {
+				const url = await uploadToFirebase(
+					file.uri,
+					file.name,
+					file.type
+				);
+
+				return {
+					filename: file.name,
+					url: url,
+					type: file.type,
+					path: `companies/${currentCompany}/events/${eventId}/${
+						file.type.startsWith("image/") ? "images" : "documents"
+					}/${file.name}`,
+					uploadTime: Date.now(),
+				};
+			});
+
+			const uploadedDocs = await Promise.all(uploadPromises);
+			setUploadedFiles((prev) => [...prev, ...uploadedDocs]);
 		} catch (err) {
 			if (!DocumentPicker.isCancel(err)) {
 				console.error(err);
+				Alert.alert("Upload Error", "Failed to upload document");
 			}
 		}
 	};
@@ -143,14 +207,50 @@ const EventSubmit = ({ navigation }) => {
 	const handleImageUpload = async () => {
 		const options: ImagePicker.ImageLibraryOptions = {
 			mediaType: "photo",
-			quality: 0.8 as ImagePicker.PhotoQuality,
+			quality: 0.8,
 			selectionLimit: 0,
 		};
 
 		try {
 			const response = await ImagePicker.launchImageLibrary(options);
+
+			if (response.assets) {
+				const uploadPromises = response.assets.map(async (asset) => {
+					if (!asset.uri || !asset.fileName) return null;
+
+					const url = await uploadToFirebase(
+						asset.uri,
+						asset.fileName,
+						asset.type || "image/jpeg"
+					);
+
+					return {
+						filename: asset.fileName,
+						url: url,
+						type: asset.type || "image/jpeg",
+						path: `companies/${currentCompany}/events/${eventId}/images/${asset.fileName}`,
+						uploadTime: Date.now(),
+					};
+				});
+				const uploadedImages = (
+					await Promise.all(uploadPromises)
+				).filter(Boolean) as UploadedFile[];
+				setUploadedFiles((prev) => [...prev, ...uploadedImages]);
+			}
 		} catch (err) {
 			console.error(err);
+			Alert.alert("Upload Error", "Failed to upload image");
+		}
+	};
+
+	const cleanupTempFiles = async () => {
+		try {
+			for (const file of uploadedFiles) {
+				const ref = storage().ref(file.path);
+				await ref.delete();
+			}
+		} catch (error) {
+			console.error("Cleanup error: ", error);
 		}
 	};
 
@@ -175,12 +275,14 @@ const EventSubmit = ({ navigation }) => {
 				duration: calculateDuration(),
 				notes: notes,
 				assignedWorkers: assignedWorkers,
+				attachments: uploadedFiles,
 			};
 
 			await addEvent(currentCompany, eventData);
 			console.log("Event successfully created!");
-			//navigation.pop();
+			navigation.pop();
 		} catch (error) {
+			await cleanupTempFiles();
 			switch (error.code) {
 				case "event/invalid-workers":
 					Alert.alert(
@@ -195,6 +297,28 @@ const EventSubmit = ({ navigation }) => {
 			setIsLoading(false);
 		}
 	};
+
+	const renderUploadedFiles = () => (
+		<View style={styles.uploadedFilesContainer}>
+			{uploadedFiles.map((file, index) => (
+				<View key={index} style={styles.uploadedFileItem}>
+					<Text numberOfLines={1} style={styles.filename}>
+						{file.filename}
+					</Text>
+					<TouchableOpacity
+						onPress={() => {
+							setUploadedFiles((prev) =>
+								prev.filter((_, i) => i !== index)
+							);
+						}}
+						style={styles.removeButton}
+					>
+						<Ionicons name="close-circle" size={24} color="red" />
+					</TouchableOpacity>
+				</View>
+			))}
+		</View>
+	);
 
 	const validateLocations = (locations: Location) => {
 		return Object.entries(locations).reduce(
@@ -756,6 +880,24 @@ const styles = StyleSheet.create({
 		marginRight: 10,
 	},
 	deleteButton: {
+		padding: 5,
+	},
+	uploadedFilesContainer: {
+		marginTop: 10,
+	},
+	uploadedFileItem: {
+		flexDirection: "row",
+		alignItems: "center",
+		backgroundColor: "#f5f5f5",
+		padding: 8,
+		borderRadius: 8,
+		marginBottom: 5,
+	},
+	filename: {
+		flex: 1,
+		marginRight: 10,
+	},
+	removeButton: {
 		padding: 5,
 	},
 });
