@@ -150,7 +150,7 @@ export async function addEvent(company: string, newEvent: Event) {
 export async function deleteEvent(eventID: string, company: string) {
 	// Delete an existing event
 	try {
-		await db
+		const data = await db
 			.collection("Companies")
 			.doc(company)
 			.collection("Events")

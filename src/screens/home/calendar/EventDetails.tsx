@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, TextInput, ScrollView } from "react-native";
+import { View, Text, StyleSheet, TextInput } from "react-native";
 import { RouteProp, useRoute } from "@react-navigation/native";
 import { subscribeCurrentUser } from "../../../controllers/userController";
 import {
@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import moment from "moment";
 import MapView, { Marker } from "react-native-maps";
 import { getUser } from "../../../controllers/userController";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
 type RootStackParamList = {
 	EventDetails: {
@@ -30,6 +31,8 @@ const EventDetails = ({ navigation }) => {
 	const [event, setEvent] = useState(null);
 	const [markers, setMarkers] = useState([]);
 	const [workerList, setWorkerList] = useState("");
+	const [localNotes, setLocalNotes] = useState("");
+	const [initialRegion, setInitialRegion] = useState(null);
 
 	useEffect(() => {
 		const subscriber = subscribeCurrentUser((user) => {
@@ -52,6 +55,7 @@ const EventDetails = ({ navigation }) => {
 
 	useEffect(() => {
 		if (!event) return;
+		setMarkers([]);
 		const locations = event.locations;
 		if (!locations) return;
 		for (let location in locations) {
@@ -65,10 +69,9 @@ const EventDetails = ({ navigation }) => {
 				},
 			]);
 		}
-	}, [event]);
 
-	useEffect(() => {
-		if (!event) return;
+		setLocalNotes(event.userNotes || "");
+
 		const getWorkerList = async () => {
 			const assignedWorkers = event.assignedWorkers;
 			let workerList = "";
@@ -82,8 +85,22 @@ const EventDetails = ({ navigation }) => {
 		getWorkerList();
 	}, [event]);
 
+	useEffect(() => {
+		if (markers.length > 0) {
+			setInitialRegion(getRegionForMarkers(markers));
+		}
+	}, [markers]);
+
 	const getRegionForMarkers = (markers) => {
 		if (!markers || markers.length === 0) return null;
+		if (markers.length === 1) {
+			return {
+				latitude: markers[0].latitude,
+				longitude: markers[0].longitude,
+				latitudeDelta: 0.01 * 1.5,
+				longitudeDelta: 0.01 * 1.5,
+			};
+		}
 
 		// Initialize with first marker
 		let minLat = markers[0].latitude;
@@ -119,9 +136,10 @@ const EventDetails = ({ navigation }) => {
 
 	return (
 		<SafeAreaView style={styles.container}>
-			<ScrollView
+			<KeyboardAwareScrollView
 				ref={scrollViewRef}
 				contentContainerStyle={{ flexGrow: 1 }}
+				extraScrollHeight={100}
 			>
 				<View style={styles.header}>
 					<TouchableOpacity
@@ -131,6 +149,23 @@ const EventDetails = ({ navigation }) => {
 						<Ionicons name="chevron-back" size={28} color="#000" />
 					</TouchableOpacity>
 					<Text style={styles.title}>{event.title}</Text>
+					{(user.companies[user.loggedInCompany] === "Owner" ||
+						user.companies[user.loggedInCompany] === "Admin") && (
+						<TouchableOpacity
+							containerStyle={styles.editButton}
+							onPress={() => {
+								navigation.navigate("EditEvent", {
+									uid: route.params.uid,
+								});
+							}}
+						>
+							<Ionicons
+								name="create-outline"
+								size={28}
+								color="#000"
+							/>
+						</TouchableOpacity>
+					)}
 				</View>
 
 				<View style={styles.content}>
@@ -181,7 +216,7 @@ const EventDetails = ({ navigation }) => {
 						{event.locations && (
 							<MapView
 								style={{ height: 300, marginBottom: 16 }}
-								initialRegion={getRegionForMarkers(markers)}
+								region={initialRegion}
 							>
 								{markers.map((marker, index) => (
 									<Marker
@@ -216,26 +251,26 @@ const EventDetails = ({ navigation }) => {
 						multiline
 						editable
 						numberOfLines={5}
-						value={event.userNotes || ""}
-						onChangeText={(text) => {
-							const updatedEvent = {
-								...event,
-								userNotes: text,
-							};
-							updateEvent(
-								user.loggedInCompany,
-								route.params.uid,
-								updatedEvent
-							);
-							setEvent(updatedEvent);
-							scrollViewRef.current.scrollToEnd({
-								animated: true,
-							});
+						value={localNotes}
+						onChangeText={setLocalNotes}
+						onBlur={() => {
+							if (localNotes !== event.userNotes) {
+								const updatedEvent = {
+									...event,
+									userNotes: localNotes,
+								};
+								updateEvent(
+									user.loggedInCompany,
+									route.params.uid,
+									updatedEvent
+								);
+								setEvent(updatedEvent);
+							}
 						}}
 						placeholder="Add your personal notes here..."
 					/>
 				</View>
-			</ScrollView>
+			</KeyboardAwareScrollView>
 		</SafeAreaView>
 	);
 };
@@ -252,9 +287,7 @@ const styles = StyleSheet.create({
 		backgroundColor: "#fff",
 	},
 	header: {
-		//flexDirection: "row",
 		display: "flex",
-		//alignItems: "center",
 		paddingHorizontal: 16,
 		paddingVertical: 12,
 		borderBottomWidth: 1,
@@ -266,12 +299,16 @@ const styles = StyleSheet.create({
 		position: "absolute",
 		zIndex: 1,
 	},
+	editButton: {
+		right: 20,
+		position: "absolute",
+		zIndex: 1,
+	},
 	title: {
 		flex: 1,
 		fontSize: 20,
 		fontWeight: "bold",
 		textAlign: "center",
-		//marginRight: 44, // To center the title accounting for back button
 	},
 	content: {
 		flex: 1,
