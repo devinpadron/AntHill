@@ -104,7 +104,7 @@ const EventSubmit = ({ navigation }) => {
 					if (event.exists) {
 						setTitle(event.data().title);
 						setDate(new Date(event.data().date));
-						setAllDay(!event.data().startTime);
+						setAllDay(event.data().startTime ? false : true);
 						setStartTime(
 							event.data().startTime
 								? moment(
@@ -182,6 +182,7 @@ const EventSubmit = ({ navigation }) => {
 	};
 
 	const calculateDuration = () => {
+		if (allDay) return null;
 		if (!hasEndTime) return null;
 		const hours = moment(endTime).diff(startTime, "minutes") / 60;
 		return Number.isInteger(hours) ? hours.toFixed(1) : hours.toString();
@@ -330,7 +331,7 @@ const EventSubmit = ({ navigation }) => {
 			const eventData: Event = {
 				title: capitalize(title),
 				date: moment(date).format("YYYY-MM-DD"),
-				startTime: moment(startTime).format("HH:mm"),
+				startTime: !allDay ? moment(startTime).format("HH:mm") : null,
 				endTime: hasEndTime ? moment(endTime).format("HH:mm") : null,
 				locations:
 					Object.keys(validatedLocations).length > 0

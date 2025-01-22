@@ -174,22 +174,33 @@ const EventDetails = ({ navigation }) => {
 							{moment(event.date).format("dddd, MMMM D, YYYY")}
 						</Text>
 					</View>
-					<View style={styles.timeSection}>
-						<Text style={styles.timeText}>
-							{moment(event.startTime, "HH:mm").format("h:mma")}
-						</Text>
 
-						{event.endTime && (
+					<View style={styles.timeSection}>
+						{event.startTime ? (
 							<>
-								<Text style={styles.timeText}>-</Text>
 								<Text style={styles.timeText}>
-									{moment(event.endTime, "HH:mm").format(
+									{moment(event.startTime, "HH:mm").format(
 										"h:mma"
 									)}
 								</Text>
+
+								{event.endTime && (
+									<>
+										<Text style={styles.timeText}>-</Text>
+										<Text style={styles.timeText}>
+											{moment(
+												event.endTime,
+												"HH:mm"
+											).format("h:mma")}
+										</Text>
+									</>
+								)}
 							</>
+						) : (
+							<Text style={styles.timeText}>All Day</Text>
 						)}
 					</View>
+
 					<View style={styles.duration}>
 						{event.duration && (
 							<Text style={{ fontSize: 18 }}>

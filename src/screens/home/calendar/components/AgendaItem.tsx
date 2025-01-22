@@ -50,7 +50,9 @@ const AgendaItem = (props: ItemProps) => {
 			<View style={styles.timeContainer}>
 				<View style={styles.timeRow}>
 					<Text style={styles.timeText}>
-						{moment(item.startTime, "HH:mm").format("h:mma")}
+						{item.startTime
+							? moment(item.startTime, "HH:mm").format("h:mma")
+							: "All Day"}
 						{item.endTime && (
 							<Text>
 								<Text style={styles.timeSeparator}> - </Text>
