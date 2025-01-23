@@ -2,6 +2,7 @@ import "react-native-get-random-values";
 import { GOOGLE_PLACES_API_KEY } from "@env";
 import React, { useEffect, useRef, useState } from "react";
 import {
+	Image,
 	View,
 	Text,
 	TextInput,
@@ -11,6 +12,7 @@ import {
 	Platform,
 	KeyboardAvoidingView,
 	ActivityIndicator,
+	Dimensions,
 } from "react-native";
 import { TouchableOpacity } from "react-native-gesture-handler";
 import {
@@ -25,7 +27,11 @@ import DropDownPicker from "react-native-dropdown-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import DocumentPicker from "react-native-document-picker";
 import * as ImagePicker from "react-native-image-picker";
-import { Event, addEvent } from "../../controllers/eventController";
+import {
+	Event,
+	addEvent,
+	updateEvent,
+} from "../../controllers/eventController";
 import {
 	subscribeCurrentUser,
 	getUser,
@@ -40,6 +46,12 @@ export interface UploadedFile {
 	type: string;
 	uploadTime: number;
 	path: string;
+}
+
+interface SelectedFile {
+	uri: string;
+	name: string;
+	type: string;
 }
 
 const EventSubmit = ({ navigation }) => {
@@ -59,7 +71,7 @@ const EventSubmit = ({ navigation }) => {
 	const [currentCompany, setCurrentCompany] = useState<string>("");
 	const [notes, setNotes] = useState("");
 	const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-	const [eventId] = useState(`temp_${Date.now()}`);
+	const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
 
 	type Location = {
 		[address: string]: {
@@ -139,19 +151,20 @@ const EventSubmit = ({ navigation }) => {
 	};
 
 	const uploadToFirebase = async (
-		uri: string,
-		filename: string,
-		type: string
-	): Promise<string> => {
+		file: SelectedFile,
+		eventId: string
+	): Promise<UploadedFile> => {
 		try {
-			const fileCategory = type.startsWith("image/")
+			const fileCategory = file.type.startsWith("image/")
 				? "images"
 				: "documnets";
-			const storagePath = `companies/${currentCompany}/events/${eventId}/${fileCategory}/${filename}`;
+			const storagePath = `companies/${currentCompany}/events/${eventId}/${fileCategory}/${file.name}`;
 			const storageRef = storage().ref(storagePath);
 
 			const uploadUri =
-				Platform.OS === "ios" ? uri.replace("file://", "") : uri;
+				Platform.OS === "ios"
+					? file.uri.replace("file://", "")
+					: file.uri;
 
 			const task = storageRef.putFile(uploadUri);
 			task.on("state_changed", (snapshot) => {
@@ -162,7 +175,13 @@ const EventSubmit = ({ navigation }) => {
 
 			await task;
 			const url = await storageRef.getDownloadURL();
-			return url;
+			return {
+				filename: file.name,
+				url: url,
+				type: file.type,
+				path: storagePath,
+				uploadTime: Date.now(),
+			};
 		} catch (error) {
 			console.error("Upload error:", error);
 			throw error;
@@ -176,26 +195,13 @@ const EventSubmit = ({ navigation }) => {
 				allowMultiSelection: true,
 			});
 
-			const uploadPromises = results.map(async (file) => {
-				const url = await uploadToFirebase(
-					file.uri,
-					file.name,
-					file.type
-				);
+			const newFiles = results.map((file) => ({
+				uri: file.uri,
+				name: file.name,
+				type: file.type,
+			}));
 
-				return {
-					filename: file.name,
-					url: url,
-					type: file.type,
-					path: `companies/${currentCompany}/events/${eventId}/${
-						file.type.startsWith("image/") ? "images" : "documents"
-					}/${file.name}`,
-					uploadTime: Date.now(),
-				};
-			});
-
-			const uploadedDocs = await Promise.all(uploadPromises);
-			setUploadedFiles((prev) => [...prev, ...uploadedDocs]);
+			setSelectedFiles((prev) => [...prev, ...newFiles]);
 		} catch (err) {
 			if (!DocumentPicker.isCancel(err)) {
 				console.error(err);
@@ -215,31 +221,19 @@ const EventSubmit = ({ navigation }) => {
 			const response = await ImagePicker.launchImageLibrary(options);
 
 			if (response.assets) {
-				const uploadPromises = response.assets.map(async (asset) => {
-					if (!asset.uri || !asset.fileName) return null;
-
-					const url = await uploadToFirebase(
-						asset.uri,
-						asset.fileName,
-						asset.type || "image/jpeg"
-					);
-
-					return {
-						filename: asset.fileName,
-						url: url,
+				const newFiles = response.assets
+					.filter((asset) => asset.uri && asset.fileName)
+					.map((asset) => ({
+						uri: asset.uri!,
+						name: asset.fileName!,
 						type: asset.type || "image/jpeg",
-						path: `companies/${currentCompany}/events/${eventId}/images/${asset.fileName}`,
-						uploadTime: Date.now(),
-					};
-				});
-				const uploadedImages = (
-					await Promise.all(uploadPromises)
-				).filter(Boolean) as UploadedFile[];
-				setUploadedFiles((prev) => [...prev, ...uploadedImages]);
+					}));
+
+				setSelectedFiles((prev) => [...prev, ...newFiles]);
 			}
 		} catch (err) {
 			console.error(err);
-			Alert.alert("Upload Error", "Failed to upload image");
+			Alert.alert("Selection Error", "Failed to select image");
 		}
 	};
 
@@ -263,6 +257,37 @@ const EventSubmit = ({ navigation }) => {
 		const validatedLocations = validateLocations(locations);
 		try {
 			setIsLoading(true);
+
+			const initialEventData: Event = {
+				title: capitalize(title),
+				date: moment(date).format("YYYY-MM-DD"),
+				startTime: moment(startTime).format("HH:mm"),
+				endTime: hasEndTime ? moment(endTime).format("HH:mm") : null,
+				locations:
+					Object.keys(validatedLocations).length > 0
+						? validatedLocations
+						: null,
+				duration: calculateDuration(),
+				notes: notes,
+				assignedWorkers: assignedWorkers,
+			};
+
+			const eventId = await addEvent(currentCompany, initialEventData);
+
+			const uploadedFiles: UploadedFile[] = [];
+			for (const file of selectedFiles) {
+				try {
+					const uploadedFile = await uploadToFirebase(file, eventId);
+					uploadedFiles.push(uploadedFile);
+				} catch (error) {
+					console.error("Error uploading file:", file.name, error);
+					Alert.alert(
+						"Upload Warning",
+						`Failed to upload ${file.name}`
+					);
+				}
+			}
+
 			const eventData: Event = {
 				title: capitalize(title),
 				date: moment(date).format("YYYY-MM-DD"),
@@ -275,10 +300,18 @@ const EventSubmit = ({ navigation }) => {
 				duration: calculateDuration(),
 				notes: notes,
 				assignedWorkers: assignedWorkers,
-				attachments: uploadedFiles,
+				attachments:
+					uploadedFiles.length > 0 ? uploadedFiles : undefined,
 			};
 
-			await addEvent(currentCompany, eventData);
+			if (uploadedFiles.length > 0) {
+				const updatedEventData = {
+					...initialEventData,
+					attachments: uploadedFiles,
+				};
+				await updateEvent(currentCompany, eventId, updatedEventData);
+			}
+
 			console.log("Event successfully created!");
 			navigation.pop();
 		} catch (error) {
@@ -307,7 +340,7 @@ const EventSubmit = ({ navigation }) => {
 					</Text>
 					<TouchableOpacity
 						onPress={() => {
-							setUploadedFiles((prev) =>
+							setSelectedFiles((prev) =>
 								prev.filter((_, i) => i !== index)
 							);
 						}}
@@ -369,6 +402,94 @@ const EventSubmit = ({ navigation }) => {
 		}
 	};
 
+	const renderThumbnails = () => {
+		const imageFiles = selectedFiles.filter((file) =>
+			file.type.startsWith("image/")
+		);
+		const documentFiles = selectedFiles.filter(
+			(file) => !file.type.startsWith("image/")
+		);
+		const handleDelete = (fileToDelete: SelectedFile) => {
+			console.log("Deleting file:", fileToDelete.name); // Debug log
+			setSelectedFiles((currentFiles) =>
+				currentFiles.filter((file) => file.uri !== fileToDelete.uri)
+			);
+		};
+
+		return (
+			<View style={styles.filesContainer}>
+				{/* Image Grid */}
+				{imageFiles.length > 0 && (
+					<View style={styles.imageGrid}>
+						{imageFiles.map((file) => (
+							<View
+								key={file.uri}
+								style={styles.thumbnailContainer}
+							>
+								<Image
+									source={{ uri: file.uri }}
+									style={styles.thumbnail}
+									resizeMode="cover"
+								/>
+								<TouchableOpacity
+									onPress={() => handleDelete(file)}
+									style={styles.deleteButton}
+								>
+									<View style={styles.deleteButtonCircle}>
+										<Ionicons
+											name="close-circle"
+											size={24}
+											color="red"
+										/>
+									</View>
+								</TouchableOpacity>
+							</View>
+						))}
+					</View>
+				)}
+
+				{/* Document List */}
+				{documentFiles.length > 0 && (
+					<View style={styles.documentList}>
+						{documentFiles.map((file, index) => (
+							<View key={index} style={styles.documentItem}>
+								<Ionicons
+									name="document-outline"
+									size={24}
+									color="#555"
+									style={styles.documentIcon}
+								/>
+								<Text
+									numberOfLines={1}
+									style={styles.documentFilename}
+								>
+									{file.name}
+								</Text>
+								<TouchableOpacity
+									onPress={() => {
+										setSelectedFiles((prev) =>
+											prev.filter(
+												(_, i) =>
+													prev[i].uri !== file.uri
+											)
+										);
+									}}
+									style={styles.documentDeleteButton}
+								>
+									<Ionicons
+										name="close-circle"
+										size={24}
+										color="red"
+									/>
+								</TouchableOpacity>
+							</View>
+						))}
+					</View>
+				)}
+			</View>
+		);
+	};
+
 	const renderAttachmentsSection = () => (
 		<View style={[styles.inputContainer, { zIndex: 1 }]}>
 			<Text style={styles.label}>Attachments</Text>
@@ -388,6 +509,10 @@ const EventSubmit = ({ navigation }) => {
 					<Ionicons name="image-outline" size={24} color="#555" />
 					<Text style={styles.uploadButtonText}>Choose Images</Text>
 				</TouchableOpacity>
+			</View>
+			{/*Render thumbnails of selected files*/}
+			<View style={styles.attachmentsContainer}>
+				{selectedFiles.length > 0 && renderThumbnails()}
 			</View>
 		</View>
 	);
@@ -705,16 +830,18 @@ const EventSubmit = ({ navigation }) => {
 					{renderAttachmentsSection()}
 
 					{/* Submission Button */}
-					<TouchableOpacity
-						style={[styles.submitButton, { zIndex: 1 }]}
-						onPress={handleEventSubmission}
-					>
-						<Text style={styles.submitButtonText}>Submit</Text>
-						<Ionicons name="send" size={24} color="white" />
-					</TouchableOpacity>
-					{isLoading && (
-						<ActivityIndicator size="small" color="#0000ff" />
-					)}
+					<View style={styles.submitButtonContainer}>
+						<TouchableOpacity
+							style={styles.submitButton}
+							onPress={handleEventSubmission}
+						>
+							<Text style={styles.submitButtonText}>Submit</Text>
+							<Ionicons name="send" size={24} color="white" />
+						</TouchableOpacity>
+						{isLoading && (
+							<ActivityIndicator size="small" color="#0000ff" />
+						)}
+					</View>
 				</ScrollView>
 			</SafeAreaView>
 		</KeyboardAvoidingView>
@@ -728,7 +855,7 @@ const styles = StyleSheet.create({
 	},
 	scrollContainer: {
 		padding: 20,
-		paddingBottom: 40,
+		paddingBottom: 80,
 	},
 	header: {
 		display: "flex",
@@ -797,6 +924,10 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		flexDirection: "row",
 		justifyContent: "center",
+		zIndex: 100, // Higher zIndex
+		elevation: 3, // For Android
+		marginTop: 20,
+		marginBottom: 20,
 	},
 	submitButtonText: {
 		color: "#fff",
@@ -899,6 +1030,93 @@ const styles = StyleSheet.create({
 	},
 	removeButton: {
 		padding: 5,
+	},
+	filesContainer: {
+		marginTop: 15,
+	},
+	imageGrid: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		gap: 10,
+		marginBottom: 30,
+		paddingBottom: 20,
+	},
+	thumbnailContainer: {
+		width: (Dimensions.get("window").width - 60) / 3, // 3 columns with padding
+		aspectRatio: 1,
+		borderRadius: 8,
+		backgroundColor: "#f5f5f5",
+		position: "relative",
+		overflow: "visible",
+	},
+	thumbnail: {
+		width: "100%",
+		height: "100%",
+		borderRadius: 8,
+	},
+	fileDeleteButton: {
+		position: "absolute",
+		top: -12,
+		right: -12,
+		width: 24,
+		height: 24,
+		zIndex: 2,
+	},
+	deleteButtonCircle: {
+		backgroundColor: "white",
+		borderRadius: 12,
+		width: 24,
+		height: 24,
+		alignItems: "center",
+		justifyContent: "center",
+		elevation: 2,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.2,
+		shadowRadius: 1,
+	},
+	thumbnailFilename: {
+		position: "absolute",
+		bottom: 0,
+		left: 0,
+		right: 0,
+		backgroundColor: "rgba(0,0,0,0.5)",
+		color: "white",
+		padding: 4,
+		fontSize: 12,
+		borderBottomLeftRadius: 8,
+		borderBottomRightRadius: 8,
+	},
+	documentList: {
+		marginTop: 10,
+	},
+	documentItem: {
+		flexDirection: "row",
+		alignItems: "center",
+		backgroundColor: "#f5f5f5",
+		padding: 10,
+		borderRadius: 8,
+		marginBottom: 15,
+	},
+	documentIcon: {
+		marginRight: 10,
+	},
+	documentFilename: {
+		flex: 1,
+		fontSize: 14,
+	},
+	documentDeleteButton: {
+		padding: 5,
+	},
+	attachmentsContainer: {
+		marginBottom: 20,
+	},
+	submitButtonContainer: {
+		paddingVertical: 30,
+		backgroundColor: "#f5f5f5",
+		zIndex: 100,
+		elevation: 3,
+		marginTop: 10,
 	},
 });
 
