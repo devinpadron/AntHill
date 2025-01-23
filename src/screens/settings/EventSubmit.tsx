@@ -146,7 +146,7 @@ const EventSubmit = ({ navigation }) => {
 		try {
 			const fileCategory = type.startsWith("image/")
 				? "images"
-				: "documnets";
+				: "documents";
 			const storagePath = `companies/${currentCompany}/events/${eventId}/${fileCategory}/${filename}`;
 			const storageRef = storage().ref(storagePath);
 
