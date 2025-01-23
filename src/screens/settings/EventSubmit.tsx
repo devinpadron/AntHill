@@ -331,28 +331,6 @@ const EventSubmit = ({ navigation }) => {
 		}
 	};
 
-	const renderUploadedFiles = () => (
-		<View style={styles.uploadedFilesContainer}>
-			{uploadedFiles.map((file, index) => (
-				<View key={index} style={styles.uploadedFileItem}>
-					<Text numberOfLines={1} style={styles.filename}>
-						{file.filename}
-					</Text>
-					<TouchableOpacity
-						onPress={() => {
-							setSelectedFiles((prev) =>
-								prev.filter((_, i) => i !== index)
-							);
-						}}
-						style={styles.removeButton}
-					>
-						<Ionicons name="close-circle" size={24} color="red" />
-					</TouchableOpacity>
-				</View>
-			))}
-		</View>
-	);
-
 	const validateLocations = (locations: Location) => {
 		return Object.entries(locations).reduce(
 			(acc: Location, [key, value]) => {
