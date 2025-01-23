@@ -19,6 +19,12 @@ export interface AgendaItemData {
 			endTime: string;
 			duration: string;
 			eventUID: string;
+			attachments?: {
+				filename: string;
+				url: string;
+				type: string;
+				path: string;
+			}[];
 		}
 	];
 }
@@ -37,6 +43,7 @@ function createAgendaItem(
 				endTime: docRef.endTime,
 				duration: docRef.duration,
 				eventUID: id,
+				attachments: docRef.attachments || [],
 			},
 		],
 	};
