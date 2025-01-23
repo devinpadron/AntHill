@@ -130,6 +130,53 @@ export function subscribeAllEvents(
 		.onSnapshot(onSnap);
 }
 
+export function subscribeEvents(
+	company: string,
+	userIDs: string[],
+	privilege: string,
+	onSnap: (
+		snapshot: FirebaseFirestoreTypes.QuerySnapshot<FirebaseFirestoreTypes.DocumentData>
+	) => void
+) {
+	try {
+		if (privilege == "User" && userIDs.length == 1) {
+			return db
+				.collection("Companies")
+				.doc(company)
+				.collection("Events")
+				.where("assignedWorkers", "array-contains", userIDs[0])
+				.onSnapshot(onSnap);
+		} else if (privilege == "Admin" || privilege == "Owner") {
+			if (!userIDs.length) {
+				//all events
+				return db
+					.collection("Companies")
+					.doc(company)
+					.collection("Events")
+					.onSnapshot(onSnap);
+			} else if (userIDs.length === 1) {
+				//theirs + all unassigned events
+				return db
+					.collection("Companies")
+					.doc(company)
+					.collection("Events")
+					.where("assignedWorkers", "in", [[], [userIDs[0]]])
+					.onSnapshot(onSnap);
+			} else if (userIDs.length > 1) {
+				//events for all ids in arr
+				return db
+					.collection("Companies")
+					.doc(company)
+					.collection("Events")
+					.where("assignedWorkers", "array-contains-any", userIDs)
+					.onSnapshot(onSnap);
+			}
+		}
+	} catch (e) {
+		console.log("Error getting events", e);
+	}
+}
+
 export async function addEvent(company: string, newEvent: Event) {
 	try {
 		const entry = await db

@@ -41,6 +41,20 @@ export async function getUser(userID: string) {
 	}
 }
 
+export async function getUserPrivilege(userID: string, company: string) {
+	try {
+		const userEntry = await db.collection("Users").doc(userID).get();
+		if (userEntry.exists) {
+			return userEntry.data().companies[company];
+		} else {
+			return null;
+		}
+	} catch (e) {
+		console.log("Error getting user privilege", e);
+		return null;
+	}
+}
+
 export function subscribeCurrentUser(
 	onSnap: (
 		snapshot: FirebaseFirestoreTypes.DocumentSnapshot<FirebaseFirestoreTypes.DocumentData>
