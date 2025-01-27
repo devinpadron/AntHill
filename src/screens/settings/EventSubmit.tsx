@@ -8,10 +8,7 @@ import {
 	TextInput,
 	StyleSheet,
 	Alert,
-	ScrollView,
 	Platform,
-	KeyboardAvoidingView,
-	ActivityIndicator,
 	Dimensions,
 } from "react-native";
 import { TouchableOpacity } from "react-native-gesture-handler";
@@ -30,6 +27,8 @@ import * as ImagePicker from "react-native-image-picker";
 import {
 	Event,
 	addEvent,
+	deleteEvent,
+	subscribeEvent,
 	updateEvent,
 } from "../../controllers/eventController";
 import {
@@ -39,6 +38,9 @@ import {
 } from "../../controllers/userController";
 import { subscribeAllUsersInCompany } from "../../controllers/companyController";
 import storage from "@react-native-firebase/storage";
+import { RouteProp, useRoute } from "@react-navigation/native";
+import LoadingScreen from "../LoadingScreen";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
 export interface FileUpload {
 	uri: string;
@@ -52,6 +54,7 @@ export interface FileUpload {
 const EventSubmit = ({ navigation }) => {
 	const [title, setTitle] = useState("");
 	const [date, setDate] = useState(new Date());
+	const [allDay, setAllDay] = useState(false);
 	const [startTime, setStartTime] = useState(new Date());
 	const [hasEndTime, setHasEndTime] = useState(false);
 	const [endTime, setEndTime] = useState(new Date());
@@ -71,11 +74,58 @@ const EventSubmit = ({ navigation }) => {
 		[address: string]: {
 			latitude: number;
 			longitude: number;
-			label: string;
+			label?: string;
 		};
 	};
 
+	const route = useRoute<EditEventRouteProp>();
+	if (!route.params) return null;
+	else if (route.params.uid && !isEditing) {
+		setIsEditing(true);
+	}
+
 	const googlePlacesRef = useRef<GooglePlacesAutocompleteRef | null>(null);
+
+	useEffect(() => {
+		if (isEditing) {
+			setIsLoading(true);
+			const subscriber = subscribeEvent(
+				currentCompany,
+				route.params.uid,
+				(event) => {
+					if (event.exists) {
+						setTitle(event.data().title);
+						setDate(new Date(event.data().date));
+						setAllDay(event.data().startTime ? false : true);
+						setStartTime(
+							event.data().startTime
+								? moment(
+										event.data().startTime,
+										"h:mm A"
+								  ).toDate()
+								: null
+						);
+						setHasEndTime(!!event.data().endTime);
+						setEndTime(
+							event.data().endTime
+								? moment(
+										event.data().endTime,
+										"h:mm A"
+								  ).toDate()
+								: null
+						);
+						setLocations(event.data().locations);
+						setAssignedWorkers(event.data().assignedWorkers);
+						setNotes(event.data().notes);
+						setEditID(route.params.uid);
+						//setUploadedFiles(event.data().attachments);
+					}
+				}
+			);
+			setIsLoading(false);
+			return () => subscriber();
+		}
+	}, [currentCompany]);
 
 	useEffect(() => {
 		const subscriber = subscribeCurrentUser((snapshot) => {
@@ -124,6 +174,7 @@ const EventSubmit = ({ navigation }) => {
 	};
 
 	const calculateDuration = () => {
+		if (allDay) return null;
 		if (!hasEndTime) return null;
 		const hours = moment(endTime).diff(startTime, "minutes") / 60;
 		return Number.isInteger(hours) ? hours.toFixed(1) : hours.toString();
@@ -140,8 +191,8 @@ const EventSubmit = ({ navigation }) => {
 				longitude: coords.lng,
 			},
 		};
-
 		setLocations(newLocations);
+		googlePlacesRef.current?.setAddressText("");
 	};
 
 	const uploadToFirebase = async (
@@ -254,7 +305,7 @@ const EventSubmit = ({ navigation }) => {
 			const initialEventData: Event = {
 				title: capitalize(title),
 				date: moment(date).format("YYYY-MM-DD"),
-				startTime: moment(startTime).format("HH:mm"),
+				startTime: !allDay ? moment(startTime).format("HH:mm") : null,
 				endTime: hasEndTime ? moment(endTime).format("HH:mm") : null,
 				locations:
 					Object.keys(validatedLocations).length > 0
@@ -284,7 +335,7 @@ const EventSubmit = ({ navigation }) => {
 			const eventData: Event = {
 				title: capitalize(title),
 				date: moment(date).format("YYYY-MM-DD"),
-				startTime: moment(startTime).format("HH:mm"),
+				startTime: !allDay ? moment(startTime).format("HH:mm") : null,
 				endTime: hasEndTime ? moment(endTime).format("HH:mm") : null,
 				locations:
 					Object.keys(validatedLocations).length > 0
@@ -293,18 +344,10 @@ const EventSubmit = ({ navigation }) => {
 				duration: calculateDuration(),
 				notes: notes,
 				assignedWorkers: assignedWorkers,
-				attachments:
-					uploadedFiles.length > 0 ? uploadedFiles : undefined,
+				attachments: uploadedFiles,
 			};
 
-			if (uploadedFiles.length > 0) {
-				const updatedEventData = {
-					...initialEventData,
-					attachments: uploadedFiles,
-				};
-				await updateEvent(currentCompany, eventId, updatedEventData);
-			}
-
+			await addEvent(currentCompany, eventData);
 			console.log("Event successfully created!");
 			navigation.pop();
 		} catch (error) {
@@ -365,12 +408,54 @@ const EventSubmit = ({ navigation }) => {
 		if (openEndTime) setOpenEndTime(false);
 	};
 
+	const handleAllDayToggle = () => {
+		const newAllDay = !allDay;
+		setAllDay(newAllDay);
+		if (newAllDay) {
+			setStartTime(null);
+			setHasEndTime(false);
+			setEndTime(null);
+		} else {
+			setStartTime(new Date());
+		}
+	};
+
 	const handleEndTimeToggle = () => {
 		const newHasEndTime = !hasEndTime;
 		setHasEndTime(newHasEndTime);
 		if (newHasEndTime) {
+			setEndTime(new Date());
 			setOpenEndTime(true);
+		} else {
+			setEndTime(null);
 		}
+	};
+
+	const handleEventDelete = async () => {
+		const handleDeleteConfirmation = async () => {
+			try {
+				setIsLoading(true);
+				await cleanupTempFiles();
+				await deleteEvent(editID, currentCompany);
+				navigation.pop(2);
+			} catch (error) {
+				Alert.alert("Error deleting event, please try again");
+				console.error(error);
+			} finally {
+				setIsLoading(false);
+			}
+		};
+		Alert.alert("Are you sure you want to delete this event?", "", [
+			{
+				text: "Cancel",
+				style: "cancel",
+			},
+			{
+				text: "Delete",
+				style: "destructive",
+				onPress: handleDeleteConfirmation,
+			},
+		]);
 	};
 
 	const renderThumbnails = () => {
@@ -489,333 +574,371 @@ const EventSubmit = ({ navigation }) => {
 	);
 
 	return (
-		<KeyboardAvoidingView
-			behavior={Platform.OS === "ios" ? "padding" : "height"}
-			style={styles.container}
-		>
-			<SafeAreaView style={{ flex: 1 }}>
-				<ScrollView
-					contentContainerStyle={styles.scrollContainer}
-					nestedScrollEnabled={true}
-				>
-					{/* Header */}
-					<View style={styles.header}>
-						<TouchableOpacity
-							containerStyle={{
-								position: "absolute",
-								left: 20,
-								zIndex: 1,
-							}}
-							onPress={() => {
-								navigation.goBack();
-							}}
-						>
-							<Ionicons
-								name="chevron-back"
-								size={28}
-								color="#000"
-							/>
-						</TouchableOpacity>
-						<Text style={styles.headerTitle}>Submit New Event</Text>
-					</View>
+		<SafeAreaView style={{ flex: 1 }}>
+			<KeyboardAwareScrollView
+				contentContainerStyle={styles.scrollContainer}
+				nestedScrollEnabled={true}
+			>
+				{/* Header */}
+				<View style={styles.header}>
+					<TouchableOpacity
+						containerStyle={{
+							position: "absolute",
+							left: 20,
+							zIndex: 1,
+						}}
+						onPress={() => {
+							navigation.goBack();
+						}}
+					>
+						<Ionicons name="chevron-back" size={28} color="#000" />
+					</TouchableOpacity>
+					<Text style={styles.headerTitle}>Submit New Event</Text>
+				</View>
 
-					{/* Title Section */}
-					<View style={styles.inputContainer}>
-						<Text style={styles.label}>Title</Text>
-						<TextInput
-							style={styles.input}
-							placeholder="Enter Title"
-							value={title}
-							onChangeText={setTitle}
+				{/* Title Section */}
+				<View style={styles.inputContainer}>
+					<Text style={styles.label}>Title</Text>
+					<TextInput
+						style={styles.input}
+						placeholder="Enter Title"
+						value={title}
+						onChangeText={setTitle}
+					/>
+				</View>
+
+				{/* Location Section */}
+				<View style={styles.inputContainer}>
+					<Text style={styles.label}>Location(s)</Text>
+					<View style={styles.locationContainer}>
+						<GooglePlacesAutocomplete
+							ref={googlePlacesRef}
+							placeholder="Search for a location"
+							onPress={(data, details = null) => {
+								if (details) {
+									updateLocation(details);
+								}
+								googlePlacesRef.current?.clear();
+							}}
+							query={{
+								key: GOOGLE_PLACES_API_KEY,
+								language: "en",
+							}}
+							styles={{
+								textInput: styles.placesTextInput,
+								listView: styles.placesListView,
+								row: styles.placesRow,
+							}}
+							fetchDetails={true}
 						/>
 					</View>
-
-					{/* Location Section */}
-					<View style={styles.inputContainer}>
-						<Text style={styles.label}>Location(s)</Text>
-						<View style={styles.locationContainer}>
-							<GooglePlacesAutocomplete
-								ref={googlePlacesRef}
-								placeholder="Search for a location"
-								onPress={(data, details = null) => {
-									if (details) {
-										updateLocation(details);
-									}
-									googlePlacesRef.current?.clear();
-								}}
-								query={{
-									key: GOOGLE_PLACES_API_KEY,
-									language: "en",
-								}}
-								styles={{
-									textInput: styles.placesTextInput,
-									listView: styles.placesListView,
-									row: styles.placesRow,
-								}}
-								fetchDetails={true}
-							/>
-						</View>
-						{Object.keys(locations).map((address) => (
-							<>
-								<View style={{ marginBottom: 10 }}>
-									<View
-										key={address}
-										style={styles.locationContainer}
-									>
-										<Text
-											style={[styles.label, { flex: 1 }]}
+					{locations
+						? Object.keys(locations).map((address, index) => (
+								<>
+									<View style={{ marginBottom: 10 }}>
+										<View
+											key={index}
+											style={styles.locationContainer}
 										>
-											{address}
-										</Text>
-										<TouchableOpacity
-											onPress={() => {
-												Alert.prompt(
-													"Add Label",
-													"Enter a label for this location",
-													[
-														{
-															text: "Cancel",
-															style: "cancel",
-														},
-														{
-															text: "OK",
-															onPress: (
-																label
-															) => {
-																if (!label)
-																	return;
-																const newLocations =
-																	{
-																		...locations,
-																	};
-																newLocations[
-																	address
-																] = {
-																	...newLocations[
-																		address
-																	],
-																	label: label,
-																};
-																setLocations(
-																	newLocations
-																);
-															},
-														},
-													]
-												);
-											}}
-											style={styles.addLocationButton}
-										>
-											<Ionicons
-												name="pencil-outline"
-												size={24}
-												color="#555"
-											/>
-										</TouchableOpacity>
-										<TouchableOpacity
-											onPress={() => {
-												const newLocations = {
-													...locations,
-												};
-												delete newLocations[address];
-												setLocations(newLocations);
-											}}
-											style={styles.deleteButton}
-										>
-											<Ionicons
-												name="trash-outline"
-												size={24}
-												color="red"
-											/>
-										</TouchableOpacity>
-									</View>
-									<View
-										key={address}
-										style={{ marginTop: -5 }}
-									>
-										{locations[address].label && (
 											<Text
 												style={[
 													styles.label,
-													{ flex: 1, fontSize: 14 },
+													{ flex: 1 },
 												]}
 											>
-												"{locations[address].label}"
+												{address}
 											</Text>
-										)}
+											<TouchableOpacity
+												onPress={() => {
+													Alert.prompt(
+														"Add Label",
+														"Enter a label for this location",
+														[
+															{
+																text: "Cancel",
+																style: "cancel",
+															},
+															{
+																text: "OK",
+																onPress: (
+																	label
+																) => {
+																	if (!label)
+																		return;
+																	const newLocations =
+																		{
+																			...locations,
+																		};
+																	newLocations[
+																		address
+																	] = {
+																		...newLocations[
+																			address
+																		],
+																		label: label,
+																	};
+																	setLocations(
+																		newLocations
+																	);
+																},
+															},
+														]
+													);
+												}}
+												style={styles.addLocationButton}
+											>
+												<Ionicons
+													name="pencil-outline"
+													size={24}
+													color="#555"
+												/>
+											</TouchableOpacity>
+											<TouchableOpacity
+												onPress={() => {
+													const newLocations = {
+														...locations,
+													};
+													delete newLocations[
+														address
+													];
+													setLocations(newLocations);
+												}}
+												style={styles.deleteButton}
+											>
+												<Ionicons
+													name="trash-outline"
+													size={24}
+													color="red"
+												/>
+											</TouchableOpacity>
+										</View>
+										<View
+											key={address}
+											style={{ marginTop: -5 }}
+										>
+											{locations[address].label && (
+												<Text
+													style={[
+														styles.label,
+														{
+															flex: 1,
+															fontSize: 14,
+														},
+													]}
+												>
+													"{locations[address].label}"
+												</Text>
+											)}
+										</View>
 									</View>
-								</View>
-							</>
-						))}
-					</View>
+								</>
+						  ))
+						: null}
+				</View>
 
-					{/* Date Toggle */}
-					<View style={styles.inputContainer}>
-						<Text style={styles.label}>Date</Text>
-						<TouchableOpacity
-							onPress={checkDateOpen}
-							style={styles.dateButton}
-						>
-							<Text style={styles.dateButtonText}>
-								{formatDate(date)}
-							</Text>
-						</TouchableOpacity>
-						<DatePicker
-							modal
-							open={openDate}
-							date={date}
-							mode="date"
-							onConfirm={(date) => {
-								setOpenDate(false);
-								setDate(date);
-							}}
-							onCancel={() => setOpenDate(false)}
-						/>
-					</View>
-
-					{/* Start Time Section */}
-					<View style={styles.inputContainer}>
-						<Text style={styles.label}>Start Time</Text>
-						<TouchableOpacity
-							onPress={checkStartTimeOpen}
-							style={styles.dateButton}
-						>
-							<Text style={styles.dateButtonText}>
-								{formatTime(startTime)}
-							</Text>
-						</TouchableOpacity>
-						<DatePicker
-							modal
-							open={openStartTime}
-							date={startTime}
-							mode="time"
-							onConfirm={(date) => {
-								setOpenStartTime(false);
-								setStartTime(date);
-							}}
-							onCancel={() => setOpenStartTime(false)}
-						/>
-					</View>
-
-					{/* End Time Toggle */}
-					<View style={styles.inputContainer}>
-						<TouchableOpacity
-							onPress={handleEndTimeToggle}
-							style={styles.checkboxContainer}
-						>
-							<Ionicons
-								name={
-									hasEndTime ? "checkbox" : "square-outline"
-								}
-								size={24}
-								color="#555"
-							/>
-							<Text style={styles.checkboxLabel}>
-								End Time (Optional)
-							</Text>
-						</TouchableOpacity>
-
-						{hasEndTime && (
-							<>
-								<TouchableOpacity
-									onPress={checkEndTimeOpen}
-									style={[
-										styles.dateButton,
-										styles.marginTop,
-									]}
-								>
-									<Text style={styles.dateButtonText}>
-										{formatTime(endTime)}
-									</Text>
-								</TouchableOpacity>
-								<DatePicker
-									modal
-									open={openEndTime}
-									date={endTime}
-									mode="time"
-									onConfirm={(date) => {
-										setOpenEndTime(false);
-										setEndTime(date);
-									}}
-									onCancel={() => {
-										setOpenEndTime(false);
-										if (!endTime) {
-											setHasEndTime(false);
-										}
-									}}
-								/>
-							</>
-						)}
-					</View>
-
-					{/* Assigned Workers Section */}
-					<View
-						style={[
-							styles.inputContainer,
-							{ zIndex: 3000, elevation: 3 },
-						]}
+				{/* Date Toggle */}
+				<View style={styles.inputContainer}>
+					<Text style={styles.label}>Date</Text>
+					<TouchableOpacity
+						onPress={checkDateOpen}
+						style={styles.dateButton}
 					>
-						<Text style={styles.label}>Assigned Workers</Text>
-						<DropDownPicker
-							searchPlaceholder="Search"
-							multiple={true}
-							min={0}
-							max={5}
-							value={assignedWorkers}
-							setValue={setAssignedWorkers}
-							items={availableWorkers}
-							setItems={setAvailableWorkers}
-							open={openSelect}
-							setOpen={checkSelectOpen}
-							mode="BADGE"
-							listMode="SCROLLVIEW"
-							searchable={true}
-							maxHeight={200}
-							style={styles.dropdown}
-							dropDownContainerStyle={[
-								styles.dropdownList,
-								{ position: "relative", top: 0 },
-							]}
-							listItemContainerStyle={styles.dropdownItem}
-							zIndex={3000}
-							placeholder="Select"
+						<Text style={styles.dateButtonText}>
+							{formatDate(date)}
+						</Text>
+					</TouchableOpacity>
+					<DatePicker
+						modal
+						open={openDate}
+						date={date}
+						mode="date"
+						onConfirm={(date) => {
+							setOpenDate(false);
+							setDate(date);
+						}}
+						onCancel={() => setOpenDate(false)}
+					/>
+				</View>
+
+				<View style={styles.inputContainer}>
+					<TouchableOpacity
+						onPress={handleAllDayToggle}
+						style={styles.checkboxContainer}
+					>
+						<Ionicons
+							name={allDay ? "checkbox" : "square-outline"}
+							size={24}
+							color="#555"
 						/>
-					</View>
+						<Text style={styles.checkboxLabel}>All Day</Text>
+					</TouchableOpacity>
+				</View>
 
-					{/* Notes Section */}
-					<View style={[styles.inputContainer, { zIndex: 1 }]}>
-						<Text style={styles.label}>Notes</Text>
-						<TextInput
-							style={[
-								styles.input,
-								{ height: 100, textAlignVertical: "top" },
-							]}
-							placeholder="Add any additional notes"
-							multiline={true}
-							numberOfLines={4}
-							onChange={(text) => setNotes(text.nativeEvent.text)}
-						/>
-					</View>
+				{!allDay && (
+					<>
+						{/* Start Time Section */}
+						<View style={styles.inputContainer}>
+							<Text style={styles.label}>Start Time</Text>
+							<TouchableOpacity
+								onPress={checkStartTimeOpen}
+								style={styles.dateButton}
+							>
+								<Text style={styles.dateButtonText}>
+									{formatTime(startTime)}
+								</Text>
+							</TouchableOpacity>
+							<DatePicker
+								modal
+								open={openStartTime}
+								date={startTime}
+								mode="time"
+								onConfirm={(date) => {
+									setOpenStartTime(false);
+									setStartTime(date);
+								}}
+								onCancel={() => setOpenStartTime(false)}
+							/>
+						</View>
 
-					{/* Attachments Section */}
-					{renderAttachmentsSection()}
+						{/* End Time Toggle */}
+						<View style={styles.inputContainer}>
+							<TouchableOpacity
+								onPress={handleEndTimeToggle}
+								style={styles.checkboxContainer}
+							>
+								<Ionicons
+									name={
+										hasEndTime
+											? "checkbox"
+											: "square-outline"
+									}
+									size={24}
+									color="#555"
+								/>
+								<Text style={styles.checkboxLabel}>
+									End Time (Optional)
+								</Text>
+							</TouchableOpacity>
 
-					{/* Submission Button */}
-					<View style={styles.submitButtonContainer}>
-						<TouchableOpacity
-							style={styles.submitButton}
-							onPress={handleEventSubmission}
-						>
-							<Text style={styles.submitButtonText}>Submit</Text>
-							<Ionicons name="send" size={24} color="white" />
-						</TouchableOpacity>
-						{isLoading && (
-							<ActivityIndicator size="small" color="#0000ff" />
-						)}
-					</View>
-				</ScrollView>
-			</SafeAreaView>
-		</KeyboardAvoidingView>
+							{hasEndTime && (
+								<>
+									<TouchableOpacity
+										onPress={checkEndTimeOpen}
+										style={[
+											styles.dateButton,
+											styles.marginTop,
+										]}
+									>
+										<Text style={styles.dateButtonText}>
+											{formatTime(endTime)}
+										</Text>
+									</TouchableOpacity>
+									<DatePicker
+										modal
+										open={openEndTime}
+										date={endTime}
+										mode="time"
+										onConfirm={(date) => {
+											setOpenEndTime(false);
+											setEndTime(date);
+										}}
+										onCancel={() => {
+											setOpenEndTime(false);
+											if (!endTime) {
+												setHasEndTime(false);
+											}
+										}}
+									/>
+								</>
+							)}
+						</View>
+					</>
+				)}
+
+				{/* Assigned Workers Section */}
+				<View
+					style={[
+						styles.inputContainer,
+						{ zIndex: 3000, elevation: 3 },
+					]}
+				>
+					<Text style={styles.label}>Assigned Workers</Text>
+					<DropDownPicker
+						searchPlaceholder="Search"
+						multiple={true}
+						min={0}
+						max={5}
+						value={assignedWorkers}
+						setValue={setAssignedWorkers}
+						items={availableWorkers}
+						setItems={setAvailableWorkers}
+						open={openSelect}
+						setOpen={checkSelectOpen}
+						mode="BADGE"
+						listMode="SCROLLVIEW"
+						searchable={true}
+						maxHeight={200}
+						style={styles.dropdown}
+						dropDownContainerStyle={[
+							styles.dropdownList,
+							{ position: "relative", top: 0 },
+						]}
+						listItemContainerStyle={styles.dropdownItem}
+						zIndex={3000}
+						placeholder="Select"
+					/>
+				</View>
+
+				{/* Notes Section */}
+				<View style={[styles.inputContainer, { zIndex: 1 }]}>
+					<Text style={styles.label}>Notes</Text>
+					<TextInput
+						style={[
+							styles.input,
+							{ height: 100, textAlignVertical: "top" },
+						]}
+						placeholder="Add any additional notes"
+						multiline={true}
+						numberOfLines={4}
+						value={notes}
+						onChange={(text) => setNotes(text.nativeEvent.text)}
+					/>
+				</View>
+
+				{/* Attachments Section */}
+				{renderAttachmentsSection()}
+
+				{/* Submission Button */}
+				<TouchableOpacity
+					style={[styles.submitButton, { zIndex: 1 }]}
+					onPress={handleEventSubmission}
+				>
+					{isEditing ? (
+						<Text style={styles.submitButtonText}>Update</Text>
+					) : (
+						<Text style={styles.submitButtonText}>Submit</Text>
+					)}
+					<Ionicons name="send" size={24} color="white" />
+				</TouchableOpacity>
+
+				{isEditing && (
+					<TouchableOpacity
+						style={[
+							styles.submitButton,
+							{
+								zIndex: 1,
+								backgroundColor: "red",
+								marginTop: 20,
+							},
+						]}
+						onPress={handleEventDelete}
+					>
+						<Text style={styles.submitButtonText}>Delete</Text>
+					</TouchableOpacity>
+				)}
+				{isLoading && <LoadingScreen />}
+			</KeyboardAwareScrollView>
+		</SafeAreaView>
 	);
 };
 

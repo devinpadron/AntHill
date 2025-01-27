@@ -14,11 +14,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { AntHill } from "../../../../global/colors";
 import moment from "moment";
 
-/*
-  TODO:
-  - Add functionality for AgendaItem button press
-  - Add functionality for the 'More Info' button.
-
 /* An AgendaItem component that is part of the AgendaList that displays information such as:
   - event title
   - event start and end time
@@ -108,7 +103,9 @@ const AgendaItem = (props: ItemProps) => {
 			<View style={styles.timeContainer}>
 				<View style={styles.timeRow}>
 					<Text style={styles.timeText}>
-						{moment(item.startTime, "HH:mm").format("h:mma")}
+						{item.startTime
+							? moment(item.startTime, "HH:mm").format("h:mma")
+							: "All Day"}
 						{item.endTime && (
 							<Text>
 								<Text style={styles.timeSeparator}> - </Text>
