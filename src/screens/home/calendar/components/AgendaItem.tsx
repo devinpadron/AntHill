@@ -63,7 +63,7 @@ const AgendaItem = (props: ItemProps) => {
 			Alert.alert("Error", "There was a problem opening the file");
 		}
 	};
-
+	/*
 	const renderAttachments = () => {
 		if (!item.attachments || item.attachments.length === 0) return null;
 
@@ -92,7 +92,7 @@ const AgendaItem = (props: ItemProps) => {
 			</View>
 		);
 	};
-
+*/
 	if (isEmpty(item)) {
 		return (
 			<View style={styles.emptyItem}>
@@ -125,7 +125,6 @@ const AgendaItem = (props: ItemProps) => {
 				<Text style={styles.title} numberOfLines={1}>
 					{item.title}
 				</Text>
-				{renderAttachments()}
 			</View>
 		</TouchableOpacity>
 	);
