@@ -40,18 +40,13 @@ import {
 import { subscribeAllUsersInCompany } from "../../controllers/companyController";
 import storage from "@react-native-firebase/storage";
 
-export interface UploadedFile {
-	filename: string;
-	url: string;
-	type: string;
-	uploadTime: number;
-	path: string;
-}
-
-interface SelectedFile {
+export interface FileUpload {
 	uri: string;
 	name: string;
 	type: string;
+	url?: string;
+	uploadTime?: number;
+	path?: string;
 }
 
 const EventSubmit = ({ navigation }) => {
@@ -70,8 +65,7 @@ const EventSubmit = ({ navigation }) => {
 	const [isLoading, setIsLoading] = useState(false);
 	const [currentCompany, setCurrentCompany] = useState<string>("");
 	const [notes, setNotes] = useState("");
-	const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-	const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
+	const [files, setFiles] = useState<FileUpload[]>([]);
 
 	type Location = {
 		[address: string]: {
@@ -151,9 +145,9 @@ const EventSubmit = ({ navigation }) => {
 	};
 
 	const uploadToFirebase = async (
-		file: SelectedFile,
+		file: FileUpload,
 		eventId: string
-	): Promise<UploadedFile> => {
+	): Promise<FileUpload> => {
 		try {
 			const fileCategory = file.type.startsWith("image/")
 				? "images"
@@ -176,9 +170,8 @@ const EventSubmit = ({ navigation }) => {
 			await task;
 			const url = await storageRef.getDownloadURL();
 			return {
-				filename: file.name,
-				url: url,
-				type: file.type,
+				...file,
+				url,
 				path: storagePath,
 				uploadTime: Date.now(),
 			};
@@ -201,7 +194,7 @@ const EventSubmit = ({ navigation }) => {
 				type: file.type,
 			}));
 
-			setSelectedFiles((prev) => [...prev, ...newFiles]);
+			setFiles((prev) => [...prev, ...newFiles]);
 		} catch (err) {
 			if (!DocumentPicker.isCancel(err)) {
 				console.error(err);
@@ -229,7 +222,7 @@ const EventSubmit = ({ navigation }) => {
 						type: asset.type || "image/jpeg",
 					}));
 
-				setSelectedFiles((prev) => [...prev, ...newFiles]);
+				setFiles((prev) => [...prev, ...newFiles]);
 			}
 		} catch (err) {
 			console.error(err);
@@ -239,7 +232,7 @@ const EventSubmit = ({ navigation }) => {
 
 	const cleanupTempFiles = async () => {
 		try {
-			for (const file of uploadedFiles) {
+			for (const file of files) {
 				const ref = storage().ref(file.path);
 				await ref.delete();
 			}
@@ -274,8 +267,8 @@ const EventSubmit = ({ navigation }) => {
 
 			const eventId = await addEvent(currentCompany, initialEventData);
 
-			const uploadedFiles: UploadedFile[] = [];
-			for (const file of selectedFiles) {
+			const uploadedFiles: FileUpload[] = [];
+			for (const file of files) {
 				try {
 					const uploadedFile = await uploadToFirebase(file, eventId);
 					uploadedFiles.push(uploadedFile);
@@ -381,15 +374,15 @@ const EventSubmit = ({ navigation }) => {
 	};
 
 	const renderThumbnails = () => {
-		const imageFiles = selectedFiles.filter((file) =>
+		const imageFiles = files.filter((file) =>
 			file.type.startsWith("image/")
 		);
-		const documentFiles = selectedFiles.filter(
+		const documentFiles = files.filter(
 			(file) => !file.type.startsWith("image/")
 		);
-		const handleDelete = (fileToDelete: SelectedFile) => {
+		const handleDelete = (fileToDelete: FileUpload) => {
 			console.log("Deleting file:", fileToDelete.name); // Debug log
-			setSelectedFiles((currentFiles) =>
+			setFiles((currentFiles) =>
 				currentFiles.filter((file) => file.uri !== fileToDelete.uri)
 			);
 		};
@@ -445,7 +438,7 @@ const EventSubmit = ({ navigation }) => {
 								</Text>
 								<TouchableOpacity
 									onPress={() => {
-										setSelectedFiles((prev) =>
+										setFiles((prev) =>
 											prev.filter(
 												(_, i) =>
 													prev[i].uri !== file.uri
@@ -490,7 +483,7 @@ const EventSubmit = ({ navigation }) => {
 			</View>
 			{/*Render thumbnails of selected files*/}
 			<View style={styles.attachmentsContainer}>
-				{selectedFiles.length > 0 && renderThumbnails()}
+				{files.length > 0 && renderThumbnails()}
 			</View>
 		</View>
 	);

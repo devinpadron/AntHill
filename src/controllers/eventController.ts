@@ -1,7 +1,11 @@
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
-import { UploadedFile } from "../screens/settings/EventSubmit";
+import { FileUpload } from "../screens/settings/EventSubmit";
 import db from "../../index";
-
+import {
+	addAttachments,
+	getEventAttachments,
+	deleteEventAttachments,
+} from "./attachmentController";
 /* An EventController that contains:
   - An event interface that provides the structure of event data
   - A function that uses an eventID to pull from Firestore and retrieve the event entry
@@ -28,7 +32,7 @@ export interface Event {
 	duration: string | null;
 	notes: string;
 	assignedWorkers: string[];
-	attachments?: UploadedFile[];
+	attachments?: FileUpload[];
 }
 
 const isValidDateFormat = (date: string): boolean => {
@@ -50,7 +54,11 @@ export async function getEvent(company: string, eventID: string) {
 		if (eventEntry.exists) {
 			const dbData = eventEntry.data();
 			if (dbData) {
-				return dbData;
+				const attachments = await getEventAttachments(company, eventID);
+				return {
+					...dbData,
+					attachments,
+				};
 			} else {
 				return null;
 			}
@@ -134,12 +142,19 @@ export function subscribeAllEvents(
 
 export async function addEvent(company: string, newEvent: Event) {
 	try {
+		const { attachments, ...eventData } = newEvent;
+
 		const entry = await db
 			.collection("Companies")
 			.doc(company)
 			.collection("Events")
 			.add(newEvent);
 		const entryid = entry.id;
+
+		if (attachments && attachments.length > 0) {
+			await addAttachments(company, entry.id, attachments);
+		}
+
 		return entryid;
 	} catch (e) {
 		console.error("Error adding event:", e);
@@ -150,6 +165,10 @@ export async function addEvent(company: string, newEvent: Event) {
 export async function deleteEvent(eventID: string, company: string) {
 	// Delete an existing event
 	try {
+		await deleteEventAttachments(company, eventID);
+
+		console.log("Event attachments Deleted");
+
 		await db
 			.collection("Companies")
 			.doc(company)
