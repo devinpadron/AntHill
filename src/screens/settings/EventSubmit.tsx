@@ -51,6 +51,14 @@ export interface FileUpload {
 	path?: string;
 }
 
+type RootStackParamList = {
+	EventDetails: {
+		uid: string;
+	};
+};
+
+type EditEventRouteProp = RouteProp<RootStackParamList, "EventDetails">;
+
 const EventSubmit = ({ navigation }) => {
 	const [title, setTitle] = useState("");
 	const [date, setDate] = useState(new Date());
@@ -69,6 +77,8 @@ const EventSubmit = ({ navigation }) => {
 	const [currentCompany, setCurrentCompany] = useState<string>("");
 	const [notes, setNotes] = useState("");
 	const [files, setFiles] = useState<FileUpload[]>([]);
+	const [isEditing, setIsEditing] = useState(false);
+	const [editID, setEditID] = useState<string | null>(null);
 
 	type Location = {
 		[address: string]: {
@@ -299,22 +309,27 @@ const EventSubmit = ({ navigation }) => {
 		}
 
 		const validatedLocations = validateLocations(locations);
+
+		const initialEventData: Event = {
+			title: capitalize(title),
+			date: moment(date).format("YYYY-MM-DD"),
+			startTime: !allDay ? moment(startTime).format("HH:mm") : null,
+			endTime: hasEndTime ? moment(endTime).format("HH:mm") : null,
+			locations:
+				Object.keys(validatedLocations).length > 0
+					? validatedLocations
+					: null,
+			duration: calculateDuration(),
+			notes: notes,
+			assignedWorkers: assignedWorkers,
+		};
+
+		if (isEditing) {
+			updateEvent(currentCompany, editID, initialEventData);
+			return;
+		}
 		try {
 			setIsLoading(true);
-
-			const initialEventData: Event = {
-				title: capitalize(title),
-				date: moment(date).format("YYYY-MM-DD"),
-				startTime: !allDay ? moment(startTime).format("HH:mm") : null,
-				endTime: hasEndTime ? moment(endTime).format("HH:mm") : null,
-				locations:
-					Object.keys(validatedLocations).length > 0
-						? validatedLocations
-						: null,
-				duration: calculateDuration(),
-				notes: notes,
-				assignedWorkers: assignedWorkers,
-			};
 
 			const eventId = await addEvent(currentCompany, initialEventData);
 
@@ -333,21 +348,11 @@ const EventSubmit = ({ navigation }) => {
 			}
 
 			const eventData: Event = {
-				title: capitalize(title),
-				date: moment(date).format("YYYY-MM-DD"),
-				startTime: !allDay ? moment(startTime).format("HH:mm") : null,
-				endTime: hasEndTime ? moment(endTime).format("HH:mm") : null,
-				locations:
-					Object.keys(validatedLocations).length > 0
-						? validatedLocations
-						: null,
-				duration: calculateDuration(),
-				notes: notes,
-				assignedWorkers: assignedWorkers,
+				...initialEventData,
 				attachments: uploadedFiles,
 			};
 
-			await addEvent(currentCompany, eventData);
+			await updateEvent(currentCompany, eventId, eventData);
 			console.log("Event successfully created!");
 			navigation.pop();
 		} catch (error) {

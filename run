@@ -1,0 +1,78 @@
+#!/usr/bin/env node
+
+const { spawn } = require("child_process");
+const fs = require("fs");
+const path = require("path");
+
+// Function to delete a directory or file
+const deletePath = (pathToDelete) => {
+	if (fs.existsSync(pathToDelete)) {
+		if (fs.lstatSync(pathToDelete).isDirectory()) {
+			fs.rmdirSync(pathToDelete, { recursive: true });
+		} else {
+			fs.unlinkSync(pathToDelete);
+		}
+		console.log(`Deleted: ${pathToDelete}`);
+	} else {
+		console.log(`Path does not exist: ${pathToDelete}`);
+	}
+};
+
+// Function to run a command with real-time output
+const runCommand = (command, args) => {
+	return new Promise((resolve, reject) => {
+		const childProcess = spawn(command, args, {
+			stdio: "inherit",
+			shell: true,
+		});
+
+		childProcess.on("close", (code) => {
+			if (code === 0) {
+				resolve();
+			} else {
+				reject(new Error(`Command failed with exit code ${code}`));
+			}
+		});
+
+		childProcess.on("error", (error) => {
+			reject(error);
+		});
+	});
+};
+
+// Main function
+const main = async () => {
+	try {
+		// Delete node_modules/
+		deletePath(path.join(__dirname, "node_modules"));
+
+		// Delete package-lock.json
+		deletePath(path.join(__dirname, "package-lock.json"));
+
+		// Delete ios/
+		deletePath(path.join(__dirname, "ios"));
+
+		// Delete android/
+		deletePath(path.join(__dirname, "android"));
+
+		// Delete .expo/
+		deletePath(path.join(__dirname, ".expo"));
+
+		// Run npm install
+		console.log("Running: npm install");
+		await runCommand("npm", ["install"]);
+
+		// Run npx expo prebuild
+		console.log("Running: npx expo prebuild");
+		await runCommand("npx", ["expo", "prebuild"]);
+
+		// Run npx expo run
+		console.log("Running: npx expo run");
+		await runCommand("npx", ["expo", "run"]);
+	} catch (error) {
+		console.error("Script failed:", error);
+	}
+};
+
+// Execute the main function
+main();
