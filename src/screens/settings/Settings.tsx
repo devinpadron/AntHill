@@ -51,7 +51,7 @@ const Settings = ({ navigation }: any) => {
 	};
 
 	const pushEventSubmit = () => {
-		navigation.push("EventSubmit");
+		navigation.navigate("EventSubmit", { event: null });
 	};
 
 	const pushEmployeeList = () => {
