@@ -278,6 +278,7 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 					<CalendarProvider
 						date={selectedDate}
 						showTodayButton={true}
+						todayButtonStyle={styles.todayButton}
 					>
 						<View style={styles.calendarContainer}>
 							{weekView ? (
@@ -428,9 +429,7 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 															styles.checkboxLabel
 														}
 													>
-														All selected users are
-														assigned (others may be
-														assigned too)
+														Together
 													</Text>
 												</TouchableOpacity>
 
@@ -471,8 +470,7 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 															styles.checkboxLabel
 														}
 													>
-														Only the selected users
-														are assigned
+														Exclusivly Together
 													</Text>
 												</TouchableOpacity>
 											</View>
@@ -746,6 +744,9 @@ const styles = StyleSheet.create({
 		flex: 1,
 		fontSize: 14,
 		lineHeight: 20,
+	},
+	todayButton: {
+		bottom: 0,
 	},
 });
 
