@@ -78,24 +78,3 @@ export async function addUserToCompany(company: string, userID: string) {
 		return false;
 	}
 }
-
-export async function getUserPrivilege(company: string, userID: string) {
-	try {
-		const userEntry = await db.collection("Users").doc(userID).get();
-		if (userEntry.exists) {
-			const dbData = userEntry.data();
-			if (dbData) {
-				return dbData.companies.get(company);
-			} else {
-				console.log("Document exists but data is undefined");
-				return null;
-			}
-		} else {
-			console.log("No such document");
-			return null;
-		}
-	} catch (e) {
-		console.error("Error getting user privilege", e);
-		return null;
-	}
-}
