@@ -131,52 +131,92 @@ export function subscribeAllEvents(
 }
 
 export function subscribeEvents(
+	type: string,
 	company: string,
 	userIDs: string[],
-	privilege: string,
 	onSnap: (
 		snapshot: FirebaseFirestoreTypes.QuerySnapshot<FirebaseFirestoreTypes.DocumentData>
-	) => void
+	) => void,
+	filterOptions?: {
+		requireAllSelected?: boolean;
+		exactMatchOnly?: boolean;
+	}
 ) {
 	try {
-		if (privilege == "User" && userIDs.length == 1) {
-			return db
-				.collection("Companies")
-				.doc(company)
-				.collection("Events")
-				.where("assignedWorkers", "array-contains", userIDs[0])
-				.onSnapshot(onSnap);
-		} else if (privilege == "Admin" || privilege == "Owner") {
-			if (!userIDs.length) {
-				//all events
+		switch (type) {
+			case "all":
+				// All events for the company
 				return db
 					.collection("Companies")
 					.doc(company)
 					.collection("Events")
 					.onSnapshot(onSnap);
-			} else if (userIDs.length === 1) {
-				//theirs + all unassigned events
+
+			case "my":
+				// Only logged-in user's events
 				return db
 					.collection("Companies")
 					.doc(company)
 					.collection("Events")
-					.where("assignedWorkers", "in", [[], [userIDs[0]]])
+					.where("assignedWorkers", "array-contains", userIDs[0])
 					.onSnapshot(onSnap);
-			} else if (userIDs.length > 1) {
-				//events for all ids in arr
+
+			case "specific":
+				if (filterOptions?.exactMatchOnly) {
+					// Only show events where exactly these users are assigned (no more, no less)
+					return db
+						.collection("Companies")
+						.doc(company)
+						.collection("Events")
+						.where("assignedWorkers", "==", userIDs.sort())
+						.onSnapshot(onSnap);
+				} else if (filterOptions?.requireAllSelected) {
+					// Show events where all selected users are assigned (others may be too)
+					return db
+						.collection("Companies")
+						.doc(company)
+						.collection("Events")
+						.where("assignedWorkers", "array-contains", userIDs[0])
+						.onSnapshot((snapshot) => {
+							// Filter in memory to check if all selected users are present
+							const filteredDocs = snapshot.docs.filter((doc) => {
+								const assignedWorkers =
+									doc.data().assignedWorkers || [];
+								return userIDs.every((uid) =>
+									assignedWorkers.includes(uid)
+								);
+							});
+							// Create a new snapshot-like object with filtered docs
+							const filteredSnapshot = {
+								...snapshot,
+								docs: filteredDocs,
+								size: filteredDocs.length,
+							};
+							onSnap(filteredSnapshot as any);
+						});
+				}
+				// Default: show events where any of the selected users are assigned
 				return db
 					.collection("Companies")
 					.doc(company)
 					.collection("Events")
 					.where("assignedWorkers", "array-contains-any", userIDs)
 					.onSnapshot(onSnap);
-			}
+
+			case "unassigned":
+				// Events with empty assignedWorkers array
+				return db
+					.collection("Companies")
+					.doc(company)
+					.collection("Events")
+					.where("assignedWorkers", "==", [])
+					.onSnapshot(onSnap);
 		}
 	} catch (e) {
-		console.log("Error getting events", e);
+		console.error("Error getting events:", e);
+		return () => {};
 	}
 }
-
 export async function addEvent(company: string, newEvent: Event) {
 	try {
 		const entry = await db

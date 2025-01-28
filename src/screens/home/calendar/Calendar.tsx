@@ -5,7 +5,14 @@ import React, {
 	useEffect,
 	useMemo,
 } from "react";
-import { StyleSheet, View, Text, TouchableOpacity } from "react-native";
+import {
+	StyleSheet,
+	View,
+	Text,
+	TouchableOpacity,
+	ScrollView,
+	Animated,
+} from "react-native";
 import {
 	ExpandableCalendar,
 	AgendaList,
@@ -16,6 +23,9 @@ import BottomSheet from "@gorhom/bottom-sheet";
 import { BottomSheetView } from "@gorhom/bottom-sheet";
 import { Filter } from "react-native-feather";
 import DropDownPicker from "react-native-dropdown-picker";
+import moment from "moment";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
 	getAgendaItems,
 	getMarkedDates,
@@ -23,10 +33,7 @@ import {
 } from "./components/agendaItemController";
 import AgendaItem from "./components/AgendaItem";
 import { getTheme, lightThemeColor } from "./theme";
-import moment from "moment";
 import LoadingScreen from "../../LoadingScreen";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
 	subscribeCurrentUser,
 	getUserPrivilege,
@@ -36,15 +43,15 @@ import {
 import { subscribeEvents } from "../../../controllers/eventController";
 import { subscribeAllUsersInCompany } from "../../../controllers/companyController";
 
-const today = moment().format("YYYY-MM-DD");
-const leftArrowIcon = require("../../../assets/previous.png");
-const rightArrowIcon = require("../../../assets/next.png");
-
 type CalendarProps = {
 	weekView?: any;
 };
 
 type FilterType = "my" | "specific" | "unassigned" | "all";
+
+const today = moment().format("YYYY-MM-DD");
+const leftArrowIcon = require("../../../assets/previous.png");
+const rightArrowIcon = require("../../../assets/next.png");
 
 const getFilterStyle = (type: FilterType, currentFilter: FilterType) => ({
 	backgroundColor: type === currentFilter ? "#e0e0e0" : "#f5f5f5",
@@ -65,15 +72,78 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 	const [availableWorkers, setAvailableWorkers] = useState([]);
 	const [openSelect, setOpenSelect] = useState(false);
 	const [bottomSheetPosition, setBottomSheetPosition] = useState(-1);
-	const theme = useRef(getTheme());
+	const [showAllSelectedOnly, setShowAllSelectedOnly] = useState(false);
+	const [showExactSelectedOnly, setShowExactSelectedOnly] = useState(false);
 
+	const fabOpacity = useRef(new Animated.Value(1)).current;
+
+	const theme = useRef(getTheme());
 	const bottomSheetRef = useRef<BottomSheet>(null);
 	const snapPoints = useMemo(() => ["65%", "90%"], []);
+
+	const handleEventsUpdate = useCallback((snapshot: { docs: any }) => {
+		const events = snapshot.docs;
+		const items = getAgendaItems(events);
+		const marks = getMarkedDates(items);
+		setAgendaItems(items);
+		setMarkedDates(marks);
+	}, []);
 
 	const closeBottomSheet = () => {
 		bottomSheetRef.current?.close();
 		setBottomSheetPosition(-1);
 		setIsBottomSheetVisible(false);
+		Animated.timing(fabOpacity, {
+			toValue: 1,
+			duration: 200,
+			useNativeDriver: true,
+		}).start();
+	};
+
+	const handleFilterPress = useCallback(() => {
+		if (isBottomSheetVisible) {
+			closeBottomSheet();
+		} else {
+			Animated.timing(fabOpacity, {
+				toValue: 0,
+				duration: 200,
+				useNativeDriver: true,
+			}).start();
+			bottomSheetRef.current?.snapToIndex(0);
+			setBottomSheetPosition(0);
+			setIsBottomSheetVisible(true);
+		}
+	}, [isBottomSheetVisible, fabOpacity]);
+
+	const handleSheetChanges = useCallback(
+		(index: number) => {
+			setIsBottomSheetVisible(index !== -1);
+			setBottomSheetPosition(index);
+			if (index === -1) {
+				Animated.timing(fabOpacity, {
+					toValue: 1,
+					duration: 200,
+					useNativeDriver: true,
+				}).start();
+			}
+		},
+		[fabOpacity]
+	);
+
+	const handleFilterChange = (type: FilterType) => {
+		setFilterType(type);
+		if (type === "specific" && !selectedUsers.length) {
+			return;
+		}
+		closeBottomSheet();
+	};
+
+	const checkSelectOpen = () => {
+		setOpenSelect(!openSelect);
+		if (!openSelect) {
+			bottomSheetRef.current?.snapToIndex(1);
+			setBottomSheetPosition(1);
+		}
 	};
 
 	useEffect(() => {
@@ -96,45 +166,56 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 		return () => subscriber();
 	}, [user?.loggedInCompany]);
 
-	const handleFilterPress = useCallback(() => {
-		if (isBottomSheetVisible) {
-			closeBottomSheet();
-		} else {
-			bottomSheetRef.current?.expand();
-			setBottomSheetPosition(0);
-			setIsBottomSheetVisible(true);
-		}
-	}, [isBottomSheetVisible]);
-
-	const handleSheetChanges = useCallback((index: number) => {
-		setIsBottomSheetVisible(index !== -1);
-		setBottomSheetPosition(index);
-	}, []);
-
-	const handleEventsUpdate = (snapshot: { docs: any }) => {
-		const events = snapshot.docs;
-		const items = getAgendaItems(events);
-		const marks = getMarkedDates(items);
-		setAgendaItems(items);
-		setMarkedDates(marks);
-	};
-
-	const handleFilterChange = (type: FilterType) => {
-		setFilterType(type);
-		if (type === "my" && user) {
-		} else if (type === "specific" && selectedUsers.length > 0) {
-		} else if (type === "unassigned" && user) {
-		} else if (type === "all" && user) {
-		}
-		closeBottomSheet();
-	};
-
-	const checkSelectOpen = () => {
-		setOpenSelect(!openSelect);
-		if (!openSelect) {
+	useEffect(() => {
+		if (filterType === "specific" && selectedUsers.length > 1) {
+			bottomSheetRef.current?.snapToIndex(1);
 			setBottomSheetPosition(1);
 		}
-	};
+	}, [selectedUsers.length, filterType]);
+
+	useEffect(() => {
+		if (!user?.loggedInCompany || !userId) return;
+
+		let userIds = [userId];
+		if (filterType === "specific") {
+			userIds = selectedUsers.length > 0 ? selectedUsers : [userId];
+
+			const filterOptions = {
+				requireAllSelected: showAllSelectedOnly,
+				exactMatchOnly: showExactSelectedOnly,
+			};
+
+			const unsubscribe = subscribeEvents(
+				filterType,
+				user.loggedInCompany,
+				userIds,
+				handleEventsUpdate,
+				filterOptions
+			);
+			return () => unsubscribe?.();
+		} else if (filterType === "unassigned" || filterType === "all") {
+			userIds = [];
+		}
+
+		const unsubscribe = subscribeEvents(
+			filterType,
+			user.loggedInCompany,
+			userIds,
+			handleEventsUpdate
+		);
+
+		return () => {
+			if (unsubscribe) unsubscribe();
+		};
+	}, [
+		filterType,
+		user?.loggedInCompany,
+		userId,
+		selectedUsers,
+		showAllSelectedOnly,
+		showExactSelectedOnly,
+		handleEventsUpdate,
+	]);
 
 	useEffect(() => {
 		const subscriber = subscribeCurrentUser(async (userSnapshot) => {
@@ -148,12 +229,6 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 					userData.loggedInCompany
 				);
 				setUserPrivilege(privilege || "User");
-				subscribeEvents(
-					userData.loggedInCompany,
-					[userSnapshot.id],
-					"User",
-					handleEventsUpdate
-				);
 			} catch (error) {
 				console.error(error);
 			}
@@ -200,15 +275,6 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 		<GestureHandlerRootView style={styles.rootView}>
 			<View style={styles.container}>
 				<SafeAreaView style={styles.safeArea}>
-					{showFilterButton && (
-						<TouchableOpacity
-							style={styles.filterButton}
-							onPress={handleFilterPress}
-						>
-							<Filter stroke="black" width={24} height={24} />
-						</TouchableOpacity>
-					)}
-
 					<CalendarProvider
 						date={selectedDate}
 						showTodayButton={true}
@@ -261,164 +327,323 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 						index={bottomSheetPosition}
 					>
 						<BottomSheetView style={styles.contentContainer}>
-							{filterType === "specific" ? (
-								<View style={styles.dropdownWrapper}>
-									<View style={styles.headerRow}>
+							<View style={styles.bottomSheetHandle} />
+							<ScrollView style={styles.scrollableContent}>
+								{filterType === "specific" ? (
+									<View style={styles.dropdownWrapper}>
+										<View style={styles.headerRow}>
+											<TouchableOpacity
+												onPress={() => {
+													setShowAllSelectedOnly(
+														false
+													);
+													setShowExactSelectedOnly(
+														false
+													);
+													setSelectedUsers([]);
+													setOpenSelect(false);
+													setFilterType("my");
+													setTimeout(() => {
+														bottomSheetRef.current?.snapToIndex(
+															0
+														);
+														setBottomSheetPosition(
+															0
+														);
+													}, 100);
+												}}
+											>
+												<Text style={styles.backButton}>
+													← Back
+												</Text>
+											</TouchableOpacity>
+											<Text style={styles.filterTitle}>
+												Select Users
+											</Text>
+										</View>
+										<DropDownPicker
+											searchPlaceholder="Search"
+											multiple={true}
+											min={0}
+											max={5}
+											value={selectedUsers}
+											setValue={setSelectedUsers}
+											items={availableWorkers}
+											setItems={setAvailableWorkers}
+											open={openSelect}
+											setOpen={checkSelectOpen}
+											mode="BADGE"
+											listMode="SCROLLVIEW"
+											searchable={true}
+											maxHeight={200}
+											style={styles.dropdown}
+											dropDownContainerStyle={
+												styles.dropdownList
+											}
+											listItemContainerStyle={
+												styles.dropdownItem
+											}
+											zIndex={3000}
+											placeholder="Select Users"
+										/>
+
+										{selectedUsers.length > 1 && (
+											<View
+												style={styles.checkboxContainer}
+											>
+												<TouchableOpacity
+													style={styles.checkboxRow}
+													onPress={() => {
+														setShowAllSelectedOnly(
+															(prev) => !prev
+														);
+														if (
+															!showAllSelectedOnly
+														) {
+															setShowExactSelectedOnly(
+																false
+															);
+														}
+													}}
+												>
+													<View
+														style={[
+															styles.checkbox,
+															showAllSelectedOnly &&
+																styles.checkboxSelected,
+														]}
+													>
+														{showAllSelectedOnly && (
+															<Text
+																style={
+																	styles.checkmark
+																}
+															>
+																✓
+															</Text>
+														)}
+													</View>
+													<Text
+														style={
+															styles.checkboxLabel
+														}
+													>
+														All selected users are
+														assigned (others may be
+														assigned too)
+													</Text>
+												</TouchableOpacity>
+
+												<TouchableOpacity
+													style={styles.checkboxRow}
+													onPress={() => {
+														setShowExactSelectedOnly(
+															(prev) => !prev
+														);
+														if (
+															!showExactSelectedOnly
+														) {
+															setShowAllSelectedOnly(
+																false
+															);
+														}
+													}}
+												>
+													<View
+														style={[
+															styles.checkbox,
+															showExactSelectedOnly &&
+																styles.checkboxSelected,
+														]}
+													>
+														{showExactSelectedOnly && (
+															<Text
+																style={
+																	styles.checkmark
+																}
+															>
+																✓
+															</Text>
+														)}
+													</View>
+													<Text
+														style={
+															styles.checkboxLabel
+														}
+													>
+														Only the selected users
+														are assigned
+													</Text>
+												</TouchableOpacity>
+											</View>
+										)}
+
 										<TouchableOpacity
-											onPress={() => {
-												setFilterType("my");
-												setBottomSheetPosition(0);
-											}}
+											style={styles.applyButton}
+											onPress={() =>
+												handleFilterChange("specific")
+											}
 										>
-											<Text style={styles.backButton}>
-												← Back
+											<Text
+												style={styles.applyButtonText}
+											>
+												Apply Filter
 											</Text>
 										</TouchableOpacity>
-										<Text style={styles.filterTitle}>
-											Assigned Workers
-										</Text>
 									</View>
-									<DropDownPicker
-										searchPlaceholder="Search"
-										multiple={true}
-										min={0}
-										max={5}
-										value={selectedUsers}
-										setValue={setSelectedUsers}
-										items={availableWorkers}
-										setItems={setAvailableWorkers}
-										open={openSelect}
-										setOpen={checkSelectOpen}
-										mode="BADGE"
-										listMode="SCROLLVIEW"
-										searchable={true}
-										maxHeight={200}
-										style={styles.dropdown}
-										dropDownContainerStyle={
-											styles.dropdownList
-										}
-										listItemContainerStyle={
-											styles.dropdownItem
-										}
-										zIndex={3000}
-										placeholder="Select Users"
-									/>
-									<TouchableOpacity
-										style={styles.applyButton}
-										onPress={() =>
-											handleFilterChange("specific")
-										}
-									>
-										<Text style={styles.applyButtonText}>
-											Apply Filter
+								) : (
+									<>
+										<Text style={styles.filterTitle}>
+											Event Filters
 										</Text>
-									</TouchableOpacity>
-								</View>
-							) : (
-								<>
-									<Text style={styles.filterTitle}>
-										Event Filters
-									</Text>
-									<TouchableOpacity
-										style={[
-											styles.filterOption,
-											getFilterStyle("my", filterType),
-										]}
-										onPress={() => handleFilterChange("my")}
-									>
-										<Text style={styles.filterText}>
-											My Events
-										</Text>
-									</TouchableOpacity>
+										<TouchableOpacity
+											style={[
+												styles.filterOption,
+												getFilterStyle(
+													"my",
+													filterType
+												),
+											]}
+											onPress={() =>
+												handleFilterChange("my")
+											}
+										>
+											<Text style={styles.filterText}>
+												My Events
+											</Text>
+										</TouchableOpacity>
 
-									<TouchableOpacity
-										style={[
-											styles.filterOption,
-											getFilterStyle(
-												"specific",
-												filterType
-											),
-										]}
-										onPress={() =>
-											setFilterType("specific")
-										}
-									>
-										<Text style={styles.filterText}>
-											Specific Users
-										</Text>
-									</TouchableOpacity>
+										<TouchableOpacity
+											style={[
+												styles.filterOption,
+												getFilterStyle(
+													"specific",
+													filterType
+												),
+											]}
+											onPress={() =>
+												setFilterType("specific")
+											}
+										>
+											<Text style={styles.filterText}>
+												Specific Users
+											</Text>
+										</TouchableOpacity>
 
-									<TouchableOpacity
-										style={[
-											styles.filterOption,
-											getFilterStyle(
-												"unassigned",
-												filterType
-											),
-										]}
-										onPress={() =>
-											handleFilterChange("unassigned")
-										}
-									>
-										<Text style={styles.filterText}>
-											Unassigned Events
-										</Text>
-									</TouchableOpacity>
+										<TouchableOpacity
+											style={[
+												styles.filterOption,
+												getFilterStyle(
+													"unassigned",
+													filterType
+												),
+											]}
+											onPress={() =>
+												handleFilterChange("unassigned")
+											}
+										>
+											<Text style={styles.filterText}>
+												Unassigned Events
+											</Text>
+										</TouchableOpacity>
 
-									<TouchableOpacity
-										style={[
-											styles.filterOption,
-											getFilterStyle("all", filterType),
-										]}
-										onPress={() =>
-											handleFilterChange("all")
-										}
-									>
-										<Text style={styles.filterText}>
-											All Events
-										</Text>
-									</TouchableOpacity>
-								</>
-							)}
+										<TouchableOpacity
+											style={[
+												styles.filterOption,
+												getFilterStyle(
+													"all",
+													filterType
+												),
+											]}
+											onPress={() =>
+												handleFilterChange("all")
+											}
+										>
+											<Text style={styles.filterText}>
+												All Events
+											</Text>
+										</TouchableOpacity>
+									</>
+								)}
+							</ScrollView>
 						</BottomSheetView>
 					</BottomSheet>
 				</SafeAreaView>
+				{showFilterButton && (
+					<Animated.View style={{ opacity: fabOpacity }}>
+						<TouchableOpacity
+							style={styles.filterButton}
+							onPress={handleFilterPress}
+						>
+							<Filter stroke="black" width={24} height={24} />
+						</TouchableOpacity>
+					</Animated.View>
+				)}
 			</View>
 		</GestureHandlerRootView>
 	);
 };
 
 const styles = StyleSheet.create({
-	rootView: { flex: 1, backgroundColor: "white" },
-	container: { flex: 1, backgroundColor: "white" },
-	safeArea: { flex: 1 },
-	calendar: { paddingLeft: 20, paddingRight: 20 },
+	rootView: {
+		flex: 1,
+		backgroundColor: "white",
+	},
+	container: {
+		flex: 1,
+		backgroundColor: "white",
+	},
+	safeArea: {
+		flex: 1,
+	},
+	calendar: {
+		paddingLeft: 20,
+		paddingRight: 20,
+	},
 	section: {
 		backgroundColor: lightThemeColor,
 		color: "grey",
 		textTransform: "capitalize",
 	},
-	calendarContainer: { position: "relative" },
-	agendaContainer: { flex: 1 },
+	calendarContainer: {
+		position: "relative",
+	},
+	agendaContainer: {
+		flex: 1,
+	},
 	contentContainer: {
 		flex: 1,
 		padding: 24,
 		paddingBottom: 10,
 		alignItems: "center",
+		minHeight: "100%",
+	},
+	scrollableContent: {
+		width: "100%",
+		flex: 1,
 	},
 	filterButton: {
 		position: "absolute",
-		top: 25,
-		right: 60,
-		zIndex: 1,
-		padding: 8,
+		bottom: 10,
+		right: 10,
+		zIndex: 999,
+		padding: 12,
 		backgroundColor: "white",
-		borderRadius: 8,
+		borderRadius: 30,
 		shadowColor: "#000",
 		shadowOffset: { width: 0, height: 2 },
 		shadowOpacity: 0.25,
 		shadowRadius: 3.84,
-		elevation: 5,
+		elevation: 8,
+	},
+	bottomSheetHandle: {
+		width: 40,
+		height: 4,
+		borderRadius: 2,
+		backgroundColor: "#DEDEDE",
+		alignSelf: "center",
+		marginBottom: 20,
+		display: "none",
 	},
 	filterTitle: {
 		fontSize: 20,
@@ -488,6 +713,39 @@ const styles = StyleSheet.create({
 		color: "white",
 		fontSize: 16,
 		fontWeight: "600",
+	},
+	checkboxContainer: {
+		marginTop: 16,
+		width: "100%",
+	},
+	checkboxRow: {
+		flexDirection: "row",
+		alignItems: "flex-start",
+		marginBottom: 12,
+		paddingHorizontal: 4,
+	},
+	checkbox: {
+		width: 20,
+		height: 20,
+		borderRadius: 4,
+		borderWidth: 2,
+		borderColor: "#2089dc",
+		marginRight: 10,
+		marginTop: 2,
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	checkboxSelected: {
+		backgroundColor: "#2089dc",
+	},
+	checkmark: {
+		color: "white",
+		fontSize: 14,
+	},
+	checkboxLabel: {
+		flex: 1,
+		fontSize: 14,
+		lineHeight: 20,
 	},
 });
 
