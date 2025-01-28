@@ -470,7 +470,7 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 															styles.checkboxLabel
 														}
 													>
-														Exclusivly Together
+														Exclusively Together
 													</Text>
 												</TouchableOpacity>
 											</View>
