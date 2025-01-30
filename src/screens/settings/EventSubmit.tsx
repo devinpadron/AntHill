@@ -20,7 +20,7 @@ import {
 } from "react-native-google-places-autocomplete";
 import DatePicker from "react-native-date-picker";
 import { Ionicons } from "@expo/vector-icons";
-import { capitalize } from "lodash";
+import { capitalize, set } from "lodash";
 import moment from "moment";
 import DropDownPicker from "react-native-dropdown-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -38,7 +38,10 @@ import {
 	getUser,
 	User,
 } from "../../controllers/userController";
-import { subscribeAllUsersInCompany } from "../../controllers/companyController";
+import {
+	isPersonal,
+	subscribeAllUsersInCompany,
+} from "../../controllers/companyController";
 import storage from "@react-native-firebase/storage";
 import { RouteProp, useRoute } from "@react-navigation/native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
@@ -88,6 +91,7 @@ const EventSubmit = ({ navigation }) => {
 	const [isEditing, setIsEditing] = useState(false);
 	const [editID, setEditID] = useState<string | null>(null);
 	const [deletionQueue, setDeletionQueue] = useState<string[]>([]);
+	const [personal, setPersonal] = useState(false);
 
 	type Location = {
 		[address: string]: {
@@ -167,6 +171,15 @@ const EventSubmit = ({ navigation }) => {
 		});
 		return () => subscriber();
 	}, []);
+
+	useEffect(() => {
+		const checkPersonal = async () => {
+			const result = await isPersonal(currentCompany);
+			console.log(result);
+			setPersonal(result);
+		};
+		checkPersonal();
+	}, [currentCompany]);
 
 	useEffect(() => {
 		if (!currentCompany) return;
@@ -1006,7 +1019,7 @@ const EventSubmit = ({ navigation }) => {
 				</View>
 
 				{/* Attachments Section */}
-				{renderAttachmentsSection()}
+				{!personal && renderAttachmentsSection()}
 
 				{/* Submission Button */}
 				<TouchableOpacity

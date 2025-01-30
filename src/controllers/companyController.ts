@@ -64,7 +64,11 @@ export function subscribeAllUsersInCompany(
 
 // A new user is added to the company with the default privilege of "User"
 // A new user will never have anythign other than "User" privilege since they must be upgraded by an admin later.
-export async function addUserToCompany(company: string, userID: string) {
+export async function addUserToCompany(
+	company: string,
+	userID: string,
+	personal: boolean = false
+) {
 	try {
 		await db
 			.collection("Companies")
@@ -72,9 +76,29 @@ export async function addUserToCompany(company: string, userID: string) {
 			.collection("Users")
 			.doc(userID)
 			.set({});
+
+		if (personal) {
+			await db
+				.collection("Companies")
+				.doc(company)
+				.set({ personal: true });
+		}
 		return true;
 	} catch (e) {
 		console.error("Error adding user to company", e);
 		return false;
+	}
+}
+
+export async function isPersonal(company: string) {
+	try {
+		const companyEntry = await db
+			.collection("Companies")
+			.doc(company)
+			.get();
+		return companyEntry.data().personal;
+	} catch (e) {
+		console.error("Error getting company", e);
+		return null;
 	}
 }
