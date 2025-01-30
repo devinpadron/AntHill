@@ -1,6 +1,11 @@
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
+import { FileUpload } from "../screens/settings/EventSubmit";
 import db from "../../index";
-
+import {
+	addAttachments,
+	getEventAttachments,
+	deleteEventAttachments,
+} from "./attachmentController";
 /* An EventController that contains:
   - An event interface that provides the structure of event data
   - A function that uses an eventID to pull from Firestore and retrieve the event entry
@@ -25,7 +30,9 @@ export interface Event {
 	endTime: string | null;
 	locations: Location;
 	duration: string | null;
+	notes: string;
 	assignedWorkers: string[];
+	attachments?: FileUpload[];
 }
 
 const isValidDateFormat = (date: string): boolean => {
@@ -47,15 +54,33 @@ export async function getEvent(company: string, eventID: string) {
 		if (eventEntry.exists) {
 			const dbData = eventEntry.data();
 			if (dbData) {
-				return dbData;
+				const attachments = await getEventAttachments(company, eventID);
+				return {
+					...dbData,
+					attachments,
+				};
 			} else {
 				return null;
 			}
-		} else {
 		}
 	} catch (e) {
 		console.error("Error getting event", e);
 	}
+}
+
+export function subscribeEvent(
+	company: string,
+	eventID: string,
+	onSnap: (
+		snapshot: FirebaseFirestoreTypes.DocumentSnapshot<FirebaseFirestoreTypes.DocumentData>
+	) => void
+) {
+	return db
+		.collection("Companies")
+		.doc(company)
+		.collection("Events")
+		.doc(eventID)
+		.onSnapshot(onSnap);
 }
 
 export async function getEventsByDate(
@@ -90,32 +115,133 @@ export async function getAllEvents(
 	company: string
 ): Promise<FirebaseFirestoreTypes.DocumentData[]> {
 	try {
-		const res: FirebaseFirestoreTypes.DocumentData[] = [];
 		const eventsFromDB = await db
 			.collection("Companies")
 			.doc(company)
 			.collection("Events")
 			.get();
-		eventsFromDB.forEach((event) => {
-			const eventData = event.data() as Event;
-			res.push(eventData);
-		});
-
-		return res;
+		return eventsFromDB.docs;
 	} catch (e) {
 		console.error("Failed to get events", e);
 		throw e;
 	}
 }
 
+export function subscribeAllEvents(
+	company: string,
+	onSnap: (
+		snapshot: FirebaseFirestoreTypes.QuerySnapshot<FirebaseFirestoreTypes.DocumentData>
+	) => void
+) {
+	return db
+		.collection("Companies")
+		.doc(company)
+		.collection("Events")
+		.onSnapshot(onSnap);
+}
+
+export function subscribeEvents(
+	type: string,
+	company: string,
+	userIDs: string[],
+	onSnap: (
+		snapshot: FirebaseFirestoreTypes.QuerySnapshot<FirebaseFirestoreTypes.DocumentData>
+	) => void,
+	filterOptions?: {
+		requireAllSelected?: boolean;
+		exactMatchOnly?: boolean;
+	}
+) {
+	try {
+		switch (type) {
+			case "all":
+				// All events for the company
+				return db
+					.collection("Companies")
+					.doc(company)
+					.collection("Events")
+					.onSnapshot(onSnap);
+
+			case "my":
+				// Only logged-in user's events
+				return db
+					.collection("Companies")
+					.doc(company)
+					.collection("Events")
+					.where("assignedWorkers", "array-contains", userIDs[0])
+					.onSnapshot(onSnap);
+
+			case "specific":
+				if (filterOptions?.exactMatchOnly) {
+					// Only show events where exactly these users are assigned (no more, no less)
+					return db
+						.collection("Companies")
+						.doc(company)
+						.collection("Events")
+						.where("assignedWorkers", "==", userIDs.sort())
+						.onSnapshot(onSnap);
+				} else if (filterOptions?.requireAllSelected) {
+					// Show events where all selected users are assigned (others may be too)
+					return db
+						.collection("Companies")
+						.doc(company)
+						.collection("Events")
+						.where("assignedWorkers", "array-contains", userIDs[0])
+						.onSnapshot((snapshot) => {
+							// Filter in memory to check if all selected users are present
+							const filteredDocs = snapshot.docs.filter((doc) => {
+								const assignedWorkers =
+									doc.data().assignedWorkers || [];
+								return userIDs.every((uid) =>
+									assignedWorkers.includes(uid)
+								);
+							});
+							// Create a new snapshot-like object with filtered docs
+							const filteredSnapshot = {
+								...snapshot,
+								docs: filteredDocs,
+								size: filteredDocs.length,
+							};
+							onSnap(filteredSnapshot as any);
+						});
+				}
+				// Default: show events where any of the selected users are assigned
+				return db
+					.collection("Companies")
+					.doc(company)
+					.collection("Events")
+					.where("assignedWorkers", "array-contains-any", userIDs)
+					.onSnapshot(onSnap);
+
+			case "unassigned":
+				// Events with empty assignedWorkers array
+				return db
+					.collection("Companies")
+					.doc(company)
+					.collection("Events")
+					.where("assignedWorkers", "==", [])
+					.onSnapshot(onSnap);
+		}
+	} catch (e) {
+		console.error("Error getting events:", e);
+		return () => {};
+	}
+}
 export async function addEvent(company: string, newEvent: Event) {
 	try {
+		const { attachments, ...eventData } = newEvent;
+
 		const entry = await db
 			.collection("Companies")
 			.doc(company)
 			.collection("Events")
 			.add(newEvent);
 		const entryid = entry.id;
+
+		if (attachments && attachments.length > 0) {
+			await addAttachments(company, entry.id, attachments);
+		}
+
 		return entryid;
 	} catch (e) {
 		console.error("Error adding event:", e);
@@ -126,6 +252,10 @@ export async function addEvent(company: string, newEvent: Event) {
 export async function deleteEvent(eventID: string, company: string) {
 	// Delete an existing event
 	try {
+		await deleteEventAttachments(company, eventID);
+
+		console.log("Event attachments Deleted");
+
 		await db
 			.collection("Companies")
 			.doc(company)
@@ -152,7 +282,7 @@ export async function updateEvent(
 			.collection("Events")
 			.doc(eventID)
 			.update(eventData);
-		console.log("Event successfully updated");
+		//console.log("Event successfully updated");
 		return true;
 	} catch (e) {
 		console.error("Error updating event:", e);

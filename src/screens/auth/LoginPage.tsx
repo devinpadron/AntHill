@@ -15,7 +15,7 @@ import auth from "@react-native-firebase/auth";
 import { getUser, updateUser } from "../../controllers/userController";
 import { AntHill } from "../../global/colors";
 
-const LoginPage = ({ navigation }: any) => {
+const LoginPage = ({ navigation }) => {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 

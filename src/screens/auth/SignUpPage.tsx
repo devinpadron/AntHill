@@ -16,7 +16,7 @@ import {
 	compareAccessCode,
 } from "../../controllers/companyController";
 
-const SignUpPage = ({ navigation }: any) => {
+const SignUpPage = ({ navigation }) => {
 	const [firstName, setFirstName] = useState("");
 	const [lastName, setLastName] = useState("");
 	const [email, setEmail] = useState("");
