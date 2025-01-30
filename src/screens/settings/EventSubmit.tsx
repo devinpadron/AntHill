@@ -77,7 +77,7 @@ const EventSubmit = ({ navigation }) => {
 	const [startTime, setStartTime] = useState(new Date());
 	const [hasEndTime, setHasEndTime] = useState(false);
 	const [endTime, setEndTime] = useState(new Date());
-	const [locations, setLocations] = useState<Location>({});
+	const [locations, setLocations] = useState<Location>(null);
 	const [assignedWorkers, setAssignedWorkers] = useState([]);
 	const [openSelect, setOpenSelect] = useState(false);
 	const [openDate, setOpenDate] = useState(false);
@@ -174,6 +174,7 @@ const EventSubmit = ({ navigation }) => {
 
 	useEffect(() => {
 		const checkPersonal = async () => {
+			if (!currentCompany) return;
 			const result = await isPersonal(currentCompany);
 			console.log(result);
 			setPersonal(result);

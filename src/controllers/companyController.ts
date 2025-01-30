@@ -96,9 +96,39 @@ export async function isPersonal(company: string) {
 			.collection("Companies")
 			.doc(company)
 			.get();
-		return companyEntry.data().personal;
+		if (companyEntry.data().personal) {
+			return true;
+		}
+		return false;
 	} catch (e) {
 		console.error("Error getting company", e);
 		return null;
+	}
+}
+
+//
+export async function deleteSoloCompany(company: string) {
+	try {
+		const users = await db
+			.collection("Companies")
+			.doc(company)
+			.collection("Users")
+			.get();
+		for (const user of users.docs) {
+			await user.ref.delete();
+		}
+		const events = await db
+			.collection("Companies")
+			.doc(company)
+			.collection("Events")
+			.get();
+		for (const event of events.docs) {
+			await event.ref.delete();
+		}
+		await db.collection("Companies").doc(company).delete();
+		return true;
+	} catch (e) {
+		console.error("Error deleting company", e);
+		return false;
 	}
 }

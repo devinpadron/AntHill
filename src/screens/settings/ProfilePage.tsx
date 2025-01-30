@@ -17,25 +17,37 @@ import {
 	deleteUser,
 	subscribeCurrentUser,
 } from "../../controllers/userController";
+import {
+	deleteSoloCompany,
+	isPersonal,
+} from "../../controllers/companyController";
 
 const ProfilePage = ({ navigation }) => {
 	const [isLoading, setIsLoading] = useState(true);
 	const [userData, setData] = useState(null);
+	const [isSolo, setIsSolo] = useState(false);
+	const [userId, setUserId] = useState("");
 
 	useEffect(() => {
 		const subscriber = subscribeCurrentUser((user) => {
 			const userData = user.data();
 			if (userData) {
 				setData(userData);
+				setUserId(user.id);
 			}
 		});
 		return () => subscriber();
 	}, []);
 
 	useEffect(() => {
-		if (userData) {
-			setIsLoading(false);
-		}
+		const fillData = async () => {
+			if (userData) {
+				const result = await isPersonal(userData.loggedInCompany);
+				setIsSolo(result);
+				setIsLoading(false);
+			}
+		};
+		fillData();
 	}, [userData]);
 
 	const handleCompanyChange = async (selectedCompany: any) => {
@@ -188,8 +200,12 @@ const ProfilePage = ({ navigation }) => {
 	};
 
 	const handleDeleteAccount = () => {
+		var title = "Delete " + userData.loggedInCompany + " Data?";
+		if (isSolo) {
+			title = "Delete Account?";
+		}
 		Alert.alert(
-			"Delete " + userData.loggedInCompany + " Data?",
+			title,
 			"Are you sure you want to delete your company account? This action cannot be undone.",
 			[
 				{ text: "Cancel", style: "cancel" },
@@ -207,7 +223,11 @@ const ProfilePage = ({ navigation }) => {
 							);
 							return;
 						}
-						await deleteUser(userData.id);
+
+						await deleteUser(userId);
+						if (isSolo) {
+							await deleteSoloCompany(userData.loggedInCompany);
+						}
 						if (userData.companies.length > 1) {
 							//TODO: Implement switch company logic here
 						} else {
@@ -269,7 +289,7 @@ const ProfilePage = ({ navigation }) => {
 						/>
 					) : (
 						<Text style={styles.value}>
-							{userData.loggedInCompany}
+							{isSolo ? "Personal" : userData.loggedInCompany}
 						</Text>
 					)}
 				</View>

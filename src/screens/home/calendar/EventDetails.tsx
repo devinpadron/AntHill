@@ -250,7 +250,7 @@ const EventDetails = ({ navigation }) => {
 		);
 	};
 
-	if (isLoading) return <LoadingScreen />;
+	if (isLoading || !event) return <LoadingScreen />;
 
 	return (
 		<SafeAreaView style={styles.container}>
