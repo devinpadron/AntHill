@@ -11,6 +11,7 @@
 			"resizeMode": "contain",
 			"backgroundColor": "#ffffff"
 		},
+		"icon": "./src/assets/AntHill/AH_Icon.png",
 		"ios": {
 			"supportsTablet": true,
 			"googleServicesFile": "./GoogleService-Info.plist",
