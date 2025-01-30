@@ -1,6 +1,7 @@
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
 import db from "../../index";
 import { FileUpload } from "../screens/settings/EventSubmit";
+import storage from "@react-native-firebase/storage";
 
 export async function addAttachments(
 	company: string,
@@ -19,11 +20,12 @@ export async function addAttachments(
 		for (const attachment of attachments) {
 			const docRef = attachmentsRef.doc();
 			batch.set(docRef, {
-				filename: attachment.name,
+				name: attachment.name,
 				url: attachment.url,
 				type: attachment.type,
 				uploadTime: attachment.uploadTime,
 				path: attachment.path,
+				id: docRef.id,
 			});
 		}
 
@@ -71,7 +73,11 @@ export function subscribeEventAttachments(
 		.onSnapshot(onSnap);
 }
 
-export async function deleteEventAttachments(company: string, eventId: string) {
+export async function deleteEventAttachments(
+	company: string,
+	eventId: string,
+	attachments: string[]
+) {
 	try {
 		const attachmentsSnapshot = await db
 			.collection("Companies")
@@ -82,8 +88,12 @@ export async function deleteEventAttachments(company: string, eventId: string) {
 			.get();
 
 		const batch = db.batch();
+
 		attachmentsSnapshot.docs.forEach((doc) => {
-			batch.delete(doc.ref);
+			if (attachments.find((attachment) => attachment === doc.id)) {
+				storage().ref(doc.data().path).delete();
+				batch.delete(doc.ref);
+			}
 		});
 
 		await batch.commit();

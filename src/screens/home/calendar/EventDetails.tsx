@@ -1,5 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, TextInput } from "react-native";
+import {
+	View,
+	Text,
+	StyleSheet,
+	TextInput,
+	Dimensions,
+	ImageBackground,
+	Linking,
+	Platform,
+} from "react-native";
 import { RouteProp, useRoute } from "@react-navigation/native";
 import { subscribeCurrentUser } from "../../../controllers/userController";
 import {
@@ -11,9 +20,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { TouchableOpacity } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 import moment from "moment";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { Callout, Marker } from "react-native-maps";
 import { getUser } from "../../../controllers/userController";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { getEventAttachments } from "../../../controllers/attachmentController";
+import ImageView from "react-native-image-viewing";
 
 type RootStackParamList = {
 	EventDetails: {
@@ -33,6 +44,9 @@ const EventDetails = ({ navigation }) => {
 	const [workerList, setWorkerList] = useState("");
 	const [localNotes, setLocalNotes] = useState("");
 	const [initialRegion, setInitialRegion] = useState(null);
+	const [isLoading, setIsLoading] = useState(true);
+	const [attachments, setAttachments] = useState([]);
+	const [visible, setIsVisible] = useState(false);
 
 	useEffect(() => {
 		const subscriber = subscribeCurrentUser((user) => {
@@ -55,22 +69,35 @@ const EventDetails = ({ navigation }) => {
 
 	useEffect(() => {
 		if (!event) return;
-		setMarkers([]);
-		const locations = event.locations;
-		if (!locations) return;
-		for (let location in locations) {
-			setMarkers((prev) => [
-				...prev,
-				{
-					latitude: locations[location].latitude,
-					longitude: locations[location].longitude,
-					title: location,
-					label: locations[location].label,
-				},
-			]);
-		}
+		setIsLoading(true);
+		const getLocationList = () => {
+			setMarkers([]);
+			const locations = event.locations;
+			if (!locations) return;
+			for (let location in locations) {
+				setMarkers((prev) => [
+					...prev,
+					{
+						latitude: locations[location].latitude,
+						longitude: locations[location].longitude,
+						title: location,
+						label: locations[location].label,
+					},
+				]);
+			}
+		};
+		getLocationList();
 
 		setLocalNotes(event.userNotes || "");
+
+		const loadAttachments = async () => {
+			const attachments = await getEventAttachments(
+				user.loggedInCompany,
+				route.params.uid
+			);
+			setAttachments(attachments);
+		};
+		loadAttachments();
 
 		const getWorkerList = async () => {
 			const assignedWorkers = event.assignedWorkers;
@@ -79,8 +106,9 @@ const EventDetails = ({ navigation }) => {
 				const workerData = await getUser(assignedWorkers[i]);
 				workerList += workerData.firstName + " " + workerData.lastName;
 				if (i < assignedWorkers.length - 1) workerList += ", ";
+				setWorkerList(workerList);
 			}
-			setWorkerList(workerList);
+			setIsLoading(false);
 		};
 		getWorkerList();
 	}, [event]);
@@ -131,8 +159,98 @@ const EventDetails = ({ navigation }) => {
 	};
 
 	const scrollViewRef = useRef(null);
+	const markerRef = useRef(null);
 
-	if (!event) return <LoadingScreen />;
+	const openMap = ({ latitude, longitude, label }) => {
+		const scheme = Platform.select({
+			ios: `maps://?q=${label}&ll=${latitude},${longitude}`,
+			android: `geo:${latitude},${longitude}?q=${latitude},${longitude}(${label})`,
+		});
+
+		if (scheme) {
+			Linking.openURL(scheme).catch((err) =>
+				console.error("Error opening map: ", err)
+			);
+		}
+	};
+
+	const renderThumbnails = () => {
+		const imageFiles = attachments.filter((file) =>
+			file.type.startsWith("image/")
+		);
+		const images = imageFiles.map((file) => ({
+			uri: file.url,
+		}));
+		const documentFiles = attachments.filter(
+			(file) => !file.type.startsWith("image/")
+		);
+
+		return (
+			<View style={styles.filesContainer}>
+				{/* Image Grid */}
+				{imageFiles.length > 0 && (
+					<>
+						<ImageView
+							images={images}
+							imageIndex={0}
+							visible={visible}
+							onRequestClose={() => setIsVisible(false)}
+						/>
+						<View style={styles.imageGrid}>
+							{imageFiles.map((file, index) => (
+								<View
+									key={index}
+									style={styles.thumbnailContainer}
+								>
+									<TouchableOpacity
+										onPress={() => setIsVisible(true)}
+									>
+										<ImageBackground
+											style={styles.thumbnail}
+											source={{ uri: file.url }}
+										/>
+									</TouchableOpacity>
+								</View>
+							))}
+						</View>
+					</>
+				)}
+
+				{/* Document List */}
+				{documentFiles.length > 0 && (
+					<View style={styles.documentList}>
+						{documentFiles.map((file, index) => (
+							<>
+								<TouchableOpacity
+									onPress={() => Linking.openURL(file.url)}
+								>
+									<View
+										key={index}
+										style={styles.documentItem}
+									>
+										<Ionicons
+											name="document-outline"
+											size={24}
+											color="#555"
+											style={styles.documentIcon}
+										/>
+										<Text
+											numberOfLines={1}
+											style={styles.documentFilename}
+										>
+											{file.name}
+										</Text>
+									</View>
+								</TouchableOpacity>
+							</>
+						))}
+					</View>
+				)}
+			</View>
+		);
+	};
+
+	if (isLoading) return <LoadingScreen />;
 
 	return (
 		<SafeAreaView style={styles.container}>
@@ -232,6 +350,7 @@ const EventDetails = ({ navigation }) => {
 								{markers.map((marker, index) => (
 									<Marker
 										key={index}
+										ref={markerRef}
 										coordinate={{
 											latitude: marker.latitude,
 											longitude: marker.longitude,
@@ -244,13 +363,18 @@ const EventDetails = ({ navigation }) => {
 												? marker.label
 												: marker.title
 										}
+										onCalloutPress={() => openMap(marker)}
 									/>
 								))}
 							</MapView>
 						)}
 					</View>
 
-					<Text style={styles.label}>Your Notes</Text>
+					{renderThumbnails()}
+
+					<Text style={[styles.label, { marginTop: 10 }]}>
+						Your Notes
+					</Text>
 					<TextInput
 						style={[
 							styles.text,
@@ -356,6 +480,48 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		lineHeight: 20,
 		marginBottom: 12,
+	},
+	thumbnailContainer: {
+		width: "30%", // 3 columns with padding
+		aspectRatio: 1,
+		borderRadius: 8,
+		backgroundColor: "#f5f5f5",
+		position: "relative",
+		overflow: "visible",
+	},
+	thumbnail: {
+		width: (Dimensions.get("window").width - 60) / 3,
+		height: "100%",
+		borderRadius: 8,
+		zIndex: 1,
+	},
+	filesContainer: {
+		marginTop: 16,
+	},
+	imageGrid: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		gap: 10,
+		marginBottom: 10,
+		paddingBottom: 20,
+	},
+	documentList: {
+		marginTop: 0,
+	},
+	documentItem: {
+		flexDirection: "row",
+		alignItems: "center",
+		backgroundColor: "#f5f5f5",
+		padding: 10,
+		borderRadius: 8,
+		marginBottom: 15,
+	},
+	documentIcon: {
+		marginRight: 10,
+	},
+	documentFilename: {
+		flex: 1,
+		fontSize: 14,
 	},
 });
 

@@ -2,7 +2,6 @@ import "react-native-get-random-values";
 import { GOOGLE_PLACES_API_KEY } from "@env";
 import React, { useEffect, useRef, useState } from "react";
 import {
-	Image,
 	View,
 	Text,
 	TextInput,
@@ -10,6 +9,9 @@ import {
 	Alert,
 	Platform,
 	Dimensions,
+	ImageBackground,
+	TouchableHighlight,
+	ActivityIndicator,
 } from "react-native";
 import { TouchableOpacity } from "react-native-gesture-handler";
 import {
@@ -39,8 +41,13 @@ import {
 import { subscribeAllUsersInCompany } from "../../controllers/companyController";
 import storage from "@react-native-firebase/storage";
 import { RouteProp, useRoute } from "@react-navigation/native";
-import LoadingScreen from "../LoadingScreen";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import {
+	addAttachments,
+	deleteEventAttachments,
+	getEventAttachments,
+} from "../../controllers/attachmentController";
+import { StackActions } from "@react-navigation/native";
 
 export interface FileUpload {
 	uri: string;
@@ -49,6 +56,7 @@ export interface FileUpload {
 	url?: string;
 	uploadTime?: number;
 	path?: string;
+	id?: string;
 }
 
 type RootStackParamList = {
@@ -79,6 +87,7 @@ const EventSubmit = ({ navigation }) => {
 	const [files, setFiles] = useState<FileUpload[]>([]);
 	const [isEditing, setIsEditing] = useState(false);
 	const [editID, setEditID] = useState<string | null>(null);
+	const [deletionQueue, setDeletionQueue] = useState<string[]>([]);
 
 	type Location = {
 		[address: string]: {
@@ -105,7 +114,7 @@ const EventSubmit = ({ navigation }) => {
 				(event) => {
 					if (event.exists) {
 						setTitle(event.data().title);
-						setDate(new Date(event.data().date));
+						setDate(moment(event.data().date).toDate());
 						setAllDay(event.data().startTime ? false : true);
 						setStartTime(
 							event.data().startTime
@@ -128,7 +137,7 @@ const EventSubmit = ({ navigation }) => {
 						setAssignedWorkers(event.data().assignedWorkers);
 						setNotes(event.data().notes);
 						setEditID(route.params.uid);
-						//setUploadedFiles(event.data().attachments);
+						checkAttachments(route.params.uid);
 					}
 				}
 			);
@@ -136,6 +145,18 @@ const EventSubmit = ({ navigation }) => {
 			return () => subscriber();
 		}
 	}, [currentCompany]);
+
+	const checkAttachments = async (eventId: string) => {
+		try {
+			const attachments = await getEventAttachments(
+				currentCompany,
+				eventId
+			);
+			setFiles(attachments);
+		} catch (error) {
+			console.error("Error getting attachments:", error);
+		}
+	};
 
 	useEffect(() => {
 		const subscriber = subscribeCurrentUser((snapshot) => {
@@ -172,10 +193,6 @@ const EventSubmit = ({ navigation }) => {
 			Alert.alert("Title is required.");
 			return false;
 		}
-		// if (Object.keys(locations).length === 0) {
-		// 	Alert.alert("At least one location is required.");
-		// 	return false;
-		// }
 		if (hasEndTime && endTime <= startTime) {
 			Alert.alert("End time must be after start time.");
 			return false;
@@ -187,7 +204,7 @@ const EventSubmit = ({ navigation }) => {
 		if (allDay) return null;
 		if (!hasEndTime) return null;
 		const hours = moment(endTime).diff(startTime, "minutes") / 60;
-		return Number.isInteger(hours) ? hours.toFixed(1) : hours.toString();
+		return hours.toFixed(2).toString(); // Round to 1 decimal place
 	};
 
 	const updateLocation = (details: any) => {
@@ -303,8 +320,8 @@ const EventSubmit = ({ navigation }) => {
 	};
 
 	const handleEventSubmission = async () => {
-		console.log("Submitting event...");
 		if (!validateFields()) {
+			console.error("Invalid fields");
 			return;
 		}
 
@@ -315,19 +332,20 @@ const EventSubmit = ({ navigation }) => {
 			date: moment(date).format("YYYY-MM-DD"),
 			startTime: !allDay ? moment(startTime).format("HH:mm") : null,
 			endTime: hasEndTime ? moment(endTime).format("HH:mm") : null,
-			locations:
-				Object.keys(validatedLocations).length > 0
-					? validatedLocations
-					: null,
+			locations: validatedLocations,
 			duration: calculateDuration(),
 			notes: notes,
 			assignedWorkers: assignedWorkers,
 		};
 
 		if (isEditing) {
-			updateEvent(currentCompany, editID, initialEventData);
+			console.log("Updating event...");
+			await updateEvent(currentCompany, editID, initialEventData);
+			await deleteEventAttachments(currentCompany, editID, deletionQueue);
+			navigation.pop();
 			return;
 		}
+		console.log("Submitting event...");
 		try {
 			setIsLoading(true);
 
@@ -347,12 +365,7 @@ const EventSubmit = ({ navigation }) => {
 				}
 			}
 
-			const eventData: Event = {
-				...initialEventData,
-				attachments: uploadedFiles,
-			};
-
-			await updateEvent(currentCompany, eventId, eventData);
+			await addAttachments(currentCompany, eventId, uploadedFiles);
 			console.log("Event successfully created!");
 			navigation.pop();
 		} catch (error) {
@@ -373,6 +386,7 @@ const EventSubmit = ({ navigation }) => {
 	};
 
 	const validateLocations = (locations: Location) => {
+		if (!locations) return null;
 		return Object.entries(locations).reduce(
 			(acc: Location, [key, value]) => {
 				// Check if location has valid coordinates
@@ -441,8 +455,13 @@ const EventSubmit = ({ navigation }) => {
 			try {
 				setIsLoading(true);
 				await cleanupTempFiles();
+				navigation.dispatch(StackActions.popToTop());
+				await deleteEventAttachments(
+					currentCompany,
+					editID,
+					files.map((file) => file.id)
+				);
 				await deleteEvent(editID, currentCompany);
-				navigation.pop(2);
 			} catch (error) {
 				Alert.alert("Error deleting event, please try again");
 				console.error(error);
@@ -470,10 +489,23 @@ const EventSubmit = ({ navigation }) => {
 		const documentFiles = files.filter(
 			(file) => !file.type.startsWith("image/")
 		);
+		console.log(documentFiles);
 		const handleDelete = (fileToDelete: FileUpload) => {
 			console.log("Deleting file:", fileToDelete.name); // Debug log
-			setFiles((currentFiles) =>
-				currentFiles.filter((file) => file.uri !== fileToDelete.uri)
+			if (isEditing) {
+				setDeletionQueue((prev) => [...prev, fileToDelete.id]);
+			} else {
+				setFiles((currentFiles) =>
+					currentFiles.filter(
+						(file) => file.name !== fileToDelete.name
+					)
+				);
+			}
+		};
+
+		const undoDelete = (fileToUndo: FileUpload) => {
+			setDeletionQueue((prev) =>
+				prev.filter((id) => id !== fileToUndo.id)
 			);
 		};
 
@@ -487,23 +519,54 @@ const EventSubmit = ({ navigation }) => {
 								key={file.uri}
 								style={styles.thumbnailContainer}
 							>
-								<Image
-									source={{ uri: file.uri }}
+								<ImageBackground
+									source={{ uri: file.url || file.uri }}
 									style={styles.thumbnail}
-									resizeMode="cover"
-								/>
-								<TouchableOpacity
-									onPress={() => handleDelete(file)}
-									style={styles.deleteButton}
 								>
-									<View style={styles.deleteButtonCircle}>
-										<Ionicons
-											name="close-circle"
-											size={24}
-											color="red"
-										/>
-									</View>
-								</TouchableOpacity>
+									{deletionQueue.includes(file.id) ? (
+										<View
+											style={
+												styles.thumbnailDeleteOverlay
+											}
+										>
+											<TouchableHighlight
+												underlayColor={"transparent"}
+												onPress={() => undoDelete(file)}
+												style={styles.fileDeleteButton}
+											>
+												<View
+													style={
+														styles.deleteButtonCircle
+													}
+												>
+													<Ionicons
+														name="arrow-undo-circle"
+														size={24}
+														color="red"
+													/>
+												</View>
+											</TouchableHighlight>
+										</View>
+									) : (
+										<TouchableHighlight
+											underlayColor={"transparent"}
+											onPress={() => handleDelete(file)}
+											style={styles.fileDeleteButton}
+										>
+											<View
+												style={
+													styles.deleteButtonCircle
+												}
+											>
+												<Ionicons
+													name="close-circle"
+													size={24}
+													color="red"
+												/>
+											</View>
+										</TouchableHighlight>
+									)}
+								</ImageBackground>
 							</View>
 						))}
 					</View>
@@ -513,37 +576,60 @@ const EventSubmit = ({ navigation }) => {
 				{documentFiles.length > 0 && (
 					<View style={styles.documentList}>
 						{documentFiles.map((file, index) => (
-							<View key={index} style={styles.documentItem}>
-								<Ionicons
-									name="document-outline"
-									size={24}
-									color="#555"
-									style={styles.documentIcon}
-								/>
-								<Text
-									numberOfLines={1}
-									style={styles.documentFilename}
-								>
-									{file.name}
-								</Text>
-								<TouchableOpacity
-									onPress={() => {
-										setFiles((prev) =>
-											prev.filter(
-												(_, i) =>
-													prev[i].uri !== file.uri
-											)
-										);
-									}}
-									style={styles.documentDeleteButton}
-								>
+							<>
+								<View key={index} style={styles.documentItem}>
 									<Ionicons
-										name="close-circle"
+										name="document-outline"
 										size={24}
-										color="red"
+										color="#555"
+										style={styles.documentIcon}
 									/>
-								</TouchableOpacity>
-							</View>
+									<Text
+										numberOfLines={1}
+										style={styles.documentFilename}
+									>
+										{file.name}
+									</Text>
+									{deletionQueue.includes(file.id) ? (
+										<>
+											<View
+												style={
+													styles.thumbnailDeleteOverlay
+												}
+											/>
+											<TouchableHighlight
+												underlayColor={"transparent"}
+												onPress={() => {
+													undoDelete(file);
+												}}
+												style={
+													styles.documentDeleteButton
+												}
+											>
+												<Ionicons
+													name="arrow-undo-circle"
+													size={24}
+													color="red"
+												/>
+											</TouchableHighlight>
+										</>
+									) : (
+										<TouchableHighlight
+											underlayColor={"transparent"}
+											onPress={() => {
+												handleDelete(file);
+											}}
+											style={styles.documentDeleteButton}
+										>
+											<Ionicons
+												name="close-circle"
+												size={24}
+												color="red"
+											/>
+										</TouchableHighlight>
+									)}
+								</View>
+							</>
 						))}
 					</View>
 				)}
@@ -640,19 +726,28 @@ const EventSubmit = ({ navigation }) => {
 					{locations
 						? Object.keys(locations).map((address, index) => (
 								<>
-									<View style={{ marginBottom: 10 }}>
-										<View
-											key={index}
-											style={styles.locationContainer}
+									<View
+										key={index}
+										style={styles.locationContainer}
+									>
+										<Text
+											style={[
+												styles.label,
+												{
+													flex: 1,
+													fontSize: 14,
+													marginRight: 10,
+													flexWrap: "wrap",
+												},
+											]}
 										>
-											<Text
-												style={[
-													styles.label,
-													{ flex: 1 },
-												]}
-											>
-												{address}
-											</Text>
+											{address}
+										</Text>
+										<View
+											style={
+												styles.locationButtonContainer
+											}
+										>
 											<TouchableOpacity
 												onPress={() => {
 													Alert.prompt(
@@ -717,24 +812,24 @@ const EventSubmit = ({ navigation }) => {
 												/>
 											</TouchableOpacity>
 										</View>
-										<View
-											key={address}
-											style={{ marginTop: -5 }}
-										>
-											{locations[address].label && (
-												<Text
-													style={[
-														styles.label,
-														{
-															flex: 1,
-															fontSize: 14,
-														},
-													]}
-												>
-													"{locations[address].label}"
-												</Text>
-											)}
-										</View>
+									</View>
+									<View
+										key={address}
+										style={{ marginTop: -5 }}
+									>
+										{locations[address].label && (
+											<Text
+												style={[
+													styles.label,
+													{
+														flex: 1,
+														fontSize: 14,
+													},
+												]}
+											>
+												"{locations[address].label}"
+											</Text>
+										)}
 									</View>
 								</>
 						  ))
@@ -941,7 +1036,7 @@ const EventSubmit = ({ navigation }) => {
 						<Text style={styles.submitButtonText}>Delete</Text>
 					</TouchableOpacity>
 				)}
-				{isLoading && <LoadingScreen />}
+				{isLoading && <ActivityIndicator size="large" color="#555" />}
 			</KeyboardAwareScrollView>
 		</SafeAreaView>
 	);
@@ -972,8 +1067,15 @@ const styles = StyleSheet.create({
 	},
 	locationContainer: {
 		flexDirection: "row",
-		alignItems: "center",
+		alignItems: "flex-start",
 		gap: 10,
+		paddingTop: 10,
+	},
+	locationButtonContainer: {
+		flexDirection: "row",
+		minWidth: 80,
+		justifyContent: "flex-end",
+		gap: 8,
 	},
 	checkboxContainer: {
 		flexDirection: "row",
@@ -1137,7 +1239,7 @@ const styles = StyleSheet.create({
 		flexDirection: "row",
 		flexWrap: "wrap",
 		gap: 10,
-		marginBottom: 30,
+		marginBottom: 10,
 		paddingBottom: 20,
 	},
 	thumbnailContainer: {
@@ -1187,7 +1289,7 @@ const styles = StyleSheet.create({
 		borderBottomRightRadius: 8,
 	},
 	documentList: {
-		marginTop: 10,
+		marginTop: 0,
 	},
 	documentItem: {
 		flexDirection: "row",
@@ -1216,6 +1318,15 @@ const styles = StyleSheet.create({
 		zIndex: 100,
 		elevation: 3,
 		marginTop: 10,
+	},
+	thumbnailDeleteOverlay: {
+		position: "absolute",
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
+		backgroundColor: "rgba(0, 0, 0, 0.5)",
+		borderRadius: 8,
 	},
 });
 

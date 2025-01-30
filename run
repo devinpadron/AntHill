@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // Use the command "node run" to run this script
-
+// This script will delete the node_modules, package-lock.json, ios, android, and .expo directories, then run npm install, npx expo prebuild, and npx expo run with the specified platform (ios or android).
 
 const { spawn } = require("child_process");
 const fs = require("fs");
@@ -11,7 +11,7 @@ const path = require("path");
 const deletePath = (pathToDelete) => {
 	if (fs.existsSync(pathToDelete)) {
 		if (fs.lstatSync(pathToDelete).isDirectory()) {
-			fs.rmdirSync(pathToDelete, { recursive: true });
+			fs.rmSync(pathToDelete, { recursive: true });
 		} else {
 			fs.unlinkSync(pathToDelete);
 		}
@@ -46,6 +46,19 @@ const runCommand = (command, args) => {
 // Main function
 const main = async () => {
 	try {
+		// Get platform from command line arguments
+		const platform = process.argv[2];
+		if (
+			platform !== "ios" &&
+			platform !== "android" &&
+			platform !== undefined
+		) {
+			console.error(
+				"Invalid platform. Please specify 'ios', 'android', or leave it blank."
+			);
+			return;
+		}
+
 		// Delete node_modules/
 		deletePath(path.join(__dirname, "node_modules"));
 
@@ -69,9 +82,14 @@ const main = async () => {
 		console.log("Running: npx expo prebuild");
 		await runCommand("npx", ["expo", "prebuild"]);
 
-		// Run npx expo run
-		console.log("Running: npx expo run");
-		await runCommand("npx", ["expo", "run"]);
+		// Run npx expo run with optional platform
+		if (platform === "ios" || platform === "android") {
+			console.log(`Running: npx expo run:${platform}`);
+			await runCommand("npx", ["expo", `run:${platform}`]);
+		} else {
+			console.log("Running: npx expo run");
+			await runCommand("npx", ["expo", "run"]);
+		}
 	} catch (error) {
 		console.error("Script failed:", error);
 	}
