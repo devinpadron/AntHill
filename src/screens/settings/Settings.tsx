@@ -4,12 +4,13 @@ import {
 	Text,
 	StyleSheet,
 	SafeAreaView,
-	TouchableOpacity,
 	StatusBar,
 	Alert,
 } from "react-native";
+import { TouchableOpacity } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
-import { getUserData, signOut } from "../../controllers/auth/authController";
+import { signOut } from "../../controllers/authController";
+import { subscribeCurrentUser } from "../../controllers/userController";
 
 const Settings = ({ navigation }: any) => {
 	const [isAdmin, setIsAdmin] = React.useState(false);
@@ -35,16 +36,14 @@ const Settings = ({ navigation }: any) => {
 	);
 
 	useEffect(() => {
-		const fetchUserData = async () => {
-			const userData = await getUserData();
+		const subscriber = subscribeCurrentUser((user) => {
+			const userData = user.data();
 			if (userData) {
-				setIsAdmin(
-					userData.privilege === "Admin" ||
-						userData.privilege === "Owner"
-				);
+				const privilege = userData.companies[userData.loggedInCompany];
+				setIsAdmin(privilege === "Admin" || privilege === "Owner");
 			}
-		};
-		fetchUserData();
+		});
+		return () => subscriber();
 	}, []);
 
 	const pushProfile = () => {
@@ -52,7 +51,7 @@ const Settings = ({ navigation }: any) => {
 	};
 
 	const pushEventSubmit = () => {
-		navigation.push("EventSubmit");
+		navigation.navigate("EventSubmit", { event: null });
 	};
 
 	const pushEmployeeList = () => {
@@ -79,11 +78,7 @@ const Settings = ({ navigation }: any) => {
 		<SafeAreaView style={styles.container}>
 			<StatusBar barStyle="dark-content" />
 			<View style={styles.header}>
-				<TouchableOpacity>
-					<Ionicons name="chevron-back" size={28} color="#000" />
-				</TouchableOpacity>
 				<Text style={styles.headerTitle}>Settings</Text>
-				<View style={{ width: 28 }} />
 			</View>
 
 			<View style={styles.section}>
@@ -119,13 +114,12 @@ const styles = StyleSheet.create({
 		backgroundColor: "#fff",
 	},
 	header: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		paddingHorizontal: 16,
-		paddingVertical: 12,
+		display: "flex",
+		paddingTop: 10,
+		paddingBottom: 16,
 		borderBottomWidth: 1,
 		borderBottomColor: "#e0e0e0",
+		justifyContent: "center",
 	},
 	headerTitle: {
 		fontSize: 20,

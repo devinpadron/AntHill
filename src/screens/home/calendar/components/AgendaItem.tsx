@@ -1,12 +1,18 @@
 import isEmpty from "lodash/isEmpty";
 import { useCallback, memo } from "react";
-import { StyleSheet, Alert, View, Text, TouchableOpacity } from "react-native";
-
-/*
-  TODO:
-  - Add functionality for AgendaItem button press
-  - Add functionality for the 'More Info' button.
-*/
+import {
+	StyleSheet,
+	View,
+	Text,
+	TouchableOpacity,
+	Linking,
+	Alert,
+} from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
+import { Ionicons } from "@expo/vector-icons";
+import { AntHill } from "../../../../global/colors";
+import moment from "moment";
 
 /* An AgendaItem component that is part of the AgendaList that displays information such as:
   - event title
@@ -14,21 +20,74 @@ import { StyleSheet, Alert, View, Text, TouchableOpacity } from "react-native";
   - event duration
 */
 
+export type RootStackParamList = {
+	Details: {
+		uid: string;
+	};
+};
+
 interface ItemProps {
 	item: any;
 }
 
 const AgendaItem = (props: ItemProps) => {
 	const { item } = props;
-
-	const buttonPressed = useCallback(() => {
-		Alert.alert("More Info!");
-	}, []);
+	const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
 	const itemPressed = useCallback(() => {
-		Alert.alert(item.title);
-	}, []);
+		navigation.navigate("Details", { uid: item.eventUID });
+	}, [item, navigation]);
 
+	const handleFilePress = async (file: {
+		url: string;
+		type: string;
+		filename: string;
+	}) => {
+		try {
+			const supported = await Linking.canOpenURL(file.url);
+
+			if (supported) {
+				await Linking.openURL(file.url);
+			} else {
+				Alert.alert(
+					"Cannot Open File",
+					"Your device doesn't support opening this type of file"
+				);
+			}
+		} catch (error) {
+			Alert.alert("Error", "There was a problem opening the file");
+		}
+	};
+	/*
+	const renderAttachments = () => {
+		if (!item.attachments || item.attachments.length === 0) return null;
+
+		return (
+			<View style={styles.attachmentsContainer}>
+				{item.attachments.map((file, index) => (
+					<TouchableOpacity
+						key={index}
+						style={styles.attachmentItem}
+						onPress={() => handleFilePress(file)}
+					>
+						<Ionicons
+							name={
+								file.type.startsWith("image/")
+									? "image-outline"
+									: "document-outline"
+							}
+							size={20}
+							color="#666"
+						/>
+						<Text numberOfLines={1} style={styles.attachmentText}>
+							{file.filename}
+						</Text>
+					</TouchableOpacity>
+				))}
+			</View>
+		);
+	};
+*/
 	if (isEmpty(item)) {
 		return (
 			<View style={styles.emptyItem}>
@@ -38,16 +97,19 @@ const AgendaItem = (props: ItemProps) => {
 			</View>
 		);
 	}
+
 	return (
 		<TouchableOpacity onPress={itemPressed} style={styles.item}>
 			<View style={styles.timeContainer}>
 				<View style={styles.timeRow}>
 					<Text style={styles.timeText}>
-						{item.startTime || "No start time set"}
-						{item.endTime !== "" && (
+						{item.startTime
+							? moment(item.startTime, "HH:mm").format("h:mma")
+							: "All Day"}
+						{item.endTime && (
 							<Text>
 								<Text style={styles.timeSeparator}> - </Text>
-								{item.endTime}
+								{moment(item.endTime, "HH:mm").format("h:mma")}
 							</Text>
 						)}
 					</Text>
@@ -60,14 +122,6 @@ const AgendaItem = (props: ItemProps) => {
 				<Text style={styles.title} numberOfLines={1}>
 					{item.title}
 				</Text>
-			</View>
-			<View style={styles.buttonContainer}>
-				<TouchableOpacity
-					onPress={buttonPressed}
-					style={styles.infoButton}
-				>
-					<Text style={styles.infoButtonText}>Info</Text>
-				</TouchableOpacity>
 			</View>
 		</TouchableOpacity>
 	);
@@ -85,7 +139,7 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 	},
 	timeContainer: {
-		width: 100,
+		maxWidth: 150,
 		marginRight: 16,
 	},
 	timeRow: {
@@ -112,7 +166,7 @@ const styles = StyleSheet.create({
 	title: {
 		fontSize: 16,
 		fontWeight: "500",
-		color: "#333",
+		color: AntHill.Black,
 		textAlign: "center",
 	},
 	buttonContainer: {
@@ -140,5 +194,26 @@ const styles = StyleSheet.create({
 	emptyItemText: {
 		fontSize: 16,
 		color: "#888",
+	},
+	attachmentsContainer: {
+		marginTop: 8,
+		flexDirection: "row",
+		flexWrap: "wrap",
+		gap: 8,
+		justifyContent: "center",
+	},
+	attachmentItem: {
+		flexDirection: "row",
+		alignItems: "center",
+		backgroundColor: "#f5f5f5",
+		padding: 6,
+		borderRadius: 4,
+		maxWidth: 150,
+	},
+	attachmentText: {
+		fontSize: 12,
+		color: "#666",
+		marginLeft: 4,
+		flex: 1,
 	},
 });

@@ -6,17 +6,18 @@ import {
 	StyleSheet,
 	Alert,
 	ActivityIndicator,
+	View,
 } from "react-native";
 import auth from "@react-native-firebase/auth";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { capitalize } from "lodash";
-import { addUser } from "../../controllers/data/userController";
+import { capitalize, lowerCase } from "lodash";
+import { addUser } from "../../controllers/userController";
 import {
 	addUserToCompany,
 	compareAccessCode,
-} from "../../controllers/data/companyController";
+} from "../../controllers/companyController";
 
-const SignUpPage = ({ navigation }: any) => {
+const SignUpPage = ({ navigation }) => {
 	const [firstName, setFirstName] = useState("");
 	const [lastName, setLastName] = useState("");
 	const [email, setEmail] = useState("");
@@ -24,6 +25,7 @@ const SignUpPage = ({ navigation }: any) => {
 	const [confPassword, setConfPassword] = useState("");
 	const [accessCode, setAccessCode] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
+	const [isSolo, setIsSolo] = useState(false);
 
 	const validateFields = () => {
 		if (!firstName.trim()) {
@@ -68,9 +70,11 @@ const SignUpPage = ({ navigation }: any) => {
 			return;
 		}
 		const company = await compareAccessCode(accessCode);
-		if (company == "" || company == null) {
-			Alert.alert("Invalid Access Code");
-			return;
+		if (!isSolo) {
+			if (company == "" || company == null) {
+				Alert.alert("Invalid Access Code");
+				return;
+			}
 		}
 		setIsLoading(true);
 		await auth()
@@ -81,16 +85,28 @@ const SignUpPage = ({ navigation }: any) => {
 					displayName:
 						capitalize(firstName) + " " + capitalize(lastName),
 				});
-				const userData = {
-					firstName: capitalize(firstName),
-					lastName: capitalize(lastName),
-					email: email,
-					loggedInCompany: company,
-					companies: [company],
-				};
-				await addUser(userData, user.uid);
-				await addUserToCompany(company, user.uid);
-				await user.sendEmailVerification();
+				if (isSolo) {
+					const userData = {
+						firstName: capitalize(firstName),
+						lastName: capitalize(lastName),
+						email: lowerCase(email),
+						loggedInCompany: user.uid,
+						companies: { [user.uid]: "Owner" },
+					};
+					await addUser(userData, user.uid);
+					await addUserToCompany(user.uid, user.uid, true);
+				} else {
+					const userData = {
+						firstName: capitalize(firstName),
+						lastName: capitalize(lastName),
+						email: lowerCase(email),
+						loggedInCompany: company,
+						companies: { [company]: "User" },
+					};
+					await addUser(userData, user.uid);
+					await addUserToCompany(company, user.uid);
+				}
+				user.sendEmailVerification();
 				console.log("User account created & signed in!");
 			})
 			.catch((error) => {
@@ -153,14 +169,35 @@ const SignUpPage = ({ navigation }: any) => {
 				autoCapitalize="none"
 				secureTextEntry={true}
 			/>
-			<TextInput
-				style={styles.textInput}
-				placeholder="Company Code:"
-				onChangeText={setAccessCode}
-				value={accessCode}
-				autoCapitalize="none"
-				autoCorrect={false}
-			/>
+			{!isSolo && (
+				<TextInput
+					style={styles.textInput}
+					placeholder="Company Code:"
+					onChangeText={setAccessCode}
+					value={accessCode}
+					autoCapitalize="none"
+					autoCorrect={false}
+				/>
+			)}
+
+			<TouchableOpacity
+				style={styles.toggleContainer}
+				onPress={() => {
+					setIsSolo(!isSolo);
+					setAccessCode("");
+				}}
+			>
+				<View style={[styles.toggle, isSolo && styles.toggleActive]}>
+					<View
+						style={[
+							styles.toggleButton,
+							isSolo && styles.toggleButtonActive,
+						]}
+					/>
+				</View>
+				<Text style={styles.toggleText}>Personal Account</Text>
+			</TouchableOpacity>
+
 			<TouchableOpacity style={styles.roundButton} onPress={handleSignUp}>
 				<Text style={{ color: "white" }}>Sign Up</Text>
 			</TouchableOpacity>
@@ -197,5 +234,34 @@ const styles = StyleSheet.create({
 		backgroundColor: "#1b2c3a",
 		borderRadius: 20,
 		height: 30,
+	},
+	toggleContainer: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginVertical: 10,
+		paddingHorizontal: 20,
+	},
+	toggle: {
+		width: 50,
+		height: 30,
+		borderRadius: 15,
+		backgroundColor: "#e0e0e0",
+		padding: 2,
+	},
+	toggleActive: {
+		backgroundColor: "#4CAF50",
+	},
+	toggleButton: {
+		width: 26,
+		height: 26,
+		borderRadius: 13,
+		backgroundColor: "white",
+	},
+	toggleButtonActive: {
+		transform: [{ translateX: 20 }],
+	},
+	toggleText: {
+		marginLeft: 10,
+		fontSize: 16,
 	},
 });

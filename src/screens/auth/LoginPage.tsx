@@ -8,14 +8,14 @@ import {
 	Alert,
 	Platform,
 } from "react-native";
-import { sendResetPassword } from "../../controllers/auth/authController";
+import { sendResetPassword } from "../../controllers/authController";
 import prompt from "react-native-prompt-android";
 import { SafeAreaView } from "react-native-safe-area-context";
 import auth from "@react-native-firebase/auth";
-import { getUser, updateUser } from "../../controllers/data/userController";
+import { getUser, updateUser } from "../../controllers/userController";
 import { AntHill } from "../../global/colors";
 
-const LoginPage = ({ navigation }: any) => {
+const LoginPage = ({ navigation }) => {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 
@@ -180,7 +180,7 @@ export default LoginPage;
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: AntHill.White,
+		backgroundColor: "white",
 		alignItems: "center",
 		justifyContent: "center", // Center content vertically
 	},

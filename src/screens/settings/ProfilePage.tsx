@@ -1,41 +1,54 @@
 import React, { useEffect, useState } from "react";
-import {
-	View,
-	Text,
-	StyleSheet,
-	TouchableOpacity,
-	Alert,
-	Platform,
-} from "react-native";
+import { View, Text, StyleSheet, Alert, Platform } from "react-native";
 import { Dropdown } from "react-native-element-dropdown";
+import { TouchableOpacity } from "react-native-gesture-handler";
 import {
 	reAuth,
 	signOut,
 	sendResetPassword,
-	getUserData,
 	deleteCurrentUser,
-} from "../../controllers/auth/authController";
+} from "../../controllers/authController";
 import { SafeAreaView } from "react-native-safe-area-context";
 import LoadingScreen from "../LoadingScreen";
 import prompt from "react-native-prompt-android";
 import auth from "@react-native-firebase/auth";
-import { deleteUser } from "../../controllers/data/userController";
+import { Ionicons } from "@expo/vector-icons";
+import {
+	deleteUser,
+	subscribeCurrentUser,
+} from "../../controllers/userController";
+import {
+	deleteSoloCompany,
+	isPersonal,
+} from "../../controllers/companyController";
 
-const ProfilePage = () => {
+const ProfilePage = ({ navigation }) => {
 	const [isLoading, setIsLoading] = useState(true);
 	const [userData, setData] = useState(null);
+	const [isSolo, setIsSolo] = useState(false);
+	const [userId, setUserId] = useState("");
+
 	useEffect(() => {
-		const fetchUserData = async () => {
-			setIsLoading(true);
-			const userData = await getUserData();
+		const subscriber = subscribeCurrentUser((user) => {
+			const userData = user.data();
 			if (userData) {
-				// Fetch user data from the server
 				setData(userData);
+				setUserId(user.id);
 			}
-			setIsLoading(false);
-		};
-		fetchUserData();
+		});
+		return () => subscriber();
 	}, []);
+
+	useEffect(() => {
+		const fillData = async () => {
+			if (userData) {
+				const result = await isPersonal(userData.loggedInCompany);
+				setIsSolo(result);
+				setIsLoading(false);
+			}
+		};
+		fillData();
+	}, [userData]);
 
 	const handleCompanyChange = async (selectedCompany: any) => {
 		console.log("Company change to " + selectedCompany);
@@ -187,8 +200,12 @@ const ProfilePage = () => {
 	};
 
 	const handleDeleteAccount = () => {
+		var title = "Delete " + userData.loggedInCompany + " Data?";
+		if (isSolo) {
+			title = "Delete Account?";
+		}
 		Alert.alert(
-			"Delete " + userData.loggedInCompany + " Data?",
+			title,
 			"Are you sure you want to delete your company account? This action cannot be undone.",
 			[
 				{ text: "Cancel", style: "cancel" },
@@ -206,7 +223,11 @@ const ProfilePage = () => {
 							);
 							return;
 						}
-						await deleteUser(userData.id);
+
+						await deleteUser(userId);
+						if (isSolo) {
+							await deleteSoloCompany(userData.loggedInCompany);
+						}
 						if (userData.companies.length > 1) {
 							//TODO: Implement switch company logic here
 						} else {
@@ -221,9 +242,23 @@ const ProfilePage = () => {
 	return !isLoading ? (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.content}>
-				<Text style={styles.header}>
-					{userData.firstName + " " + userData.lastName}
-				</Text>
+				<View style={styles.header}>
+					<TouchableOpacity
+						containerStyle={{
+							position: "absolute",
+							left: 20,
+							zIndex: 1,
+						}}
+						onPress={() => {
+							navigation.goBack();
+						}}
+					>
+						<Ionicons name="chevron-back" size={28} color="#000" />
+					</TouchableOpacity>
+					<Text style={styles.headerTitle}>
+						{userData.firstName + " " + userData.lastName}
+					</Text>
+				</View>
 
 				<View style={styles.section}>
 					<Text style={styles.label}>Email</Text>
@@ -254,7 +289,7 @@ const ProfilePage = () => {
 						/>
 					) : (
 						<Text style={styles.value}>
-							{userData.loggedInCompany}
+							{isSolo ? "Personal" : userData.loggedInCompany}
 						</Text>
 					)}
 				</View>
@@ -291,9 +326,13 @@ const styles = StyleSheet.create({
 		backgroundColor: "#fff",
 	},
 	header: {
+		display: "flex",
+		marginBottom: 24,
+		justifyContent: "center",
+	},
+	headerTitle: {
 		fontSize: 24,
 		fontWeight: "bold",
-		marginBottom: 24,
 		textAlign: "center",
 	},
 	section: {

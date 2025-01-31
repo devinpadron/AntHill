@@ -1,6 +1,6 @@
 import { MarkedDates } from "react-native-calendars/src/types";
-import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
-import { getAllEvents } from "../../../../controllers/data/eventController";
+import { doc, FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
+import { getAllEvents } from "../../../../controllers/eventController";
 
 /* An AgendaItem controller that conatains:
   - An AgendaItemData interface that provides the structure of AgendaItem data
@@ -13,13 +13,27 @@ import { getAllEvents } from "../../../../controllers/data/eventController";
 export interface AgendaItemData {
 	date: string;
 	data: [
-		{ title: string; startTime: string; endTime: string; duration: string }
+		{
+			title: string;
+			startTime: string;
+			endTime: string;
+			duration: string;
+			eventUID: string;
+			attachments?: {
+				filename: string;
+				url: string;
+				type: string;
+				path: string;
+			}[];
+		}
 	];
 }
 
 function createAgendaItem(
 	docRef: FirebaseFirestoreTypes.DocumentData
 ): AgendaItemData {
+	const id = docRef.id;
+	docRef = docRef.data();
 	return {
 		date: docRef.date,
 		data: [
@@ -28,17 +42,15 @@ function createAgendaItem(
 				startTime: docRef.startTime,
 				endTime: docRef.endTime,
 				duration: docRef.duration,
+				eventUID: id,
+				attachments: docRef.attachments || [],
 			},
 		],
 	};
 }
 
-export async function getAgendaItems(
-	company: string
-): Promise<AgendaItemData[]> {
+export function getAgendaItems(events: any[]): AgendaItemData[] {
 	const res: AgendaItemData[] = [];
-	const events = await getAllEvents(company);
-
 	events.forEach((event) => {
 		res.push(createAgendaItem(event));
 	});

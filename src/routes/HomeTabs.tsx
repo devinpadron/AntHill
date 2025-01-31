@@ -1,6 +1,6 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import Calendar from "../screens/home/calendar/Calendar";
+import CalendarStack from "./CalendarStack";
 import SettingStack from "./SettingStack";
 
 const Tab = createBottomTabNavigator();
@@ -10,7 +10,7 @@ const HomeTabs = () => {
 		<Tab.Navigator>
 			<Tab.Screen
 				name="Calendar"
-				component={Calendar}
+				component={CalendarStack}
 				options={{ headerShown: false }}
 			/>
 			<Tab.Screen

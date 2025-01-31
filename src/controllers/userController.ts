@@ -1,4 +1,6 @@
-import db from "../../../firebaseConfig";
+import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
+import db from "../../index";
+import auth from "@react-native-firebase/auth";
 
 /* A UserController that contains:
   - A user interface that provides the structure of user data
@@ -13,7 +15,9 @@ export interface User {
 	lastName: string;
 	email: string;
 	loggedInCompany: string;
-	companies: string[];
+	companies: {
+		[companyId: string]: string;
+	};
 }
 
 export async function getUser(userID: string) {
@@ -35,6 +39,31 @@ export async function getUser(userID: string) {
 	} catch (e) {
 		console.error("Error getting user", e);
 	}
+}
+
+export async function getUserPrivilege(userID: string, company: string) {
+	try {
+		const userEntry = await db.collection("Users").doc(userID).get();
+		if (userEntry.exists) {
+			return userEntry.data().companies[company];
+		} else {
+			return null;
+		}
+	} catch (e) {
+		console.log("Error getting user privilege", e);
+		return null;
+	}
+}
+
+export function subscribeCurrentUser(
+	onSnap: (
+		snapshot: FirebaseFirestoreTypes.DocumentSnapshot<FirebaseFirestoreTypes.DocumentData>
+	) => void
+) {
+	return db
+		.collection("Users")
+		.doc(auth().currentUser.uid)
+		.onSnapshot(onSnap);
 }
 
 export async function deleteUser(userID: string) {
