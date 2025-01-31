@@ -20,7 +20,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { TouchableOpacity } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 import moment from "moment";
-import MapView, { Callout, Marker } from "react-native-maps";
+import MapView, { Marker } from "react-native-maps";
 import { getUser } from "../../../controllers/userController";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { getEventAttachments } from "../../../controllers/attachmentController";
@@ -100,6 +100,7 @@ const EventDetails = ({ navigation }) => {
 		loadAttachments();
 
 		const getWorkerList = async () => {
+			setWorkerList("");
 			const assignedWorkers = event.assignedWorkers;
 			let workerList = "";
 			for (let i = 0; i < assignedWorkers.length; i++) {
