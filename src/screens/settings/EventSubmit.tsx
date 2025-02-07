@@ -683,6 +683,7 @@ const EventSubmit = ({ navigation }) => {
 			<KeyboardAwareScrollView
 				contentContainerStyle={styles.scrollContainer}
 				nestedScrollEnabled={true}
+				keyboardShouldPersistTaps="handled"
 			>
 				{/* Header */}
 				<View style={styles.header}>
@@ -1257,7 +1258,7 @@ const styles = StyleSheet.create({
 		paddingBottom: 20,
 	},
 	thumbnailContainer: {
-		width: (Dimensions.get("window").width - 60) / 3, // 3 columns with padding
+		width: "30%", // 3 columns with padding
 		aspectRatio: 1,
 		borderRadius: 8,
 		backgroundColor: "#f5f5f5",

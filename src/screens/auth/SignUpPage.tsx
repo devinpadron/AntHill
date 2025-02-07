@@ -106,7 +106,7 @@ const SignUpPage = ({ navigation }) => {
 					await addUser(userData, user.uid);
 					await addUserToCompany(company, user.uid);
 				}
-				user.sendEmailVerification();
+				await user.sendEmailVerification();
 				console.log("User account created & signed in!");
 			})
 			.catch((error) => {
@@ -118,7 +118,7 @@ const SignUpPage = ({ navigation }) => {
 						Alert.alert("That email address is invalid!");
 						break;
 					default:
-						Alert.alert("Error during sign up, please try again");
+						Alert.alert(error.message);
 						console.error(error);
 				}
 			});

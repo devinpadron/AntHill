@@ -68,7 +68,7 @@ const AppNavigator = () => {
 							text: "Resend Email",
 							onPress: async () => {
 								try {
-									const user = currentUser;
+									const user = auth().currentUser;
 									if (user) {
 										await user.sendEmailVerification();
 										Alert.alert(
@@ -82,8 +82,8 @@ const AppNavigator = () => {
 										error
 									);
 									Alert.alert(
-										"Error",
-										"Failed to send verification email. Please try again."
+										"Failed to send verification email. Please try again.",
+										error.message
 									);
 								}
 								signOut();
