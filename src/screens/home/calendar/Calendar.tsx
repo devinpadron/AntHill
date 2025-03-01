@@ -67,7 +67,7 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 	const [userId, setUserId] = useState<string>("");
 	const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
 	const [userPrivilege, setUserPrivilege] = useState<string>("");
-	const [filterType, setFilterType] = useState<FilterType>("my");
+	const [filterType, setFilterType] = useState<FilterType>("all");
 	const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
 	const [availableWorkers, setAvailableWorkers] = useState([]);
 	const [openSelect, setOpenSelect] = useState(false);
