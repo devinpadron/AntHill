@@ -176,7 +176,6 @@ const EventSubmit = ({ navigation }) => {
 		const checkPersonal = async () => {
 			if (!currentCompany) return;
 			const result = await isPersonal(currentCompany);
-			console.log(result);
 			setPersonal(result);
 		};
 		checkPersonal();
