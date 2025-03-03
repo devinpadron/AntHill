@@ -1,5 +1,5 @@
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
-import db from "../../index";
+import db from "../global/firestore";
 import { FileUpload } from "../screens/home/calendar/EventSubmit";
 import storage from "@react-native-firebase/storage";
 
