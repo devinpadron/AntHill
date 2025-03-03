@@ -361,7 +361,7 @@ const EventSubmit = ({ navigation }) => {
 		const validatedLocations = validateLocations(locations);
 
 		const initialEventData: Event = {
-			title: capitalize(title),
+			title: title,
 			date: moment(date).format("YYYY-MM-DD"),
 			startTime: !allDay ? moment(startTime).format("HH:mm") : null,
 			endTime: hasEndTime ? moment(endTime).format("HH:mm") : null,
@@ -513,7 +513,6 @@ const EventSubmit = ({ navigation }) => {
 		const documentFiles = files.filter(
 			(file) => !file.type.startsWith("image/")
 		);
-		console.log(documentFiles);
 		const handleDelete = (fileToDelete: FileUpload) => {
 			console.log("Deleting file:", fileToDelete.name); // Debug log
 			if (isEditing) {
