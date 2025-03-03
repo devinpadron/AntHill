@@ -1,5 +1,5 @@
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
-import { FileUpload } from "../screens/settings/EventSubmit";
+import { FileUpload } from "../screens/home/calendar/EventSubmit";
 import db from "../../index";
 import {
 	addAttachments,
