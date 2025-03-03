@@ -281,50 +281,56 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 		<GestureHandlerRootView style={styles.rootView}>
 			<View style={styles.container}>
 				<SafeAreaView style={styles.safeArea}>
-					<CalendarProvider
-						date={selectedDate}
-						showTodayButton={true}
-						todayButtonStyle={styles.todayButton}
-					>
-						<View style={styles.calendarContainer}>
-							{weekView ? (
-								<WeekCalendar
-									firstDay={1}
-									markedDates={markedDates}
-								/>
-							) : (
-								<ExpandableCalendar
-									horizontal={true}
-									pagingEnabled={true}
-									initialPosition={
-										ExpandableCalendar.positions.OPEN
-									}
-									calendarStyle={styles.calendar}
-									theme={theme.current}
-									firstDay={1}
-									markedDates={markedDates}
-									leftArrowImageSource={leftArrowIcon}
-									rightArrowImageSource={rightArrowIcon}
-									closeOnDayPress={false}
-									date={selectedDate}
-									onDayPress={(day) =>
-										setSelectedDate(day.dateString)
-									}
-								/>
-							)}
-						</View>
+					{user ? (
+						<CalendarProvider
+							date={selectedDate}
+							showTodayButton={true}
+							todayButtonStyle={styles.todayButton}
+						>
+							<View style={styles.calendarContainer}>
+								{weekView ? (
+									<WeekCalendar
+										firstDay={1}
+										markedDates={markedDates}
+									/>
+								) : (
+									<ExpandableCalendar
+										horizontal={true}
+										pagingEnabled={true}
+										initialPosition={
+											ExpandableCalendar.positions.OPEN
+										}
+										calendarStyle={styles.calendar}
+										theme={theme.current}
+										firstDay={1}
+										markedDates={markedDates}
+										leftArrowImageSource={leftArrowIcon}
+										rightArrowImageSource={rightArrowIcon}
+										closeOnDayPress={false}
+										date={selectedDate}
+										onDayPress={(day) =>
+											setSelectedDate(day.dateString)
+										}
+									/>
+								)}
+							</View>
 
-						<View style={styles.agendaContainer}>
-							<AgendaList
-								sections={sortedSections}
-								renderItem={renderItem}
-								sectionStyle={styles.section}
-								ListFooterComponent={
-									<View style={{ paddingVertical: 150 }} />
-								}
-							/>
-						</View>
-					</CalendarProvider>
+							<View style={styles.agendaContainer}>
+								<AgendaList
+									sections={sortedSections}
+									renderItem={renderItem}
+									sectionStyle={styles.section}
+									ListFooterComponent={
+										<View
+											style={{ paddingVertical: 150 }}
+										/>
+									}
+								/>
+							</View>
+						</CalendarProvider>
+					) : (
+						<LoadingScreen />
+					)}
 
 					<BottomSheet
 						ref={bottomSheetRef}
@@ -585,6 +591,7 @@ const styles = StyleSheet.create({
 	},
 	calendarContainer: {
 		position: "relative",
+		zIndex: 1000,
 	},
 	agendaContainer: {
 		flex: 1,
