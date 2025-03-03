@@ -10,9 +10,9 @@ import {
 	View,
 	Text,
 	TouchableOpacity,
-	ScrollView,
 	Animated,
 } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import {
 	ExpandableCalendar,
 	AgendaList,
@@ -21,7 +21,6 @@ import {
 } from "react-native-calendars";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { BottomSheetView } from "@gorhom/bottom-sheet";
-import { Filter } from "react-native-feather";
 import DropDownPicker from "react-native-dropdown-picker";
 import moment from "moment";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -43,6 +42,7 @@ import {
 import { subscribeEvents } from "../../../controllers/eventController";
 import { subscribeAllUsersInCompany } from "../../../controllers/companyController";
 import { LogBox } from "react-native";
+import { Filter, PlusCircle } from "react-native-feather";
 
 // Add this near the top of your file, after imports
 LogBox.ignoreLogs([
@@ -64,7 +64,10 @@ const getFilterStyle = (type: FilterType, currentFilter: FilterType) => ({
 	borderColor: type === currentFilter ? "#2089dc" : "#ccc",
 });
 
-const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
+const ExpandableCalendarScreen = ({
+	weekView,
+	navigation,
+}: CalendarProps & { navigation: any }) => {
 	const [agendaItems, setAgendaItems] = useState<AgendaItemData[]>([]);
 	const [selectedDate, setSelectedDate] = useState(today);
 	const [markedDates, setMarkedDates] = useState({});
@@ -270,8 +273,7 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 		return <AgendaItem item={item} />;
 	}, []);
 
-	const showFilterButton =
-		userPrivilege === "Admin" || userPrivilege === "Owner";
+	const isAdmin = userPrivilege === "Admin" || userPrivilege === "Owner";
 
 	if (isLoading) {
 		return <LoadingScreen />;
@@ -553,15 +555,43 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 						</BottomSheetView>
 					</BottomSheet>
 				</SafeAreaView>
-				{showFilterButton && (
-					<Animated.View style={{ opacity: fabOpacity }}>
-						<TouchableOpacity
-							style={styles.filterButton}
-							onPress={handleFilterPress}
+				{isAdmin && (
+					<>
+						<Animated.View
+							style={{ opacity: fabOpacity }}
+							pointerEvents={
+								isBottomSheetVisible ? "none" : "auto"
+							}
 						>
-							<Filter stroke="black" width={24} height={24} />
-						</TouchableOpacity>
-					</Animated.View>
+							<TouchableOpacity
+								style={styles.addEventButton}
+								onPress={() =>
+									navigation.navigate("EditEvent", {
+										event: null,
+									})
+								}
+							>
+								<PlusCircle
+									stroke="black"
+									width={24}
+									height={24}
+								/>
+							</TouchableOpacity>
+						</Animated.View>
+						<Animated.View
+							style={{ opacity: fabOpacity }}
+							pointerEvents={
+								isBottomSheetVisible ? "none" : "auto"
+							}
+						>
+							<TouchableOpacity
+								style={styles.filterButton}
+								onPress={handleFilterPress}
+							>
+								<Filter stroke="black" width={24} height={24} />
+							</TouchableOpacity>
+						</Animated.View>
+					</>
 				)}
 			</View>
 		</GestureHandlerRootView>
@@ -591,6 +621,7 @@ const styles = StyleSheet.create({
 	},
 	calendarContainer: {
 		position: "relative",
+		//height: 300,
 		zIndex: 1000,
 	},
 	agendaContainer: {
@@ -610,7 +641,7 @@ const styles = StyleSheet.create({
 	filterButton: {
 		position: "absolute",
 		bottom: 10,
-		right: 10,
+		right: 70, // Changed from right: 10 to position it to the left
 		zIndex: 999,
 		padding: 12,
 		backgroundColor: "white",
@@ -734,6 +765,20 @@ const styles = StyleSheet.create({
 	},
 	todayButton: {
 		bottom: 0,
+	},
+	addEventButton: {
+		position: "absolute",
+		bottom: 10,
+		right: 10, // Changed from right: 70 to position it on the right
+		zIndex: 999,
+		padding: 12,
+		backgroundColor: "white",
+		borderRadius: 30,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.25,
+		shadowRadius: 3.84,
+		elevation: 8,
 	},
 });
 

@@ -50,10 +50,6 @@ const Settings = ({ navigation }: any) => {
 		navigation.push("Profile");
 	};
 
-	const pushEventSubmit = () => {
-		navigation.navigate("EventSubmit", { event: null });
-	};
-
 	const pushEmployeeList = () => {
 		navigation.push("EmployeeList");
 	};
@@ -89,10 +85,6 @@ const Settings = ({ navigation }: any) => {
 			{isAdmin ? (
 				<View style={styles.section}>
 					<Text style={styles.sectionTitle}>ADMIN</Text>
-					<SettingsItem
-						title="Create New Event"
-						onPress={pushEventSubmit}
-					/>
 					<SettingsItem
 						title="Employee List"
 						onPress={pushEmployeeList}

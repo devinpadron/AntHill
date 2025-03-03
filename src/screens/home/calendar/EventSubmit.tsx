@@ -19,7 +19,6 @@ import {
 } from "react-native-google-places-autocomplete";
 import DatePicker from "react-native-date-picker";
 import { Ionicons } from "@expo/vector-icons";
-import { capitalize, set } from "lodash";
 import moment from "moment";
 import DropDownPicker from "react-native-dropdown-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -31,16 +30,16 @@ import {
 	deleteEvent,
 	subscribeEvent,
 	updateEvent,
-} from "../../controllers/eventController";
+} from "../../../controllers/eventController";
 import {
 	subscribeCurrentUser,
 	getUser,
 	User,
-} from "../../controllers/userController";
+} from "../../../controllers/userController";
 import {
 	isPersonal,
 	subscribeAllUsersInCompany,
-} from "../../controllers/companyController";
+} from "../../../controllers/companyController";
 import storage from "@react-native-firebase/storage";
 import { RouteProp, useRoute } from "@react-navigation/native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
@@ -48,7 +47,7 @@ import {
 	addAttachments,
 	deleteEventAttachments,
 	getEventAttachments,
-} from "../../controllers/attachmentController";
+} from "../../../controllers/attachmentController";
 import { StackActions } from "@react-navigation/native";
 
 export interface FileUpload {
@@ -601,8 +600,8 @@ const EventSubmit = ({ navigation }) => {
 				{documentFiles.length > 0 && (
 					<View style={styles.documentList}>
 						{documentFiles.map((file, index) => (
-							<>
-								<View key={index} style={styles.documentItem}>
+							<React.Fragment key={file.uri || `doc-${index}`}>
+								<View style={styles.documentItem}>
 									<Ionicons
 										name="document-outline"
 										size={24}
@@ -654,7 +653,7 @@ const EventSubmit = ({ navigation }) => {
 										</TouchableHighlight>
 									)}
 								</View>
-							</>
+							</React.Fragment>
 						))}
 					</View>
 				)}

@@ -25,7 +25,7 @@ import { getUser } from "../../../controllers/userController";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { subscribeEventAttachments } from "../../../controllers/attachmentController";
 import ImageView from "react-native-image-viewing";
-import { FileUpload } from "../../settings/EventSubmit";
+import { FileUpload } from "./EventSubmit";
 
 type RootStackParamList = {
 	EventDetails: {
