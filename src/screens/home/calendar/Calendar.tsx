@@ -42,6 +42,12 @@ import {
 } from "../../../controllers/userController";
 import { subscribeEvents } from "../../../controllers/eventController";
 import { subscribeAllUsersInCompany } from "../../../controllers/companyController";
+import { LogBox } from "react-native";
+
+// Add this near the top of your file, after imports
+LogBox.ignoreLogs([
+	"ExpandableCalendar: Support for defaultProps will be removed from function components",
+]);
 
 type CalendarProps = {
 	weekView?: any;
@@ -288,8 +294,8 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 								/>
 							) : (
 								<ExpandableCalendar
-									horizontal
-									pagingEnabled
+									horizontal={true}
+									pagingEnabled={true}
 									initialPosition={
 										ExpandableCalendar.positions.OPEN
 									}

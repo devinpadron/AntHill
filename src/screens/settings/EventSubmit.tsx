@@ -8,7 +8,6 @@ import {
 	StyleSheet,
 	Alert,
 	Platform,
-	Dimensions,
 	ImageBackground,
 	TouchableHighlight,
 	ActivityIndicator,
@@ -92,6 +91,7 @@ const EventSubmit = ({ navigation }) => {
 	const [editID, setEditID] = useState<string | null>(null);
 	const [deletionQueue, setDeletionQueue] = useState<string[]>([]);
 	const [personal, setPersonal] = useState(false);
+	const [uploadQueue, setUploadQueue] = useState<FileUpload[]>([]);
 
 	type Location = {
 		[address: string]: {
@@ -285,6 +285,7 @@ const EventSubmit = ({ navigation }) => {
 				type: file.type,
 			}));
 
+			setUploadQueue((prev) => [...prev, ...newFiles]);
 			setFiles((prev) => [...prev, ...newFiles]);
 		} catch (err) {
 			if (!DocumentPicker.isCancel(err)) {
@@ -313,6 +314,7 @@ const EventSubmit = ({ navigation }) => {
 						type: asset.type || "image/jpeg",
 					}));
 
+				setUploadQueue((prev) => [...prev, ...newFiles]);
 				setFiles((prev) => [...prev, ...newFiles]);
 			}
 		} catch (err) {
@@ -338,6 +340,24 @@ const EventSubmit = ({ navigation }) => {
 			return;
 		}
 
+		const upload = async (id) => {
+			const uploadedFiles: FileUpload[] = [];
+			for (const file of uploadQueue) {
+				try {
+					const uploadedFile = await uploadToFirebase(file, id);
+					uploadedFiles.push(uploadedFile);
+				} catch (error) {
+					console.error("Error uploading file:", file.name, error);
+					Alert.alert(
+						"Upload Warning",
+						`Failed to upload ${file.name}`
+					);
+				}
+			}
+			await addAttachments(currentCompany, id, uploadedFiles);
+			setUploadQueue([]);
+		};
+
 		const validatedLocations = validateLocations(locations);
 
 		const initialEventData: Event = {
@@ -350,35 +370,26 @@ const EventSubmit = ({ navigation }) => {
 			notes: notes,
 			assignedWorkers: assignedWorkers,
 		};
-
-		if (isEditing) {
-			console.log("Updating event...");
-			await updateEvent(currentCompany, editID, initialEventData);
-			await deleteEventAttachments(currentCompany, editID, deletionQueue);
-			navigation.pop();
-			return;
-		}
 		console.log("Submitting event...");
 		try {
 			setIsLoading(true);
 
-			const eventId = await addEvent(currentCompany, initialEventData);
-
-			const uploadedFiles: FileUpload[] = [];
-			for (const file of files) {
-				try {
-					const uploadedFile = await uploadToFirebase(file, eventId);
-					uploadedFiles.push(uploadedFile);
-				} catch (error) {
-					console.error("Error uploading file:", file.name, error);
-					Alert.alert(
-						"Upload Warning",
-						`Failed to upload ${file.name}`
-					);
-				}
+			if (isEditing) {
+				console.log("Updating event...");
+				await updateEvent(currentCompany, editID, initialEventData);
+				await deleteEventAttachments(
+					currentCompany,
+					editID,
+					deletionQueue
+				);
+				await upload(editID);
+			} else {
+				const eventId = await addEvent(
+					currentCompany,
+					initialEventData
+				);
+				await upload(eventId);
 			}
-
-			await addAttachments(currentCompany, eventId, uploadedFiles);
 			console.log("Event successfully created!");
 			navigation.pop();
 		} catch (error) {
