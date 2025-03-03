@@ -16,7 +16,7 @@ const HomeTabs = () => {
 			<Tab.Screen
 				name="Settings"
 				component={SettingStack}
-				options={{ headerShown: false }}
+				options={{ headerShown: false, unmountOnBlur: true }}
 			/>
 		</Tab.Navigator>
 	);
