@@ -62,7 +62,7 @@ const EmployeeList = ({ navigation }) => {
 			}
 		);
 		return () => subscriber();
-	}, [employees, user]);
+	}, [user]);
 
 	useEffect(() => {
 		const subscriber = subscribeCurrentUser((snapshot) => {
