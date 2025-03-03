@@ -8,7 +8,6 @@ import {
 	StyleSheet,
 	Alert,
 	Platform,
-	Dimensions,
 	ImageBackground,
 	TouchableHighlight,
 	ActivityIndicator,
@@ -20,7 +19,6 @@ import {
 } from "react-native-google-places-autocomplete";
 import DatePicker from "react-native-date-picker";
 import { Ionicons } from "@expo/vector-icons";
-import { capitalize, set } from "lodash";
 import moment from "moment";
 import DropDownPicker from "react-native-dropdown-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -32,16 +30,16 @@ import {
 	deleteEvent,
 	subscribeEvent,
 	updateEvent,
-} from "../../controllers/eventController";
+} from "../../../controllers/eventController";
 import {
 	subscribeCurrentUser,
 	getUser,
 	User,
-} from "../../controllers/userController";
+} from "../../../controllers/userController";
 import {
 	isPersonal,
 	subscribeAllUsersInCompany,
-} from "../../controllers/companyController";
+} from "../../../controllers/companyController";
 import storage from "@react-native-firebase/storage";
 import { RouteProp, useRoute } from "@react-navigation/native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
@@ -49,7 +47,7 @@ import {
 	addAttachments,
 	deleteEventAttachments,
 	getEventAttachments,
-} from "../../controllers/attachmentController";
+} from "../../../controllers/attachmentController";
 import { StackActions } from "@react-navigation/native";
 
 export interface FileUpload {
@@ -92,6 +90,9 @@ const EventSubmit = ({ navigation }) => {
 	const [editID, setEditID] = useState<string | null>(null);
 	const [deletionQueue, setDeletionQueue] = useState<string[]>([]);
 	const [personal, setPersonal] = useState(false);
+	const [uploadQueue, setUploadQueue] = useState<FileUpload[]>([]);
+	const [editingLabelForAddress, setEditingLabelForAddress] = useState("");
+	const [labelText, setLabelText] = useState("");
 
 	type Location = {
 		[address: string]: {
@@ -176,7 +177,6 @@ const EventSubmit = ({ navigation }) => {
 		const checkPersonal = async () => {
 			if (!currentCompany) return;
 			const result = await isPersonal(currentCompany);
-			console.log(result);
 			setPersonal(result);
 		};
 		checkPersonal();
@@ -286,6 +286,7 @@ const EventSubmit = ({ navigation }) => {
 				type: file.type,
 			}));
 
+			setUploadQueue((prev) => [...prev, ...newFiles]);
 			setFiles((prev) => [...prev, ...newFiles]);
 		} catch (err) {
 			if (!DocumentPicker.isCancel(err)) {
@@ -314,6 +315,7 @@ const EventSubmit = ({ navigation }) => {
 						type: asset.type || "image/jpeg",
 					}));
 
+				setUploadQueue((prev) => [...prev, ...newFiles]);
 				setFiles((prev) => [...prev, ...newFiles]);
 			}
 		} catch (err) {
@@ -339,36 +341,11 @@ const EventSubmit = ({ navigation }) => {
 			return;
 		}
 
-		const validatedLocations = validateLocations(locations);
-
-		const initialEventData: Event = {
-			title: capitalize(title),
-			date: moment(date).format("YYYY-MM-DD"),
-			startTime: !allDay ? moment(startTime).format("HH:mm") : null,
-			endTime: hasEndTime ? moment(endTime).format("HH:mm") : null,
-			locations: validatedLocations,
-			duration: calculateDuration(),
-			notes: notes,
-			assignedWorkers: assignedWorkers,
-		};
-
-		if (isEditing) {
-			console.log("Updating event...");
-			await updateEvent(currentCompany, editID, initialEventData);
-			await deleteEventAttachments(currentCompany, editID, deletionQueue);
-			navigation.pop();
-			return;
-		}
-		console.log("Submitting event...");
-		try {
-			setIsLoading(true);
-
-			const eventId = await addEvent(currentCompany, initialEventData);
-
+		const upload = async (id) => {
 			const uploadedFiles: FileUpload[] = [];
-			for (const file of files) {
+			for (const file of uploadQueue) {
 				try {
-					const uploadedFile = await uploadToFirebase(file, eventId);
+					const uploadedFile = await uploadToFirebase(file, id);
 					uploadedFiles.push(uploadedFile);
 				} catch (error) {
 					console.error("Error uploading file:", file.name, error);
@@ -378,8 +355,42 @@ const EventSubmit = ({ navigation }) => {
 					);
 				}
 			}
+			await addAttachments(currentCompany, id, uploadedFiles);
+			setUploadQueue([]);
+		};
 
-			await addAttachments(currentCompany, eventId, uploadedFiles);
+		const validatedLocations = validateLocations(locations);
+
+		const initialEventData: Event = {
+			title: title,
+			date: moment(date).format("YYYY-MM-DD"),
+			startTime: !allDay ? moment(startTime).format("HH:mm") : null,
+			endTime: hasEndTime ? moment(endTime).format("HH:mm") : null,
+			locations: validatedLocations,
+			duration: calculateDuration(),
+			notes: notes,
+			assignedWorkers: assignedWorkers,
+		};
+		console.log("Submitting event...");
+		try {
+			setIsLoading(true);
+
+			if (isEditing) {
+				console.log("Updating event...");
+				await updateEvent(currentCompany, editID, initialEventData);
+				await deleteEventAttachments(
+					currentCompany,
+					editID,
+					deletionQueue
+				);
+				await upload(editID);
+			} else {
+				const eventId = await addEvent(
+					currentCompany,
+					initialEventData
+				);
+				await upload(eventId);
+			}
 			console.log("Event successfully created!");
 			navigation.pop();
 		} catch (error) {
@@ -503,7 +514,6 @@ const EventSubmit = ({ navigation }) => {
 		const documentFiles = files.filter(
 			(file) => !file.type.startsWith("image/")
 		);
-		console.log(documentFiles);
 		const handleDelete = (fileToDelete: FileUpload) => {
 			console.log("Deleting file:", fileToDelete.name); // Debug log
 			if (isEditing) {
@@ -590,8 +600,8 @@ const EventSubmit = ({ navigation }) => {
 				{documentFiles.length > 0 && (
 					<View style={styles.documentList}>
 						{documentFiles.map((file, index) => (
-							<>
-								<View key={index} style={styles.documentItem}>
+							<React.Fragment key={file.uri || `doc-${index}`}>
+								<View style={styles.documentItem}>
 									<Ionicons
 										name="document-outline"
 										size={24}
@@ -643,7 +653,7 @@ const EventSubmit = ({ navigation }) => {
 										</TouchableHighlight>
 									)}
 								</View>
-							</>
+							</React.Fragment>
 						))}
 					</View>
 				)}
@@ -740,11 +750,8 @@ const EventSubmit = ({ navigation }) => {
 					</View>
 					{locations
 						? Object.keys(locations).map((address, index) => (
-								<>
-									<View
-										key={index}
-										style={styles.locationContainer}
-									>
+								<React.Fragment key={index}>
+									<View style={styles.locationContainer}>
 										<Text
 											style={[
 												styles.label,
@@ -765,45 +772,34 @@ const EventSubmit = ({ navigation }) => {
 										>
 											<TouchableOpacity
 												onPress={() => {
-													Alert.prompt(
-														"Add Label",
-														"Enter a label for this location",
-														[
-															{
-																text: "Cancel",
-																style: "cancel",
-															},
-															{
-																text: "OK",
-																onPress: (
-																	label
-																) => {
-																	if (!label)
-																		return;
-																	const newLocations =
-																		{
-																			...locations,
-																		};
-																	newLocations[
-																		address
-																	] = {
-																		...newLocations[
-																			address
-																		],
-																		label: label,
-																	};
-																	setLocations(
-																		newLocations
-																	);
-																},
-															},
-														]
-													);
+													// Toggle label editing for this address
+													if (
+														editingLabelForAddress ===
+														address
+													) {
+														setEditingLabelForAddress(
+															""
+														);
+														setLabelText("");
+													} else {
+														setEditingLabelForAddress(
+															address
+														);
+														setLabelText(
+															locations[address]
+																?.label || ""
+														);
+													}
 												}}
 												style={styles.addLocationButton}
 											>
 												<Ionicons
-													name="pencil-outline"
+													name={
+														editingLabelForAddress ===
+														address
+															? "pricetag"
+															: "pricetag-outline"
+													}
 													size={24}
 													color="#555"
 												/>
@@ -817,6 +813,14 @@ const EventSubmit = ({ navigation }) => {
 														address
 													];
 													setLocations(newLocations);
+													if (
+														editingLabelForAddress ===
+														address
+													) {
+														setEditingLabelForAddress(
+															""
+														);
+													}
 												}}
 												style={styles.deleteButton}
 											>
@@ -828,25 +832,76 @@ const EventSubmit = ({ navigation }) => {
 											</TouchableOpacity>
 										</View>
 									</View>
+
+									{/* Show label text or label input field */}
 									<View
-										key={address}
-										style={{ marginTop: -5 }}
+										style={{
+											marginTop: 5,
+											marginBottom: 10,
+										}}
 									>
-										{locations[address].label && (
-											<Text
-												style={[
-													styles.label,
-													{
-														flex: 1,
-														fontSize: 14,
-													},
-												]}
+										{editingLabelForAddress === address ? (
+											<View
+												style={
+													styles.labelInputContainer
+												}
 											>
-												"{locations[address].label}"
-											</Text>
+												<TextInput
+													style={styles.labelInput}
+													placeholder="Enter location label"
+													value={labelText}
+													onChangeText={setLabelText}
+												/>
+												<TouchableOpacity
+													style={
+														styles.saveLabelButton
+													}
+													onPress={() => {
+														// Save the label
+														const newLocations = {
+															...locations,
+														};
+														newLocations[address] =
+															{
+																...newLocations[
+																	address
+																],
+																label: labelText,
+															};
+														setLocations(
+															newLocations
+														);
+														setEditingLabelForAddress(
+															""
+														);
+													}}
+												>
+													<Text
+														style={
+															styles.saveLabelButtonText
+														}
+													>
+														Save
+													</Text>
+												</TouchableOpacity>
+											</View>
+										) : (
+											locations[address].label && (
+												<Text
+													style={[
+														styles.label,
+														{
+															flex: 1,
+															fontSize: 14,
+														},
+													]}
+												>
+													"{locations[address].label}"
+												</Text>
+											)
 										)}
 									</View>
-								</>
+								</React.Fragment>
 						  ))
 						: null}
 				</View>
@@ -1342,6 +1397,33 @@ const styles = StyleSheet.create({
 		bottom: 0,
 		backgroundColor: "rgba(0, 0, 0, 0.5)",
 		borderRadius: 8,
+	},
+	labelInputContainer: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginBottom: 5,
+	},
+	labelInput: {
+		flex: 1,
+		height: 40,
+		borderColor: "#ccc",
+		borderWidth: 1,
+		borderRadius: 10,
+		paddingHorizontal: 15,
+		fontSize: 14,
+		backgroundColor: "white",
+		marginRight: 10,
+	},
+	saveLabelButton: {
+		backgroundColor: "#555",
+		paddingVertical: 8,
+		paddingHorizontal: 12,
+		borderRadius: 10,
+	},
+	saveLabelButtonText: {
+		color: "white",
+		fontSize: 14,
+		fontWeight: "600",
 	},
 });
 

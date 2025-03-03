@@ -53,6 +53,7 @@ const EmployeeList = ({ navigation }) => {
 					const data = await getUser(doc.id);
 					const privilege = data.companies[user.loggedInCompany];
 					const employeeJson = {
+						id: doc.id, // Add the document ID as an id property
 						privilege: privilege,
 						...data,
 					};
@@ -62,7 +63,7 @@ const EmployeeList = ({ navigation }) => {
 			}
 		);
 		return () => subscriber();
-	}, [employees, user]);
+	}, [user]);
 
 	useEffect(() => {
 		const subscriber = subscribeCurrentUser((snapshot) => {
@@ -95,7 +96,9 @@ const EmployeeList = ({ navigation }) => {
 	const handleLongPress = (employee) => {
 		// Must check to see if current user is an owner before allowing them to demote or promote another user
 		// Owners cannot be demoted, and only owners can promote users to admin
-		if (employee.privilege != "Owner" && user.privilege === "Owner") {
+		const loggedInCompany = user.loggedInCompany;
+		const userPriv = user.companies[loggedInCompany];
+		if (employee.privilege != "Owner" && userPriv === "Owner") {
 			Alert.alert(
 				employee.firstName + " " + employee.lastName,
 				"What would you like to do?",
@@ -192,7 +195,7 @@ const EmployeeList = ({ navigation }) => {
 			<FlatList
 				data={sortedEmployees}
 				renderItem={renderItem}
-				keyExtractor={(item) => item.lastName}
+				keyExtractor={(item) => item.id} // Use the id property instead of key
 				ListEmptyComponent={<ActivityIndicator />}
 			/>
 		</SafeAreaView>

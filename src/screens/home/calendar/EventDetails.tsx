@@ -23,8 +23,9 @@ import moment from "moment";
 import MapView, { Marker } from "react-native-maps";
 import { getUser } from "../../../controllers/userController";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
-import { getEventAttachments } from "../../../controllers/attachmentController";
+import { subscribeEventAttachments } from "../../../controllers/attachmentController";
 import ImageView from "react-native-image-viewing";
+import { FileUpload } from "./EventSubmit";
 
 type RootStackParamList = {
 	EventDetails: {
@@ -69,6 +70,21 @@ const EventDetails = ({ navigation }) => {
 
 	useEffect(() => {
 		if (!event) return;
+		const subscriber = subscribeEventAttachments(
+			user.loggedInCompany,
+			route.params.uid,
+			(attachments) => {
+				const files = attachments.docs.map(
+					(doc) => doc.data() as FileUpload
+				);
+				setAttachments(files);
+			}
+		);
+		return () => subscriber();
+	}, [event]);
+
+	useEffect(() => {
+		if (!event) return;
 		setIsLoading(true);
 		const getLocationList = () => {
 			setMarkers([]);
@@ -89,15 +105,6 @@ const EventDetails = ({ navigation }) => {
 		getLocationList();
 
 		setLocalNotes(event.userNotes || "");
-
-		const loadAttachments = async () => {
-			const attachments = await getEventAttachments(
-				user.loggedInCompany,
-				route.params.uid
-			);
-			setAttachments(attachments);
-		};
-		loadAttachments();
 
 		const getWorkerList = async () => {
 			setWorkerList("");

@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import {
 	deleteUser,
 	subscribeCurrentUser,
+	updateUser,
 } from "../../controllers/userController";
 import {
 	deleteSoloCompany,
@@ -49,6 +50,107 @@ const ProfilePage = ({ navigation }) => {
 		};
 		fillData();
 	}, [userData]);
+
+	// Add this function to update the name in Firebase
+	const updateUserName = async (firstName: string, lastName: string) => {
+		try {
+			await updateUser(userId, {
+				...userData,
+				firstName,
+				lastName,
+			});
+
+			Alert.alert("Success", "Your name has been updated successfully.");
+		} catch (error) {
+			console.error("Error updating name:", error);
+			Alert.alert(
+				"Error",
+				"There was an error updating your name. Please try again."
+			);
+		}
+	};
+
+	const handleNameChange = () => {
+		// First, prompt for first name
+		if (Platform.OS === "android") {
+			prompt(
+				"Update First Name",
+				"Please enter your first name:",
+				[
+					{ text: "Cancel", style: "cancel" },
+					{
+						text: "Next",
+						onPress: (firstName) => {
+							if (firstName) {
+								// Then prompt for last name
+								prompt(
+									"Update Last Name",
+									"Please enter your last name:",
+									[
+										{ text: "Cancel", style: "cancel" },
+										{
+											text: "Update",
+											onPress: (lastName) => {
+												if (lastName) {
+													updateUserName(
+														firstName,
+														lastName
+													);
+												}
+											},
+										},
+									],
+									{
+										type: "plain-text",
+										defaultValue: userData.lastName,
+									}
+								);
+							}
+						},
+					},
+				],
+				{ type: "plain-text", defaultValue: userData.firstName }
+			);
+		} else {
+			// iOS flow
+			Alert.prompt(
+				"Update First Name",
+				"Please enter your first name:",
+				[
+					{ text: "Cancel", style: "cancel" },
+					{
+						text: "Next",
+						onPress: (firstName) => {
+							if (firstName) {
+								Alert.prompt(
+									"Update Last Name",
+									"Please enter your last name:",
+									[
+										{ text: "Cancel", style: "cancel" },
+										{
+											text: "Update",
+											onPress: (lastName) => {
+												if (lastName) {
+													updateUserName(
+														firstName,
+														lastName
+													);
+												}
+											},
+										},
+									],
+									"plain-text",
+									userData.lastName
+								);
+							}
+						},
+					},
+				],
+				"plain-text",
+				userData.firstName
+			);
+		}
+	};
 
 	const handleCompanyChange = async (selectedCompany: any) => {
 		console.log("Company change to " + selectedCompany);
@@ -255,9 +357,16 @@ const ProfilePage = ({ navigation }) => {
 					>
 						<Ionicons name="chevron-back" size={28} color="#000" />
 					</TouchableOpacity>
-					<Text style={styles.headerTitle}>
-						{userData.firstName + " " + userData.lastName}
-					</Text>
+					<TouchableOpacity onPress={handleNameChange}>
+						<Text
+							style={[
+								styles.headerTitle,
+								{ textDecorationLine: "underline" },
+							]}
+						>
+							{userData.firstName + " " + userData.lastName}
+						</Text>
+					</TouchableOpacity>
 				</View>
 
 				<View style={styles.section}>

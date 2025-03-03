@@ -10,9 +10,9 @@ import {
 	View,
 	Text,
 	TouchableOpacity,
-	ScrollView,
 	Animated,
 } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import {
 	ExpandableCalendar,
 	AgendaList,
@@ -21,7 +21,6 @@ import {
 } from "react-native-calendars";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { BottomSheetView } from "@gorhom/bottom-sheet";
-import { Filter } from "react-native-feather";
 import DropDownPicker from "react-native-dropdown-picker";
 import moment from "moment";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -42,6 +41,13 @@ import {
 } from "../../../controllers/userController";
 import { subscribeEvents } from "../../../controllers/eventController";
 import { subscribeAllUsersInCompany } from "../../../controllers/companyController";
+import { LogBox } from "react-native";
+import { Filter, PlusCircle } from "react-native-feather";
+
+// Add this near the top of your file, after imports
+LogBox.ignoreLogs([
+	"ExpandableCalendar: Support for defaultProps will be removed from function components",
+]);
 
 type CalendarProps = {
 	weekView?: any;
@@ -58,7 +64,10 @@ const getFilterStyle = (type: FilterType, currentFilter: FilterType) => ({
 	borderColor: type === currentFilter ? "#2089dc" : "#ccc",
 });
 
-const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
+const ExpandableCalendarScreen = ({
+	weekView,
+	navigation,
+}: CalendarProps & { navigation: any }) => {
 	const [agendaItems, setAgendaItems] = useState<AgendaItemData[]>([]);
 	const [selectedDate, setSelectedDate] = useState(today);
 	const [markedDates, setMarkedDates] = useState({});
@@ -67,7 +76,7 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 	const [userId, setUserId] = useState<string>("");
 	const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
 	const [userPrivilege, setUserPrivilege] = useState<string>("");
-	const [filterType, setFilterType] = useState<FilterType>("my");
+	const [filterType, setFilterType] = useState<FilterType>("all");
 	const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
 	const [availableWorkers, setAvailableWorkers] = useState([]);
 	const [openSelect, setOpenSelect] = useState(false);
@@ -264,8 +273,7 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 		return <AgendaItem item={item} />;
 	}, []);
 
-	const showFilterButton =
-		userPrivilege === "Admin" || userPrivilege === "Owner";
+	const isAdmin = userPrivilege === "Admin" || userPrivilege === "Owner";
 
 	if (isLoading) {
 		return <LoadingScreen />;
@@ -275,50 +283,56 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 		<GestureHandlerRootView style={styles.rootView}>
 			<View style={styles.container}>
 				<SafeAreaView style={styles.safeArea}>
-					<CalendarProvider
-						date={selectedDate}
-						showTodayButton={true}
-						todayButtonStyle={styles.todayButton}
-					>
-						<View style={styles.calendarContainer}>
-							{weekView ? (
-								<WeekCalendar
-									firstDay={1}
-									markedDates={markedDates}
-								/>
-							) : (
-								<ExpandableCalendar
-									horizontal
-									pagingEnabled
-									initialPosition={
-										ExpandableCalendar.positions.OPEN
-									}
-									calendarStyle={styles.calendar}
-									theme={theme.current}
-									firstDay={1}
-									markedDates={markedDates}
-									leftArrowImageSource={leftArrowIcon}
-									rightArrowImageSource={rightArrowIcon}
-									closeOnDayPress={false}
-									date={selectedDate}
-									onDayPress={(day) =>
-										setSelectedDate(day.dateString)
-									}
-								/>
-							)}
-						</View>
+					{user ? (
+						<CalendarProvider
+							date={selectedDate}
+							showTodayButton={true}
+							todayButtonStyle={styles.todayButton}
+						>
+							<View style={styles.calendarContainer}>
+								{weekView ? (
+									<WeekCalendar
+										firstDay={1}
+										markedDates={markedDates}
+									/>
+								) : (
+									<ExpandableCalendar
+										horizontal={true}
+										pagingEnabled={true}
+										initialPosition={
+											ExpandableCalendar.positions.OPEN
+										}
+										calendarStyle={styles.calendar}
+										theme={theme.current}
+										firstDay={1}
+										markedDates={markedDates}
+										leftArrowImageSource={leftArrowIcon}
+										rightArrowImageSource={rightArrowIcon}
+										closeOnDayPress={false}
+										date={selectedDate}
+										onDayPress={(day) =>
+											setSelectedDate(day.dateString)
+										}
+									/>
+								)}
+							</View>
 
-						<View style={styles.agendaContainer}>
-							<AgendaList
-								sections={sortedSections}
-								renderItem={renderItem}
-								sectionStyle={styles.section}
-								ListFooterComponent={
-									<View style={{ paddingVertical: 150 }} />
-								}
-							/>
-						</View>
-					</CalendarProvider>
+							<View style={styles.agendaContainer}>
+								<AgendaList
+									sections={sortedSections}
+									renderItem={renderItem}
+									sectionStyle={styles.section}
+									ListFooterComponent={
+										<View
+											style={{ paddingVertical: 150 }}
+										/>
+									}
+								/>
+							</View>
+						</CalendarProvider>
+					) : (
+						<LoadingScreen />
+					)}
 
 					<BottomSheet
 						ref={bottomSheetRef}
@@ -329,253 +343,255 @@ const ExpandableCalendarScreen = ({ weekView }: CalendarProps) => {
 					>
 						<BottomSheetView style={styles.contentContainer}>
 							<View style={styles.bottomSheetHandle} />
-							<ScrollView style={styles.scrollableContent}>
-								{filterType === "specific" ? (
-									<View style={styles.dropdownWrapper}>
-										<View style={styles.headerRow}>
+							{filterType === "specific" ? (
+								<View style={styles.dropdownWrapper}>
+									<View style={styles.headerRow}>
+										<TouchableOpacity
+											onPress={() => {
+												setShowAllSelectedOnly(false);
+												setShowExactSelectedOnly(false);
+												setSelectedUsers([]);
+												setOpenSelect(false);
+												setFilterType("my");
+												setTimeout(() => {
+													bottomSheetRef.current?.snapToIndex(
+														0
+													);
+													setBottomSheetPosition(0);
+												}, 100);
+											}}
+										>
+											<Text style={styles.backButton}>
+												← Back
+											</Text>
+										</TouchableOpacity>
+										<Text style={styles.filterTitle}>
+											Select Users
+										</Text>
+									</View>
+									<DropDownPicker
+										searchPlaceholder="Search"
+										multiple={true}
+										min={0}
+										max={5}
+										value={selectedUsers}
+										setValue={setSelectedUsers}
+										items={availableWorkers}
+										setItems={setAvailableWorkers}
+										open={openSelect}
+										setOpen={checkSelectOpen}
+										mode="BADGE"
+										listMode="SCROLLVIEW"
+										searchable={true}
+										maxHeight={200}
+										style={styles.dropdown}
+										dropDownContainerStyle={
+											styles.dropdownList
+										}
+										listItemContainerStyle={
+											styles.dropdownItem
+										}
+										zIndex={3000}
+										placeholder="Select Users"
+									/>
+
+									{selectedUsers.length > 1 && (
+										<View style={styles.checkboxContainer}>
 											<TouchableOpacity
+												style={styles.checkboxRow}
 												onPress={() => {
 													setShowAllSelectedOnly(
-														false
+														(prev) => !prev
 													);
-													setShowExactSelectedOnly(
-														false
-													);
-													setSelectedUsers([]);
-													setOpenSelect(false);
-													setFilterType("my");
-													setTimeout(() => {
-														bottomSheetRef.current?.snapToIndex(
-															0
+													if (!showAllSelectedOnly) {
+														setShowExactSelectedOnly(
+															false
 														);
-														setBottomSheetPosition(
-															0
-														);
-													}, 100);
+													}
 												}}
 											>
-												<Text style={styles.backButton}>
-													← Back
+												<View
+													style={[
+														styles.checkbox,
+														showAllSelectedOnly &&
+															styles.checkboxSelected,
+													]}
+												>
+													{showAllSelectedOnly && (
+														<Text
+															style={
+																styles.checkmark
+															}
+														>
+															✓
+														</Text>
+													)}
+												</View>
+												<Text
+													style={styles.checkboxLabel}
+												>
+													Together
 												</Text>
 											</TouchableOpacity>
-											<Text style={styles.filterTitle}>
-												Select Users
-											</Text>
-										</View>
-										<DropDownPicker
-											searchPlaceholder="Search"
-											multiple={true}
-											min={0}
-											max={5}
-											value={selectedUsers}
-											setValue={setSelectedUsers}
-											items={availableWorkers}
-											setItems={setAvailableWorkers}
-											open={openSelect}
-											setOpen={checkSelectOpen}
-											mode="BADGE"
-											listMode="SCROLLVIEW"
-											searchable={true}
-											maxHeight={200}
-											style={styles.dropdown}
-											dropDownContainerStyle={
-												styles.dropdownList
-											}
-											listItemContainerStyle={
-												styles.dropdownItem
-											}
-											zIndex={3000}
-											placeholder="Select Users"
-										/>
 
-										{selectedUsers.length > 1 && (
-											<View
-												style={styles.checkboxContainer}
-											>
-												<TouchableOpacity
-													style={styles.checkboxRow}
-													onPress={() => {
+											<TouchableOpacity
+												style={styles.checkboxRow}
+												onPress={() => {
+													setShowExactSelectedOnly(
+														(prev) => !prev
+													);
+													if (
+														!showExactSelectedOnly
+													) {
 														setShowAllSelectedOnly(
-															(prev) => !prev
+															false
 														);
-														if (
-															!showAllSelectedOnly
-														) {
-															setShowExactSelectedOnly(
-																false
-															);
-														}
-													}}
-												>
-													<View
-														style={[
-															styles.checkbox,
-															showAllSelectedOnly &&
-																styles.checkboxSelected,
-														]}
-													>
-														{showAllSelectedOnly && (
-															<Text
-																style={
-																	styles.checkmark
-																}
-															>
-																✓
-															</Text>
-														)}
-													</View>
-													<Text
-														style={
-															styles.checkboxLabel
-														}
-													>
-														Together
-													</Text>
-												</TouchableOpacity>
-
-												<TouchableOpacity
-													style={styles.checkboxRow}
-													onPress={() => {
-														setShowExactSelectedOnly(
-															(prev) => !prev
-														);
-														if (
-															!showExactSelectedOnly
-														) {
-															setShowAllSelectedOnly(
-																false
-															);
-														}
-													}}
-												>
-													<View
-														style={[
-															styles.checkbox,
-															showExactSelectedOnly &&
-																styles.checkboxSelected,
-														]}
-													>
-														{showExactSelectedOnly && (
-															<Text
-																style={
-																	styles.checkmark
-																}
-															>
-																✓
-															</Text>
-														)}
-													</View>
-													<Text
-														style={
-															styles.checkboxLabel
-														}
-													>
-														Exclusively Together
-													</Text>
-												</TouchableOpacity>
-											</View>
-										)}
-
-										<TouchableOpacity
-											style={styles.applyButton}
-											onPress={() =>
-												handleFilterChange("specific")
-											}
-										>
-											<Text
-												style={styles.applyButtonText}
+													}
+												}}
 											>
-												Apply Filter
-											</Text>
-										</TouchableOpacity>
-									</View>
-								) : (
-									<>
-										<Text style={styles.filterTitle}>
-											Event Filters
+												<View
+													style={[
+														styles.checkbox,
+														showExactSelectedOnly &&
+															styles.checkboxSelected,
+													]}
+												>
+													{showExactSelectedOnly && (
+														<Text
+															style={
+																styles.checkmark
+															}
+														>
+															✓
+														</Text>
+													)}
+												</View>
+												<Text
+													style={styles.checkboxLabel}
+												>
+													Exclusively Together
+												</Text>
+											</TouchableOpacity>
+										</View>
+									)}
+
+									<TouchableOpacity
+										style={styles.applyButton}
+										onPress={() =>
+											handleFilterChange("specific")
+										}
+									>
+										<Text style={styles.applyButtonText}>
+											Apply Filter
 										</Text>
-										<TouchableOpacity
-											style={[
-												styles.filterOption,
-												getFilterStyle(
-													"my",
-													filterType
-												),
-											]}
-											onPress={() =>
-												handleFilterChange("my")
-											}
-										>
-											<Text style={styles.filterText}>
-												My Events
-											</Text>
-										</TouchableOpacity>
+									</TouchableOpacity>
+								</View>
+							) : (
+								<>
+									<Text style={styles.filterTitle}>
+										Event Filters
+									</Text>
+									<TouchableOpacity
+										style={[
+											styles.filterOption,
+											getFilterStyle("my", filterType),
+										]}
+										onPress={() => handleFilterChange("my")}
+									>
+										<Text style={styles.filterText}>
+											My Events
+										</Text>
+									</TouchableOpacity>
 
-										<TouchableOpacity
-											style={[
-												styles.filterOption,
-												getFilterStyle(
-													"specific",
-													filterType
-												),
-											]}
-											onPress={() =>
-												setFilterType("specific")
-											}
-										>
-											<Text style={styles.filterText}>
-												Specific Users
-											</Text>
-										</TouchableOpacity>
+									<TouchableOpacity
+										style={[
+											styles.filterOption,
+											getFilterStyle(
+												"specific",
+												filterType
+											),
+										]}
+										onPress={() =>
+											setFilterType("specific")
+										}
+									>
+										<Text style={styles.filterText}>
+											Specific Users
+										</Text>
+									</TouchableOpacity>
 
-										<TouchableOpacity
-											style={[
-												styles.filterOption,
-												getFilterStyle(
-													"unassigned",
-													filterType
-												),
-											]}
-											onPress={() =>
-												handleFilterChange("unassigned")
-											}
-										>
-											<Text style={styles.filterText}>
-												Unassigned Events
-											</Text>
-										</TouchableOpacity>
+									<TouchableOpacity
+										style={[
+											styles.filterOption,
+											getFilterStyle(
+												"unassigned",
+												filterType
+											),
+										]}
+										onPress={() =>
+											handleFilterChange("unassigned")
+										}
+									>
+										<Text style={styles.filterText}>
+											Unassigned Events
+										</Text>
+									</TouchableOpacity>
 
-										<TouchableOpacity
-											style={[
-												styles.filterOption,
-												getFilterStyle(
-													"all",
-													filterType
-												),
-											]}
-											onPress={() =>
-												handleFilterChange("all")
-											}
-										>
-											<Text style={styles.filterText}>
-												All Events
-											</Text>
-										</TouchableOpacity>
-									</>
-								)}
-							</ScrollView>
+									<TouchableOpacity
+										style={[
+											styles.filterOption,
+											getFilterStyle("all", filterType),
+										]}
+										onPress={() =>
+											handleFilterChange("all")
+										}
+									>
+										<Text style={styles.filterText}>
+											All Events
+										</Text>
+									</TouchableOpacity>
+								</>
+							)}
 						</BottomSheetView>
 					</BottomSheet>
 				</SafeAreaView>
-				{showFilterButton && (
-					<Animated.View style={{ opacity: fabOpacity }}>
-						<TouchableOpacity
-							style={styles.filterButton}
-							onPress={handleFilterPress}
+				{isAdmin && (
+					<>
+						<Animated.View
+							style={{ opacity: fabOpacity }}
+							pointerEvents={
+								isBottomSheetVisible ? "none" : "auto"
+							}
 						>
-							<Filter stroke="black" width={24} height={24} />
-						</TouchableOpacity>
-					</Animated.View>
+							<TouchableOpacity
+								style={styles.addEventButton}
+								onPress={() =>
+									navigation.navigate("EditEvent", {
+										event: null,
+									})
+								}
+							>
+								<PlusCircle
+									stroke="black"
+									width={24}
+									height={24}
+								/>
+							</TouchableOpacity>
+						</Animated.View>
+						<Animated.View
+							style={{ opacity: fabOpacity }}
+							pointerEvents={
+								isBottomSheetVisible ? "none" : "auto"
+							}
+						>
+							<TouchableOpacity
+								style={styles.filterButton}
+								onPress={handleFilterPress}
+							>
+								<Filter stroke="black" width={24} height={24} />
+							</TouchableOpacity>
+						</Animated.View>
+					</>
 				)}
 			</View>
 		</GestureHandlerRootView>
@@ -605,6 +621,8 @@ const styles = StyleSheet.create({
 	},
 	calendarContainer: {
 		position: "relative",
+		//height: 300,
+		zIndex: 1000,
 	},
 	agendaContainer: {
 		flex: 1,
@@ -623,7 +641,7 @@ const styles = StyleSheet.create({
 	filterButton: {
 		position: "absolute",
 		bottom: 10,
-		right: 10,
+		right: 70, // Changed from right: 10 to position it to the left
 		zIndex: 999,
 		padding: 12,
 		backgroundColor: "white",
@@ -747,6 +765,20 @@ const styles = StyleSheet.create({
 	},
 	todayButton: {
 		bottom: 0,
+	},
+	addEventButton: {
+		position: "absolute",
+		bottom: 10,
+		right: 10, // Changed from right: 70 to position it on the right
+		zIndex: 999,
+		padding: 12,
+		backgroundColor: "white",
+		borderRadius: 30,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.25,
+		shadowRadius: 3.84,
+		elevation: 8,
 	},
 });
 

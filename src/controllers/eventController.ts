@@ -1,6 +1,6 @@
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
-import { FileUpload } from "../screens/settings/EventSubmit";
-import db from "../../index";
+import { FileUpload } from "../screens/home/calendar/EventSubmit";
+import db from "../global/firestore";
 import {
 	addAttachments,
 	getEventAttachments,
@@ -252,10 +252,6 @@ export async function addEvent(company: string, newEvent: Event) {
 export async function deleteEvent(eventID: string, company: string) {
 	// Delete an existing event
 	try {
-		await deleteEventAttachments(company, eventID);
-
-		console.log("Event attachments Deleted");
-
 		await db
 			.collection("Companies")
 			.doc(company)
