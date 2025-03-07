@@ -1,18 +1,13 @@
 import React, { useEffect } from "react";
-import {
-	View,
-	Text,
-	StyleSheet,
-	SafeAreaView,
-	StatusBar,
-	Alert,
-} from "react-native";
+import { View, Text, StyleSheet, StatusBar, Alert } from "react-native";
 import { TouchableOpacity } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 import { signOut } from "../../controllers/authController";
 import { subscribeCurrentUser } from "../../controllers/userController";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const Settings = ({ navigation }: any) => {
+	const insets = useSafeAreaInsets();
 	const [isAdmin, setIsAdmin] = React.useState(false);
 	const SettingsItem: React.FC<{
 		title: string;
@@ -71,7 +66,7 @@ const Settings = ({ navigation }: any) => {
 	};
 
 	return (
-		<SafeAreaView style={styles.container}>
+		<View style={[{ flex: 1, paddingTop: insets.top }, styles.container]}>
 			<StatusBar barStyle="dark-content" />
 			<View style={styles.header}>
 				<Text style={styles.headerTitle}>Settings</Text>
@@ -96,7 +91,7 @@ const Settings = ({ navigation }: any) => {
 				<Text style={styles.sectionTitle}>ACTIONS</Text>
 				<SettingsItem title="Log Out" isAction onPress={handleLogout} />
 			</View>
-		</SafeAreaView>
+		</View>
 	);
 };
 

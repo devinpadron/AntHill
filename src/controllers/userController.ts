@@ -97,3 +97,53 @@ export async function updateUser(userID: string, userData: User) {
 		throw e;
 	}
 }
+
+export async function swapUserCompany(userID: string, companyID: string) {
+	const userData = await getUser(userID);
+	var companyID = companyID;
+	console.log(companyID);
+	if (companyID === "") {
+		const companies = userData.companies;
+		companyID = Object.keys(companies)[0];
+		console.log(companyID);
+	}
+
+	if (!userData.companies[companyID]) {
+		console.error("User does not belong to company");
+		return false;
+	}
+
+	try {
+		await db.collection("Users").doc(userID).update({
+			loggedInCompany: companyID,
+		});
+		return true;
+	} catch (e) {
+		console.error("Error swapping user company:", e);
+		throw e;
+	}
+}
+
+export async function deleteCompanyFromUser(userID: string, companyID: string) {
+	const userData = await getUser(userID);
+	if (!userData.companies[companyID]) {
+		console.error("User does not belong to company");
+		return -1;
+	}
+
+	try {
+		const companies = userData.companies;
+		delete companies[companyID];
+		await db.collection("Users").doc(userID).update({
+			companies: companies,
+		});
+		if (companies.isEmpty) {
+			await deleteUser(userID);
+			return 1;
+		}
+		return userData.loggedInCompany;
+	} catch (e) {
+		console.error("Error deleting company from user:", e);
+		throw e;
+	}
+}

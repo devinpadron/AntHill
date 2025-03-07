@@ -1,6 +1,10 @@
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
 import db from "../global/firestore";
-import { getUser } from "./userController";
+import {
+	deleteCompanyFromUser,
+	getUser,
+	swapUserCompany,
+} from "./userController";
 
 export interface Company {
 	accessCode: string;
@@ -129,6 +133,28 @@ export async function deleteSoloCompany(company: string) {
 		return true;
 	} catch (e) {
 		console.error("Error deleting company", e);
+		return false;
+	}
+}
+
+export async function removeUserFromCompany(company: string, userID: string) {
+	try {
+		await db
+			.collection("Companies")
+			.doc(company)
+			.collection("Users")
+			.doc(userID)
+			.delete();
+		const result = await deleteCompanyFromUser(userID, company);
+		if (result === 1) {
+			return true;
+		} else if (result != company) {
+			return true;
+		}
+		await swapUserCompany(userID, "");
+		return true;
+	} catch (e) {
+		console.error("Error removing user from company", e);
 		return false;
 	}
 }
