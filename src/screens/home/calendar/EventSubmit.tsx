@@ -21,7 +21,7 @@ import DatePicker from "react-native-date-picker";
 import { Ionicons } from "@expo/vector-icons";
 import moment from "moment";
 import DropDownPicker from "react-native-dropdown-picker";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import DocumentPicker from "react-native-document-picker";
 import * as ImagePicker from "react-native-image-picker";
 import {
@@ -93,6 +93,7 @@ const EventSubmit = ({ navigation }) => {
 	const [uploadQueue, setUploadQueue] = useState<FileUpload[]>([]);
 	const [editingLabelForAddress, setEditingLabelForAddress] = useState("");
 	const [labelText, setLabelText] = useState("");
+	const insets = useSafeAreaInsets();
 
 	type Location = {
 		[address: string]: {
@@ -689,7 +690,7 @@ const EventSubmit = ({ navigation }) => {
 	);
 
 	return (
-		<SafeAreaView style={{ flex: 1 }}>
+		<View style={[{ flex: 1, paddingTop: insets.top }, styles.container]}>
 			<KeyboardAwareScrollView
 				contentContainerStyle={styles.scrollContainer}
 				nestedScrollEnabled={true}
@@ -1108,7 +1109,7 @@ const EventSubmit = ({ navigation }) => {
 				)}
 				{isLoading && <ActivityIndicator size="large" color="#555" />}
 			</KeyboardAwareScrollView>
-		</SafeAreaView>
+		</View>
 	);
 };
 

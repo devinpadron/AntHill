@@ -1,6 +1,6 @@
 import { MarkedDates } from "react-native-calendars/src/types";
-import { doc, FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
-import { getAllEvents } from "../../../../controllers/eventController";
+import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
+import moment from "moment";
 
 /* An AgendaItem controller that conatains:
   - An AgendaItemData interface that provides the structure of AgendaItem data
@@ -11,22 +11,23 @@ import { getAllEvents } from "../../../../controllers/eventController";
 */
 
 export interface AgendaItemData {
-	date: string;
-	data: [
-		{
-			title: string;
-			startTime: string;
-			endTime: string;
-			duration: string;
-			eventUID: string;
-			attachments?: {
-				filename: string;
-				url: string;
-				type: string;
-				path: string;
-			}[];
-		}
-	];
+	day: string;
+	title: string;
+	startTime: string;
+	endTime: string;
+	duration: string;
+	assigned: string[];
+	uid: string;
+	attachments?: {
+		filename: string;
+		url: string;
+		type: string;
+		path: string;
+	}[];
+}
+
+export interface AgendaItem {
+	[day: string]: AgendaItemData[];
 }
 
 function createAgendaItem(
@@ -35,25 +36,49 @@ function createAgendaItem(
 	const id = docRef.id;
 	docRef = docRef.data();
 	return {
-		date: docRef.date,
-		data: [
-			{
-				title: docRef.title,
-				startTime: docRef.startTime,
-				endTime: docRef.endTime,
-				duration: docRef.duration,
-				eventUID: id,
-				attachments: docRef.attachments || [],
-			},
-		],
+		day: docRef.date,
+		title: docRef.title,
+		startTime: docRef.startTime,
+		endTime: docRef.endTime,
+		duration: docRef.duration,
+		assigned: docRef.assignedWorkers || [],
+		uid: id,
+		attachments: docRef.attachments || [],
 	};
 }
 
-export function getAgendaItems(events: any[]): AgendaItemData[] {
-	const res: AgendaItemData[] = [];
+export function getAgendaItems(events: any[]): AgendaItem {
+	const res: AgendaItem = {};
 	events.forEach((event) => {
-		res.push(createAgendaItem(event));
+		const data = event.data();
+		const day = data.date; // Assuming event has a date field in YYYY-MM-DD format
+		const item = createAgendaItem(event);
+
+		if (!res[day]) {
+			res[day] = [];
+		}
+
+		res[day].push(item);
 	});
+
+	// Now fill in empty arrays for dates without data
+	// Create a range of dates (e.g., 3 months before and after current month)
+	const startDate = moment().subtract(50, "months").startOf("month");
+	const endDate = moment().add(50, "months").endOf("month");
+
+	// Loop through each day in the range
+	for (
+		let m = moment(startDate);
+		m.diff(endDate, "days") <= 0;
+		m.add(1, "days")
+	) {
+		const dateStr = m.format("YYYY-MM-DD");
+
+		// If this date doesn't already have events, add an empty array
+		if (!res[dateStr]) {
+			res[dateStr] = [];
+		}
+	}
 
 	return res;
 }
@@ -62,14 +87,12 @@ function isEmpty(obj: any): boolean {
 	return Object.keys(obj).length === 0;
 }
 
-export function getMarkedDates(items: AgendaItemData[]): MarkedDates {
+export function getMarkedDates(items: AgendaItem): MarkedDates {
 	const marked: MarkedDates = {};
-	items.forEach((item) => {
-		if (item.data && item.data.length > 0 && !isEmpty(item.data[0])) {
-			marked[item.date] = { marked: true };
-		} else {
-			marked[item.date] = { disabled: true };
+	for (const day in items) {
+		if (items[day] && items[day].length > 0) {
+			marked[day] = { marked: true };
 		}
-	});
+	}
 	return marked;
 }

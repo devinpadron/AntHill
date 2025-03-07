@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-	SafeAreaView,
 	View,
 	Text,
 	FlatList,
@@ -10,6 +9,7 @@ import {
 	Platform,
 	Alert,
 	ActivityIndicator,
+	RefreshControl,
 } from "react-native";
 import { TouchableOpacity } from "react-native-gesture-handler";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
@@ -17,8 +17,13 @@ import { LongPressGestureHandler, State } from "react-native-gesture-handler";
 import {
 	getUser,
 	subscribeCurrentUser,
+	updateUser,
 } from "../../controllers/userController";
-import { subscribeAllUsersInCompany } from "../../controllers/companyController";
+import {
+	removeUserFromCompany,
+	subscribeAllUsersInCompany,
+} from "../../controllers/companyController";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Enable LayoutAnimation on Android
 if (
@@ -34,7 +39,7 @@ const EmployeeList = ({ navigation }) => {
 		Record<
 			string,
 			{
-				privilege: string;
+				companies: Record<string, string>;
 				firstName: string;
 				lastName: string;
 				email: string;
@@ -42,6 +47,9 @@ const EmployeeList = ({ navigation }) => {
 		>
 	>({});
 	const [user, setUser] = useState(null);
+	const [loggedInCompany, setLoggedInCompany] = useState(null);
+	const [refreshing, setRefreshing] = useState(false);
+	const insets = useSafeAreaInsets();
 
 	useEffect(() => {
 		if (!user) return;
@@ -51,10 +59,8 @@ const EmployeeList = ({ navigation }) => {
 				const employeeData = {};
 				for (const doc of snapshot.docs) {
 					const data = await getUser(doc.id);
-					const privilege = data.companies[user.loggedInCompany];
 					const employeeJson = {
 						id: doc.id, // Add the document ID as an id property
-						privilege: privilege,
 						...data,
 					};
 					employeeData[doc.id] = employeeJson;
@@ -69,19 +75,50 @@ const EmployeeList = ({ navigation }) => {
 		const subscriber = subscribeCurrentUser((snapshot) => {
 			const userData = snapshot.data();
 			setUser(userData);
+			setLoggedInCompany(userData.loggedInCompany);
 		});
 		return () => subscriber();
 	}, []);
 
+	const onRefresh = useCallback(() => {
+		setRefreshing(true);
+
+		// Re-fetch the employee data
+		if (user && loggedInCompany) {
+			subscribeAllUsersInCompany(loggedInCompany, async (snapshot) => {
+				const employeeData = {};
+				for (const doc of snapshot.docs) {
+					const data = await getUser(doc.id);
+					const employeeJson = {
+						id: doc.id,
+						...data,
+					};
+					employeeData[doc.id] = employeeJson;
+				}
+				setEmployees(employeeData);
+				setRefreshing(false);
+			});
+		} else {
+			setRefreshing(false);
+		}
+	}, [user, loggedInCompany]);
+
 	const sortedEmployees = Object.values(employees)
 		.filter(
-			(employee) => employee && employee.privilege && employee.firstName
+			(employee) =>
+				employee &&
+				employee.companies[loggedInCompany] &&
+				employee.firstName
 		) // Filter out invalid entries
 		.sort((a, b) => {
 			const privilegeOrder = { Owner: 0, Admin: 1, User: 2 };
-			if (privilegeOrder[a.privilege] !== privilegeOrder[b.privilege]) {
+			if (
+				privilegeOrder[a.companies[loggedInCompany]] !==
+				privilegeOrder[b.companies[loggedInCompany]]
+			) {
 				return (
-					privilegeOrder[a.privilege] - privilegeOrder[b.privilege]
+					privilegeOrder[a.companies[loggedInCompany]] -
+					privilegeOrder[b.companies[loggedInCompany]]
 				);
 			}
 			// Sorted by first name if same privilege
@@ -96,39 +133,78 @@ const EmployeeList = ({ navigation }) => {
 	const handleLongPress = (employee) => {
 		// Must check to see if current user is an owner before allowing them to demote or promote another user
 		// Owners cannot be demoted, and only owners can promote users to admin
-		const loggedInCompany = user.loggedInCompany;
 		const userPriv = user.companies[loggedInCompany];
-		if (employee.privilege != "Owner" && userPriv === "Owner") {
+		if (
+			employee.companies[loggedInCompany] != "Owner" &&
+			userPriv === "Owner"
+		) {
 			Alert.alert(
 				employee.firstName + " " + employee.lastName,
 				"What would you like to do?",
 				[
-					employee.privilege === "Admin"
+					employee.companies[loggedInCompany] === "Admin"
 						? {
 								text: "Demote",
 								onPress: () => {
+									updateUser(employee.id, {
+										...employee,
+										companies: {
+											[loggedInCompany]: "User",
+										},
+									});
 									console.log(
 										"Demoted",
 										employee.firstName + employee.lastName
 									);
+									onRefresh();
 								},
 						  }
 						: {
 								text: "Promote",
 								onPress: () => {
+									updateUser(employee.id, {
+										...employee,
+										companies: {
+											[loggedInCompany]: "Admin",
+										},
+									});
 									console.log(
 										"Promoted",
 										employee.firstName + employee.lastName
 									);
+									onRefresh();
 								},
 						  },
 					{
 						text: "Delete",
 						style: "destructive",
 						onPress: () => {
-							console.log(
-								"Delete",
-								employee.firstName + employee.lastName
+							// TODO: Add confirmation dialog
+							Alert.alert(
+								"Confirm Delete",
+								`Are you sure you want to remove ${employee.firstName} ${employee.lastName} from the company?`,
+								[
+									{
+										text: "Cancel",
+										style: "cancel",
+									},
+									{
+										text: "Delete",
+										style: "destructive",
+										onPress: () => {
+											removeUserFromCompany(
+												loggedInCompany,
+												employee.id
+											);
+											console.log(
+												"Deleted",
+												employee.firstName +
+													employee.lastName
+											);
+											onRefresh();
+										},
+									},
+								]
 							);
 						},
 					},
@@ -156,10 +232,10 @@ const EmployeeList = ({ navigation }) => {
 						<Text style={styles.name}>
 							{item.firstName + " " + item.lastName}
 						</Text>
-						{item.privilege === "Owner" && (
+						{item.companies[loggedInCompany] === "Owner" && (
 							<FontAwesome name="star" size={24} color="red" />
 						)}
-						{item.privilege === "Admin" && (
+						{item.companies[loggedInCompany] === "Admin" && (
 							<FontAwesome name="star" size={24} color="gold" />
 						)}
 					</View>
@@ -176,7 +252,7 @@ const EmployeeList = ({ navigation }) => {
 	);
 
 	return (
-		<SafeAreaView style={styles.container}>
+		<View style={[{ flex: 1, paddingTop: insets.top }, styles.container]}>
 			<View style={styles.titleBar}>
 				<TouchableOpacity
 					containerStyle={{
@@ -197,8 +273,14 @@ const EmployeeList = ({ navigation }) => {
 				renderItem={renderItem}
 				keyExtractor={(item) => item.id} // Use the id property instead of key
 				ListEmptyComponent={<ActivityIndicator />}
+				refreshControl={
+					<RefreshControl
+						refreshing={refreshing}
+						onRefresh={onRefresh}
+					/>
+				}
 			/>
-		</SafeAreaView>
+		</View>
 	);
 };
 
