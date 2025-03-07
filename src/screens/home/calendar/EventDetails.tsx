@@ -38,7 +38,7 @@ type EventDetailsRouteProp = RouteProp<RootStackParamList, "EventDetails">;
 const EventDetails = ({ navigation }) => {
 	const route = useRoute<EventDetailsRouteProp>();
 	if (!route.params) return null;
-
+	console.log(route.params.uid);
 	const [user, setUser] = useState(null);
 	const [event, setEvent] = useState(null);
 	const [markers, setMarkers] = useState([]);

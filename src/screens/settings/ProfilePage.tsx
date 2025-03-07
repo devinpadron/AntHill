@@ -16,11 +16,13 @@ import { Ionicons } from "@expo/vector-icons";
 import {
 	deleteUser,
 	subscribeCurrentUser,
+	swapUserCompany,
 	updateUser,
 } from "../../controllers/userController";
 import {
 	deleteSoloCompany,
 	isPersonal,
+	removeUserFromCompany,
 } from "../../controllers/companyController";
 
 const ProfilePage = ({ navigation }) => {
@@ -153,7 +155,7 @@ const ProfilePage = ({ navigation }) => {
 	};
 
 	const handleCompanyChange = async (selectedCompany: any) => {
-		console.log("Company change to " + selectedCompany);
+		await swapUserCompany(userId, selectedCompany);
 		return;
 	};
 
@@ -326,21 +328,19 @@ const ProfilePage = ({ navigation }) => {
 							return;
 						}
 
-						await deleteUser(userId);
 						if (isSolo) {
 							await deleteSoloCompany(userData.loggedInCompany);
+							await deleteUser(userId);
 						}
-						if (userData.companies.length > 1) {
-							//TODO: Implement switch company logic here
-						} else {
-							await deleteCurrentUser();
-						}
+						await removeUserFromCompany(
+							userData.loggedInCompany,
+							userId
+						);
 					},
 				},
 			]
 		);
 	};
-
 	return !isLoading ? (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.content}>
@@ -384,12 +384,14 @@ const ProfilePage = ({ navigation }) => {
 
 				<View style={styles.section}>
 					<Text style={styles.label}>Company</Text>
-					{userData.companies.length > 1 ? (
+					{Object.keys(userData.companies).length > 1 ? (
 						<Dropdown
-							data={userData.companies.map((company) => ({
-								label: company,
-								value: company,
-							}))}
+							data={Object.keys(userData.companies).map(
+								(company: string) => ({
+									label: company,
+									value: company,
+								})
+							)}
 							value={userData.loggedInCompany}
 							onChange={(item) => handleCompanyChange(item.value)}
 							labelField="label"

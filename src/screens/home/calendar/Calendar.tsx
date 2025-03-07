@@ -12,13 +12,6 @@ import {
 	TouchableOpacity,
 	Animated,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import {
-	ExpandableCalendar,
-	AgendaList,
-	CalendarProvider,
-	WeekCalendar,
-} from "react-native-calendars";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { BottomSheetView } from "@gorhom/bottom-sheet";
 import DropDownPicker from "react-native-dropdown-picker";
@@ -28,10 +21,9 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
 	getAgendaItems,
 	getMarkedDates,
-	AgendaItemData,
+	AgendaItem,
 } from "./components/agendaItemController";
-import AgendaItem from "./components/AgendaItem";
-import { getTheme, lightThemeColor } from "./theme";
+import { lightThemeColor } from "./theme";
 import LoadingScreen from "../../LoadingScreen";
 import {
 	subscribeCurrentUser,
@@ -43,32 +35,24 @@ import { subscribeEvents } from "../../../controllers/eventController";
 import { subscribeAllUsersInCompany } from "../../../controllers/companyController";
 import { LogBox } from "react-native";
 import { Filter, PlusCircle } from "react-native-feather";
+import { AgendaScreen } from "./components/AgendaScreen";
 
 // Add this near the top of your file, after imports
 LogBox.ignoreLogs([
 	"ExpandableCalendar: Support for defaultProps will be removed from function components",
 ]);
 
-type CalendarProps = {
-	weekView?: any;
-};
-
 type FilterType = "my" | "specific" | "unassigned" | "all";
 
 const today = moment().format("YYYY-MM-DD");
-const leftArrowIcon = require("../../../assets/previous.png");
-const rightArrowIcon = require("../../../assets/next.png");
 
 const getFilterStyle = (type: FilterType, currentFilter: FilterType) => ({
 	backgroundColor: type === currentFilter ? "#e0e0e0" : "#f5f5f5",
 	borderColor: type === currentFilter ? "#2089dc" : "#ccc",
 });
 
-const ExpandableCalendarScreen = ({
-	weekView,
-	navigation,
-}: CalendarProps & { navigation: any }) => {
-	const [agendaItems, setAgendaItems] = useState<AgendaItemData[]>([]);
+const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
+	const [agendaItems, setAgendaItems] = useState<AgendaItem>({});
 	const [selectedDate, setSelectedDate] = useState(today);
 	const [markedDates, setMarkedDates] = useState({});
 	const [isLoading, setIsLoading] = useState(true);
@@ -83,10 +67,10 @@ const ExpandableCalendarScreen = ({
 	const [bottomSheetPosition, setBottomSheetPosition] = useState(-1);
 	const [showAllSelectedOnly, setShowAllSelectedOnly] = useState(false);
 	const [showExactSelectedOnly, setShowExactSelectedOnly] = useState(false);
+	const [refreshKey, setRefreshKey] = useState(0);
 
 	const fabOpacity = useRef(new Animated.Value(1)).current;
 
-	const theme = useRef(getTheme());
 	const bottomSheetRef = useRef<BottomSheet>(null);
 	const snapPoints = useMemo(() => ["65%", "90%"], []);
 
@@ -96,6 +80,7 @@ const ExpandableCalendarScreen = ({
 		const marks = getMarkedDates(items);
 		setAgendaItems(items);
 		setMarkedDates(marks);
+		setRefreshKey((prev) => prev + 1);
 	}, []);
 
 	const closeBottomSheet = () => {
@@ -252,28 +237,15 @@ const ExpandableCalendarScreen = ({
 		}
 	}, [user]);
 
-	const sortedSections = agendaItems
-		.reduce((acc, item) => {
-			const existing = acc.find((x) => x.title === item.date);
-			if (existing) {
-				existing.data.push(...item.data);
-			} else {
-				acc.push({
-					title: item.date,
-					data: [...item.data],
-				});
-			}
-			return acc;
-		}, [] as { title: string; data: any[] }[])
-		.sort(
-			(a, b) => new Date(a.title).getTime() - new Date(b.title).getTime()
-		);
-
-	const renderItem = useCallback(({ item }: { item: AgendaItemData }) => {
-		return <AgendaItem item={item} />;
-	}, []);
-
 	const isAdmin = userPrivilege === "Admin" || userPrivilege === "Owner";
+	const refreshAgenda = useCallback(async () => {
+		// You can add additional refresh logic here if needed
+
+		// Force a re-render by changing the key
+		setRefreshKey((prev) => prev + 1);
+
+		return Promise.resolve();
+	}, []);
 
 	if (isLoading) {
 		return <LoadingScreen />;
@@ -281,55 +253,20 @@ const ExpandableCalendarScreen = ({
 
 	return (
 		<GestureHandlerRootView style={styles.rootView}>
-			<View style={styles.container}>
-				<SafeAreaView style={styles.safeArea}>
+			<SafeAreaView style={styles.safeArea}>
+				<View style={styles.container}>
 					{user ? (
-						<CalendarProvider
-							date={selectedDate}
-							showTodayButton={true}
-							todayButtonStyle={styles.todayButton}
-						>
-							<View style={styles.calendarContainer}>
-								{weekView ? (
-									<WeekCalendar
-										firstDay={1}
-										markedDates={markedDates}
-									/>
-								) : (
-									<ExpandableCalendar
-										horizontal={true}
-										pagingEnabled={true}
-										initialPosition={
-											ExpandableCalendar.positions.OPEN
-										}
-										calendarStyle={styles.calendar}
-										theme={theme.current}
-										firstDay={1}
-										markedDates={markedDates}
-										leftArrowImageSource={leftArrowIcon}
-										rightArrowImageSource={rightArrowIcon}
-										closeOnDayPress={false}
-										date={selectedDate}
-										onDayPress={(day) =>
-											setSelectedDate(day.dateString)
-										}
-									/>
-								)}
-							</View>
-
-							<View style={styles.agendaContainer}>
-								<AgendaList
-									sections={sortedSections}
-									renderItem={renderItem}
-									sectionStyle={styles.section}
-									ListFooterComponent={
-										<View
-											style={{ paddingVertical: 150 }}
-										/>
-									}
-								/>
-							</View>
-						</CalendarProvider>
+						<AgendaScreen
+							onDayPress={(day) =>
+								setSelectedDate(day.dateString)
+							}
+							markedDates={markedDates}
+							agendaItems={agendaItems}
+							selectedDate={selectedDate}
+							navigation={navigation}
+							key={refreshKey}
+							onRefreshData={refreshAgenda}
+						/>
 					) : (
 						<LoadingScreen />
 					)}
@@ -554,7 +491,7 @@ const ExpandableCalendarScreen = ({
 							)}
 						</BottomSheetView>
 					</BottomSheet>
-				</SafeAreaView>
+				</View>
 				{isAdmin && (
 					<>
 						<Animated.View
@@ -593,7 +530,7 @@ const ExpandableCalendarScreen = ({
 						</Animated.View>
 					</>
 				)}
-			</View>
+			</SafeAreaView>
 		</GestureHandlerRootView>
 	);
 };

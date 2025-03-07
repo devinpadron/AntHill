@@ -1,11 +1,7 @@
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
 import { FileUpload } from "../screens/home/calendar/EventSubmit";
 import db from "../global/firestore";
-import {
-	addAttachments,
-	getEventAttachments,
-	deleteEventAttachments,
-} from "./attachmentController";
+import { addAttachments, getEventAttachments } from "./attachmentController";
 /* An EventController that contains:
   - An event interface that provides the structure of event data
   - A function that uses an eventID to pull from Firestore and retrieve the event entry
