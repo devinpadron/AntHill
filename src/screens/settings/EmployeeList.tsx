@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
-	SafeAreaView,
 	View,
 	Text,
 	FlatList,
@@ -24,7 +23,7 @@ import {
 	removeUserFromCompany,
 	subscribeAllUsersInCompany,
 } from "../../controllers/companyController";
-import { deleteUser } from "@react-native-firebase/auth";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Enable LayoutAnimation on Android
 if (
@@ -50,6 +49,7 @@ const EmployeeList = ({ navigation }) => {
 	const [user, setUser] = useState(null);
 	const [loggedInCompany, setLoggedInCompany] = useState(null);
 	const [refreshing, setRefreshing] = useState(false);
+	const insets = useSafeAreaInsets();
 
 	useEffect(() => {
 		if (!user) return;
@@ -252,7 +252,7 @@ const EmployeeList = ({ navigation }) => {
 	);
 
 	return (
-		<SafeAreaView style={styles.container}>
+		<View style={[{ flex: 1, paddingTop: insets.top }, styles.container]}>
 			<View style={styles.titleBar}>
 				<TouchableOpacity
 					containerStyle={{
@@ -280,7 +280,7 @@ const EmployeeList = ({ navigation }) => {
 					/>
 				}
 			/>
-		</SafeAreaView>
+		</View>
 	);
 };
 

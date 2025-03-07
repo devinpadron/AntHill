@@ -16,7 +16,7 @@ import {
 	updateEvent,
 } from "../../../controllers/eventController";
 import LoadingScreen from "../../LoadingScreen";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { TouchableOpacity } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 import moment from "moment";
@@ -36,6 +36,7 @@ type RootStackParamList = {
 type EventDetailsRouteProp = RouteProp<RootStackParamList, "EventDetails">;
 
 const EventDetails = ({ navigation }) => {
+	const insets = useSafeAreaInsets();
 	const route = useRoute<EventDetailsRouteProp>();
 	if (!route.params) return null;
 	console.log(route.params.uid);
@@ -261,7 +262,7 @@ const EventDetails = ({ navigation }) => {
 	if (isLoading || !event) return <LoadingScreen />;
 
 	return (
-		<SafeAreaView style={styles.container}>
+		<View style={[{ flex: 1, paddingTop: insets.top }, styles.container]}>
 			<KeyboardAwareScrollView
 				ref={scrollViewRef}
 				contentContainerStyle={{ flexGrow: 1 }}
@@ -414,7 +415,7 @@ const EventDetails = ({ navigation }) => {
 					/>
 				</View>
 			</KeyboardAwareScrollView>
-		</SafeAreaView>
+		</View>
 	);
 };
 

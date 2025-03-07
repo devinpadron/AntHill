@@ -6,9 +6,8 @@ import {
 	reAuth,
 	signOut,
 	sendResetPassword,
-	deleteCurrentUser,
 } from "../../controllers/authController";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import LoadingScreen from "../LoadingScreen";
 import prompt from "react-native-prompt-android";
 import auth from "@react-native-firebase/auth";
@@ -30,6 +29,7 @@ const ProfilePage = ({ navigation }) => {
 	const [userData, setData] = useState(null);
 	const [isSolo, setIsSolo] = useState(false);
 	const [userId, setUserId] = useState("");
+	const insets = useSafeAreaInsets();
 
 	useEffect(() => {
 		const subscriber = subscribeCurrentUser((user) => {
@@ -342,7 +342,7 @@ const ProfilePage = ({ navigation }) => {
 		);
 	};
 	return !isLoading ? (
-		<SafeAreaView style={styles.container}>
+		<View style={[{ flex: 1, paddingTop: insets.top }, styles.container]}>
 			<View style={styles.content}>
 				<View style={styles.header}>
 					<TouchableOpacity
@@ -424,7 +424,7 @@ const ProfilePage = ({ navigation }) => {
 					</TouchableOpacity>
 				</View>
 			</View>
-		</SafeAreaView>
+		</View>
 	) : (
 		<LoadingScreen />
 	);

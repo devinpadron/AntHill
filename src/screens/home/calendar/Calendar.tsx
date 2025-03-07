@@ -16,7 +16,10 @@ import BottomSheet from "@gorhom/bottom-sheet";
 import { BottomSheetView } from "@gorhom/bottom-sheet";
 import DropDownPicker from "react-native-dropdown-picker";
 import moment from "moment";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+	SafeAreaView,
+	useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
 	getAgendaItems,
@@ -68,8 +71,8 @@ const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 	const [showAllSelectedOnly, setShowAllSelectedOnly] = useState(false);
 	const [showExactSelectedOnly, setShowExactSelectedOnly] = useState(false);
 	const [refreshKey, setRefreshKey] = useState(0);
-
 	const fabOpacity = useRef(new Animated.Value(1)).current;
+	const insets = useSafeAreaInsets();
 
 	const bottomSheetRef = useRef<BottomSheet>(null);
 	const snapPoints = useMemo(() => ["65%", "90%"], []);
@@ -253,7 +256,7 @@ const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 
 	return (
 		<GestureHandlerRootView style={styles.rootView}>
-			<SafeAreaView style={styles.safeArea}>
+			<View style={{ flex: 1, paddingTop: insets.top }}>
 				<View style={styles.container}>
 					{user ? (
 						<AgendaScreen
@@ -530,7 +533,7 @@ const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 						</Animated.View>
 					</>
 				)}
-			</SafeAreaView>
+			</View>
 		</GestureHandlerRootView>
 	);
 };
@@ -543,9 +546,6 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 		backgroundColor: "white",
-	},
-	safeArea: {
-		flex: 1,
 	},
 	calendar: {
 		paddingLeft: 20,

@@ -8,6 +8,7 @@ import { Alert, PermissionsAndroid, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { signOut } from "./src/controllers/authController";
 import messaging from "@react-native-firebase/messaging";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 // This component will handle the conditional rendering based on auth state
 const AppNavigator = () => {
@@ -141,15 +142,17 @@ const AppNavigator = () => {
 
 	return (
 		<GestureHandlerRootView style={{ flex: 1 }}>
-			<NavigationContainer>
-				{loggedIn ? (
-					// User is signed in
-					<HomeTabs />
-				) : (
-					// No user is signed in
-					<AuthStack />
-				)}
-			</NavigationContainer>
+			<SafeAreaProvider>
+				<NavigationContainer>
+					{loggedIn ? (
+						// User is signed in
+						<HomeTabs />
+					) : (
+						// No user is signed in
+						<AuthStack />
+					)}
+				</NavigationContainer>
+			</SafeAreaProvider>
 		</GestureHandlerRootView>
 	);
 };
