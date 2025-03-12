@@ -533,6 +533,23 @@ const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 						</Animated.View>
 					</>
 				)}
+
+				{/* Today Button - Only show when not on today's date */}
+				{selectedDate !== today && (
+					<Animated.View
+						style={{ opacity: fabOpacity }}
+						pointerEvents={isBottomSheetVisible ? "none" : "auto"}
+					>
+						<TouchableOpacity
+							style={styles.todayButton}
+							onPress={() => {
+								setSelectedDate(today);
+							}}
+						>
+							<Text style={styles.todayButtonText}>Today</Text>
+						</TouchableOpacity>
+					</Animated.View>
+				)}
 			</View>
 		</GestureHandlerRootView>
 	);
@@ -700,9 +717,6 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		lineHeight: 20,
 	},
-	todayButton: {
-		bottom: 0,
-	},
 	addEventButton: {
 		position: "absolute",
 		bottom: 10,
@@ -716,6 +730,29 @@ const styles = StyleSheet.create({
 		shadowOpacity: 0.25,
 		shadowRadius: 3.84,
 		elevation: 8,
+	},
+	todayButton: {
+		position: "absolute",
+		bottom: 10,
+		left: 10,
+		zIndex: 999,
+		padding: 10,
+		paddingHorizontal: 15,
+		backgroundColor: "white",
+		borderRadius: 30,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.25,
+		shadowRadius: 3.84,
+		elevation: 8,
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	todayButtonText: {
+		fontSize: 14,
+		fontWeight: "600",
+		color: "#2089dc",
 	},
 });
 
