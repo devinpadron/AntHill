@@ -57,8 +57,8 @@ export async function getUserPrivilege(userID: string, company: string) {
 
 export function subscribeCurrentUser(
 	onSnap: (
-		snapshot: FirebaseFirestoreTypes.DocumentSnapshot<FirebaseFirestoreTypes.DocumentData>
-	) => void
+		snapshot: FirebaseFirestoreTypes.DocumentSnapshot<FirebaseFirestoreTypes.DocumentData>,
+	) => void,
 ) {
 	return db
 		.collection("Users")

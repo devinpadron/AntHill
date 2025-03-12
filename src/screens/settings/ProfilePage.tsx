@@ -67,7 +67,7 @@ const ProfilePage = ({ navigation }) => {
 			console.error("Error updating name:", error);
 			Alert.alert(
 				"Error",
-				"There was an error updating your name. Please try again."
+				"There was an error updating your name. Please try again.",
 			);
 		}
 	};
@@ -96,7 +96,7 @@ const ProfilePage = ({ navigation }) => {
 												if (lastName) {
 													updateUserName(
 														firstName,
-														lastName
+														lastName,
 													);
 												}
 											},
@@ -105,13 +105,13 @@ const ProfilePage = ({ navigation }) => {
 									{
 										type: "plain-text",
 										defaultValue: userData.lastName,
-									}
+									},
 								);
 							}
 						},
 					},
 				],
-				{ type: "plain-text", defaultValue: userData.firstName }
+				{ type: "plain-text", defaultValue: userData.firstName },
 			);
 		} else {
 			// iOS flow
@@ -135,21 +135,21 @@ const ProfilePage = ({ navigation }) => {
 												if (lastName) {
 													updateUserName(
 														firstName,
-														lastName
+														lastName,
 													);
 												}
 											},
 										},
 									],
 									"plain-text",
-									userData.lastName
+									userData.lastName,
 								);
 							}
 						},
 					},
 				],
 				"plain-text",
-				userData.firstName
+				userData.firstName,
 			);
 		}
 	};
@@ -179,7 +179,7 @@ const ProfilePage = ({ navigation }) => {
 							onPress: handlePress,
 						},
 					],
-					{ type: "secure-text" }
+					{ type: "secure-text" },
 				);
 			} else {
 				Alert.prompt(
@@ -192,7 +192,7 @@ const ProfilePage = ({ navigation }) => {
 							onPress: handlePress,
 						},
 					],
-					"secure-text"
+					"secure-text",
 				);
 			}
 		});
@@ -215,7 +215,7 @@ const ProfilePage = ({ navigation }) => {
 							changeEmail(email);
 						},
 					},
-				]
+				],
 			);
 		};
 
@@ -231,7 +231,7 @@ const ProfilePage = ({ navigation }) => {
 						onPress: (text) => confirmEmail(text),
 					},
 				],
-				{ type: "plain-text" }
+				{ type: "plain-text" },
 			);
 		} else {
 			Alert.prompt(
@@ -244,7 +244,7 @@ const ProfilePage = ({ navigation }) => {
 						onPress: (text) => confirmEmail(text),
 					},
 				],
-				"plain-text"
+				"plain-text",
 			);
 		}
 	};
@@ -262,12 +262,12 @@ const ProfilePage = ({ navigation }) => {
 					break;
 				case "auth/email-already-in-use":
 					Alert.alert(
-						"This email is already in use by another account"
+						"This email is already in use by another account",
 					);
 					break;
 				case "auth/requires-recent-login":
 					Alert.alert(
-						"For security, please sign out and sign in again to change your email"
+						"For security, please sign out and sign in again to change your email",
 					);
 					break;
 				default:
@@ -283,7 +283,7 @@ const ProfilePage = ({ navigation }) => {
 					style: "default",
 					onPress: async () => signOut(),
 				},
-			]
+			],
 		);
 	};
 
@@ -299,7 +299,7 @@ const ProfilePage = ({ navigation }) => {
 						sendResetPassword(userData.email);
 					},
 				},
-			]
+			],
 		);
 	};
 
@@ -323,7 +323,7 @@ const ProfilePage = ({ navigation }) => {
 							console.error(e);
 							Alert.alert(
 								"Error",
-								"An error occurred. Please try again."
+								"An error occurred. Please try again.",
 							);
 							return;
 						}
@@ -334,11 +334,11 @@ const ProfilePage = ({ navigation }) => {
 						}
 						await removeUserFromCompany(
 							userData.loggedInCompany,
-							userId
+							userId,
 						);
 					},
 				},
-			]
+			],
 		);
 	};
 	return !isLoading ? (
@@ -390,7 +390,7 @@ const ProfilePage = ({ navigation }) => {
 								(company: string) => ({
 									label: company,
 									value: company,
-								})
+								}),
 							)}
 							value={userData.loggedInCompany}
 							onChange={(item) => handleCompanyChange(item.value)}

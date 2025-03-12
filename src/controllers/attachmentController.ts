@@ -6,7 +6,7 @@ import storage from "@react-native-firebase/storage";
 export async function addAttachments(
 	company: string,
 	eventId: string,
-	attachments: FileUpload[]
+	attachments: FileUpload[],
 ) {
 	try {
 		const batch = db.batch();
@@ -39,7 +39,7 @@ export async function addAttachments(
 
 export async function getEventAttachments(
 	company: string,
-	eventId: string
+	eventId: string,
 ): Promise<FileUpload[]> {
 	try {
 		const attachmentsSnapshot = await db
@@ -61,8 +61,8 @@ export function subscribeEventAttachments(
 	company: string,
 	eventId: string,
 	onSnap: (
-		snapshot: FirebaseFirestoreTypes.QuerySnapshot<FirebaseFirestoreTypes.DocumentData>
-	) => void
+		snapshot: FirebaseFirestoreTypes.QuerySnapshot<FirebaseFirestoreTypes.DocumentData>,
+	) => void,
 ) {
 	return db
 		.collection("Companies")
@@ -76,7 +76,7 @@ export function subscribeEventAttachments(
 export async function deleteEventAttachments(
 	company: string,
 	eventId: string,
-	attachments: string[]
+	attachments: string[],
 ) {
 	try {
 		const attachmentsSnapshot = await db

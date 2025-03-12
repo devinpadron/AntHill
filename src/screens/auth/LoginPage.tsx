@@ -39,7 +39,7 @@ const LoginPage = ({ navigation }) => {
 					case "auth/too-many-requests":
 						Alert.alert(
 							"Too many attempts have been made",
-							"Please try again later, or reset your password"
+							"Please try again later, or reset your password",
 						);
 						break;
 					default:
@@ -145,7 +145,7 @@ const LoginPage = ({ navigation }) => {
 							],
 							{
 								type: "plain-text",
-							}
+							},
 						);
 					}
 					Alert.prompt(
@@ -163,7 +163,7 @@ const LoginPage = ({ navigation }) => {
 								isPreferred: true,
 							},
 						],
-						"plain-text"
+						"plain-text",
 					);
 				}}
 			>

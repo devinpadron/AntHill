@@ -56,8 +56,8 @@ export async function getAllUsersInCompany(company: string) {
 export function subscribeAllUsersInCompany(
 	company: string,
 	onSnap: (
-		snapshot: FirebaseFirestoreTypes.QuerySnapshot<FirebaseFirestoreTypes.DocumentData>
-	) => void
+		snapshot: FirebaseFirestoreTypes.QuerySnapshot<FirebaseFirestoreTypes.DocumentData>,
+	) => void,
 ) {
 	return db
 		.collection("Companies")
@@ -71,7 +71,7 @@ export function subscribeAllUsersInCompany(
 export async function addUserToCompany(
 	company: string,
 	userID: string,
-	personal: boolean = false
+	personal: boolean = false,
 ) {
 	try {
 		await db

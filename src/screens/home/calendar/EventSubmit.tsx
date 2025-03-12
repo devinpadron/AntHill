@@ -126,18 +126,18 @@ const EventSubmit = ({ navigation }) => {
 							event.data().startTime
 								? moment(
 										event.data().startTime,
-										"h:mm A"
-								  ).toDate()
-								: null
+										"h:mm A",
+									).toDate()
+								: null,
 						);
 						setHasEndTime(!!event.data().endTime);
 						setEndTime(
 							event.data().endTime
 								? moment(
 										event.data().endTime,
-										"h:mm A"
-								  ).toDate()
-								: null
+										"h:mm A",
+									).toDate()
+								: null,
 						);
 						setLocations(event.data().locations);
 						setAssignedWorkers(event.data().assignedWorkers);
@@ -145,7 +145,7 @@ const EventSubmit = ({ navigation }) => {
 						setEditID(route.params.uid);
 						checkAttachments(route.params.uid);
 					}
-				}
+				},
 			);
 			setIsLoading(false);
 			return () => subscriber();
@@ -156,7 +156,7 @@ const EventSubmit = ({ navigation }) => {
 		try {
 			const attachments = await getEventAttachments(
 				currentCompany,
-				eventId
+				eventId,
 			);
 			setFiles(attachments);
 		} catch (error) {
@@ -195,10 +195,10 @@ const EventSubmit = ({ navigation }) => {
 							label: `${userData.firstName} ${userData.lastName}`,
 							value: doc.id,
 						};
-					})
+					}),
 				);
 				setAvailableWorkers(workers);
-			}
+			},
 		);
 		return () => subscriber();
 	}, [currentCompany]);
@@ -239,7 +239,7 @@ const EventSubmit = ({ navigation }) => {
 
 	const uploadToFirebase = async (
 		file: FileUpload,
-		eventId: string
+		eventId: string,
 	): Promise<FileUpload> => {
 		try {
 			const fileCategory = file.type.startsWith("image/")
@@ -352,7 +352,7 @@ const EventSubmit = ({ navigation }) => {
 					console.error("Error uploading file:", file.name, error);
 					Alert.alert(
 						"Upload Warning",
-						`Failed to upload ${file.name}`
+						`Failed to upload ${file.name}`,
 					);
 				}
 			}
@@ -382,13 +382,13 @@ const EventSubmit = ({ navigation }) => {
 				await deleteEventAttachments(
 					currentCompany,
 					editID,
-					deletionQueue
+					deletionQueue,
 				);
 				await upload(editID);
 			} else {
 				const eventId = await addEvent(
 					currentCompany,
-					initialEventData
+					initialEventData,
 				);
 				await upload(eventId);
 			}
@@ -399,7 +399,7 @@ const EventSubmit = ({ navigation }) => {
 			switch (error.code) {
 				case "event/invalid-workers":
 					Alert.alert(
-						"One or more selected workers are not available!"
+						"One or more selected workers are not available!",
 					);
 					break;
 				default:
@@ -421,7 +421,7 @@ const EventSubmit = ({ navigation }) => {
 				}
 				return acc;
 			},
-			{}
+			{},
 		);
 	};
 
@@ -485,7 +485,7 @@ const EventSubmit = ({ navigation }) => {
 				await deleteEventAttachments(
 					currentCompany,
 					editID,
-					files.map((file) => file.id)
+					files.map((file) => file.id),
 				);
 				await deleteEvent(editID, currentCompany);
 			} catch (error) {
@@ -510,10 +510,10 @@ const EventSubmit = ({ navigation }) => {
 
 	const renderThumbnails = () => {
 		const imageFiles = files.filter((file) =>
-			file.type.startsWith("image/")
+			file.type.startsWith("image/"),
 		);
 		const documentFiles = files.filter(
-			(file) => !file.type.startsWith("image/")
+			(file) => !file.type.startsWith("image/"),
 		);
 		const handleDelete = (fileToDelete: FileUpload) => {
 			console.log("Deleting file:", fileToDelete.name); // Debug log
@@ -522,15 +522,15 @@ const EventSubmit = ({ navigation }) => {
 			} else {
 				setFiles((currentFiles) =>
 					currentFiles.filter(
-						(file) => file.name !== fileToDelete.name
-					)
+						(file) => file.name !== fileToDelete.name,
+					),
 				);
 			}
 		};
 
 		const undoDelete = (fileToUndo: FileUpload) => {
 			setDeletionQueue((prev) =>
-				prev.filter((id) => id !== fileToUndo.id)
+				prev.filter((id) => id !== fileToUndo.id),
 			);
 		};
 
@@ -779,16 +779,16 @@ const EventSubmit = ({ navigation }) => {
 														address
 													) {
 														setEditingLabelForAddress(
-															""
+															"",
 														);
 														setLabelText("");
 													} else {
 														setEditingLabelForAddress(
-															address
+															address,
 														);
 														setLabelText(
 															locations[address]
-																?.label || ""
+																?.label || "",
 														);
 													}
 												}}
@@ -819,7 +819,7 @@ const EventSubmit = ({ navigation }) => {
 														address
 													) {
 														setEditingLabelForAddress(
-															""
+															"",
 														);
 													}
 												}}
@@ -870,10 +870,10 @@ const EventSubmit = ({ navigation }) => {
 																label: labelText,
 															};
 														setLocations(
-															newLocations
+															newLocations,
 														);
 														setEditingLabelForAddress(
-															""
+															"",
 														);
 													}}
 												>
@@ -903,7 +903,7 @@ const EventSubmit = ({ navigation }) => {
 										)}
 									</View>
 								</React.Fragment>
-						  ))
+							))
 						: null}
 				</View>
 

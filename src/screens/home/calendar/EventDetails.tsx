@@ -64,7 +64,7 @@ const EventDetails = ({ navigation }) => {
 			route.params.uid,
 			(event) => {
 				setEvent(event.data());
-			}
+			},
 		);
 		return () => subscriber();
 	}, [user]);
@@ -76,10 +76,10 @@ const EventDetails = ({ navigation }) => {
 			route.params.uid,
 			(attachments) => {
 				const files = attachments.docs.map(
-					(doc) => doc.data() as FileUpload
+					(doc) => doc.data() as FileUpload,
 				);
 				setAttachments(files);
-			}
+			},
 		);
 		return () => subscriber();
 	}, [event]);
@@ -178,20 +178,20 @@ const EventDetails = ({ navigation }) => {
 
 		if (scheme) {
 			Linking.openURL(scheme).catch((err) =>
-				console.error("Error opening map: ", err)
+				console.error("Error opening map: ", err),
 			);
 		}
 	};
 
 	const renderThumbnails = () => {
 		const imageFiles = attachments.filter((file) =>
-			file.type.startsWith("image/")
+			file.type.startsWith("image/"),
 		);
 		const images = imageFiles.map((file) => ({
 			uri: file.url,
 		}));
 		const documentFiles = attachments.filter(
-			(file) => !file.type.startsWith("image/")
+			(file) => !file.type.startsWith("image/"),
 		);
 
 		return (
@@ -307,7 +307,7 @@ const EventDetails = ({ navigation }) => {
 							<>
 								<Text style={styles.timeText}>
 									{moment(event.startTime, "HH:mm").format(
-										"h:mma"
+										"h:mma",
 									)}
 								</Text>
 
@@ -317,7 +317,7 @@ const EventDetails = ({ navigation }) => {
 										<Text style={styles.timeText}>
 											{moment(
 												event.endTime,
-												"HH:mm"
+												"HH:mm",
 											).format("h:mma")}
 										</Text>
 									</>
@@ -406,7 +406,7 @@ const EventDetails = ({ navigation }) => {
 								updateEvent(
 									user.loggedInCompany,
 									route.params.uid,
-									updatedEvent
+									updatedEvent,
 								);
 								setEvent(updatedEvent);
 							}

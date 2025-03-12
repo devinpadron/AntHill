@@ -66,7 +66,7 @@ const EmployeeList = ({ navigation }) => {
 					employeeData[doc.id] = employeeJson;
 				}
 				setEmployees(employeeData);
-			}
+			},
 		);
 		return () => subscriber();
 	}, [user]);
@@ -108,7 +108,7 @@ const EmployeeList = ({ navigation }) => {
 			(employee) =>
 				employee &&
 				employee.companies[loggedInCompany] &&
-				employee.firstName
+				employee.firstName,
 		) // Filter out invalid entries
 		.sort((a, b) => {
 			const privilegeOrder = { Owner: 0, Admin: 1, User: 2 };
@@ -154,11 +154,11 @@ const EmployeeList = ({ navigation }) => {
 									});
 									console.log(
 										"Demoted",
-										employee.firstName + employee.lastName
+										employee.firstName + employee.lastName,
 									);
 									onRefresh();
 								},
-						  }
+							}
 						: {
 								text: "Promote",
 								onPress: () => {
@@ -170,11 +170,11 @@ const EmployeeList = ({ navigation }) => {
 									});
 									console.log(
 										"Promoted",
-										employee.firstName + employee.lastName
+										employee.firstName + employee.lastName,
 									);
 									onRefresh();
 								},
-						  },
+							},
 					{
 						text: "Delete",
 						style: "destructive",
@@ -194,17 +194,17 @@ const EmployeeList = ({ navigation }) => {
 										onPress: () => {
 											removeUserFromCompany(
 												loggedInCompany,
-												employee.id
+												employee.id,
 											);
 											console.log(
 												"Deleted",
 												employee.firstName +
-													employee.lastName
+													employee.lastName,
 											);
 											onRefresh();
 										},
 									},
-								]
+								],
 							);
 						},
 					},
@@ -212,7 +212,7 @@ const EmployeeList = ({ navigation }) => {
 						text: "Cancel",
 						style: "cancel",
 					},
-				]
+				],
 			);
 		}
 	};

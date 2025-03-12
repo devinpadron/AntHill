@@ -98,15 +98,15 @@ export const AgendaScreen = ({
 									? item.endTime
 										? `${moment(
 												item.startTime,
-												"hh:mm"
-										  ).format("h:mm A")} - ${moment(
+												"hh:mm",
+											).format("h:mm A")} - ${moment(
 												item.endTime,
-												"hh:mm"
-										  ).format("h:mm A")}`
+												"hh:mm",
+											).format("h:mm A")}`
 										: `${moment(
 												item.startTime,
-												"hh:mm"
-										  ).format("h:mm A")}`
+												"hh:mm",
+											).format("h:mm A")}`
 									: "All Day"}
 							</Text>
 							{item.duration && (

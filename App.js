@@ -35,7 +35,7 @@ const AppNavigator = () => {
 
 		if (Platform.OS === "android") {
 			PermissionsAndroid.request(
-				PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+				PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
 			);
 		} else if (Platform.OS === "ios") {
 			requestUserPermission();
@@ -48,7 +48,7 @@ const AppNavigator = () => {
 		const unsubscribe = messaging().onMessage(async (remoteMessage) => {
 			Alert.alert(
 				"A new FCM message arrived!",
-				JSON.stringify(remoteMessage)
+				JSON.stringify(remoteMessage),
 			);
 		});
 
@@ -74,17 +74,17 @@ const AppNavigator = () => {
 										await user.sendEmailVerification();
 										Alert.alert(
 											"Success",
-											"Verification email sent!"
+											"Verification email sent!",
 										);
 									}
 								} catch (error) {
 									console.error(
 										"Error sending verification email:",
-										error
+										error,
 									);
 									Alert.alert(
 										"Failed to send verification email. Please try again.",
-										error.message
+										error.message,
 									);
 								}
 								signOut();
@@ -97,7 +97,7 @@ const AppNavigator = () => {
 								signOut();
 							},
 						},
-					]
+					],
 				);
 			}
 		};

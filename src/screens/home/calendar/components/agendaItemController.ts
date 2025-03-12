@@ -31,7 +31,7 @@ export interface AgendaItem {
 }
 
 function createAgendaItem(
-	docRef: FirebaseFirestoreTypes.DocumentData
+	docRef: FirebaseFirestoreTypes.DocumentData,
 ): AgendaItemData {
 	const id = docRef.id;
 	docRef = docRef.data();
