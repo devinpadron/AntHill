@@ -287,13 +287,12 @@ const EmployeeList = ({ navigation }) => {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		marginTop: 20,
+		//marginTop: 20,
 	},
 	titleBar: {
 		display: "flex",
 		justifyContent: "center",
 		padding: 10,
-		backgroundColor: "#f8f8f8",
 		borderBottomWidth: 1,
 		borderBottomColor: "#ccc",
 	},
