@@ -52,12 +52,12 @@ const SignUpPage = ({ navigation }) => {
 		// Password must be 8 characters long, include atleast 1 uppercase char, 1 lowercase char, 1 number, and 1 special char.
 		// The reason for the tight restrictions is due to the amount of personal data being saved, and how this is tied directly to their job.
 		const regexp = new RegExp(
-			"^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$"
+			"^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$",
 		);
 		if (regexp.test(password) == false) {
 			Alert.alert(
 				"Weak password",
-				"Your password must include atleast:\n\n8 characters\n1 uppercase character\n1 lowercase character\n1 number\n1 special character"
+				"Your password must include atleast:\n\n8 characters\n1 uppercase character\n1 lowercase character\n1 number\n1 special character",
 			);
 			return false;
 		}

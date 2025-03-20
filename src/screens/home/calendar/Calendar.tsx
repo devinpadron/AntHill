@@ -124,7 +124,7 @@ const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 				}).start();
 			}
 		},
-		[fabOpacity]
+		[fabOpacity],
 	);
 
 	const handleFilterChange = (type: FilterType) => {
@@ -155,10 +155,10 @@ const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 							label: `${userData.firstName} ${userData.lastName}`,
 							value: doc.id,
 						};
-					})
+					}),
 				);
 				setAvailableWorkers(workers);
-			}
+			},
 		);
 		return () => subscriber();
 	}, [user?.loggedInCompany]);
@@ -187,7 +187,7 @@ const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 				user.loggedInCompany,
 				userIds,
 				handleEventsUpdate,
-				filterOptions
+				filterOptions,
 			);
 			return () => unsubscribe?.();
 		} else if (filterType === "unassigned" || filterType === "all") {
@@ -198,7 +198,7 @@ const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 			filterType,
 			user.loggedInCompany,
 			userIds,
-			handleEventsUpdate
+			handleEventsUpdate,
 		);
 
 		return () => {
@@ -223,7 +223,7 @@ const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 				setUserId(userSnapshot.id);
 				const privilege = await getUserPrivilege(
 					userSnapshot.id,
-					userData.loggedInCompany
+					userData.loggedInCompany,
 				);
 				setUserPrivilege(privilege || "User");
 			} catch (error) {
@@ -295,7 +295,7 @@ const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 												setFilterType("my");
 												setTimeout(() => {
 													bottomSheetRef.current?.snapToIndex(
-														0
+														0,
 													);
 													setBottomSheetPosition(0);
 												}, 100);
@@ -341,11 +341,11 @@ const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 												style={styles.checkboxRow}
 												onPress={() => {
 													setShowAllSelectedOnly(
-														(prev) => !prev
+														(prev) => !prev,
 													);
 													if (!showAllSelectedOnly) {
 														setShowExactSelectedOnly(
-															false
+															false,
 														);
 													}
 												}}
@@ -378,13 +378,13 @@ const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 												style={styles.checkboxRow}
 												onPress={() => {
 													setShowExactSelectedOnly(
-														(prev) => !prev
+														(prev) => !prev,
 													);
 													if (
 														!showExactSelectedOnly
 													) {
 														setShowAllSelectedOnly(
-															false
+															false,
 														);
 													}
 												}}
@@ -448,7 +448,7 @@ const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 											styles.filterOption,
 											getFilterStyle(
 												"specific",
-												filterType
+												filterType,
 											),
 										]}
 										onPress={() =>
@@ -465,7 +465,7 @@ const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 											styles.filterOption,
 											getFilterStyle(
 												"unassigned",
-												filterType
+												filterType,
 											),
 										]}
 										onPress={() =>
@@ -532,6 +532,23 @@ const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 							</TouchableOpacity>
 						</Animated.View>
 					</>
+				)}
+
+				{/* Today Button - Only show when not on today's date */}
+				{selectedDate !== today && (
+					<Animated.View
+						style={{ opacity: fabOpacity }}
+						pointerEvents={isBottomSheetVisible ? "none" : "auto"}
+					>
+						<TouchableOpacity
+							style={styles.todayButton}
+							onPress={() => {
+								setSelectedDate(today);
+							}}
+						>
+							<Text style={styles.todayButtonText}>Today</Text>
+						</TouchableOpacity>
+					</Animated.View>
 				)}
 			</View>
 		</GestureHandlerRootView>
@@ -700,9 +717,6 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		lineHeight: 20,
 	},
-	todayButton: {
-		bottom: 0,
-	},
 	addEventButton: {
 		position: "absolute",
 		bottom: 10,
@@ -716,6 +730,29 @@ const styles = StyleSheet.create({
 		shadowOpacity: 0.25,
 		shadowRadius: 3.84,
 		elevation: 8,
+	},
+	todayButton: {
+		position: "absolute",
+		bottom: 10,
+		left: 10,
+		zIndex: 999,
+		padding: 10,
+		paddingHorizontal: 15,
+		backgroundColor: "white",
+		borderRadius: 30,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.25,
+		shadowRadius: 3.84,
+		elevation: 8,
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	todayButtonText: {
+		fontSize: 14,
+		fontWeight: "600",
+		color: "#2089dc",
 	},
 });
 

@@ -68,8 +68,8 @@ export function subscribeEvent(
 	company: string,
 	eventID: string,
 	onSnap: (
-		snapshot: FirebaseFirestoreTypes.DocumentSnapshot<FirebaseFirestoreTypes.DocumentData>
-	) => void
+		snapshot: FirebaseFirestoreTypes.DocumentSnapshot<FirebaseFirestoreTypes.DocumentData>,
+	) => void,
 ) {
 	return db
 		.collection("Companies")
@@ -81,7 +81,7 @@ export function subscribeEvent(
 
 export async function getEventsByDate(
 	company: string,
-	date: string
+	date: string,
 ): Promise<FirebaseFirestoreTypes.DocumentData[]> {
 	if (!isValidDateFormat(date)) {
 		throw new Error("Invalid date format. Please use YYYY-MM-DD.");
@@ -108,7 +108,7 @@ export async function getEventsByDate(
 }
 
 export async function getAllEvents(
-	company: string
+	company: string,
 ): Promise<FirebaseFirestoreTypes.DocumentData[]> {
 	try {
 		const eventsFromDB = await db
@@ -126,8 +126,8 @@ export async function getAllEvents(
 export function subscribeAllEvents(
 	company: string,
 	onSnap: (
-		snapshot: FirebaseFirestoreTypes.QuerySnapshot<FirebaseFirestoreTypes.DocumentData>
-	) => void
+		snapshot: FirebaseFirestoreTypes.QuerySnapshot<FirebaseFirestoreTypes.DocumentData>,
+	) => void,
 ) {
 	return db
 		.collection("Companies")
@@ -141,12 +141,12 @@ export function subscribeEvents(
 	company: string,
 	userIDs: string[],
 	onSnap: (
-		snapshot: FirebaseFirestoreTypes.QuerySnapshot<FirebaseFirestoreTypes.DocumentData>
+		snapshot: FirebaseFirestoreTypes.QuerySnapshot<FirebaseFirestoreTypes.DocumentData>,
 	) => void,
 	filterOptions?: {
 		requireAllSelected?: boolean;
 		exactMatchOnly?: boolean;
-	}
+	},
 ) {
 	try {
 		switch (type) {
@@ -189,7 +189,7 @@ export function subscribeEvents(
 								const assignedWorkers =
 									doc.data().assignedWorkers || [];
 								return userIDs.every((uid) =>
-									assignedWorkers.includes(uid)
+									assignedWorkers.includes(uid),
 								);
 							});
 							// Create a new snapshot-like object with filtered docs
@@ -265,7 +265,7 @@ export async function deleteEvent(eventID: string, company: string) {
 export async function updateEvent(
 	company: string,
 	eventID: string,
-	eventData: Event
+	eventData: Event,
 ) {
 	try {
 		await db

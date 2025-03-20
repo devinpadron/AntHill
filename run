@@ -54,7 +54,7 @@ const main = async () => {
 			platform !== undefined
 		) {
 			console.error(
-				"Invalid platform. Please specify 'ios', 'android', or leave it blank."
+				"Invalid platform. Please specify 'ios', 'android', or leave it blank.",
 			);
 			return;
 		}

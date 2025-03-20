@@ -36,7 +36,7 @@ export async function sendResetPassword(email: string) {
 		.sendPasswordResetEmail(email)
 		.then(() => {
 			Alert.alert(
-				"Please check your email to finish resetting your password"
+				"Please check your email to finish resetting your password",
 			);
 		})
 		.catch((error) => {
