@@ -158,3 +158,54 @@ export async function removeUserFromCompany(company: string, userID: string) {
 		return false;
 	}
 }
+
+export const joinCompanyWithAccessCode = async (userId, accessCode) => {
+	try {
+		// Query companies collection for the access code
+		const companySnapshot = await db
+			.collection("Companies")
+			.where("accessCode", "==", accessCode)
+			.get();
+
+		if (companySnapshot.empty) {
+			return false; // No company found with this access code
+		}
+
+		// Get the company document
+		const companyDoc = companySnapshot.docs[0];
+		const companyId = companyDoc.id;
+		const companyData = companyDoc.data();
+
+		// Check if user is already a member
+		const userCompaniesSnapshot = await db
+			.collection("Users")
+			.doc(userId)
+			.get();
+
+		const userData = userCompaniesSnapshot.data();
+		if (userData.companies && userData.companies[companyId]) {
+			return false; // User is already a member
+		}
+
+		// Add user to company's users collection
+		await db
+			.collection("Companies")
+			.doc(companyId)
+			.collection("Users")
+			.doc(userId)
+			.set({});
+
+		// Add company to user's companies
+		await db
+			.collection("Users")
+			.doc(userId)
+			.update({
+				[`companies.${companyId}`]: "User",
+			});
+
+		return companyId; // Return company ID for switching
+	} catch (error) {
+		console.error("Error joining company:", error);
+		throw error;
+	}
+};

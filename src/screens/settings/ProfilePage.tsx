@@ -21,6 +21,7 @@ import {
 import {
 	deleteSoloCompany,
 	isPersonal,
+	joinCompanyWithAccessCode,
 	removeUserFromCompany,
 } from "../../controllers/companyController";
 
@@ -196,6 +197,141 @@ const ProfilePage = ({ navigation }) => {
 				);
 			}
 		});
+
+	const handleJoinCompany = () => {
+		const promptForCode = () => {
+			if (Platform.OS === "android") {
+				prompt(
+					"Join Company",
+					"Enter the company access code:",
+					[
+						{ text: "Cancel", style: "cancel" },
+						{
+							text: "Join",
+							onPress: async (accessCode) => {
+								if (!accessCode || accessCode.trim() === "") {
+									Alert.alert(
+										"Error",
+										"Please enter a valid access code",
+									);
+									return;
+								}
+
+								try {
+									setIsLoading(true);
+									const success =
+										await joinCompanyWithAccessCode(
+											userId,
+											accessCode.trim(),
+										);
+									setIsLoading(false);
+
+									if (success) {
+										Alert.alert(
+											"Success",
+											"You've successfully joined the company. Would you like to switch to it now?",
+											[
+												{ text: "No", style: "cancel" },
+												{
+													text: "Yes",
+													onPress: () =>
+														handleCompanyChange(
+															success,
+														),
+												},
+											],
+										);
+									} else {
+										Alert.alert(
+											"Error",
+											"Invalid access code or you're already a member of this company",
+										);
+									}
+								} catch (error) {
+									setIsLoading(false);
+									console.error(
+										"Error joining company:",
+										error,
+									);
+									Alert.alert(
+										"Error",
+										"Failed to join company. Please try again.",
+									);
+								}
+							},
+						},
+					],
+					{ type: "plain-text" },
+				);
+			} else {
+				// iOS version
+				Alert.prompt(
+					"Join Company",
+					"Enter the company access code:",
+					[
+						{ text: "Cancel", style: "cancel" },
+						{
+							text: "Join",
+							onPress: async (accessCode) => {
+								if (!accessCode || accessCode.trim() === "") {
+									Alert.alert(
+										"Error",
+										"Please enter a valid access code",
+									);
+									return;
+								}
+
+								try {
+									setIsLoading(true);
+									const success =
+										await joinCompanyWithAccessCode(
+											userId,
+											accessCode.trim(),
+										);
+									setIsLoading(false);
+
+									if (success) {
+										Alert.alert(
+											"Success",
+											"You've successfully joined the company. Would you like to switch to it now?",
+											[
+												{ text: "No", style: "cancel" },
+												{
+													text: "Yes",
+													onPress: () =>
+														handleCompanyChange(
+															success,
+														),
+												},
+											],
+										);
+									} else {
+										Alert.alert(
+											"Error",
+											"Invalid access code or you're already a member of this company",
+										);
+									}
+								} catch (error) {
+									setIsLoading(false);
+									console.error(
+										"Error joining company:",
+										error,
+									);
+									Alert.alert(
+										"Error",
+										"Failed to join company. Please try again.",
+									);
+								}
+							},
+						},
+					],
+					"plain-text",
+				);
+			}
+		};
+
+		promptForCode();
+	};
 
 	const handleEmailChange = async () => {
 		await reAuthenticatePrompt().catch((error) => {
@@ -403,6 +539,15 @@ const ProfilePage = ({ navigation }) => {
 							{isSolo ? "Personal" : userData.loggedInCompany}
 						</Text>
 					)}
+
+					<TouchableOpacity
+						style={[styles.button, styles.joinCompanyButton]}
+						onPress={handleJoinCompany}
+					>
+						<Text style={styles.buttonText}>
+							Join Another Company
+						</Text>
+					</TouchableOpacity>
 				</View>
 
 				<View style={styles.buttonContainer}>
@@ -467,6 +612,10 @@ const styles = StyleSheet.create({
 		padding: 10,
 		borderRadius: 8,
 		marginVertical: 8,
+	},
+	joinCompanyButton: {
+		backgroundColor: "#007AFF",
+		marginTop: 16,
 	},
 	buttonText: {
 		color: "#fff",
