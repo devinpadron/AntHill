@@ -275,7 +275,15 @@ const EventDetails = ({ navigation }) => {
 					>
 						<Ionicons name="chevron-back" size={28} color="#000" />
 					</TouchableOpacity>
-					<Text style={styles.title}>{event.title}</Text>
+					<View style={styles.titleContainer}>
+						<Text
+							style={styles.title}
+							numberOfLines={2}
+							ellipsizeMode="tail"
+						>
+							{event.title}
+						</Text>
+					</View>
 					{(user.companies[user.loggedInCompany] === "Owner" ||
 						user.companies[user.loggedInCompany] === "Admin") && (
 						<TouchableOpacity
@@ -430,29 +438,35 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: "#fff",
 	},
+	titleContainer: {
+		flex: 1,
+		paddingHorizontal: 10,
+	},
 	header: {
 		display: "flex",
+		flexDirection: "row",
 		paddingHorizontal: 16,
 		paddingVertical: 12,
 		borderBottomWidth: 1,
 		borderBottomColor: "#eee",
-		justifyContent: "center",
+		alignItems: "center", // Center items vertically
+		minHeight: 60, // Ensure minimum height for wrapped text
 	},
 	backButton: {
-		left: 20,
-		position: "absolute",
+		width: 40,
 		zIndex: 1,
+		paddingRight: 8,
 	},
 	editButton: {
-		right: 20,
-		position: "absolute",
+		width: 40,
 		zIndex: 1,
+		paddingLeft: 8,
 	},
 	title: {
-		flex: 1,
 		fontSize: 20,
 		fontWeight: "bold",
 		textAlign: "center",
+		flexWrap: "wrap", // Enable text wrapping
 	},
 	content: {
 		flex: 1,

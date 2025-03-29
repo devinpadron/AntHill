@@ -128,6 +128,10 @@ const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 	);
 
 	const handleFilterChange = (type: FilterType) => {
+		if (userPrivilege !== "Admin" && userPrivilege !== "Owner") {
+			return;
+		}
+
 		setFilterType(type);
 		if (type === "specific" && !selectedUsers.length) {
 			return;
@@ -174,6 +178,24 @@ const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 		if (!user?.loggedInCompany || !userId) return;
 
 		let userIds = [userId];
+
+		if (userPrivilege !== "Admin" && userPrivilege !== "Owner") {
+			if (filterType !== "my") {
+				setFilterType("my");
+			}
+
+			const unsubscribe = subscribeEvents(
+				filterType,
+				user.loggedInCompany,
+				userIds,
+				handleEventsUpdate,
+			);
+
+			return () => {
+				if (unsubscribe) unsubscribe();
+			};
+		}
+
 		if (filterType === "specific") {
 			userIds = selectedUsers.length > 0 ? selectedUsers : [userId];
 
@@ -212,6 +234,7 @@ const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 		showAllSelectedOnly,
 		showExactSelectedOnly,
 		handleEventsUpdate,
+		userPrivilege,
 	]);
 
 	useEffect(() => {
@@ -226,6 +249,12 @@ const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 					userData.loggedInCompany,
 				);
 				setUserPrivilege(privilege || "User");
+
+				if (privilege !== "Admin" && privilege !== "Owner") {
+					setFilterType("my");
+				} else {
+					setFilterType("all");
+				}
 			} catch (error) {
 				console.error(error);
 			}
@@ -292,7 +321,7 @@ const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 												setShowExactSelectedOnly(false);
 												setSelectedUsers([]);
 												setOpenSelect(false);
-												setFilterType("my");
+												setFilterType("all");
 												setTimeout(() => {
 													bottomSheetRef.current?.snapToIndex(
 														0,
