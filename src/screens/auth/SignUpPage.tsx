@@ -1,209 +1,90 @@
-import React, { useState } from "react";
-import {
-	TextInput,
-	TouchableOpacity,
-	Text,
-	StyleSheet,
-	Alert,
-	ActivityIndicator,
-	View,
-} from "react-native";
-import auth from "@react-native-firebase/auth";
+import React from "react";
+import { StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { capitalize, lowerCase } from "lodash";
-import { addUser } from "../../services/userService";
-import {
-	addUserToCompany,
-	compareAccessCode,
-} from "../../services/companyService";
+import { FormInput } from "../../components/ui/FormInput";
+import { Button } from "../../components/ui/Button";
+import { ToggleSwitch } from "../../components/ui/ToggleSwitch";
+import { useSignUp } from "../../hooks/useSignUp";
+import { AntHill } from "../../constants/colors";
 
 const SignUpPage = ({ navigation }) => {
-	const [firstName, setFirstName] = useState("");
-	const [lastName, setLastName] = useState("");
-	const [email, setEmail] = useState("");
-	const [password, setPassword] = useState("");
-	const [confPassword, setConfPassword] = useState("");
-	const [accessCode, setAccessCode] = useState("");
-	const [isLoading, setIsLoading] = useState(false);
-	const [isSolo, setIsSolo] = useState(false);
-
-	const validateFields = () => {
-		if (!firstName.trim()) {
-			Alert.alert("First name is required.");
-			return false;
-		}
-		if (!lastName.trim()) {
-			Alert.alert("Last name is required.");
-			return false;
-		}
-		if (!email.trim()) {
-			Alert.alert("Email is required.");
-			return false;
-		}
-		if (!password) {
-			Alert.alert("Password is required.");
-			return false;
-		}
-		if (password !== confPassword) {
-			Alert.alert("Passwords do not match.");
-			return false;
-		}
-
-		// Password must be 8 characters long, include atleast 1 uppercase char, 1 lowercase char, 1 number, and 1 special char.
-		// The reason for the tight restrictions is due to the amount of personal data being saved, and how this is tied directly to their job.
-		const regexp = new RegExp(
-			"^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$",
-		);
-		if (regexp.test(password) == false) {
-			Alert.alert(
-				"Weak password",
-				"Your password must include atleast:\n\n8 characters\n1 uppercase character\n1 lowercase character\n1 number\n1 special character",
-			);
-			return false;
-		}
-		// Add any other validation rules here (e.g., for accessCode if it's required)
-		return true; // No errors
-	};
-
-	const handleSignUp = async () => {
-		if (!validateFields()) {
-			return;
-		}
-		const company = await compareAccessCode(accessCode);
-		if (!isSolo) {
-			if (company == "" || company == null) {
-				Alert.alert("Invalid Access Code");
-				return;
-			}
-		}
-		setIsLoading(true);
-		await auth()
-			.createUserWithEmailAndPassword(email, password)
-			.then(async (userCredential) => {
-				const user = userCredential.user;
-				await user.updateProfile({
-					displayName:
-						capitalize(firstName) + " " + capitalize(lastName),
-				});
-				if (isSolo) {
-					const userData = {
-						firstName: capitalize(firstName),
-						lastName: capitalize(lastName),
-						email: lowerCase(email),
-						loggedInCompany: user.uid,
-						companies: { [user.uid]: "Owner" },
-					};
-					await addUser(userData, user.uid);
-					await addUserToCompany(user.uid, user.uid, true);
-				} else {
-					const userData = {
-						firstName: capitalize(firstName),
-						lastName: capitalize(lastName),
-						email: lowerCase(email),
-						loggedInCompany: company,
-						companies: { [company]: "User" },
-					};
-					await addUser(userData, user.uid);
-					await addUserToCompany(company, user.uid);
-				}
-				await user.sendEmailVerification();
-				console.log("User account created & signed in!");
-			})
-			.catch((error) => {
-				switch (error.code) {
-					case "auth/email-already-in-use":
-						Alert.alert("That email address is already in use!");
-						break;
-					case "auth/invalid-email":
-						Alert.alert("That email address is invalid!");
-						break;
-					default:
-						Alert.alert(error.message);
-						console.error(error);
-				}
-			});
-		navigation.pop();
-		setIsLoading(false);
-	};
+	const {
+		firstName,
+		setFirstName,
+		lastName,
+		setLastName,
+		email,
+		setEmail,
+		password,
+		setPassword,
+		confPassword,
+		setConfPassword,
+		accessCode,
+		setAccessCode,
+		isLoading,
+		isSolo,
+		togglePersonalAccount,
+		handleSignUp,
+	} = useSignUp(navigation);
 
 	return (
 		<SafeAreaView style={styles.container}>
-			<TextInput
-				style={styles.textInput}
+			<FormInput
 				placeholder="First Name:"
-				onChangeText={setFirstName}
 				value={firstName}
-				autoCorrect={false}
+				onChangeText={setFirstName}
 			/>
-			<TextInput
-				style={styles.textInput}
+
+			<FormInput
 				placeholder="Last Name:"
-				onChangeText={setLastName}
 				value={lastName}
-				autoCorrect={false}
+				onChangeText={setLastName}
 			/>
-			<TextInput
-				style={styles.textInput}
+
+			<FormInput
 				placeholder="Email:"
-				onChangeText={setEmail}
 				value={email}
-				autoCorrect={false}
-				autoCapitalize="none"
+				onChangeText={setEmail}
 				keyboardType="email-address"
 			/>
-			<TextInput
-				style={styles.textInput}
+
+			<FormInput
 				placeholder="Password:"
-				onChangeText={setPassword}
 				value={password}
-				autoCorrect={false}
-				autoCapitalize="none"
-				secureTextEntry={true}
+				onChangeText={setPassword}
+				secureTextEntry
 			/>
-			<TextInput
-				style={styles.textInput}
+
+			<FormInput
 				placeholder="Confirm Password:"
-				onChangeText={setConfPassword}
 				value={confPassword}
-				autoCorrect={false}
-				autoCapitalize="none"
-				secureTextEntry={true}
+				onChangeText={setConfPassword}
+				secureTextEntry
 			/>
+
 			{!isSolo && (
-				<TextInput
-					style={styles.textInput}
+				<FormInput
 					placeholder="Company Code:"
-					onChangeText={setAccessCode}
 					value={accessCode}
-					autoCapitalize="none"
-					autoCorrect={false}
+					onChangeText={setAccessCode}
 				/>
 			)}
 
-			<TouchableOpacity
-				style={styles.toggleContainer}
-				onPress={() => {
-					setIsSolo(!isSolo);
-					setAccessCode("");
-				}}
-			>
-				<View style={[styles.toggle, isSolo && styles.toggleActive]}>
-					<View
-						style={[
-							styles.toggleButton,
-							isSolo && styles.toggleButtonActive,
-						]}
-					/>
-				</View>
-				<Text style={styles.toggleText}>Personal Account</Text>
-			</TouchableOpacity>
+			<ToggleSwitch
+				value={isSolo}
+				onValueChange={togglePersonalAccount}
+				label="Personal Account"
+			/>
 
-			<TouchableOpacity style={styles.roundButton} onPress={handleSignUp}>
-				<Text style={{ color: "white" }}>Sign Up</Text>
-			</TouchableOpacity>
-			{isLoading ? (
-				<ActivityIndicator size="small" color="#0000ff" />
-			) : null}
+			<Button
+				title="Sign Up"
+				onPress={handleSignUp}
+				loading={isLoading}
+				style={styles.signUpButton}
+				textStyle={styles.buttonText}
+				variant="primary"
+				fullWidth
+			/>
 		</SafeAreaView>
 	);
 };
@@ -214,54 +95,29 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 		alignItems: "center",
-	},
-	textInput: {
-		width: 350,
-		height: 40,
-		color: "black",
-		margin: 10,
-		padding: 5,
-		fontSize: 16,
-		borderColor: "rgba(211,211,211,0.5)",
-		borderWidth: 1,
-		borderRadius: 5,
-	},
-	roundButton: {
-		width: 350,
-		margin: 15,
-		alignItems: "center",
-		justifyContent: "center",
-		backgroundColor: "#1b2c3a",
-		borderRadius: 20,
-		height: 30,
-	},
-	toggleContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-		marginVertical: 10,
+		//justifyContent: "center",
 		paddingHorizontal: 20,
-	},
-	toggle: {
-		width: 50,
-		height: 30,
-		borderRadius: 15,
-		backgroundColor: "#e0e0e0",
-		padding: 2,
-	},
-	toggleActive: {
-		backgroundColor: "#4CAF50",
-	},
-	toggleButton: {
-		width: 26,
-		height: 26,
-		borderRadius: 13,
 		backgroundColor: "white",
 	},
-	toggleButtonActive: {
-		transform: [{ translateX: 20 }],
+	signUpButton: {
+		height: 48,
+		marginTop: 20,
+		borderRadius: 8,
+		width: "100%",
+		backgroundColor: AntHill.Black,
 	},
-	toggleText: {
-		marginLeft: 10,
+	buttonText: {
+		fontSize: 18,
+		fontWeight: "600",
+		color: AntHill.White,
+	},
+	backButton: {
+		backgroundColor: "transparent",
+		marginTop: 16,
+	},
+	backButtonText: {
 		fontSize: 16,
+		color: AntHill.Black,
+		textDecorationLine: "underline",
 	},
 });

@@ -1,45 +1,13 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { View, Text, StyleSheet, StatusBar, Alert } from "react-native";
-import { TouchableOpacity } from "react-native-gesture-handler";
-import { Ionicons } from "@expo/vector-icons";
-import { signOut } from "../../services/authService";
-import { subscribeCurrentUser } from "../../services/userService";
+import { SettingsItem } from "../../components/settings/SettingsItem";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useUser } from "../../contexts/UserContext";
 
 const Settings = ({ navigation }: any) => {
 	const insets = useSafeAreaInsets();
-	const [isAdmin, setIsAdmin] = React.useState(false);
-	const SettingsItem: React.FC<{
-		title: string;
-		isAction?: boolean;
-		onPress: () => void;
-	}> = ({ title, isAction = false, onPress }) => (
-		<TouchableOpacity style={styles.settingsItem} onPress={onPress}>
-			<Text
-				style={[styles.settingsItemText, isAction && styles.actionText]}
-			>
-				{title}
-			</Text>
-			{!isAction && (
-				<Ionicons
-					name="chevron-forward-outline"
-					size={20}
-					color="#888"
-				/>
-			)}
-		</TouchableOpacity>
-	);
 
-	useEffect(() => {
-		const subscriber = subscribeCurrentUser((user) => {
-			const userData = user.data();
-			if (userData) {
-				const privilege = userData.companies[userData.loggedInCompany];
-				setIsAdmin(privilege === "Admin" || privilege === "Owner");
-			}
-		});
-		return () => subscriber();
-	}, []);
+	const { user: userData, isAdmin, logout } = useUser();
 
 	const pushProfile = () => {
 		navigation.push("Profile");
@@ -56,7 +24,7 @@ const Settings = ({ navigation }: any) => {
 				text: "Logout",
 				onPress: async () => {
 					try {
-						signOut();
+						logout();
 					} catch (error) {
 						console.error("Signout Error", error);
 					}
@@ -122,21 +90,6 @@ const styles = StyleSheet.create({
 		color: "#888",
 		marginLeft: 16,
 		marginBottom: 8,
-	},
-	settingsItem: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		paddingVertical: 12,
-		paddingHorizontal: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: "#e0e0e0",
-	},
-	settingsItemText: {
-		fontSize: 16,
-	},
-	actionText: {
-		color: "red",
 	},
 });
 
