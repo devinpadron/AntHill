@@ -11,11 +11,11 @@ import {
 import auth from "@react-native-firebase/auth";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { capitalize, lowerCase } from "lodash";
-import { addUser } from "../../controllers/userController";
+import { addUser } from "../../services/userService";
 import {
 	addUserToCompany,
 	compareAccessCode,
-} from "../../controllers/companyController";
+} from "../../services/companyService";
 
 const SignUpPage = ({ navigation }) => {
 	const [firstName, setFirstName] = useState("");

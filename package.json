@@ -1,6 +1,6 @@
 {
 	"name": "anthill",
-	"version": "1.0.0",
+	"version": "1.0.3",
 	"main": "node_modules/expo/AppEntry.js",
 	"scripts": {
 		"start": "expo start",
@@ -58,7 +58,8 @@
 		"react-native-svg": "15.8.0",
 		"react-native-web": "~0.19.10",
 		"react-navigation-stack": "^2.10.4",
-		"webpack-config": "^7.5.0"
+		"webpack-config": "^7.5.0",
+		"@react-native-async-storage/async-storage": "1.23.1"
 	},
 	"devDependencies": {
 		"@babel/core": "^7.24.0",

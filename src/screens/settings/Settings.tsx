@@ -2,8 +2,8 @@ import React, { useEffect } from "react";
 import { View, Text, StyleSheet, StatusBar, Alert } from "react-native";
 import { TouchableOpacity } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
-import { signOut } from "../../controllers/authController";
-import { subscribeCurrentUser } from "../../controllers/userController";
+import { signOut } from "../../services/authService";
+import { subscribeCurrentUser } from "../../services/userService";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const Settings = ({ navigation }: any) => {

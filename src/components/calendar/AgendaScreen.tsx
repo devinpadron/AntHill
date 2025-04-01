@@ -14,7 +14,7 @@ type AgendaScreenProps = {
 	markedDates: Record<string, any>;
 	agendaItems: AgendaItem;
 	selectedDate: string;
-	onDayPress: (day: DateData) => void;
+	onDayChange: (day: DateData) => void;
 	navigation: any;
 	onRefreshData: () => Promise<void>;
 };
@@ -23,7 +23,7 @@ export const AgendaScreen = ({
 	markedDates,
 	agendaItems,
 	selectedDate,
-	onDayPress,
+	onDayChange,
 	navigation,
 	onRefreshData,
 }: AgendaScreenProps) => {
@@ -68,6 +68,7 @@ export const AgendaScreen = ({
 	}, [agendaItems]);
 	return (
 		<Agenda
+			scrollEventThrottle={16}
 			items={sortedAgendaItems}
 			renderItem={(item, firstItemInDay) => {
 				console.log(item);
@@ -145,7 +146,8 @@ export const AgendaScreen = ({
 			hideKnob={false}
 			showOnlySelectedDayItems={false}
 			selected={selectedDate}
-			onDayPress={onDayPress}
+			onDayChange={onDayChange}
+			onDayPress={onDayChange}
 			refreshControl={
 				<RefreshControl
 					refreshing={refreshing}

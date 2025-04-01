@@ -1,6 +1,7 @@
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
-import db from "../global/firestore";
+import db from "../constants/firestore";
 import auth from "@react-native-firebase/auth";
+import { User } from "../types";
 
 /* A UserController that contains:
   - A user interface that provides the structure of user data
@@ -9,17 +10,6 @@ import auth from "@react-native-firebase/auth";
   - A function that uses a userID to delete a user from Firestore
   - A function that creates a new user entry and puts it into Firestore
 */
-
-export interface User {
-	firstName: string;
-	lastName: string;
-	email: string;
-	loggedInCompany: string;
-	companies: {
-		[companyId: string]: string;
-	};
-}
-
 export async function getUser(userID: string) {
 	try {
 		//Retrieve user data

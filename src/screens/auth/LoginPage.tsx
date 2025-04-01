@@ -8,12 +8,12 @@ import {
 	Alert,
 	Platform,
 } from "react-native";
-import { sendResetPassword } from "../../controllers/authController";
+import { sendResetPassword } from "../../services/authService";
 import prompt from "react-native-prompt-android";
 import { SafeAreaView } from "react-native-safe-area-context";
 import auth from "@react-native-firebase/auth";
-import { getUser, updateUser } from "../../controllers/userController";
-import { AntHill } from "../../global/colors";
+import { getUser, updateUser } from "../../services/userService";
+import { AntHill } from "../../constants/colors";
 
 const LoginPage = ({ navigation }) => {
 	const [email, setEmail] = useState("");

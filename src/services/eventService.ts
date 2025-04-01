@@ -1,7 +1,7 @@
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
-import { FileUpload } from "../screens/home/calendar/EventSubmit";
-import db from "../global/firestore";
-import { addAttachments, getEventAttachments } from "./attachmentController";
+import { Event } from "../types";
+import db from "../constants/firestore";
+import { addAttachments, getEventAttachments } from "./attachmentService";
 /* An EventController that contains:
   - An event interface that provides the structure of event data
   - A function that uses an eventID to pull from Firestore and retrieve the event entry
@@ -11,25 +11,6 @@ import { addAttachments, getEventAttachments } from "./attachmentController";
   - A function that uses a date string to retrieve all events for a given date
   - A function that retrieves all of the events stored in Firestore.
 */
-
-type Location = {
-	[address: string]: {
-		latitude: number;
-		longitude: number;
-	};
-};
-
-export interface Event {
-	title: string;
-	date: string;
-	startTime: string;
-	endTime: string | null;
-	locations: Location;
-	duration: string | null;
-	notes: string;
-	assignedWorkers: string[];
-	attachments?: FileUpload[];
-}
 
 const isValidDateFormat = (date: string): boolean => {
 	const dateFormatRegex = /^\d{4}-\d{2}-\d{2}$/;

@@ -1,5 +1,6 @@
 import { Alert } from "react-native";
 import auth from "@react-native-firebase/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export async function reAuth(password: string) {
 	const user = auth().currentUser;
@@ -26,10 +27,15 @@ export async function reAuth(password: string) {
 	return true;
 }
 
-export async function signOut() {
-	await auth().signOut();
-	return true;
-}
+export const signOut = async () => {
+	try {
+		await auth().signOut();
+		// No need to clear AsyncStorage here since we'll handle it in the UserContext
+	} catch (error) {
+		console.error("Error signing out:", error);
+		throw error;
+	}
+};
 
 export async function sendResetPassword(email: string) {
 	await auth()

@@ -25,21 +25,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import DocumentPicker from "react-native-document-picker";
 import * as ImagePicker from "react-native-image-picker";
 import {
-	Event,
 	addEvent,
 	deleteEvent,
 	subscribeEvent,
 	updateEvent,
-} from "../../../controllers/eventController";
-import {
-	subscribeCurrentUser,
-	getUser,
-	User,
-} from "../../../controllers/userController";
+} from "../../services/eventService";
+import { subscribeCurrentUser, getUser } from "../../services/userService";
 import {
 	isPersonal,
 	subscribeAllUsersInCompany,
-} from "../../../controllers/companyController";
+} from "../../services/companyService";
 import storage from "@react-native-firebase/storage";
 import { RouteProp, useRoute } from "@react-navigation/native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
@@ -47,18 +42,11 @@ import {
 	addAttachments,
 	deleteEventAttachments,
 	getEventAttachments,
-} from "../../../controllers/attachmentController";
+} from "../../services/attachmentService";
 import { StackActions } from "@react-navigation/native";
-
-export interface FileUpload {
-	uri: string;
-	name: string;
-	type: string;
-	url?: string;
-	uploadTime?: number;
-	path?: string;
-	id?: string;
-}
+import { User } from "../../types";
+import { Event } from "../../types";
+import { FileUpload } from "../../types";
 
 type RootStackParamList = {
 	EventDetails: {

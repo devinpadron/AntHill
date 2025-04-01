@@ -1,14 +1,6 @@
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
-import db from "../global/firestore";
-import {
-	deleteCompanyFromUser,
-	getUser,
-	swapUserCompany,
-} from "./userController";
-
-export interface Company {
-	accessCode: string;
-}
+import db from "../constants/firestore";
+import { deleteCompanyFromUser, getUser, swapUserCompany } from "./userService";
 
 export async function compareAccessCode(accessCode: string) {
 	let data = null;

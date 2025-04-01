@@ -10,22 +10,19 @@ import {
 	Platform,
 } from "react-native";
 import { RouteProp, useRoute } from "@react-navigation/native";
-import { subscribeCurrentUser } from "../../../controllers/userController";
-import {
-	subscribeEvent,
-	updateEvent,
-} from "../../../controllers/eventController";
-import LoadingScreen from "../../LoadingScreen";
+import { subscribeCurrentUser } from "../../services/userService";
+import { subscribeEvent, updateEvent } from "../../services/eventService";
+import LoadingScreen from "../LoadingScreen";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { TouchableOpacity } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 import moment from "moment";
 import MapView, { Marker } from "react-native-maps";
-import { getUser } from "../../../controllers/userController";
+import { getUser } from "../../services/userService";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
-import { subscribeEventAttachments } from "../../../controllers/attachmentController";
+import { subscribeEventAttachments } from "../../services/attachmentService";
 import ImageView from "react-native-image-viewing";
-import { FileUpload } from "./EventSubmit";
+import { FileUpload } from "../../types";
 
 type RootStackParamList = {
 	EventDetails: {
