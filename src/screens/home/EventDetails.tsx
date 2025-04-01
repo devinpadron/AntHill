@@ -1,33 +1,23 @@
 import React, { useEffect, useRef, useState } from "react";
-import {
-	View,
-	Text,
-	StyleSheet,
-	TextInput,
-	Dimensions,
-	ImageBackground,
-	Linking,
-	Platform,
-} from "react-native";
+import { View, Text, StyleSheet, TextInput } from "react-native";
 import { RouteProp, useRoute } from "@react-navigation/native";
-import { subscribeCurrentUser } from "../../services/userService";
-import { subscribeEvent, updateEvent } from "../../services/eventService";
 import LoadingScreen from "../LoadingScreen";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { TouchableOpacity } from "react-native-gesture-handler";
-import { Ionicons } from "@expo/vector-icons";
 import moment from "moment";
 import MapView, { Marker } from "react-native-maps";
-import { getUser } from "../../services/userService";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
-import { subscribeEventAttachments } from "../../services/attachmentService";
-import ImageView from "react-native-image-viewing";
-import { FileUpload } from "../../types";
 
+// Custom hooks and utilities
+import { useEventDetails } from "../../hooks/useEventDetails";
+import { getRegionForMarkers, openMap, MapMarker } from "../../utils/mapUtils";
+
+// Components
+import { EventHeader } from "../../components/eventDetails/EventHeader";
+import { AttachmentGallery } from "../../components/eventDetails/AttachmentGallery";
+
+// Types
 type RootStackParamList = {
-	EventDetails: {
-		uid: string;
-	};
+	EventDetails: { uid: string };
 };
 
 type EventDetailsRouteProp = RouteProp<RootStackParamList, "EventDetails">;
@@ -36,227 +26,58 @@ const EventDetails = ({ navigation }) => {
 	const insets = useSafeAreaInsets();
 	const route = useRoute<EventDetailsRouteProp>();
 	if (!route.params) return null;
-	console.log(route.params.uid);
-	const [user, setUser] = useState(null);
-	const [event, setEvent] = useState(null);
-	const [markers, setMarkers] = useState([]);
-	const [workerList, setWorkerList] = useState("");
-	const [localNotes, setLocalNotes] = useState("");
+
+	const eventId = route.params.uid;
+	const [markers, setMarkers] = useState<MapMarker[]>([]);
 	const [initialRegion, setInitialRegion] = useState(null);
-	const [isLoading, setIsLoading] = useState(true);
-	const [attachments, setAttachments] = useState([]);
-	const [visible, setIsVisible] = useState(false);
+	const scrollViewRef = useRef(null);
 
-	useEffect(() => {
-		const subscriber = subscribeCurrentUser((user) => {
-			setUser(user.data());
-		});
-		return () => subscriber();
-	}, []);
+	// Use custom hook for event data
+	const {
+		user,
+		event,
+		workerList,
+		localNotes,
+		setLocalNotes,
+		isLoading,
+		attachments,
+		saveNotes,
+		hasEditPermission,
+	} = useEventDetails(eventId);
 
+	// Process location data
 	useEffect(() => {
-		if (!user) return;
-		const subscriber = subscribeEvent(
-			user.loggedInCompany,
-			route.params.uid,
-			(event) => {
-				setEvent(event.data());
-			},
-		);
-		return () => subscriber();
-	}, [user]);
+		if (!event?.locations) return;
 
-	useEffect(() => {
-		if (!event) return;
-		const subscriber = subscribeEventAttachments(
-			user.loggedInCompany,
-			route.params.uid,
-			(attachments) => {
-				const files = attachments.docs.map(
-					(doc) => doc.data() as FileUpload,
-				);
-				setAttachments(files);
-			},
-		);
-		return () => subscriber();
+		const locationMarkers: MapMarker[] = [];
+
+		for (let location in event.locations) {
+			locationMarkers.push({
+				latitude: event.locations[location].latitude,
+				longitude: event.locations[location].longitude,
+				title: location,
+				label: event.locations[location].label,
+			});
+		}
+
+		setMarkers(locationMarkers);
 	}, [event]);
 
-	useEffect(() => {
-		if (!event) return;
-		setIsLoading(true);
-		const getLocationList = () => {
-			setMarkers([]);
-			const locations = event.locations;
-			if (!locations) return;
-			for (let location in locations) {
-				setMarkers((prev) => [
-					...prev,
-					{
-						latitude: locations[location].latitude,
-						longitude: locations[location].longitude,
-						title: location,
-						label: locations[location].label,
-					},
-				]);
-			}
-		};
-		getLocationList();
-
-		setLocalNotes(event.userNotes || "");
-
-		const getWorkerList = async () => {
-			setWorkerList("");
-			const assignedWorkers = event.assignedWorkers;
-			let workerList = "";
-			for (let i = 0; i < assignedWorkers.length; i++) {
-				const workerData = await getUser(assignedWorkers[i]);
-				workerList += workerData.firstName + " " + workerData.lastName;
-				if (i < assignedWorkers.length - 1) workerList += ", ";
-				setWorkerList(workerList);
-			}
-			setIsLoading(false);
-		};
-		getWorkerList();
-	}, [event]);
-
+	// Calculate map region when markers change
 	useEffect(() => {
 		if (markers.length > 0) {
 			setInitialRegion(getRegionForMarkers(markers));
 		}
 	}, [markers]);
 
-	const getRegionForMarkers = (markers) => {
-		if (!markers || markers.length === 0) return null;
-		if (markers.length === 1) {
-			return {
-				latitude: markers[0].latitude,
-				longitude: markers[0].longitude,
-				latitudeDelta: 0.01 * 1.5,
-				longitudeDelta: 0.01 * 1.5,
-			};
-		}
-
-		// Initialize with first marker
-		let minLat = markers[0].latitude;
-		let maxLat = markers[0].latitude;
-		let minLng = markers[0].longitude;
-		let maxLng = markers[0].longitude;
-
-		// Find min/max values
-		markers.forEach((marker) => {
-			minLat = Math.min(minLat, marker.latitude);
-			maxLat = Math.max(maxLat, marker.latitude);
-			minLng = Math.min(minLng, marker.longitude);
-			maxLng = Math.max(maxLng, marker.longitude);
-		});
-
-		// Calculate center and deltas
-		const centerLat = (minLat + maxLat) / 2;
-		const centerLng = (minLng + maxLng) / 2;
-		const latDelta = (maxLat - minLat) * 1.5; // 1.5 adds 50% padding
-		const lngDelta = (maxLng - minLng) * 1.5;
-
-		return {
-			latitude: centerLat,
-			longitude: centerLng,
-			latitudeDelta: latDelta,
-			longitudeDelta: lngDelta,
-		};
+	// Handle edit navigation
+	const handleEdit = () => {
+		navigation.navigate("EditEvent", { uid: eventId });
 	};
 
-	const scrollViewRef = useRef(null);
-	const markerRef = useRef(null);
-
-	const openMap = ({ latitude, longitude, label }) => {
-		const scheme = Platform.select({
-			ios: `maps://?q=${label}&ll=${latitude},${longitude}`,
-			android: `geo:${latitude},${longitude}?q=${latitude},${longitude}(${label})`,
-		});
-
-		if (scheme) {
-			Linking.openURL(scheme).catch((err) =>
-				console.error("Error opening map: ", err),
-			);
-		}
-	};
-
-	const renderThumbnails = () => {
-		const imageFiles = attachments.filter((file) =>
-			file.type.startsWith("image/"),
-		);
-		const images = imageFiles.map((file) => ({
-			uri: file.url,
-		}));
-		const documentFiles = attachments.filter(
-			(file) => !file.type.startsWith("image/"),
-		);
-
-		return (
-			<View style={styles.filesContainer}>
-				{/* Image Grid */}
-				{imageFiles.length > 0 && (
-					<>
-						<ImageView
-							images={images}
-							imageIndex={0}
-							visible={visible}
-							onRequestClose={() => setIsVisible(false)}
-						/>
-						<View style={styles.imageGrid}>
-							{imageFiles.map((file, index) => (
-								<View
-									key={index}
-									style={styles.thumbnailContainer}
-								>
-									<TouchableOpacity
-										onPress={() => setIsVisible(true)}
-									>
-										<ImageBackground
-											style={styles.thumbnail}
-											source={{ uri: file.url }}
-										/>
-									</TouchableOpacity>
-								</View>
-							))}
-						</View>
-					</>
-				)}
-
-				{/* Document List */}
-				{documentFiles.length > 0 && (
-					<View style={styles.documentList}>
-						{documentFiles.map((file, index) => (
-							<>
-								<TouchableOpacity
-									onPress={() => Linking.openURL(file.url)}
-								>
-									<View
-										key={index}
-										style={styles.documentItem}
-									>
-										<Ionicons
-											name="document-outline"
-											size={24}
-											color="#555"
-											style={styles.documentIcon}
-										/>
-										<Text
-											numberOfLines={1}
-											style={styles.documentFilename}
-										>
-											{file.name}
-										</Text>
-									</View>
-								</TouchableOpacity>
-							</>
-						))}
-					</View>
-				)}
-			</View>
-		);
-	};
-
-	if (isLoading || !event) return <LoadingScreen />;
+	if (isLoading || !event) {
+		return <LoadingScreen />;
+	}
 
 	return (
 		<View style={[{ flex: 1, paddingTop: insets.top }, styles.container]}>
@@ -265,48 +86,22 @@ const EventDetails = ({ navigation }) => {
 				contentContainerStyle={{ flexGrow: 1 }}
 				extraScrollHeight={100}
 			>
-				<View style={styles.header}>
-					<TouchableOpacity
-						containerStyle={styles.backButton}
-						onPress={() => navigation.goBack()}
-					>
-						<Ionicons name="chevron-back" size={28} color="#000" />
-					</TouchableOpacity>
-					<View style={styles.titleContainer}>
-						<Text
-							style={styles.title}
-							numberOfLines={2}
-							ellipsizeMode="tail"
-						>
-							{event.title}
-						</Text>
-					</View>
-					{(user.companies[user.loggedInCompany] === "Owner" ||
-						user.companies[user.loggedInCompany] === "Admin") && (
-						<TouchableOpacity
-							containerStyle={styles.editButton}
-							onPress={() => {
-								navigation.navigate("EditEvent", {
-									uid: route.params.uid,
-								});
-							}}
-						>
-							<Ionicons
-								name="create-outline"
-								size={28}
-								color="#000"
-							/>
-						</TouchableOpacity>
-					)}
-				</View>
+				<EventHeader
+					title={event.title}
+					onBack={() => navigation.goBack()}
+					onEdit={handleEdit}
+					canEdit={hasEditPermission}
+				/>
 
 				<View style={styles.content}>
+					{/* Event Date */}
 					<View style={[styles.timeSection, { marginBottom: 10 }]}>
 						<Text style={styles.timeText}>
 							{moment(event.date).format("dddd, MMMM D, YYYY")}
 						</Text>
 					</View>
 
+					{/* Event Time */}
 					<View style={styles.timeSection}>
 						{event.startTime ? (
 							<>
@@ -333,6 +128,7 @@ const EventDetails = ({ navigation }) => {
 						)}
 					</View>
 
+					{/* Event Duration */}
 					<View style={styles.duration}>
 						{event.duration && (
 							<Text style={{ fontSize: 18 }}>
@@ -342,7 +138,8 @@ const EventDetails = ({ navigation }) => {
 					</View>
 
 					<View style={styles.detailsSection}>
-						{event.assignedWorkers && (
+						{/* Workers Section */}
+						{event.assignedWorkers?.length > 0 && (
 							<>
 								<Text style={styles.label}>
 									Assigned Workers
@@ -350,21 +147,21 @@ const EventDetails = ({ navigation }) => {
 								<Text style={styles.text}>{workerList}</Text>
 							</>
 						)}
+
+						{/* Notes Section */}
 						{event.notes && (
 							<>
 								<Text style={styles.label}>Notes</Text>
 								<Text style={styles.text}>{event.notes}</Text>
 							</>
 						)}
-						{event.locations && (
-							<MapView
-								style={{ height: 300, marginBottom: 16 }}
-								region={initialRegion}
-							>
+
+						{/* Map Section */}
+						{markers.length > 0 && initialRegion && (
+							<MapView style={styles.map} region={initialRegion}>
 								{markers.map((marker, index) => (
 									<Marker
 										key={index}
-										ref={markerRef}
 										coordinate={{
 											latitude: marker.latitude,
 											longitude: marker.longitude,
@@ -384,38 +181,21 @@ const EventDetails = ({ navigation }) => {
 						)}
 					</View>
 
-					{renderThumbnails()}
+					{/* Attachments */}
+					<AttachmentGallery attachments={attachments} />
 
+					{/* User Notes */}
 					<Text style={[styles.label, { marginTop: 10 }]}>
 						Your Notes
 					</Text>
 					<TextInput
-						style={[
-							styles.text,
-							{
-								padding: 8,
-								minHeight: 150,
-							},
-						]}
+						style={styles.notesInput}
 						multiline
 						editable
 						numberOfLines={5}
 						value={localNotes}
 						onChangeText={setLocalNotes}
-						onBlur={() => {
-							if (localNotes !== event.userNotes) {
-								const updatedEvent = {
-									...event,
-									userNotes: localNotes,
-								};
-								updateEvent(
-									user.loggedInCompany,
-									route.params.uid,
-									updatedEvent,
-								);
-								setEvent(updatedEvent);
-							}
-						}}
+						onBlur={saveNotes}
 						placeholder="Add your personal notes here..."
 					/>
 				</View>
@@ -425,68 +205,27 @@ const EventDetails = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-	modalContainer: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-		backgroundColor: "rgba(0, 0, 0, 0.5)",
-	},
 	container: {
 		flex: 1,
 		backgroundColor: "#fff",
-	},
-	titleContainer: {
-		flex: 1,
-		paddingHorizontal: 10,
-	},
-	header: {
-		display: "flex",
-		flexDirection: "row",
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		borderBottomWidth: 1,
-		borderBottomColor: "#eee",
-		alignItems: "center", // Center items vertically
-		minHeight: 60, // Ensure minimum height for wrapped text
-	},
-	backButton: {
-		width: 40,
-		zIndex: 1,
-		paddingRight: 8,
-	},
-	editButton: {
-		width: 40,
-		zIndex: 1,
-		paddingLeft: 8,
-	},
-	title: {
-		fontSize: 20,
-		fontWeight: "bold",
-		textAlign: "center",
-		flexWrap: "wrap", // Enable text wrapping
 	},
 	content: {
 		flex: 1,
 		padding: 16,
 	},
-	duration: {
-		marginBottom: 16,
-		flexDirection: "row",
-		justifyContent: "center",
-	},
 	timeSection: {
 		flexDirection: "row",
 		justifyContent: "center",
-	},
-	timeLabel: {
-		fontSize: 14,
-		color: "#666",
-		marginBottom: 4,
 	},
 	timeText: {
 		fontSize: 20,
 		fontWeight: "500",
 		paddingHorizontal: 4,
+	},
+	duration: {
+		marginBottom: 16,
+		flexDirection: "row",
+		justifyContent: "center",
 	},
 	detailsSection: {
 		gap: 12,
@@ -501,47 +240,20 @@ const styles = StyleSheet.create({
 		lineHeight: 20,
 		marginBottom: 12,
 	},
-	thumbnailContainer: {
-		width: "30%", // 3 columns with padding
-		aspectRatio: 1,
+	map: {
+		height: 300,
+		marginBottom: 16,
 		borderRadius: 8,
-		backgroundColor: "#f5f5f5",
-		position: "relative",
-		overflow: "visible",
 	},
-	thumbnail: {
-		width: (Dimensions.get("window").width - 60) / 3,
-		height: "100%",
+	notesInput: {
+		fontSize: 16,
+		lineHeight: 20,
+		marginBottom: 12,
+		padding: 8,
+		minHeight: 150,
+		borderWidth: 1,
+		borderColor: "#eee",
 		borderRadius: 8,
-		zIndex: 1,
-	},
-	filesContainer: {
-		marginTop: 16,
-	},
-	imageGrid: {
-		flexDirection: "row",
-		flexWrap: "wrap",
-		gap: 10,
-		marginBottom: 10,
-		paddingBottom: 20,
-	},
-	documentList: {
-		marginTop: 0,
-	},
-	documentItem: {
-		flexDirection: "row",
-		alignItems: "center",
-		backgroundColor: "#f5f5f5",
-		padding: 10,
-		borderRadius: 8,
-		marginBottom: 15,
-	},
-	documentIcon: {
-		marginRight: 10,
-	},
-	documentFilename: {
-		flex: 1,
-		fontSize: 14,
 	},
 });
 

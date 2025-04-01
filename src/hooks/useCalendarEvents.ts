@@ -4,7 +4,7 @@ import {
 	getAgendaItems,
 	getMarkedDates,
 	AgendaItem,
-} from "../components/calendar/agendaItemController";
+} from "../services/agendaItemService";
 import { FilterType } from "../types/enums/FilterType";
 
 export const useCalendarEvents = (

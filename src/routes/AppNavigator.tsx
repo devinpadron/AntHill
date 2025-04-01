@@ -2,7 +2,6 @@ import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import HomeTabs from "../routes/HomeTabs";
 import AuthStack from "../routes/AuthStack";
-import LoadingScreen from "../screens/LoadingScreen";
 import SplashScreen from "../screens/SplashScreen";
 import { useUser } from "../contexts/UserContext";
 

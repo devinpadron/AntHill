@@ -6,8 +6,8 @@ import {
 	TouchableOpacity,
 	RefreshControl,
 } from "react-native";
-import { Agenda, DateData } from "react-native-calendars";
-import { AgendaItem } from "./agendaItemController";
+import { Agenda, AgendaList, DateData } from "react-native-calendars";
+import { AgendaItem } from "../../services/agendaItemService";
 import moment from "moment";
 
 type AgendaScreenProps = {
@@ -119,18 +119,9 @@ export const AgendaScreen = ({
 					</TouchableOpacity>
 				);
 			}}
-			renderEmptyDate={() => (
-				<View
-					style={{
-						height: 1,
-						backgroundColor: "#000",
-						opacity: 0.1,
-						width: "80%",
-						marginTop: 10,
-					}}
-				/>
-			)}
-			rowHasChanged={(r1, r2) => r1.id !== r2.id}
+			rowHasChanged={(r1, r2) => {
+				return r1.text !== r2.text;
+			}}
 			markedDates={markedDates}
 			theme={{
 				agendaDayTextColor: "#2d4150",
