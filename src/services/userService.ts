@@ -91,11 +91,9 @@ export async function updateUser(userID: string, userData: User) {
 export async function swapUserCompany(userID: string, companyID: string) {
 	const userData = await getUser(userID);
 	var companyID = companyID;
-	console.log(companyID);
 	if (companyID === "") {
 		const companies = userData.companies;
 		companyID = Object.keys(companies)[0];
-		console.log(companyID);
 	}
 
 	if (!userData.companies[companyID]) {

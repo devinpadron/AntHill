@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, TouchableOpacity, StyleSheet } from "react-native";
-import { Filter, PlusCircle } from "react-native-feather";
+import { ArrowLeft, Filter, PlusCircle } from "react-native-feather";
 import { Button } from "../ui/Button";
 
 type FloatingActionButtonsProps = {
@@ -8,7 +8,6 @@ type FloatingActionButtonsProps = {
 	selectedDate: string;
 	today: string;
 	isBottomSheetVisible: boolean;
-	fabOpacity: Animated.Value;
 	onAddEvent: () => void;
 	onFilterPress: () => void;
 	onTodayPress: () => void;
@@ -19,14 +18,32 @@ export const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({
 	selectedDate,
 	today,
 	isBottomSheetVisible,
-	fabOpacity,
 	onAddEvent,
 	onFilterPress,
 	onTodayPress,
 }) => {
 	const showTodayButton = useMemo(() => {
-		return selectedDate !== today;
+		return selectedDate !== null;
 	}, [selectedDate, today]);
+
+	const fabOpacity = useRef(new Animated.Value(1)).current;
+
+	useEffect(() => {
+		if (isBottomSheetVisible) {
+			Animated.timing(fabOpacity, {
+				toValue: 0,
+				duration: 200,
+				useNativeDriver: true,
+			}).start();
+		} else {
+			Animated.timing(fabOpacity, {
+				toValue: 1,
+				duration: 200,
+				useNativeDriver: true,
+			}).start();
+		}
+	}, [isBottomSheetVisible]);
+
 	return (
 		<>
 			{isAdmin && (
@@ -63,12 +80,19 @@ export const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({
 					pointerEvents={isBottomSheetVisible ? "none" : "auto"}
 				>
 					<Button
-						title="Today"
 						onPress={onTodayPress}
 						style={styles.todayButton}
 						textStyle={styles.todayButtonText}
 						variant="outline"
 						size="small"
+						icon={
+							<ArrowLeft
+								stroke="#2089dc"
+								width={20}
+								height={20}
+							/>
+						}
+						iconPosition="center"
 					/>
 				</Animated.View>
 			)}

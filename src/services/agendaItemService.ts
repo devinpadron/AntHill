@@ -33,7 +33,6 @@ export interface AgendaItem {
 function createAgendaItem(
 	docRef: FirebaseFirestoreTypes.DocumentData,
 ): AgendaItemData {
-	const id = docRef.id;
 	docRef = docRef.data();
 	return {
 		day: docRef.date,
@@ -42,7 +41,7 @@ function createAgendaItem(
 		endTime: docRef.endTime,
 		duration: docRef.duration,
 		assigned: docRef.assignedWorkers || [],
-		uid: id,
+		uid: docRef.id,
 		attachments: docRef.attachments || [],
 	};
 }
@@ -60,26 +59,6 @@ export function getAgendaItems(events: any[]): AgendaItem {
 
 		res[day].push(item);
 	});
-
-	// Now fill in empty arrays for dates without data
-	// Create a range of dates (e.g., 3 months before and after current month)
-	const startDate = moment().subtract(50, "months").startOf("month");
-	const endDate = moment().add(50, "months").endOf("month");
-
-	// Loop through each day in the range
-	for (
-		let m = moment(startDate);
-		m.diff(endDate, "days") <= 0;
-		m.add(1, "days")
-	) {
-		const dateStr = m.format("YYYY-MM-DD");
-
-		// If this date doesn't already have events, add an empty array
-		if (!res[dateStr]) {
-			res[dateStr] = [];
-		}
-	}
-
 	return res;
 }
 
@@ -87,12 +66,14 @@ function isEmpty(obj: any): boolean {
 	return Object.keys(obj).length === 0;
 }
 
-export function getMarkedDates(items: AgendaItem): MarkedDates {
+export function getMarkedDates(events: any[]): MarkedDates {
 	const marked: MarkedDates = {};
-	for (const day in items) {
-		if (items[day] && items[day].length > 0) {
+	events.forEach((event) => {
+		const data = event.data();
+		const day = data.date; // Assuming event has a date field in YYYY-MM-DD format
+		if (day) {
 			marked[day] = { marked: true };
 		}
-	}
+	});
 	return marked;
 }

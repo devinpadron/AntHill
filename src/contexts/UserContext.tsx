@@ -20,7 +20,7 @@ type UserContextType = {
 	user: any | null;
 	userId: string;
 	userPrivilege: string;
-	isAdmin: boolean;
+	isAdmin: boolean | null;
 	isLoading: boolean;
 	loggedIn: boolean;
 	companyId: string | undefined;
@@ -33,7 +33,7 @@ const UserContext = createContext<UserContextType>({
 	user: null,
 	userId: "",
 	userPrivilege: "",
-	isAdmin: false,
+	isAdmin: null,
 	isLoading: true,
 	loggedIn: false,
 	companyId: undefined,

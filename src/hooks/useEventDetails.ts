@@ -51,7 +51,6 @@ export const useEventDetails = (eventId: string) => {
 	// Process event data
 	useEffect(() => {
 		if (!event) return;
-		setIsLoading(true);
 
 		// Initialize local notes
 		setLocalNotes(event.userNotes || "");

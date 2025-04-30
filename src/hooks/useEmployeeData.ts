@@ -24,7 +24,7 @@ export const useEmployeeData = () => {
 	// Fetch employee data
 	const fetchEmployees = useCallback(async () => {
 		if (!companyId) {
-			console.log("No company ID available");
+			("No company ID available");
 			return () => {}; // Return empty cleanup function
 		}
 

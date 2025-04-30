@@ -19,14 +19,14 @@ export type ButtonVariant =
 export type ButtonSize = "small" | "medium" | "large";
 
 type ButtonProps = {
-	title: string;
 	onPress: () => void;
+	title?: string;
 	variant?: ButtonVariant;
 	size?: ButtonSize;
 	disabled?: boolean;
 	loading?: boolean;
 	icon?: React.ReactNode;
-	iconPosition?: "left" | "right";
+	iconPosition?: "left" | "right" | "center";
 	fullWidth?: boolean;
 	style?: StyleProp<ViewStyle>;
 	textStyle?: StyleProp<TextStyle>;
@@ -84,7 +84,10 @@ export const Button: React.FC<ButtonProps> = ({
 					{icon && iconPosition === "left" && (
 						<View style={styles.iconLeft}>{icon}</View>
 					)}
-					<Text style={textStyles}>{title}</Text>
+					{title && <Text style={textStyles}>{title}</Text>}
+					{icon && iconPosition === "center" && (
+						<View style={styles.iconCenter}>{icon}</View>
+					)}
 					{icon && iconPosition === "right" && (
 						<View style={styles.iconRight}>{icon}</View>
 					)}
@@ -194,6 +197,10 @@ const styles = StyleSheet.create({
 	},
 	iconRight: {
 		marginLeft: 8,
+	},
+	iconCenter: {
+		alignContent: "center",
+		justifyContent: "center",
 	},
 	destructiveButton: {
 		backgroundColor: "#f44336", // Red color
