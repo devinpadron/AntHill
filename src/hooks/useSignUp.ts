@@ -12,7 +12,7 @@ import {
 } from "../utils/authUtils";
 import { Alert } from "react-native";
 import { capitalize } from "lodash";
-import { Role } from "../types/enums/Role";
+import { Role } from "../types";
 
 export const useSignUp = (navigation: any) => {
 	const [firstName, setFirstName] = useState("");

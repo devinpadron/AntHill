@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { getUser, getUserPrivilege } from "../services/userService";
 import { subscribeAllUsersInCompany } from "../services/companyService";
 import { useUser } from "../contexts/UserContext";
-import { Role } from "../types/enums/Role";
+import { Role } from "../types";
 
 // Define proper types for better type safety
 type Employee = {

@@ -1,6 +1,5 @@
 import { MarkedDates } from "react-native-calendars/src/types";
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
-import moment from "moment";
 
 /* An AgendaItem controller that conatains:
   - An AgendaItemData interface that provides the structure of AgendaItem data

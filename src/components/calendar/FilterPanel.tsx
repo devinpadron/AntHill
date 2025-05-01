@@ -210,7 +210,10 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
 							title="Specific Users"
 							variant="outline"
 							fullWidth
-							selected={filterType === FilterType.SPECIFIC}
+							selected={
+								(filterType as FilterType) ===
+								FilterType.SPECIFIC
+							}
 							onPress={() => setFilterType(FilterType.SPECIFIC)}
 							style={styles.filterButton}
 						/>

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from "react-native";
 import { TouchableOpacity } from "react-native-gesture-handler";
 import { FontAwesome } from "@expo/vector-icons";
 import { LongPressGestureHandler, State } from "react-native-gesture-handler";
-import { Role } from "../../types/enums/Role";
+import { Role } from "../../types";
 
 type EmployeeItemProps = {
 	employee: any;

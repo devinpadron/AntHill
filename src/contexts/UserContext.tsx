@@ -9,12 +9,11 @@ import auth from "@react-native-firebase/auth";
 import { Alert } from "react-native";
 import {
 	subscribeCurrentUser,
-	getUserPrivilege,
 	subscribeUserPrivilege,
 } from "../services/userService";
 import { signOut } from "../services/authService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Role } from "../types/enums/Role";
+import { Role } from "../types";
 
 // Define the shape of our context
 type UserContextType = {

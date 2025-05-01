@@ -4,7 +4,7 @@ import {
 } from "@react-native-firebase/firestore";
 import db from "../constants/firestore";
 import { deleteCompanyFromUser, getUser, swapUserCompany } from "./userService";
-import { Role } from "../types/enums/Role";
+import { Role } from "../types";
 
 export async function compareAccessCode(accessCode: string) {
 	let data = null;

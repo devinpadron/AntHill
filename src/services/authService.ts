@@ -1,6 +1,5 @@
 import { Alert } from "react-native";
 import auth from "@react-native-firebase/auth";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export async function reAuth(password: string) {
 	const user = auth().currentUser;

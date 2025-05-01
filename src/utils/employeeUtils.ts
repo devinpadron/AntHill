@@ -3,7 +3,7 @@ import {
 	removeUserFromCompany,
 	changeUserRole,
 } from "../services/companyService";
-import { Role } from "../types/enums/Role";
+import { Role } from "../types";
 
 export const handleEmployeeAction = (
 	employee,
