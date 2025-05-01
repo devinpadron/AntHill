@@ -102,7 +102,7 @@ export const usePullEvents = (
 				// Or include past events if includePastEvents is true
 				const todayString = moment().format("YYYY-MM-DD");
 
-				if (includePastEvents) {
+				if (includePastEvents && date === null) {
 					// Show all events when past events are included
 					return events;
 				} else {

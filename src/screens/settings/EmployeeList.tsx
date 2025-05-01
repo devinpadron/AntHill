@@ -28,10 +28,12 @@ if (
 
 const EmployeeList = ({ navigation }) => {
 	const insets = useSafeAreaInsets();
-	const { user } = useUser();
+	const { user, userPrivilege } = useUser();
 	const { employees, refreshing, refetchEmployees, companyId } =
 		useEmployeeData();
 	const [expandedIndex, setExpandedIndex] = useState(null);
+
+	console.log("EmployeeList", employees);
 
 	// Toggle expanded item
 	const handlePress = useCallback(
@@ -47,7 +49,12 @@ const EmployeeList = ({ navigation }) => {
 	// Handle long-press actions
 	const handleLongPress = useCallback(
 		(employee) => {
-			handleEmployeeAction(employee, user, companyId, refetchEmployees);
+			handleEmployeeAction(
+				employee,
+				userPrivilege,
+				companyId,
+				refetchEmployees,
+			);
 		},
 		[user, companyId, refetchEmployees],
 	);

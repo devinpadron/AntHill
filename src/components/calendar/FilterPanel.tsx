@@ -4,15 +4,9 @@
 // It includes options for filtering by specific users, all events, my events, and unassigned events.
 //
 import React, { useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
-import {
-	FilterType,
-	ALL,
-	MY,
-	SPECIFIC,
-	UNASSIGNED,
-} from "../../types/enums/FilterType";
+import { FilterType } from "../../types/enums/FilterType";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { BottomSheetView } from "@gorhom/bottom-sheet";
 import { Checkbox } from "../ui/Checkbox";
@@ -120,7 +114,7 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
 		>
 			<BottomSheetView style={styles.contentContainer}>
 				<View style={styles.bottomSheetHandle} />
-				{filterType === SPECIFIC ? (
+				{filterType === FilterType.SPECIFIC ? (
 					<View style={styles.dropdownWrapper}>
 						{/* Specific user filter UI */}
 						<View style={styles.headerRow}>
@@ -131,7 +125,7 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
 									setShowAllSelectedOnly(false);
 									setShowExactSelectedOnly(false);
 									setSelectedUsers([]);
-									setFilterType(ALL);
+									setFilterType(FilterType.ALL);
 									setTimeout(() => {
 										bottomSheetRef.current?.snapToIndex(0);
 									}, 100);
@@ -194,7 +188,9 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
 							title="Apply Filter"
 							variant="primary"
 							fullWidth
-							onPress={() => handleFilterChange(SPECIFIC)}
+							onPress={() =>
+								handleFilterChange(FilterType.SPECIFIC)
+							}
 							style={styles.applyButton}
 						/>
 					</View>
@@ -205,8 +201,8 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
 							title="My Events"
 							variant="outline"
 							fullWidth
-							selected={filterType === MY}
-							onPress={() => handleFilterChange(MY)}
+							selected={filterType === FilterType.MY}
+							onPress={() => handleFilterChange(FilterType.MY)}
 							style={styles.filterButton}
 						/>
 
@@ -214,8 +210,8 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
 							title="Specific Users"
 							variant="outline"
 							fullWidth
-							selected={filterType === SPECIFIC}
-							onPress={() => setFilterType(SPECIFIC)}
+							selected={filterType === FilterType.SPECIFIC}
+							onPress={() => setFilterType(FilterType.SPECIFIC)}
 							style={styles.filterButton}
 						/>
 
@@ -223,8 +219,10 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
 							title="Unassigned Events"
 							variant="outline"
 							fullWidth
-							selected={filterType === UNASSIGNED}
-							onPress={() => handleFilterChange(UNASSIGNED)}
+							selected={filterType === FilterType.UNASSIGNED}
+							onPress={() =>
+								handleFilterChange(FilterType.UNASSIGNED)
+							}
 							style={styles.filterButton}
 						/>
 
@@ -232,8 +230,8 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
 							title="All Events"
 							variant="outline"
 							fullWidth
-							selected={filterType === ALL}
-							onPress={() => handleFilterChange(ALL)}
+							selected={filterType === FilterType.ALL}
+							onPress={() => handleFilterChange(FilterType.ALL)}
 							style={styles.filterButton}
 						/>
 					</>

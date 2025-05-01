@@ -198,25 +198,18 @@ const ProfilePage = ({ navigation }) => {
 
 				<View style={styles.section}>
 					<Text style={styles.label}>Company</Text>
-					{Object.keys(userData.companies).length > 1 ? (
-						<Dropdown
-							data={Object.keys(userData.companies).map(
-								(company: string) => ({
-									label: company,
-									value: company,
-								}),
-							)}
-							value={userData.loggedInCompany}
-							onChange={(item) => handleCompanyChange(item.value)}
-							labelField="label"
-							valueField="value"
-							style={styles.dropdown}
-						/>
-					) : (
-						<Text style={styles.value}>
-							{isSolo ? "Personal" : userData.loggedInCompany}
-						</Text>
-					)}
+					<Dropdown
+						data={userData.companies.map((company) => ({
+							label: company,
+							value: company,
+						}))}
+						value={userData.loggedInCompany}
+						onChange={(item) => handleCompanyChange(item.value)}
+						labelField="label"
+						valueField="value"
+						style={styles.dropdown}
+						disable={isSolo || userData.companies.length <= 1}
+					/>
 
 					<Button
 						title="Join Another Company"

@@ -33,9 +33,14 @@ export async function getUser(userID: string) {
 
 export async function getUserPrivilege(userID: string, company: string) {
 	try {
-		const userEntry = await db.collection("Users").doc(userID).get();
+		const userEntry = await db
+			.collection("Companies")
+			.doc(company)
+			.collection("Users")
+			.doc(userID)
+			.get();
 		if (userEntry.exists) {
-			return userEntry.data().companies[company];
+			return userEntry.data().role;
 		} else {
 			return null;
 		}
@@ -43,6 +48,21 @@ export async function getUserPrivilege(userID: string, company: string) {
 		console.log("Error getting user privilege", e);
 		return null;
 	}
+}
+
+export async function subscribeUserPrivilege(
+	userID: string,
+	company: string,
+	onSnap: (
+		snapshot: FirebaseFirestoreTypes.DocumentSnapshot<FirebaseFirestoreTypes.DocumentData>,
+	) => void,
+) {
+	return db
+		.collection("Companies")
+		.doc(company)
+		.collection("Users")
+		.doc(userID)
+		.onSnapshot(onSnap);
 }
 
 export function subscribeCurrentUser(
@@ -93,10 +113,10 @@ export async function swapUserCompany(userID: string, companyID: string) {
 	var companyID = companyID;
 	if (companyID === "") {
 		const companies = userData.companies;
-		companyID = Object.keys(companies)[0];
+		companyID = companies[0];
 	}
 
-	if (!userData.companies[companyID]) {
+	if (!userData.companies.includes(companyID)) {
 		console.error("User does not belong to company");
 		return false;
 	}
@@ -114,18 +134,18 @@ export async function swapUserCompany(userID: string, companyID: string) {
 
 export async function deleteCompanyFromUser(userID: string, companyID: string) {
 	const userData = await getUser(userID);
-	if (!userData.companies[companyID]) {
+	if (!userData.companies.includes(companyID)) {
 		console.error("User does not belong to company");
 		return -1;
 	}
 
 	try {
 		const companies = userData.companies;
-		delete companies[companyID];
+		companies.splice(companies.indexOf(companyID), 1);
 		await db.collection("Users").doc(userID).update({
 			companies: companies,
 		});
-		if (companies.isEmpty) {
+		if (companies.length === 0) {
 			await deleteUser(userID);
 			return 1;
 		}

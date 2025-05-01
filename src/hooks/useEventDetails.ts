@@ -13,7 +13,7 @@ export const useEventDetails = (eventId: string) => {
 	const [attachments, setAttachments] = useState<FileUpload[]>([]);
 
 	// Subscribe to current user
-	const { user } = useUser();
+	const { user, isAdmin } = useUser();
 
 	// Subscribe to event data
 	useEffect(() => {
@@ -96,9 +96,7 @@ export const useEventDetails = (eventId: string) => {
 		}
 	};
 
-	const hasEditPermission =
-		user?.companies[user?.loggedInCompany] === "Owner" ||
-		user?.companies[user?.loggedInCompany] === "Admin";
+	const hasEditPermission = isAdmin;
 
 	return {
 		user,

@@ -8,7 +8,7 @@ import { useBottomSheetController } from "../../hooks/useBottomSheetController";
 import { FilterPanel } from "../../components/calendar/FilterPanel";
 import { FloatingActionButtons } from "../../components/calendar/FloatingActionButtons";
 import LoadingScreen from "../LoadingScreen";
-import { ALL, FilterType, MY, SPECIFIC } from "../../types";
+import { FilterType } from "../../types";
 import Timesheet from "../../components/calendar/Timesheet";
 import { initial, set } from "lodash";
 
@@ -16,7 +16,7 @@ const today = moment().format("YYYY-MM-DD");
 
 const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 	// User State
-	const { user, userId, userPrivilege, isAdmin, isLoading } = useUser();
+	const { user, isAdmin, isLoading } = useUser();
 
 	// Date Selection
 	const [selectedDate, setSelectedDate] = useState<string>(null);
@@ -28,13 +28,10 @@ const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 	const [showAllSelectedOnly, setShowAllSelectedOnly] = useState(false);
 	const [showExactSelectedOnly, setShowExactSelectedOnly] = useState(false);
 	const [calendarOpen, setCalendarOpen] = useState(false);
-	const [filterType, setFilterType] = useState<FilterType>(MY);
+	const [filterType, setFilterType] = useState<FilterType>(FilterType.MY);
 
 	useEffect(() => {
-		if (!isAdmin) {
-			return;
-		}
-		setFilterType(isAdmin ? ALL : MY);
+		setFilterType(isAdmin ? FilterType.ALL : FilterType.MY);
 	}, [isLoading, isAdmin]);
 
 	// The rest of your component remains the same
@@ -42,7 +39,7 @@ const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 		if (!isAdmin) return;
 
 		setFilterType(type);
-		if (type === SPECIFIC && !selectedUsers.length) {
+		if (type === FilterType.SPECIFIC && !selectedUsers.length) {
 			return;
 		}
 		closeBottomSheet();

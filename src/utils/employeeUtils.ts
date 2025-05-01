@@ -1,18 +1,20 @@
 import { Alert } from "react-native";
-import { removeUserFromCompany } from "../services/companyService";
-import { updateUser } from "../services/userService";
+import {
+	removeUserFromCompany,
+	changeUserRole,
+} from "../services/companyService";
+import { Role } from "../types/enums/Role";
 
 export const handleEmployeeAction = (
 	employee,
-	currentUser,
+	currentUserRole,
 	companyId,
 	onRefresh,
 ) => {
-	const userPrivilege = currentUser.companies[companyId];
-	const employeePrivilege = employee.companies[companyId];
+	const employeePrivilege = employee.role;
 
 	// Only owners can manage users
-	if (userPrivilege !== "Owner" || employeePrivilege === "Owner") {
+	if (currentUserRole !== Role.OWNER || employeePrivilege === Role.OWNER) {
 		return;
 	}
 
@@ -21,7 +23,7 @@ export const handleEmployeeAction = (
 		"What would you like to do?",
 		[
 			// Dynamically show promote/demote based on current privilege
-			employeePrivilege === "Admin"
+			employeePrivilege === Role.MANAGER
 				? {
 						text: "Demote",
 						onPress: () =>
@@ -48,13 +50,7 @@ export const handleEmployeeAction = (
 
 const promoteEmployee = async (employee, companyId, onRefresh) => {
 	try {
-		await updateUser(employee.id, {
-			...employee,
-			companies: {
-				...employee.companies,
-				[companyId]: "Admin",
-			},
-		});
+		await changeUserRole(employee.id, companyId, Role.MANAGER);
 		console.log("Promoted", `${employee.firstName} ${employee.lastName}`);
 		onRefresh();
 	} catch (error) {
@@ -65,13 +61,7 @@ const promoteEmployee = async (employee, companyId, onRefresh) => {
 
 const demoteEmployee = async (employee, companyId, onRefresh) => {
 	try {
-		await updateUser(employee.id, {
-			...employee,
-			companies: {
-				...employee.companies,
-				[companyId]: "User",
-			},
-		});
+		await changeUserRole(employee.id, companyId, Role.USER);
 		console.log("Demoted", `${employee.firstName} ${employee.lastName}`);
 		onRefresh();
 	} catch (error) {

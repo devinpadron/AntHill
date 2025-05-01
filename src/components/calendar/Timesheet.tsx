@@ -16,7 +16,6 @@ import { FilterType } from "../../types";
 import { CalendarList } from "react-native-calendars";
 import { Dimensions } from "react-native";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
-import { filter } from "lodash";
 
 export default function Timesheet(
 	props: {
@@ -282,14 +281,6 @@ export default function Timesheet(
 					<Ionicons name="calendar" size={24} color="#007AFF" />
 				</TouchableOpacity>
 			</View>
-
-			{/* Summary Card
-			<View style={styles.summaryCard}>
-				<View style={styles.summaryRow}>
-					<Text style={styles.summaryLabel}>This Week:</Text>
-					<Text style={styles.summaryValue}>24.5 hrs</Text>
-				</View>
-			</View> */}
 			{includePastEvents && (
 				<View style={styles.pastEventsIndicator}>
 					<Text style={styles.pastEventsText}>
@@ -303,19 +294,28 @@ export default function Timesheet(
 					</TouchableOpacity>
 				</View>
 			)}
+			{timesheetData.length === 0 && (
+				<View style={styles.pastEventsIndicator}>
+					<Text style={styles.pastEventsText}>
+						No scheduled events
+					</Text>
+				</View>
+			)}
 			<FlatList
 				data={timesheetData}
 				refreshControl={
-					<RefreshControl
-						refreshing={refreshing}
-						onRefresh={onRefresh}
-						title={
-							includePastEvents
-								? "Including past events"
-								: "Pull to see past events"
-						}
-						tintColor="#007AFF"
-					/>
+					props.selectedDate === null ? (
+						<RefreshControl
+							refreshing={refreshing}
+							onRefresh={onRefresh}
+							title={
+								includePastEvents
+									? "Including past events"
+									: "Pull to see past events"
+							}
+							tintColor="#007AFF"
+						/>
+					) : null
 				}
 				keyExtractor={(item) => item.date}
 				renderItem={({ item }) => (

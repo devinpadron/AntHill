@@ -12,6 +12,7 @@ import {
 } from "../utils/authUtils";
 import { Alert } from "react-native";
 import { capitalize } from "lodash";
+import { Role } from "../types/enums/Role";
 
 export const useSignUp = (navigation: any) => {
 	const [firstName, setFirstName] = useState("");
@@ -72,12 +73,11 @@ export const useSignUp = (navigation: any) => {
 				lastName,
 				email,
 				companyId,
-				role,
 			);
 
 			// Save user data
 			await addUser(userData, user.uid);
-			await addUserToCompany(companyId, user.uid, isSolo);
+			await addUserToCompany(companyId, user.uid, Role.USER, isSolo);
 
 			// Send verification email
 			await user.sendEmailVerification();

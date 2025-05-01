@@ -10,10 +10,11 @@ import { Alert } from "react-native";
 import {
 	subscribeCurrentUser,
 	getUserPrivilege,
+	subscribeUserPrivilege,
 } from "../services/userService";
 import { signOut } from "../services/authService";
-import { log } from "@react-native-firebase/crashlytics";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Role } from "../types/enums/Role";
 
 // Define the shape of our context
 type UserContextType = {
@@ -50,6 +51,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 	const [loggedIn, setLoggedIn] = useState(false);
 	const [hasShownAlert, setHasShownAlert] = useState(false);
 	const [initializing, setInitializing] = useState(true);
+	const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+	const [companyId, setCompanyId] = useState<string | undefined>(undefined);
 
 	// When auth state changes (user logged in)
 	const storeAuthState = async () => {
@@ -187,13 +190,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 					const userData = userSnapshot.data();
 					setUser(userData);
 					setUserId(userSnapshot.id);
-
-					// Get user privilege
-					const privilege = await getUserPrivilege(
-						userSnapshot.id,
-						userData.loggedInCompany,
-					);
-					setUserPrivilege(privilege || "User");
+					setCompanyId(userData.loggedInCompany);
 
 					setIsLoading(false);
 				} catch (error) {
@@ -208,6 +205,23 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 		return userSubscriber;
 	}, [loggedIn]);
 
+	useEffect(() => {
+		const privSubscriber = subscribeUserPrivilege(
+			userId,
+			companyId,
+			async (userPrivilegeSnapshot) => {
+				if (userPrivilegeSnapshot.exists) {
+					const privilege = userPrivilegeSnapshot.data().role;
+					setUserPrivilege(privilege);
+					setIsAdmin(
+						privilege === Role.MANAGER || privilege === Role.OWNER,
+					);
+				}
+			},
+		);
+		privSubscriber;
+	}, [user]);
+
 	const logout = async () => {
 		try {
 			await clearAuthState();
@@ -216,10 +230,6 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 			console.error("Error during logout:", error);
 		}
 	};
-
-	// Calculate derived values
-	const isAdmin = userPrivilege === "Admin" || userPrivilege === "Owner";
-	const companyId = user?.loggedInCompany;
 
 	// Create the context value object
 	const value = {

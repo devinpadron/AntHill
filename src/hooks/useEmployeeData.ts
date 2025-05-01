@@ -1,83 +1,57 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { getUser } from "../services/userService";
+import { getUser, getUserPrivilege } from "../services/userService";
 import { subscribeAllUsersInCompany } from "../services/companyService";
 import { useUser } from "../contexts/UserContext";
+import { Role } from "../types/enums/Role";
 
 // Define proper types for better type safety
 type Employee = {
-	id: string;
 	firstName: string;
 	lastName: string;
 	email: string;
-	companies: Record<string, string>;
-	[key: string]: any;
+	id: string;
+	role?: string;
 };
 
 type EmployeeMap = Record<string, Employee>;
 
 export const useEmployeeData = () => {
-	const { user, userId, companyId } = useUser();
+	const { userId, companyId } = useUser();
 	const [employees, setEmployees] = useState<EmployeeMap>({});
 	const [refreshing, setRefreshing] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 
 	// Fetch employee data
 	const fetchEmployees = useCallback(async () => {
-		if (!companyId) {
-			("No company ID available");
-			return () => {}; // Return empty cleanup function
-		}
-
-		setError(null);
-		setRefreshing(true);
-
+		if (!userId) return;
 		try {
-			const subscriber = subscribeAllUsersInCompany(
+			const unsubscribe = subscribeAllUsersInCompany(
 				companyId,
 				async (snapshot) => {
-					try {
-						const employeeData: EmployeeMap = {};
-
-						// Use Promise.all for parallel execution instead of sequential awaits
-						const promises = snapshot.docs.map(async (doc) => {
-							try {
-								const data = await getUser(doc.id);
-								if (data) {
-									employeeData[doc.id] = {
-										id: doc.id,
-										...data,
-									};
-								}
-							} catch (userError) {
-								console.error(
-									`Error fetching user ${doc.id}:`,
-									userError,
-								);
-							}
-						});
-
-						await Promise.all(promises);
-						setEmployees(employeeData);
-					} catch (processError) {
-						console.error(
-							"Error processing employee data:",
-							processError,
-						);
-						setError("Failed to process employee data");
-					} finally {
-						setRefreshing(false);
+					const newEmployees: EmployeeMap = {};
+					for (const doc of snapshot.docs) {
+						if (!doc.exists) continue;
+						const data = await getUser(doc.id);
+						const role = await getUserPrivilege(doc.id, companyId);
+						if (data) {
+							newEmployees[doc.id] = {
+								id: doc.id,
+								firstName: data.firstName,
+								lastName: data.lastName,
+								email: data.email,
+								role: role || Role.USER,
+							};
+						}
 					}
+					setEmployees(newEmployees);
+					setRefreshing(false);
 				},
 			);
-
-			return subscriber;
+			return unsubscribe;
 		} catch (error) {
 			console.error("Error fetching employees:", error);
-			setError("Failed to fetch employees");
 			setRefreshing(false);
-			return () => {}; // Return empty cleanup function
 		}
-	}, [companyId]);
+	}, [userId, companyId]);
 
 	// Initial data fetch
 	useEffect(() => {
@@ -103,19 +77,14 @@ export const useEmployeeData = () => {
 		return Object.values(employees)
 			.filter((employee): employee is Employee => {
 				// Safe null checks
-				return Boolean(
-					employee &&
-						employee.companies &&
-						employee.companies[companyId] &&
-						employee.firstName,
-				);
+				return Boolean(employee && employee.role && employee.firstName);
 			})
 			.sort((a, b) => {
-				const privilegeOrder = { Owner: 0, Admin: 1, User: 2, "": 3 };
+				const privilegeOrder = { owner: 0, manager: 1, user: 2, "": 3 };
 
 				// Get privileges safely with fallbacks
-				const aPrivilege = a.companies[companyId] || "";
-				const bPrivilege = b.companies[companyId] || "";
+				const aPrivilege = a.role || "";
+				const bPrivilege = b.role || "";
 
 				// Sort by privilege level first
 				if (privilegeOrder[aPrivilege] !== privilegeOrder[bPrivilege]) {
@@ -135,6 +104,5 @@ export const useEmployeeData = () => {
 		refreshing,
 		refetchEmployees: fetchEmployees,
 		companyId,
-		error,
 	};
 };

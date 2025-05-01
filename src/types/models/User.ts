@@ -3,7 +3,5 @@ export interface User {
 	lastName: string;
 	email: string;
 	loggedInCompany: string;
-	companies: {
-		[companyId: string]: string;
-	};
+	companies: string[];
 }

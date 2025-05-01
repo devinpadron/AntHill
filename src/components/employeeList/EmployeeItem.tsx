@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from "react-native";
 import { TouchableOpacity } from "react-native-gesture-handler";
 import { FontAwesome } from "@expo/vector-icons";
 import { LongPressGestureHandler, State } from "react-native-gesture-handler";
+import { Role } from "../../types/enums/Role";
 
 type EmployeeItemProps = {
 	employee: any;
@@ -36,10 +37,10 @@ export const EmployeeItem = ({
 						<Text style={styles.name}>
 							{`${employee.firstName} ${employee.lastName}`}
 						</Text>
-						{employee.companies[companyId] === "Owner" && (
+						{employee.role === Role.OWNER && (
 							<FontAwesome name="star" size={24} color="red" />
 						)}
-						{employee.companies[companyId] === "Admin" && (
+						{employee.role == Role.MANAGER && (
 							<FontAwesome name="star" size={24} color="gold" />
 						)}
 					</View>

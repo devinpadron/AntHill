@@ -1,6 +1,10 @@
-import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
+import {
+	firebase,
+	FirebaseFirestoreTypes,
+} from "@react-native-firebase/firestore";
 import db from "../constants/firestore";
 import { deleteCompanyFromUser, getUser, swapUserCompany } from "./userService";
+import { Role } from "../types/enums/Role";
 
 export async function compareAccessCode(accessCode: string) {
 	let data = null;
@@ -63,6 +67,7 @@ export function subscribeAllUsersInCompany(
 export async function addUserToCompany(
 	company: string,
 	userID: string,
+	role: Role = Role.USER,
 	personal: boolean = false,
 ) {
 	try {
@@ -71,7 +76,7 @@ export async function addUserToCompany(
 			.doc(company)
 			.collection("Users")
 			.doc(userID)
-			.set({});
+			.set({ role: role });
 
 		if (personal) {
 			await db
@@ -185,19 +190,37 @@ export const joinCompanyWithAccessCode = async (userId, accessCode) => {
 			.doc(companyId)
 			.collection("Users")
 			.doc(userId)
-			.set({});
+			.set({ role: Role.USER });
 
 		// Add company to user's companies
 		await db
 			.collection("Users")
 			.doc(userId)
 			.update({
-				[`companies.${companyId}`]: "User",
+				companies: firebase.firestore.FieldValue.arrayUnion(companyId),
 			});
-
 		return companyId; // Return company ID for switching
 	} catch (error) {
 		console.error("Error joining company:", error);
 		throw error;
 	}
 };
+
+export async function changeUserRole(
+	userId: string,
+	companyId: string,
+	role: Role,
+): Promise<boolean> {
+	try {
+		await db
+			.collection("Companies")
+			.doc(companyId)
+			.collection("Users")
+			.doc(userId)
+			.update({ role: role });
+		return true;
+	} catch (error) {
+		console.error("Error changing user role:", error);
+		return false;
+	}
+}
