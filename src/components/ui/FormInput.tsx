@@ -33,7 +33,7 @@ export const FormInput = ({
 
 const styles = StyleSheet.create({
 	textInput: {
-		width: 400,
+		width: 350,
 		height: 40,
 		color: AntHill.Black,
 		margin: 10,

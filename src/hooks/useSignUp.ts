@@ -67,7 +67,7 @@ export const useSignUp = (navigation: any) => {
 
 			// Prepare user data based on account type
 			const companyId = isSolo ? user.uid : company;
-			const role = isSolo ? "Owner" : "User";
+			const role = isSolo ? Role.OWNER : Role.USER;
 			const userData = formatUserData(
 				firstName,
 				lastName,
@@ -77,7 +77,7 @@ export const useSignUp = (navigation: any) => {
 
 			// Save user data
 			await addUser(userData, user.uid);
-			await addUserToCompany(companyId, user.uid, Role.USER, isSolo);
+			await addUserToCompany(companyId, user.uid, role, isSolo);
 
 			// Send verification email
 			await user.sendEmailVerification();

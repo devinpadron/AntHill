@@ -1,5 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, TextInput } from "react-native";
+import {
+	View,
+	Text,
+	StyleSheet,
+	TextInput,
+	Animated,
+	TouchableOpacity,
+} from "react-native";
 import { RouteProp, useRoute } from "@react-navigation/native";
 import LoadingScreen from "../LoadingScreen";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -31,6 +38,10 @@ const EventDetails = ({ navigation }) => {
 	const [markers, setMarkers] = useState<MapMarker[]>([]);
 	const [initialRegion, setInitialRegion] = useState(null);
 	const scrollViewRef = useRef(null);
+	const [isEditingNotes, setIsEditingNotes] = useState(false);
+	const [lastTapTime, setLastTapTime] = useState(0);
+
+	const animatedOpacity = useRef(new Animated.Value(0)).current;
 
 	// Use custom hook for event data
 	const {
@@ -44,6 +55,41 @@ const EventDetails = ({ navigation }) => {
 		saveNotes,
 		hasEditPermission,
 	} = useEventDetails(eventId);
+
+	const handleDoubleTap = () => {
+		const now = Date.now();
+		const DOUBLE_TAP_DELAY = 300; // ms between taps
+
+		if (now - lastTapTime < DOUBLE_TAP_DELAY) {
+			// Double tap detected
+			setIsEditingNotes(true);
+
+			// Show animation feedback
+			Animated.sequence([
+				Animated.timing(animatedOpacity, {
+					toValue: 1,
+					duration: 200,
+					useNativeDriver: true,
+				}),
+				Animated.timing(animatedOpacity, {
+					toValue: 0.5,
+					duration: 200,
+					useNativeDriver: true,
+				}),
+			]).start();
+
+			// Reset tap timer
+			setLastTapTime(0);
+		} else {
+			// First tap - start timer
+			setLastTapTime(now);
+		}
+	};
+
+	const handleBlur = () => {
+		saveNotes();
+		setIsEditingNotes(false);
+	};
 
 	// Process location data
 	useEffect(() => {
@@ -185,19 +231,59 @@ const EventDetails = ({ navigation }) => {
 					<AttachmentGallery attachments={attachments} />
 
 					{/* User Notes */}
-					<Text style={[styles.label, { marginTop: 10 }]}>
-						Your Notes
-					</Text>
-					<TextInput
-						style={styles.notesInput}
-						multiline
-						editable
-						numberOfLines={5}
-						value={localNotes}
-						onChangeText={setLocalNotes}
-						onBlur={saveNotes}
-						placeholder="Add your personal notes here..."
-					/>
+					<View>
+						<Text style={[styles.label, { marginTop: 10 }]}>
+							Your Notes
+							<Text style={styles.editHint}>
+								{isEditingNotes
+									? " (editing)"
+									: " (double-tap to unlock)"}
+							</Text>
+						</Text>
+
+						<TouchableOpacity
+							activeOpacity={0.8}
+							onPress={
+								isEditingNotes ? undefined : handleDoubleTap
+							}
+							disabled={isEditingNotes}
+						>
+							<Animated.View
+								style={[
+									styles.notesContainer,
+									isEditingNotes &&
+										styles.editingNotesContainer,
+									!isEditingNotes && {
+										opacity: animatedOpacity.interpolate({
+											inputRange: [0, 0.5, 1],
+											outputRange: [1, 0.8, 1],
+										}),
+									},
+								]}
+							>
+								<TextInput
+									style={styles.notesInput}
+									multiline
+									editable={isEditingNotes}
+									numberOfLines={5}
+									value={localNotes}
+									onChangeText={
+										isEditingNotes
+											? setLocalNotes
+											: undefined
+									}
+									onBlur={
+										isEditingNotes ? handleBlur : undefined
+									}
+									placeholder="Add your personal notes here..."
+									contextMenuHidden={!isEditingNotes}
+									pointerEvents={
+										isEditingNotes ? "auto" : "none"
+									}
+								/>
+							</Animated.View>
+						</TouchableOpacity>
+					</View>
 				</View>
 			</KeyboardAwareScrollView>
 		</View>
@@ -245,15 +331,30 @@ const styles = StyleSheet.create({
 		marginBottom: 16,
 		borderRadius: 8,
 	},
-	notesInput: {
-		fontSize: 16,
-		lineHeight: 20,
-		marginBottom: 12,
-		padding: 8,
-		minHeight: 150,
+	notesContainer: {
 		borderWidth: 1,
 		borderColor: "#eee",
 		borderRadius: 8,
+		marginBottom: 12,
+	},
+
+	editingNotesContainer: {
+		borderColor: "#007AFF",
+		backgroundColor: "#F0F8FF",
+	},
+
+	notesInput: {
+		fontSize: 16,
+		lineHeight: 20,
+		padding: 8,
+		minHeight: 150,
+	},
+
+	editHint: {
+		fontSize: 12,
+		fontStyle: "italic",
+		color: "#999",
+		fontWeight: "400",
 	},
 });
 

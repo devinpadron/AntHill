@@ -33,8 +33,6 @@ const EmployeeList = ({ navigation }) => {
 		useEmployeeData();
 	const [expandedIndex, setExpandedIndex] = useState(null);
 
-	console.log("EmployeeList", employees);
-
 	// Toggle expanded item
 	const handlePress = useCallback(
 		(index) => {

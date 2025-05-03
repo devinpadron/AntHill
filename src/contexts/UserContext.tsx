@@ -219,7 +219,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 			},
 		);
 		privSubscriber;
-	}, [user]);
+	}, [user, userId, companyId]);
 
 	const logout = async () => {
 		try {

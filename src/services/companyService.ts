@@ -83,6 +83,13 @@ export async function addUserToCompany(
 				.collection("Companies")
 				.doc(company)
 				.set({ personal: true });
+
+			await db
+				.collection("Companies")
+				.doc(company)
+				.collection("Users")
+				.doc(userID)
+				.set({ role: role });
 		}
 		return true;
 	} catch (e) {

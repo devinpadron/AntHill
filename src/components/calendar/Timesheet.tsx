@@ -16,6 +16,7 @@ import { FilterType } from "../../types";
 import { CalendarList } from "react-native-calendars";
 import { Dimensions } from "react-native";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
+import LoadingScreen from "../../screens/LoadingScreen";
 
 export default function Timesheet(
 	props: {
@@ -49,6 +50,7 @@ export default function Timesheet(
 		includePastEvents,
 		loadPastEvents,
 		togglePastEvents,
+		isLoading,
 	} = usePullEvents(
 		companyId,
 		userId,
@@ -262,6 +264,10 @@ export default function Timesheet(
 			</BottomSheet>
 		);
 	};
+
+	if (isLoading) {
+		return <LoadingScreen />;
+	}
 
 	return (
 		<View style={styles.container}>

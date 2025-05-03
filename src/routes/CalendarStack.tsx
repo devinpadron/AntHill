@@ -1,5 +1,5 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import ExpandableCalendarScreen from "../screens/home/Calendar";
+import CalendarScreen from "../screens/home/Calendar";
 import EventDetails from "../screens/home/EventDetails";
 import EventSubmit from "../screens/home/EventSubmit";
 
@@ -10,7 +10,7 @@ const SettingStack = () => {
 		<Stack.Navigator>
 			<Stack.Screen
 				name="Calendar"
-				component={ExpandableCalendarScreen}
+				component={CalendarScreen}
 				options={{ headerShown: false }}
 			/>
 			<Stack.Screen

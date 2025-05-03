@@ -18,6 +18,7 @@ export const usePullEvents = (
 	const [agendaItems, setAgendaItems] = useState({});
 	const [markedDates, setMarkedDates] = useState({});
 	const [rawEvents, setRawEvents] = useState([]);
+	const [isLoading, setIsLoading] = useState(true);
 
 	// Filter function that processes data based on FilterType
 	const filterEventsByType = useCallback(
@@ -159,7 +160,7 @@ export const usePullEvents = (
 
 			setAgendaItems(items);
 			setMarkedDates(marks);
-
+			setIsLoading(false);
 			console.log(
 				`Processed ${allEvents.length} events, filtered to ${filteredEvents.length} items`,
 			);
@@ -190,5 +191,6 @@ export const usePullEvents = (
 		includePastEvents,
 		togglePastEvents: () => setIncludePastEvents((prev) => !prev),
 		loadPastEvents: () => setIncludePastEvents(true),
+		isLoading,
 	};
 };

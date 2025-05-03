@@ -3,18 +3,16 @@ import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import moment from "moment";
 import { useUser } from "../../contexts/UserContext";
-//import { useCalendarEvents } from "../../hooks/useCalendarEvents";
 import { useBottomSheetController } from "../../hooks/useBottomSheetController";
 import { FilterPanel } from "../../components/calendar/FilterPanel";
 import { FloatingActionButtons } from "../../components/calendar/FloatingActionButtons";
 import LoadingScreen from "../LoadingScreen";
 import { FilterType } from "../../types";
 import Timesheet from "../../components/calendar/Timesheet";
-import { initial, set } from "lodash";
 
 const today = moment().format("YYYY-MM-DD");
 
-const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
+const CalendarScreen = ({ navigation }: { navigation: any }) => {
 	// User State
 	const { user, isAdmin, isLoading } = useUser();
 
@@ -65,7 +63,7 @@ const ExpandableCalendarScreen = ({ navigation }: { navigation: any }) => {
 
 	const insets = useSafeAreaInsets();
 
-	if (isLoading || filterType === null) {
+	if (isLoading || isAdmin === null) {
 		return <LoadingScreen />;
 	}
 
@@ -148,4 +146,4 @@ const styles = StyleSheet.create({
 	},
 });
 
-export default ExpandableCalendarScreen;
+export default CalendarScreen;
