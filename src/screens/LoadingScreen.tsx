@@ -1,6 +1,6 @@
 import React from "react";
 import { View, ActivityIndicator, StyleSheet, Text } from "react-native";
-import { AntHill } from "../global/colors";
+import { AntHill } from "../constants/colors";
 
 const LoadingScreen = () => {
 	return (
