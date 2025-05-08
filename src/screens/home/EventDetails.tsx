@@ -152,9 +152,10 @@ const EventDetails = ({ navigation }) => {
 						{event.startTime ? (
 							<>
 								<Text style={styles.timeText}>
-									{moment(event.startTime, "HH:mm").format(
-										"h:mma",
-									)}
+									{moment(
+										event.startTime,
+										"YYYY-MM-DD HH:mm",
+									).format("h:mma")}
 								</Text>
 
 								{event.endTime && (
@@ -163,15 +164,13 @@ const EventDetails = ({ navigation }) => {
 										<Text style={styles.timeText}>
 											{moment(
 												event.endTime,
-												"HH:mm",
+												"YYYY-MM-DD HH:mm",
 											).format("h:mma")}
 										</Text>
 									</>
 								)}
 							</>
-						) : (
-							<Text style={styles.timeText}>All Day</Text>
-						)}
+						) : null}
 					</View>
 
 					{/* Event Duration */}

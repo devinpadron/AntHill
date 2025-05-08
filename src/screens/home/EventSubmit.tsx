@@ -118,7 +118,12 @@ const EventSubmit = ({ navigation }) => {
 
 	const formatDate = (date: Date) =>
 		moment(date).format("dddd, MMMM Do YYYY");
-	const formatTime = (time: Date) => moment(time).format("h:mm A");
+	const formatTime = (time: Date, start: boolean = true) => {
+		if (start) {
+			return moment(time).format("h:mm A");
+		}
+		return moment(time).format("ddd, MMM Do h:mm A");
+	};
 
 	const handleBackPress = () => {
 		if (hasFormChanged()) {
@@ -274,14 +279,14 @@ const EventSubmit = ({ navigation }) => {
 										]}
 									>
 										<Text style={styles.dateButtonText}>
-											{formatTime(endTime)}
+											{formatTime(endTime, false)}
 										</Text>
 									</TouchableOpacity>
 									<DatePicker
 										modal
 										open={openEndTime}
 										date={endTime}
-										mode="time"
+										mode="datetime"
 										onConfirm={(date) => {
 											toggleDatePicker("endTime");
 											setEndTime(date);
