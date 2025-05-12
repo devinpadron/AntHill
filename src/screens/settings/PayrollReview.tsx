@@ -3,12 +3,12 @@ import {
 	View,
 	Text,
 	StyleSheet,
-	TouchableOpacity,
 	FlatList,
 	SafeAreaView,
 	ActivityIndicator,
 	ScrollView,
 } from "react-native";
+import { TouchableOpacity } from "react-native-gesture-handler";
 import {
 	format,
 	startOfWeek,
@@ -23,6 +23,7 @@ import { useUser } from "../../contexts/UserContext";
 import { getAllTimeEntries } from "../../services/timeEntryService";
 import { getUser } from "../../services/userService";
 import DatePicker from "react-native-date-picker";
+import { Ionicons } from "@expo/vector-icons";
 
 const PayrollReview = ({ navigation }) => {
 	// State for date range
@@ -315,6 +316,12 @@ const PayrollReview = ({ navigation }) => {
 	return (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.header}>
+				<TouchableOpacity
+					containerStyle={styles.backButton}
+					onPress={() => navigation.goBack()}
+				>
+					<Ionicons name="chevron-back" size={28} color="#000" />
+				</TouchableOpacity>
 				<Text style={styles.headerTitle}>Payroll Review</Text>
 			</View>
 
@@ -521,9 +528,14 @@ const PayrollReview = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
+	backButton: {
+		position: "absolute",
+		left: 20,
+		zIndex: 1,
+	},
 	container: {
 		flex: 1,
-		backgroundColor: "#f7f7f7",
+		backgroundColor: "white",
 	},
 	header: {
 		paddingHorizontal: 16,
@@ -531,11 +543,14 @@ const styles = StyleSheet.create({
 		backgroundColor: "white",
 		borderBottomWidth: 1,
 		borderBottomColor: "#eaeaea",
+		//flexDirection: "row",
+		justifyContent: "center",
 	},
 	headerTitle: {
 		fontSize: 20,
 		fontWeight: "600",
 		color: "#333",
+		textAlign: "center",
 	},
 	dateSelector: {
 		backgroundColor: "white",
