@@ -129,6 +129,10 @@ export async function addEvent(company: string, newEvent: Event) {
 			.add(newEvent);
 		const entryid = entry.id;
 
+		entry.update({
+			id: entryid,
+		});
+
 		if (attachments && attachments.length > 0) {
 			await addAttachments(company, entry.id, attachments);
 		}

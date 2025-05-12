@@ -363,16 +363,16 @@ export const useEventForm = (navigation, eventId?: string) => {
 				: null;
 
 			const eventData: Event = {
+				id: editID || "",
 				title,
 				date: moment(date).format("YYYY-MM-DD"),
 				startTime: !allDay
-					? moment(startTime).format(
-							moment(date).format("YYYY-MM-DD") + " HH:mm",
-						)
+					? moment(date)
+							.hours(startTime.getHours())
+							.minutes(startTime.getMinutes())
+							.toISOString(true)
 					: null,
-				endTime: hasEndTime
-					? moment(endTime).format("YYYY-MM-DD HH:mm")
-					: null,
+				endTime: hasEndTime ? moment(endTime).toISOString(true) : null,
 				locations: validatedLocations,
 				duration: calculateDuration(),
 				notes,

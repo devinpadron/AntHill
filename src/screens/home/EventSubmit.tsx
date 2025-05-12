@@ -116,13 +116,9 @@ const EventSubmit = ({ navigation }) => {
 		return () => subscriber();
 	}, [currentCompany]);
 
-	const formatDate = (date: Date) =>
-		moment(date).format("dddd, MMMM Do YYYY");
-	const formatTime = (time: Date, start: boolean = true) => {
-		if (start) {
-			return moment(time).format("h:mm A");
-		}
-		return moment(time).format("ddd, MMM Do h:mm A");
+	const formatDate = (date: Date) => moment(date).format("MMM D, YYYY");
+	const formatTime = (time: Date) => {
+		return moment(time).format("h:mm A");
 	};
 
 	const handleBackPress = () => {
@@ -279,7 +275,7 @@ const EventSubmit = ({ navigation }) => {
 										]}
 									>
 										<Text style={styles.dateButtonText}>
-											{formatTime(endTime, false)}
+											{formatTime(endTime)}
 										</Text>
 									</TouchableOpacity>
 									<DatePicker
