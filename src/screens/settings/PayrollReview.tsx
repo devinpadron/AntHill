@@ -149,9 +149,22 @@ const PayrollReview = ({ navigation }) => {
 	};
 
 	// Navigate to time entry details
-	const viewTimeEntryDetails = (entryId) => {
+	const viewTimeEntryDetails = (employeeId, entryId) => {
 		//TODO: This will be implemented later
-		navigation.navigate("TimeEntryDetails", { entryId });
+		navigation.navigate("TimeEntryDetails", {
+			employeeId,
+			entryId,
+			isEmployeeView: false,
+		});
+	};
+
+	// Add this new function to navigate to TimeEntryDetails with all entries for an employee
+	const viewEmployeeTimeEntries = (employeeId, entries) => {
+		navigation.navigate("TimeEntryDetails", {
+			employeeId,
+			entries,
+			isEmployeeView: true, // Flag to indicate this is a grouped view
+		});
 	};
 
 	// Go to previous week
@@ -221,7 +234,7 @@ const PayrollReview = ({ navigation }) => {
 		return (
 			<TouchableOpacity
 				style={styles.timeEntryItem}
-				onPress={() => viewTimeEntryDetails(item.id)}
+				onPress={() => viewTimeEntryDetails(item.userId, item.id)}
 			>
 				<View style={styles.timeEntryHeader}>
 					<Text style={styles.timeEntryDate}>
@@ -415,33 +428,34 @@ const PayrollReview = ({ navigation }) => {
 							key={employeeGroup.userId}
 							style={styles.employeeSection}
 						>
-							<TouchableOpacity
-								style={styles.employeeHeader}
-								onPress={() =>
-									toggleEmployeeExpansion(
-										employeeGroup.userId,
-									)
-								}
-							>
-								<View style={styles.employeeInfo}>
-									<View style={styles.employeeAvatar}>
-										<Text style={styles.avatarText}>
-											{employeeGroup.displayName
-												.charAt(0)
-												.toUpperCase()}
-										</Text>
+							<View style={styles.employeeHeader}>
+								<TouchableOpacity
+									style={styles.employeeHeaderMain}
+									onPress={() =>
+										viewEmployeeTimeEntries(
+											employeeGroup.userId,
+											employeeGroup.entries,
+										)
+									}
+								>
+									<View style={styles.employeeInfo}>
+										<View style={styles.employeeAvatar}>
+											<Text style={styles.avatarText}>
+												{employeeGroup.displayName
+													.charAt(0)
+													.toUpperCase()}
+											</Text>
+										</View>
+										<View>
+											<Text style={styles.employeeName}>
+												{employeeGroup.displayName}
+											</Text>
+											<Text style={styles.employeeEmail}>
+												{employeeGroup.email}
+											</Text>
+										</View>
 									</View>
-									<View>
-										<Text style={styles.employeeName}>
-											{employeeGroup.displayName}
-										</Text>
-										<Text style={styles.employeeEmail}>
-											{employeeGroup.email}
-										</Text>
-									</View>
-								</View>
 
-								<View style={styles.employeeHeaderRight}>
 									<Text style={styles.employeeHours}>
 										{
 											getTotalHours(employeeGroup.entries)
@@ -458,6 +472,22 @@ const PayrollReview = ({ navigation }) => {
 										}
 										m
 									</Text>
+								</TouchableOpacity>
+
+								<TouchableOpacity
+									style={styles.collapseButton}
+									onPress={() =>
+										toggleEmployeeExpansion(
+											employeeGroup.userId,
+										)
+									}
+									hitSlop={{
+										top: 10,
+										right: 10,
+										bottom: 10,
+										left: 10,
+									}}
+								>
 									<Icon
 										name={
 											expandedEmployees[
@@ -469,8 +499,8 @@ const PayrollReview = ({ navigation }) => {
 										size={24}
 										color="#666"
 									/>
-								</View>
-							</TouchableOpacity>
+								</TouchableOpacity>
+							</View>
 
 							{expandedEmployees[employeeGroup.userId] && (
 								<View style={styles.entriesContainer}>
@@ -627,9 +657,20 @@ const styles = StyleSheet.create({
 		borderBottomWidth: 1,
 		borderBottomColor: "#eaeaea",
 	},
+	employeeHeaderMain: {
+		flex: 1,
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+	},
 	employeeInfo: {
 		flexDirection: "row",
 		alignItems: "center",
+	},
+	collapseButton: {
+		paddingLeft: 16,
+		alignItems: "center",
+		justifyContent: "center",
 	},
 	employeeAvatar: {
 		width: 40,
