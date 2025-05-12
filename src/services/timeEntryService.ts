@@ -1,5 +1,6 @@
 import db from "../constants/firestore";
 import { TimeEntry } from "../types";
+import { CollectionReference, Query } from "firebase/firestore";
 
 export const clockIn = async (userId: string, companyId: string) => {
 	const timeEntryRef = db
@@ -152,25 +153,49 @@ export const subscribeToActiveTimeEntry = (
 };
 
 export const getAllTimeEntries = async (
-	userId: string,
+	userId: string | null,
 	companyId: string,
+	startDate?: string,
+	endDate?: string,
 	limit = 50,
 ) => {
-	const timeEntriesRef = db
-		.collection("Companies")
-		.doc(companyId)
-		.collection("TimeEntries")
-		.where("userId", "==", userId)
-		.orderBy("clockInTime", "desc")
-		.limit(limit);
+	try {
+		// Start with the collection reference
+		const collectionRef = db
+			.collection("Companies")
+			.doc(companyId)
+			.collection("TimeEntries");
 
-	const snapshot = await timeEntriesRef.get();
-	if (snapshot.empty) return [];
+		// Build the query step by step
+		let queryRef = collectionRef as any; // Start with a flexible type
 
-	return snapshot.docs.map((doc) => ({
-		id: doc.id,
-		...doc.data(),
-	})) as TimeEntry[];
+		// Add userId filter if provided
+		if (userId) {
+			queryRef = queryRef.where("userId", "==", userId);
+		}
+
+		// Add date range filters if provided
+		if (startDate && endDate) {
+			queryRef = queryRef.where("clockInTime", ">=", startDate);
+			queryRef = queryRef.where("clockInTime", "<=", endDate);
+		}
+
+		// Always sort by clockInTime in descending order and limit results
+		queryRef = queryRef.orderBy("clockInTime", "desc").limit(limit);
+
+		// Execute the query
+		const snapshot = await queryRef.get();
+
+		if (snapshot.empty) return [];
+
+		return snapshot.docs.map((doc) => ({
+			id: doc.id,
+			...doc.data(),
+		})) as TimeEntry[];
+	} catch (error) {
+		console.error("Error getting time entries:", error);
+		throw error;
+	}
 };
 
 // Pause time entry
@@ -242,6 +267,38 @@ export const resumeTimeEntry = async (
 		return { success: true, totalPausedSeconds };
 	} catch (error) {
 		console.error("Error resuming time entry:", error);
+		throw error;
+	}
+};
+
+// Submit time entry for approval
+export const submitTimeEntryForApproval = async (
+	timeEntryId: string,
+	companyId: string,
+	notes: string,
+) => {
+	try {
+		const timeEntryRef = db
+			.collection("Companies")
+			.doc(companyId)
+			.collection("TimeEntries")
+			.doc(timeEntryId);
+
+		const timestamp = new Date().toISOString();
+
+		await timeEntryRef.update({
+			status: "pending_approval",
+			submittedAt: timestamp,
+			notes: notes,
+			submissionNotes: notes, // Store separately to preserve original notes
+		});
+
+		return {
+			success: true,
+			message: "Time entry submitted for approval",
+		};
+	} catch (error) {
+		console.error("Error submitting time entry:", error);
 		throw error;
 	}
 };

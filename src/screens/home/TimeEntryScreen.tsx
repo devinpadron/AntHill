@@ -9,19 +9,21 @@ import {
 	SafeAreaView,
 	Alert,
 	ActivityIndicator,
-	RefreshControl, // Add this import
+	RefreshControl,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { format, startOfWeek, endOfWeek, differenceInMinutes } from "date-fns";
 import TimeEntryCard from "../../components/time/TimeEntryCard";
+import TimeEntrySubmitModal from "../../components/time/TimeEntrySubmitModal";
 import { useTimeTracking } from "../../hooks/useTimeTracking";
-
-//TODO: Add a submit button to the time entry screen after clock-out that will open up a modal to submit the time entry for approval. This will be a separate component that will take the time entry details and allow the user to add notes or comments before submitting it for approval. The modal should have a cancel button to close it without submitting, and a submit button to send the time entry for approval. The modal should also show a loading indicator while the submission is in progress.
+import { submitTimeEntryForApproval } from "../../services/timeEntryService";
+import { useUser } from "../../contexts/UserContext";
 
 // Time Entry Screen Component
 const TimeEntryScreen = ({ navigation }) => {
 	const insets = useSafeAreaInsets();
+	const { userId, companyId } = useUser();
 	const {
 		timeEntries,
 		activeTimeEntry,
@@ -39,6 +41,10 @@ const TimeEntryScreen = ({ navigation }) => {
 
 	// Add state for pull-to-refresh
 	const [refreshing, setRefreshing] = useState(false);
+
+	// Add state for time entry submission modal
+	const [submitModalVisible, setSubmitModalVisible] = useState(false);
+	const [selectedTimeEntry, setSelectedTimeEntry] = useState(null);
 
 	// Handle pull-to-refresh
 	const onRefresh = async () => {
@@ -69,8 +75,14 @@ const TimeEntryScreen = ({ navigation }) => {
 				style: "destructive",
 				onPress: async () => {
 					try {
-						await clockOut();
+						const completedEntry = await clockOut();
 						fetchTimeEntries();
+
+						// Show submit for approval option after clock out
+						setTimeout(() => {
+							setSelectedTimeEntry(completedEntry);
+							setSubmitModalVisible(true);
+						}, 500);
 					} catch (error) {
 						console.error("Error clocking out:", error);
 						Alert.alert("Error", "Failed to clock out");
@@ -80,9 +92,38 @@ const TimeEntryScreen = ({ navigation }) => {
 		]);
 	};
 
+	// Handle time entry submission
+	const handleSubmitTimeEntry = async (timeEntryId, notes) => {
+		if (!timeEntryId || !companyId) {
+			throw new Error("Missing required data for submission");
+		}
+
+		await submitTimeEntryForApproval(timeEntryId, companyId, notes);
+		fetchTimeEntries(); // Refresh the list to update status
+	};
+
+	// Open submit modal for a specific time entry
+	const openSubmitModal = (timeEntry) => {
+		setSelectedTimeEntry(timeEntry);
+		setSubmitModalVisible(true);
+	};
+
 	// View time entry details
 	const viewTimeEntryDetails = (entryId) => {
-		//navigation.navigate("TimeEntryDetail", { entryId });
+		// Future implementation
+	};
+
+	// Update the renderTimeEntry function
+	const renderTimeEntry = ({ item }) => {
+		return (
+			<TimeEntryCard
+				timeEntry={item}
+				onPress={() => viewTimeEntryDetails(item.id)}
+				onSubmit={
+					item.status === "pending_approval" ? null : openSubmitModal
+				}
+			/>
+		);
 	};
 
 	return (
@@ -257,12 +298,7 @@ const TimeEntryScreen = ({ navigation }) => {
 				<FlatList
 					data={timeEntries}
 					keyExtractor={(item) => item.id}
-					renderItem={({ item }) => (
-						<TimeEntryCard
-							timeEntry={item}
-							onPress={() => viewTimeEntryDetails(item.id)}
-						/>
-					)}
+					renderItem={renderTimeEntry}
 					ListEmptyComponent={
 						<View style={styles.emptyContainer}>
 							<Text style={styles.emptyText}>
@@ -270,23 +306,31 @@ const TimeEntryScreen = ({ navigation }) => {
 							</Text>
 						</View>
 					}
-					// Add RefreshControl for pull-to-refresh
 					refreshControl={
 						<RefreshControl
 							refreshing={refreshing}
 							onRefresh={onRefresh}
-							colors={["#007AFF"]} // iOS refresh indicator color
-							tintColor="#007AFF" // Android refresh indicator color
-							title="Refreshing..." // Only shown on iOS
-							titleColor="#999" // Only shown on iOS
+							colors={["#007AFF"]}
+							tintColor="#007AFF"
+							title="Refreshing..."
+							titleColor="#999"
 						/>
 					}
 				/>
 			</View>
+
+			{/* Time Entry Submission Modal */}
+			<TimeEntrySubmitModal
+				visible={submitModalVisible}
+				timeEntry={selectedTimeEntry}
+				onClose={() => setSubmitModalVisible(false)}
+				onSubmit={handleSubmitTimeEntry}
+			/>
 		</SafeAreaView>
 	);
 };
 
+// Add these new styles to your existing StyleSheet
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
@@ -460,6 +504,44 @@ const styles = StyleSheet.create({
 	},
 	pausedText: {
 		color: "#FFA500",
+	},
+	submitButton: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		paddingVertical: 8,
+		marginTop: -8,
+		marginBottom: 12,
+		backgroundColor: "#f0f7ff",
+		borderRadius: 8,
+		marginHorizontal: 16,
+	},
+	submitIcon: {
+		marginRight: 6,
+	},
+	submitText: {
+		color: "#007AFF",
+		fontWeight: "500",
+		fontSize: 14,
+	},
+	pendingApprovalBadge: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		paddingVertical: 8,
+		marginTop: -8,
+		marginBottom: 12,
+		backgroundColor: "#fff8e1",
+		borderRadius: 8,
+		marginHorizontal: 16,
+	},
+	pendingIcon: {
+		marginRight: 6,
+	},
+	pendingText: {
+		color: "#FFA500",
+		fontWeight: "500",
+		fontSize: 14,
 	},
 });
 

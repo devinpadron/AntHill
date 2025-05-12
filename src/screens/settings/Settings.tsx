@@ -17,6 +17,10 @@ const Settings = ({ navigation }: any) => {
 		navigation.push("EmployeeList");
 	};
 
+	const pushPayrollReview = () => {
+		navigation.push("PayrollReview");
+	};
+
 	const handleLogout = () => {
 		Alert.alert("Logout", "Are you sure you want to logout?", [
 			{ text: "Cancel", style: "cancel" },
@@ -51,6 +55,10 @@ const Settings = ({ navigation }: any) => {
 					<SettingsItem
 						title="Employee List"
 						onPress={pushEmployeeList}
+					/>
+					<SettingsItem
+						title="Payroll Review"
+						onPress={pushPayrollReview}
 					/>
 				</View>
 			) : null}

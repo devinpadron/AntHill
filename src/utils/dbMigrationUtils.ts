@@ -68,6 +68,13 @@ async function migrateToV1(userId: string) {
 
 	// Skip if companies is already an array or doesn't exist
 	if (!companies || Array.isArray(companies)) {
+		// Even if we don't need to convert companies, we should still add the ID
+		if (!userData?.id) {
+			await userRef.update({
+				id: userId,
+			});
+			console.log("Added user ID to user document");
+		}
 		console.log("No companies to migrate or already in array format");
 		return true;
 	}
@@ -80,9 +87,10 @@ async function migrateToV1(userId: string) {
 	// Extract the company IDs for the new array format
 	const companyIds = Object.keys(companies);
 
-	// Update the user document with just the array of company IDs
+	// Update the user document with just the array of company IDs and add userId field
 	batch.update(userRef, {
 		companies: companyIds,
+		id: userId, // Add the user's ID to the user object
 	});
 
 	// For each company, add the user's privilege to Company.Users collection
@@ -109,6 +117,7 @@ async function migrateToV1(userId: string) {
 			companyUserRef,
 			{
 				role: privilege,
+				id: userId, // Also include user ID in the company-user relationship
 			},
 			{ merge: true },
 		); // Use merge to avoid overwriting existing data
@@ -118,7 +127,7 @@ async function migrateToV1(userId: string) {
 	await batch.commit();
 
 	console.log(
-		`Successfully migrated ${companyIds.length} companies from object to array format and moved privileges to Company.Users collection`,
+		`Successfully migrated ${companyIds.length} companies from object to array format, moved privileges to Company.Users collection, and added user ID to user document`,
 	);
 	return true;
 }

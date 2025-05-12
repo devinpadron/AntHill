@@ -3,7 +3,7 @@ import { TouchableOpacity, View, Text, StyleSheet } from "react-native";
 import { format, differenceInSeconds } from "date-fns";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
-const TimeEntryCard = ({ timeEntry, onPress }) => {
+const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 	// Format date and times
 	const entryDate = new Date(timeEntry.clockInTime);
 	const formattedDate = format(entryDate, "EEEE, MMMM d");
@@ -17,6 +17,11 @@ const TimeEntryCard = ({ timeEntry, onPress }) => {
 		: timeEntry.status === "paused"
 			? "Paused"
 			: "Active";
+
+	// Determine if entry can be submitted for approval
+	const canSubmit =
+		(timeEntry.status === "completed" || timeEntry.status === "edited") &&
+		timeEntry.status !== "pending_approval";
 
 	// Setup and manage timer for active entries
 	useEffect(() => {
@@ -67,7 +72,7 @@ const TimeEntryCard = ({ timeEntry, onPress }) => {
 		timeEntry.status,
 		timeEntry.clockInTime,
 		timeEntry.pauseStartTime,
-		timeEntry.totalPausedSeconds, // Change from totalPausedMinutes to totalPausedSeconds
+		timeEntry.totalPausedSeconds,
 	]);
 
 	// Calculate hours and minutes
@@ -82,8 +87,8 @@ const TimeEntryCard = ({ timeEntry, onPress }) => {
 	// For active/paused entries, use the elapsed seconds
 	const duration =
 		timeEntry.status === "completed" || timeEntry.status === "edited"
-			? getDurationValues(timeEntry.duration || 0) // No need to convert, already in seconds
-			: getDurationValues(Math.max(0, elapsedSeconds)); // Use calculated elapsed time
+			? getDurationValues(timeEntry.duration || 0)
+			: getDurationValues(Math.max(0, elapsedSeconds));
 
 	// Format duration string with seconds for active entries
 	const formatDurationString = (h, m, s, isActive, isPaused) => {
@@ -114,11 +119,19 @@ const TimeEntryCard = ({ timeEntry, onPress }) => {
 				return "#ff9500";
 			case "paused":
 				return "#FFA500"; // Different orange for paused
+			case "pending_approval":
+				return "#FFA500"; // Orange for pending
 			case "edited":
 				return "#007AFF";
 			default:
 				return "#34C759";
 		}
+	};
+
+	// Handler for submission button
+	const handleSubmit = (e) => {
+		e.stopPropagation(); // Prevent triggering card's onPress
+		if (onSubmit) onSubmit(timeEntry);
 	};
 
 	return (
@@ -215,19 +228,31 @@ const TimeEntryCard = ({ timeEntry, onPress }) => {
 				</View>
 			)}
 
-			{/* Notes if available */}
-			{timeEntry.notes && (
-				<View style={styles.notesContainer}>
-					<Text style={styles.notesLabel}>Notes:</Text>
-					<Text
-						style={styles.notesText}
-						numberOfLines={2}
-						ellipsizeMode="tail"
-					>
-						{timeEntry.notes}
-					</Text>
+			{/* Status badges and submit button */}
+			{timeEntry.status === "pending_approval" ? (
+				<View style={styles.statusBadge}>
+					<Icon
+						name="clock-check-outline"
+						size={16}
+						color="#FFA500"
+						style={styles.icon}
+					/>
+					<Text style={styles.pendingText}>Pending Approval</Text>
 				</View>
-			)}
+			) : canSubmit && onSubmit ? (
+				<TouchableOpacity
+					style={styles.submitButton}
+					onPress={handleSubmit}
+				>
+					<Icon
+						name="check-circle-outline"
+						size={16}
+						color="#007AFF"
+						style={styles.icon}
+					/>
+					<Text style={styles.submitText}>Submit for Approval</Text>
+				</TouchableOpacity>
+			) : null}
 		</TouchableOpacity>
 	);
 };
@@ -321,21 +346,34 @@ const styles = StyleSheet.create({
 		color: "#007AFF",
 		flex: 1,
 	},
-	notesContainer: {
-		marginTop: 8,
-		paddingTop: 8,
-		borderTopWidth: 1,
-		borderTopColor: "#eee",
+	// Submit button and status badge styles
+	submitButton: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		backgroundColor: "#f0f7ff",
+		paddingVertical: 8,
+		borderRadius: 6,
+		marginTop: 12,
 	},
-	notesLabel: {
+	submitText: {
 		fontSize: 14,
-		color: "#666",
-		marginBottom: 4,
+		fontWeight: "500",
+		color: "#007AFF",
 	},
-	notesText: {
+	statusBadge: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		backgroundColor: "#fff8e1",
+		paddingVertical: 8,
+		borderRadius: 6,
+		marginTop: 12,
+	},
+	pendingText: {
 		fontSize: 14,
-		color: "#333",
-		lineHeight: 18,
+		fontWeight: "500",
+		color: "#FFA500",
 	},
 });
 
