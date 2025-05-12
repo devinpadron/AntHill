@@ -21,6 +21,10 @@ const Settings = ({ navigation }: any) => {
 		navigation.push("PayrollReview");
 	};
 
+	const pushCompanyCustomForm = () => {
+		navigation.push("CompanyCustomForm");
+	};
+
 	const handleLogout = () => {
 		Alert.alert("Logout", "Are you sure you want to logout?", [
 			{ text: "Cancel", style: "cancel" },
@@ -59,6 +63,10 @@ const Settings = ({ navigation }: any) => {
 					<SettingsItem
 						title="Payroll Review"
 						onPress={pushPayrollReview}
+					/>
+					<SettingsItem
+						title="Custom Submission Form"
+						onPress={pushCompanyCustomForm}
 					/>
 				</View>
 			) : null}

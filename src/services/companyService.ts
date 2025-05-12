@@ -231,3 +231,56 @@ export async function changeUserRole(
 		return false;
 	}
 }
+
+/**
+ * Gets company preferences including form configuration
+ * @param companyId The company identifier
+ * @returns Company preferences object or null if error
+ */
+export async function getCompanyPreferences(
+	companyId: string,
+): Promise<any | null> {
+	try {
+		const preferencesDoc = await db
+			.collection("Companies")
+			.doc(companyId)
+			.collection("Settings")
+			.doc("preferences")
+			.get();
+
+		if (preferencesDoc.exists) {
+			return preferencesDoc.data();
+		}
+
+		// Return empty object if no preferences are set yet
+		return {};
+	} catch (error) {
+		console.error("Error getting company preferences:", error);
+		return null;
+	}
+}
+
+/**
+ * Updates company preferences with merge capability
+ * @param companyId The company identifier
+ * @param preferences Preferences object to update
+ * @returns True if successful, false otherwise
+ */
+export async function updateCompanyPreferences(
+	companyId: string,
+	preferences: any,
+): Promise<boolean> {
+	try {
+		await db
+			.collection("Companies")
+			.doc(companyId)
+			.collection("Settings")
+			.doc("SubmitForm")
+			.set(preferences, { merge: true });
+
+		return true;
+	} catch (error) {
+		console.error("Error updating company preferences:", error);
+		return false;
+	}
+}

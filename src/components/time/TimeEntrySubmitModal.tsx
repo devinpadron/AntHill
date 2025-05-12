@@ -1,21 +1,23 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
-	Modal,
 	View,
 	Text,
 	TextInput,
 	TouchableOpacity,
 	StyleSheet,
 	ActivityIndicator,
-	KeyboardAvoidingView,
 	Platform,
-	FlatList,
+	Keyboard,
 } from "react-native";
 import { format } from "date-fns";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { getEventsByDate } from "../../services/eventService";
 import { useUser } from "../../contexts/UserContext";
 import moment from "moment";
+import { getCompanyPreferences } from "../../services/companyService";
+import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import CustomFormRender from "./CustomFormRender";
 
 const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const [notes, setNotes] = useState("");
@@ -26,31 +28,79 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const [isLoadingEvents, setIsLoadingEvents] = useState(false);
 	const [showOtherEvents, setShowOtherEvents] = useState(false);
 	const { userId, companyId } = useUser();
+	const [customForm, setCustomForm] = useState(null);
+	const [formResponses, setFormResponses] = useState({});
+	const [formErrors, setFormErrors] = useState({});
+	const insets = useSafeAreaInsets();
 
-	// Fetch relevant events when modal opens
+	const bottomSheetRef = useRef(null);
+	const snapPoints = useRef(["85%"]).current;
+
+	useEffect(() => {
+		if (visible && bottomSheetRef.current) {
+			bottomSheetRef.current.expand();
+		} else if (!visible && bottomSheetRef.current) {
+			bottomSheetRef.current.close();
+		}
+	}, [visible]);
+
+	const handleClosePress = useCallback(() => {
+		Keyboard.dismiss();
+		if (bottomSheetRef.current) {
+			bottomSheetRef.current.close();
+		}
+		onClose();
+	}, [onClose]);
+
 	useEffect(() => {
 		if (visible && timeEntry) {
 			fetchRelatedEvents();
 		}
 	}, [visible, timeEntry]);
 
-	// Function to fetch events related to the time entry
+	useEffect(() => {
+		const loadCustomForm = async () => {
+			if (!companyId) return;
+
+			try {
+				const preferences = await getCompanyPreferences(companyId);
+				if (preferences?.timeEntryForm?.isEnabled) {
+					setCustomForm(preferences.timeEntryForm);
+
+					const initialResponses = {};
+					preferences.timeEntryForm.fields.forEach((field) => {
+						if (field.type === "checkbox") {
+							initialResponses[field.id] = false;
+						} else if (field.type === "multiSelect") {
+							initialResponses[field.id] = [];
+						} else {
+							initialResponses[field.id] = "";
+						}
+					});
+					setFormResponses(initialResponses);
+				}
+			} catch (error) {
+				console.error("Failed to load custom form:", error);
+			}
+		};
+
+		if (visible) {
+			loadCustomForm();
+		}
+	}, [visible, companyId]);
+
 	const fetchRelatedEvents = async () => {
 		if (!timeEntry || !companyId || !userId) return;
 
 		try {
 			setIsLoadingEvents(true);
 
-			// Get date string in YYYY-MM-DD format for getEventsByDate
 			const clockInDate = moment(new Date(timeEntry.clockInTime)).format(
 				"YYYY-MM-DD",
 			);
 			const events = await getEventsByDate(companyId, clockInDate);
 
-			// First filter events by assigned workers
 			const userEvents = events.filter((event) => {
-				// Include events where this user is assigned
-				// If no assignedWorkers property or it's empty, don't include the event
 				if (
 					!event.assignedWorkers ||
 					!Array.isArray(event.assignedWorkers)
@@ -58,11 +108,9 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 					return false;
 				}
 
-				// Check if the current user is in the assignedWorkers list
 				return event.assignedWorkers.includes(userId);
 			});
 
-			// Filter events based on time criteria
 			const clockInTime = new Date(timeEntry.clockInTime).getTime();
 			const clockOutTime = new Date(timeEntry.clockOutTime).getTime();
 
@@ -70,23 +118,19 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 			const otherEvents = [];
 
 			userEvents.forEach((event) => {
-				// Case 1: All day events (no specific start time)
 				if (!event.startTime) {
 					autoConnectedEvents.push(event);
 					return;
 				}
 
-				// Convert event start time to milliseconds
 				const eventStartTime = new Date(event.startTime).getTime();
 
-				// Case 2: Event starts within 30 mins of clock in
 				const thirtyMinsBeforeClockIn = clockInTime - 30 * 60 * 1000;
 				const thirtyMinsAfterClockIn = clockInTime + 30 * 60 * 1000;
 				const isWithin30MinsOfClockIn =
 					eventStartTime >= thirtyMinsBeforeClockIn &&
 					eventStartTime <= thirtyMinsAfterClockIn;
 
-				// Case 3: Event falls between clock in and clock out time
 				const isBetweenClockInAndOut =
 					eventStartTime >= clockInTime &&
 					eventStartTime <= clockOutTime;
@@ -114,36 +158,69 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 		return `${hours > 0 ? `${hours}h ` : ""}${minutes}m`;
 	};
 
-	// Add an event to selected events
 	const addEvent = (event) => {
 		setSelectedEvents((prev) => [...prev, event]);
-		// Remove from other available events when added to selected
 		setOtherAvailableEvents((prev) =>
 			prev.filter((e) => e.id !== event.id),
 		);
 	};
 
-	// Remove an event from selected events and add to other available events
 	const removeEvent = (eventId) => {
-		// Find the event before removing it
 		const eventToRemove = selectedEvents.find(
 			(event) => event.id === eventId,
 		);
 
-		// Remove from selected events
 		setSelectedEvents((prev) =>
 			prev.filter((event) => event.id !== eventId),
 		);
 
-		// If we found the event, add it to other available events
 		if (eventToRemove) {
 			setOtherAvailableEvents((prev) => [...prev, eventToRemove]);
 		}
 	};
 
-	// Check if event is already selected
 	const isEventSelected = (eventId) => {
 		return selectedEvents.some((event) => event.id === eventId);
+	};
+
+	const handleFieldChange = (fieldId, value) => {
+		setFormResponses((prev) => ({
+			...prev,
+			[fieldId]: value,
+		}));
+
+		if (formErrors[fieldId]) {
+			setFormErrors((prev) => ({
+				...prev,
+				[fieldId]: null,
+			}));
+		}
+	};
+
+	const validateForm = () => {
+		if (!customForm) return true;
+
+		const errors = {};
+		let isValid = true;
+
+		customForm.fields.forEach((field) => {
+			if (field.required) {
+				const value = formResponses[field.id];
+
+				if (
+					value === undefined ||
+					value === null ||
+					value === "" ||
+					(Array.isArray(value) && value.length === 0)
+				) {
+					errors[field.id] = `${field.label} is required`;
+					isValid = false;
+				}
+			}
+		});
+
+		setFormErrors(errors);
+		return isValid;
 	};
 
 	const handleSubmit = async () => {
@@ -151,7 +228,11 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 			setIsSubmitting(true);
 			setError(null);
 
-			// Create a modified time entry with the selected events attached
+			if (customForm && !validateForm()) {
+				setError("Please complete all required fields");
+				return;
+			}
+
 			const enrichedTimeEntry = {
 				...timeEntry,
 				notes: notes,
@@ -161,15 +242,13 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 					eventId: event.id,
 					eventTitle: event.title,
 				})),
+				formResponses: customForm ? formResponses : null,
 			};
 
-			console.log("Enriched Time Entry:", enrichedTimeEntry);
-
-			// Pass the enriched time entry to the submit handler
 			await onSubmit(enrichedTimeEntry.id, enrichedTimeEntry);
 
-			setNotes(""); // Clear notes after successful submission
-			onClose(); // Close modal
+			setNotes("");
+			handleClosePress();
 		} catch (err) {
 			setError("Failed to submit time entry. Please try again.");
 			console.error("Error submitting time entry:", err);
@@ -178,252 +257,236 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 		}
 	};
 
-	if (!timeEntry) return null;
+	if (!timeEntry || !visible) return null;
 
 	return (
-		<Modal
-			visible={visible}
-			transparent={true}
-			animationType="slide"
-			onRequestClose={onClose}
+		<BottomSheet
+			ref={bottomSheetRef}
+			snapPoints={snapPoints}
+			enablePanDownToClose
+			onClose={onClose}
+			handleIndicatorStyle={styles.sheetIndicator}
+			backgroundStyle={styles.sheetBackground}
 		>
-			<KeyboardAvoidingView
-				behavior={Platform.OS === "ios" ? "padding" : "height"}
-				style={styles.modalContainer}
+			<View style={[styles.modalHeader, { paddingTop: 0 }]}>
+				<Text style={styles.modalTitle}>Submit Time Entry</Text>
+			</View>
+
+			<BottomSheetScrollView
+				contentContainerStyle={[
+					styles.scrollContent,
+					{ paddingBottom: insets.bottom + 20 },
+				]}
+				keyboardShouldPersistTaps="handled"
+				nestedScrollEnabled={true}
+				scrollEnabled={!customForm?.fields.some((f) => f.isOpen)}
 			>
-				<View style={styles.modalContent}>
-					<View style={styles.modalHeader}>
-						<Text style={styles.modalTitle}>Submit Time Entry</Text>
-						<TouchableOpacity
-							onPress={onClose}
-							disabled={isSubmitting}
-						>
-							<Icon name="close" size={24} color="#999" />
-						</TouchableOpacity>
+				<View style={styles.entryDetails}>
+					<View style={styles.detailRow}>
+						<Text style={styles.detailLabel}>Date:</Text>
+						<Text style={styles.detailValue}>
+							{format(
+								new Date(timeEntry.clockInTime),
+								"EEEE, MMMM d, yyyy",
+							)}
+						</Text>
 					</View>
 
-					{/* Time Entry Details Card */}
-					<View style={styles.entryDetails}>
-						<View style={styles.detailRow}>
-							<Text style={styles.detailLabel}>Date:</Text>
-							<Text style={styles.detailValue}>
-								{format(
-									new Date(timeEntry.clockInTime),
-									"EEEE, MMMM d, yyyy",
-								)}
-							</Text>
-						</View>
+					<View style={styles.detailRow}>
+						<Text style={styles.detailLabel}>Time:</Text>
+						<Text style={styles.detailValue}>
+							{format(new Date(timeEntry.clockInTime), "h:mm a")}{" "}
+							-{" "}
+							{format(new Date(timeEntry.clockOutTime), "h:mm a")}
+						</Text>
+					</View>
 
-						<View style={styles.detailRow}>
-							<Text style={styles.detailLabel}>Time:</Text>
-							<Text style={styles.detailValue}>
-								{format(
-									new Date(timeEntry.clockInTime),
-									"h:mm a",
-								)}{" "}
-								-{" "}
-								{format(
-									new Date(timeEntry.clockOutTime),
-									"h:mm a",
-								)}
-							</Text>
-						</View>
+					<View style={styles.detailRow}>
+						<Text style={styles.detailLabel}>Duration:</Text>
+						<Text style={styles.detailValue}>
+							{formatDuration(timeEntry.duration)}
+						</Text>
+					</View>
+				</View>
 
-						<View style={styles.detailRow}>
-							<Text style={styles.detailLabel}>Duration:</Text>
-							<Text style={styles.detailValue}>
-								{formatDuration(timeEntry.duration)}
+				{isLoadingEvents ? (
+					<View style={styles.eventsCard}>
+						<View style={styles.eventsLoadingContainer}>
+							<ActivityIndicator size="small" color="#666" />
+							<Text style={styles.loadingText}>
+								Finding related events...
 							</Text>
 						</View>
 					</View>
+				) : (
+					<View style={styles.eventsCard}>
+						<Text style={styles.cardTitle}>Connected Events</Text>
 
-					{/* Connected Events Card - Separate from Time Entry Details */}
-					{isLoadingEvents ? (
-						<View style={styles.eventsCard}>
-							<View style={styles.eventsLoadingContainer}>
-								<ActivityIndicator size="small" color="#666" />
-								<Text style={styles.loadingText}>
-									Finding related events...
-								</Text>
-							</View>
-						</View>
-					) : (
-						<View style={styles.eventsCard}>
-							<Text style={styles.cardTitle}>
-								Connected Events
-							</Text>
-
-							{selectedEvents.length > 0 ? (
-								<View style={styles.relatedEventsContainer}>
-									{selectedEvents.map((event) => (
-										<View
-											key={event.id}
-											style={styles.eventRow}
+						{selectedEvents.length > 0 ? (
+							<View style={styles.relatedEventsContainer}>
+								{selectedEvents.map((event) => (
+									<View
+										key={event.id}
+										style={styles.eventRow}
+									>
+										<View style={styles.eventInfo}>
+											<Icon
+												name="calendar"
+												size={16}
+												color="#007AFF"
+											/>
+											<Text style={styles.eventItem}>
+												{event.title}
+											</Text>
+										</View>
+										<TouchableOpacity
+											onPress={() =>
+												removeEvent(event.id)
+											}
+											style={styles.eventActionButton}
 										>
-											<View style={styles.eventInfo}>
-												<Icon
-													name="calendar"
-													size={16}
-													color="#007AFF"
-												/>
-												<Text style={styles.eventItem}>
-													{event.title}
-												</Text>
-											</View>
+											<Icon
+												name="close-circle"
+												size={20}
+												color="#FF3B30"
+											/>
+										</TouchableOpacity>
+									</View>
+								))}
+							</View>
+						) : (
+							<Text style={styles.noEventsText}>
+								No events connected to this time entry
+							</Text>
+						)}
+
+						{otherAvailableEvents.length > 0 && (
+							<TouchableOpacity
+								style={styles.toggleOtherEventsButton}
+								onPress={() =>
+									setShowOtherEvents(!showOtherEvents)
+								}
+							>
+								<Text style={styles.toggleButtonText}>
+									{showOtherEvents
+										? "Possible Connections"
+										: `Possible Connections (${otherAvailableEvents.length})`}
+								</Text>
+								<Icon
+									name={
+										showOtherEvents
+											? "chevron-up"
+											: "chevron-down"
+									}
+									size={20}
+									color="#007AFF"
+								/>
+							</TouchableOpacity>
+						)}
+
+						{showOtherEvents && otherAvailableEvents.length > 0 && (
+							<View style={styles.otherEventsContainer}>
+								{otherAvailableEvents.map((event) => (
+									<View
+										key={event.id}
+										style={styles.eventRow}
+									>
+										<View style={styles.eventInfo}>
+											<Icon
+												name="calendar-outline"
+												size={16}
+												color="#666"
+											/>
+											<Text style={styles.otherEventItem}>
+												{event.title}
+											</Text>
+										</View>
+										{!isEventSelected(event.id) && (
 											<TouchableOpacity
-												onPress={() =>
-													removeEvent(event.id)
-												}
+												onPress={() => addEvent(event)}
 												style={styles.eventActionButton}
 											>
 												<Icon
-													name="close-circle"
+													name="plus-circle"
 													size={20}
-													color="#FF3B30"
+													color="#4CD964"
 												/>
 											</TouchableOpacity>
-										</View>
-									))}
-								</View>
-							) : (
-								<Text style={styles.noEventsText}>
-									No events connected to this time entry
-								</Text>
-							)}
-
-							{/* Toggle for other available events */}
-							{otherAvailableEvents.length > 0 && (
-								<TouchableOpacity
-									style={styles.toggleOtherEventsButton}
-									onPress={() =>
-										setShowOtherEvents(!showOtherEvents)
-									}
-								>
-									<Text style={styles.toggleButtonText}>
-										{showOtherEvents
-											? "Possible Connections"
-											: `Possible Connections (${otherAvailableEvents.length})`}
-									</Text>
-									<Icon
-										name={
-											showOtherEvents
-												? "chevron-up"
-												: "chevron-down"
-										}
-										size={20}
-										color="#007AFF"
-									/>
-								</TouchableOpacity>
-							)}
-
-							{/* Other available events section */}
-							{showOtherEvents &&
-								otherAvailableEvents.length > 0 && (
-									<View style={styles.otherEventsContainer}>
-										{otherAvailableEvents.map((event) => (
-											<View
-												key={event.id}
-												style={styles.eventRow}
-											>
-												<View style={styles.eventInfo}>
-													<Icon
-														name="calendar-outline"
-														size={16}
-														color="#666"
-													/>
-													<Text
-														style={
-															styles.otherEventItem
-														}
-													>
-														{event.title}
-													</Text>
-												</View>
-												{!isEventSelected(event.id) && (
-													<TouchableOpacity
-														onPress={() =>
-															addEvent(event)
-														}
-														style={
-															styles.eventActionButton
-														}
-													>
-														<Icon
-															name="plus-circle"
-															size={20}
-															color="#4CD964"
-														/>
-													</TouchableOpacity>
-												)}
-											</View>
-										))}
+										)}
 									</View>
-								)}
-						</View>
-					)}
-
-					<Text style={styles.notesLabel}>Notes/Comments:</Text>
-					<TextInput
-						style={styles.notesInput}
-						multiline
-						numberOfLines={4}
-						placeholder="Add any comments about this time entry"
-						value={notes}
-						onChangeText={setNotes}
-						editable={!isSubmitting}
-					/>
-
-					{error && <Text style={styles.errorText}>{error}</Text>}
-
-					<View style={styles.buttonRow}>
-						<TouchableOpacity
-							style={[styles.button, styles.cancelButton]}
-							onPress={onClose}
-							disabled={isSubmitting}
-						>
-							<Text style={styles.cancelButtonText}>Cancel</Text>
-						</TouchableOpacity>
-
-						<TouchableOpacity
-							style={[
-								styles.button,
-								styles.submitButton,
-								isSubmitting && styles.disabledButton,
-							]}
-							onPress={handleSubmit}
-							disabled={isSubmitting}
-						>
-							{isSubmitting ? (
-								<ActivityIndicator size="small" color="white" />
-							) : (
-								<Text style={styles.submitButtonText}>
-									Submit for Approval
-								</Text>
-							)}
-						</TouchableOpacity>
+								))}
+							</View>
+						)}
 					</View>
+				)}
+
+				{customForm && (
+					<CustomFormRender
+						customForm={customForm}
+						formResponses={formResponses}
+						formErrors={formErrors}
+						onFieldChange={handleFieldChange}
+						setCustomForm={setCustomForm}
+					/>
+				)}
+
+				<Text style={styles.notesLabel}>Notes/Comments:</Text>
+				<TextInput
+					style={styles.notesInput}
+					multiline
+					numberOfLines={4}
+					placeholder="Add any comments about this time entry"
+					value={notes}
+					onChangeText={setNotes}
+					editable={!isSubmitting}
+				/>
+
+				{error && <Text style={styles.errorText}>{error}</Text>}
+
+				<View style={styles.buttonRow}>
+					<TouchableOpacity
+						style={[styles.button, styles.cancelButton]}
+						onPress={handleClosePress}
+						disabled={isSubmitting}
+					>
+						<Text style={styles.cancelButtonText}>Cancel</Text>
+					</TouchableOpacity>
+
+					<TouchableOpacity
+						style={[
+							styles.button,
+							styles.submitButton,
+							isSubmitting && styles.disabledButton,
+						]}
+						onPress={handleSubmit}
+						disabled={isSubmitting}
+					>
+						{isSubmitting ? (
+							<ActivityIndicator size="small" color="white" />
+						) : (
+							<Text style={styles.submitButtonText}>
+								Submit for Approval
+							</Text>
+						)}
+					</TouchableOpacity>
 				</View>
-			</KeyboardAvoidingView>
-		</Modal>
+			</BottomSheetScrollView>
+		</BottomSheet>
 	);
 };
 
 const styles = StyleSheet.create({
-	modalContainer: {
-		flex: 1,
-		justifyContent: "center",
-		backgroundColor: "rgba(0,0,0,0.5)",
-		padding: 16,
-	},
-	modalContent: {
+	sheetBackground: {
 		backgroundColor: "white",
-		borderRadius: 12,
-		padding: 20,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.25,
-		shadowRadius: 3.84,
-		elevation: 5,
+	},
+	sheetIndicator: {
+		backgroundColor: "#ccc",
+		width: 40,
+		height: 4,
+	},
+	scrollContent: {
+		paddingHorizontal: 20,
+		paddingTop: 8,
 	},
 	modalHeader: {
 		flexDirection: "row",
@@ -431,6 +494,7 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		marginBottom: 16,
 		paddingBottom: 12,
+		paddingHorizontal: 20,
 		borderBottomWidth: 1,
 		borderBottomColor: "#eaeaea",
 	},
@@ -483,6 +547,7 @@ const styles = StyleSheet.create({
 	buttonRow: {
 		flexDirection: "row",
 		justifyContent: "space-between",
+		marginBottom: 8,
 	},
 	button: {
 		paddingVertical: 12,

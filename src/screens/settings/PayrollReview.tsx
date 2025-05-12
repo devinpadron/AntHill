@@ -294,8 +294,10 @@ const PayrollReview = ({ navigation }) => {
 				return "Approved";
 			case "rejected":
 				return "Rejected";
+			case "completed":
+				return "Not Submitted";
 			default:
-				return "Submitted";
+				return "Active";
 		}
 	};
 
@@ -308,6 +310,8 @@ const PayrollReview = ({ navigation }) => {
 				return "#81C784"; // Green
 			case "rejected":
 				return "#E57373"; // Red
+			case "completed":
+				return "#FF8A65"; // Light Red
 			default:
 				return "#90CAF9"; // Blue
 		}
