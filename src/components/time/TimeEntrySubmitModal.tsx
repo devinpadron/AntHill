@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
 	Modal,
 	View,
@@ -9,14 +9,104 @@ import {
 	ActivityIndicator,
 	KeyboardAvoidingView,
 	Platform,
+	FlatList,
 } from "react-native";
 import { format } from "date-fns";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import { getEventsByDate } from "../../services/eventService";
+import { useUser } from "../../contexts/UserContext";
+import moment from "moment";
 
 const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const [notes, setNotes] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState(null);
+	const [otherAvailableEvents, setOtherAvailableEvents] = useState([]);
+	const [selectedEvents, setSelectedEvents] = useState([]);
+	const [isLoadingEvents, setIsLoadingEvents] = useState(false);
+	const [showOtherEvents, setShowOtherEvents] = useState(false);
+	const { userId, companyId } = useUser();
+
+	// Fetch relevant events when modal opens
+	useEffect(() => {
+		if (visible && timeEntry) {
+			fetchRelatedEvents();
+		}
+	}, [visible, timeEntry]);
+
+	// Function to fetch events related to the time entry
+	const fetchRelatedEvents = async () => {
+		if (!timeEntry || !companyId || !userId) return;
+
+		try {
+			setIsLoadingEvents(true);
+
+			// Get date string in YYYY-MM-DD format for getEventsByDate
+			const clockInDate = moment(new Date(timeEntry.clockInTime)).format(
+				"YYYY-MM-DD",
+			);
+			const events = await getEventsByDate(companyId, clockInDate);
+
+			// First filter events by assigned workers
+			const userEvents = events.filter((event) => {
+				// Include events where this user is assigned
+				// If no assignedWorkers property or it's empty, don't include the event
+				if (
+					!event.assignedWorkers ||
+					!Array.isArray(event.assignedWorkers)
+				) {
+					return false;
+				}
+
+				// Check if the current user is in the assignedWorkers list
+				return event.assignedWorkers.includes(userId);
+			});
+
+			// Filter events based on time criteria
+			const clockInTime = new Date(timeEntry.clockInTime).getTime();
+			const clockOutTime = new Date(timeEntry.clockOutTime).getTime();
+
+			const autoConnectedEvents = [];
+			const otherEvents = [];
+
+			userEvents.forEach((event) => {
+				// Case 1: All day events (no specific start time)
+				if (!event.startTime) {
+					autoConnectedEvents.push(event);
+					return;
+				}
+
+				// Convert event start time to milliseconds
+				const eventStartTime = new Date(event.startTime).getTime();
+
+				// Case 2: Event starts within 30 mins of clock in
+				const thirtyMinsBeforeClockIn = clockInTime - 30 * 60 * 1000;
+				const thirtyMinsAfterClockIn = clockInTime + 30 * 60 * 1000;
+				const isWithin30MinsOfClockIn =
+					eventStartTime >= thirtyMinsBeforeClockIn &&
+					eventStartTime <= thirtyMinsAfterClockIn;
+
+				// Case 3: Event falls between clock in and clock out time
+				const isBetweenClockInAndOut =
+					eventStartTime >= clockInTime &&
+					eventStartTime <= clockOutTime;
+
+				if (isWithin30MinsOfClockIn || isBetweenClockInAndOut) {
+					autoConnectedEvents.push(event);
+				} else {
+					otherEvents.push(event);
+				}
+			});
+
+			setSelectedEvents(autoConnectedEvents);
+			setOtherAvailableEvents(otherEvents);
+		} catch (err) {
+			console.error("Error fetching events:", err);
+			setError("Failed to retrieve related events");
+		} finally {
+			setIsLoadingEvents(false);
+		}
+	};
 
 	const formatDuration = (durationSeconds) => {
 		const hours = Math.floor(durationSeconds / 3600);
@@ -24,11 +114,60 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 		return `${hours > 0 ? `${hours}h ` : ""}${minutes}m`;
 	};
 
+	// Add an event to selected events
+	const addEvent = (event) => {
+		setSelectedEvents((prev) => [...prev, event]);
+		// Remove from other available events when added to selected
+		setOtherAvailableEvents((prev) =>
+			prev.filter((e) => e.id !== event.id),
+		);
+	};
+
+	// Remove an event from selected events and add to other available events
+	const removeEvent = (eventId) => {
+		// Find the event before removing it
+		const eventToRemove = selectedEvents.find(
+			(event) => event.id === eventId,
+		);
+
+		// Remove from selected events
+		setSelectedEvents((prev) =>
+			prev.filter((event) => event.id !== eventId),
+		);
+
+		// If we found the event, add it to other available events
+		if (eventToRemove) {
+			setOtherAvailableEvents((prev) => [...prev, eventToRemove]);
+		}
+	};
+
+	// Check if event is already selected
+	const isEventSelected = (eventId) => {
+		return selectedEvents.some((event) => event.id === eventId);
+	};
+
 	const handleSubmit = async () => {
 		try {
 			setIsSubmitting(true);
 			setError(null);
-			await onSubmit(timeEntry.id, notes);
+
+			// Create a modified time entry with the selected events attached
+			const enrichedTimeEntry = {
+				...timeEntry,
+				notes: notes,
+				submittedAt: new Date().toISOString(),
+				status: "pending_approval",
+				connectedEvents: selectedEvents.map((event) => ({
+					eventId: event.id,
+					eventTitle: event.title,
+				})),
+			};
+
+			console.log("Enriched Time Entry:", enrichedTimeEntry);
+
+			// Pass the enriched time entry to the submit handler
+			await onSubmit(enrichedTimeEntry.id, enrichedTimeEntry);
+
 			setNotes(""); // Clear notes after successful submission
 			onClose(); // Close modal
 		} catch (err) {
@@ -63,6 +202,7 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 						</TouchableOpacity>
 					</View>
 
+					{/* Time Entry Details Card */}
 					<View style={styles.entryDetails}>
 						<View style={styles.detailRow}>
 							<Text style={styles.detailLabel}>Date:</Text>
@@ -95,21 +235,132 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 								{formatDuration(timeEntry.duration)}
 							</Text>
 						</View>
-
-						{timeEntry.connectedEvents &&
-							timeEntry.connectedEvents.length > 0 && (
-								<View style={styles.detailRow}>
-									<Text style={styles.detailLabel}>
-										Events:
-									</Text>
-									<Text style={styles.detailValue}>
-										{timeEntry.connectedEvents
-											.map((e) => e.eventTitle)
-											.join(", ")}
-									</Text>
-								</View>
-							)}
 					</View>
+
+					{/* Connected Events Card - Separate from Time Entry Details */}
+					{isLoadingEvents ? (
+						<View style={styles.eventsCard}>
+							<View style={styles.eventsLoadingContainer}>
+								<ActivityIndicator size="small" color="#666" />
+								<Text style={styles.loadingText}>
+									Finding related events...
+								</Text>
+							</View>
+						</View>
+					) : (
+						<View style={styles.eventsCard}>
+							<Text style={styles.cardTitle}>
+								Connected Events
+							</Text>
+
+							{selectedEvents.length > 0 ? (
+								<View style={styles.relatedEventsContainer}>
+									{selectedEvents.map((event) => (
+										<View
+											key={event.id}
+											style={styles.eventRow}
+										>
+											<View style={styles.eventInfo}>
+												<Icon
+													name="calendar"
+													size={16}
+													color="#007AFF"
+												/>
+												<Text style={styles.eventItem}>
+													{event.title}
+												</Text>
+											</View>
+											<TouchableOpacity
+												onPress={() =>
+													removeEvent(event.id)
+												}
+												style={styles.eventActionButton}
+											>
+												<Icon
+													name="close-circle"
+													size={20}
+													color="#FF3B30"
+												/>
+											</TouchableOpacity>
+										</View>
+									))}
+								</View>
+							) : (
+								<Text style={styles.noEventsText}>
+									No events connected to this time entry
+								</Text>
+							)}
+
+							{/* Toggle for other available events */}
+							{otherAvailableEvents.length > 0 && (
+								<TouchableOpacity
+									style={styles.toggleOtherEventsButton}
+									onPress={() =>
+										setShowOtherEvents(!showOtherEvents)
+									}
+								>
+									<Text style={styles.toggleButtonText}>
+										{showOtherEvents
+											? "Possible Connections"
+											: `Possible Connections (${otherAvailableEvents.length})`}
+									</Text>
+									<Icon
+										name={
+											showOtherEvents
+												? "chevron-up"
+												: "chevron-down"
+										}
+										size={20}
+										color="#007AFF"
+									/>
+								</TouchableOpacity>
+							)}
+
+							{/* Other available events section */}
+							{showOtherEvents &&
+								otherAvailableEvents.length > 0 && (
+									<View style={styles.otherEventsContainer}>
+										{otherAvailableEvents.map((event) => (
+											<View
+												key={event.id}
+												style={styles.eventRow}
+											>
+												<View style={styles.eventInfo}>
+													<Icon
+														name="calendar-outline"
+														size={16}
+														color="#666"
+													/>
+													<Text
+														style={
+															styles.otherEventItem
+														}
+													>
+														{event.title}
+													</Text>
+												</View>
+												{!isEventSelected(event.id) && (
+													<TouchableOpacity
+														onPress={() =>
+															addEvent(event)
+														}
+														style={
+															styles.eventActionButton
+														}
+													>
+														<Icon
+															name="plus-circle"
+															size={20}
+															color="#4CD964"
+														/>
+													</TouchableOpacity>
+												)}
+											</View>
+										))}
+									</View>
+								)}
+						</View>
+					)}
 
 					<Text style={styles.notesLabel}>Notes/Comments:</Text>
 					<TextInput
@@ -259,6 +510,87 @@ const styles = StyleSheet.create({
 	submitButtonText: {
 		color: "white",
 		fontWeight: "600",
+	},
+	eventsCard: {
+		backgroundColor: "#f0f7ff",
+		borderRadius: 8,
+		padding: 12,
+		marginBottom: 16,
+		borderLeftWidth: 3,
+		borderLeftColor: "#007AFF",
+	},
+	cardTitle: {
+		fontSize: 15,
+		fontWeight: "600",
+		color: "#333",
+		marginBottom: 8,
+	},
+	relatedEventsContainer: {
+		marginTop: 2,
+	},
+	eventItem: {
+		fontSize: 14,
+		color: "#333",
+		marginLeft: 4,
+		marginTop: 2,
+		lineHeight: 20,
+	},
+	eventsLoadingContainer: {
+		flexDirection: "row",
+		alignItems: "center",
+	},
+	loadingText: {
+		fontSize: 14,
+		color: "#666",
+		marginLeft: 8,
+	},
+	eventRow: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		marginBottom: 6,
+	},
+	eventInfo: {
+		flexDirection: "row",
+		alignItems: "center",
+		flex: 1,
+	},
+	eventActionButton: {
+		padding: 4,
+	},
+	noEventsText: {
+		fontStyle: "italic",
+		color: "#666",
+		marginVertical: 4,
+	},
+	toggleOtherEventsButton: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		paddingVertical: 8,
+		marginTop: 8,
+		borderTopWidth: 1,
+		borderTopColor: "rgba(0, 122, 255, 0.2)",
+	},
+	toggleButtonText: {
+		color: "#007AFF",
+		fontSize: 14,
+		marginRight: 4,
+	},
+	otherEventsContainer: {
+		marginTop: 8,
+		paddingTop: 8,
+	},
+	otherEventsTitle: {
+		fontSize: 14,
+		fontWeight: "500",
+		color: "#666",
+		marginBottom: 8,
+	},
+	otherEventItem: {
+		fontSize: 14,
+		color: "#666",
+		marginLeft: 4,
 	},
 });
 

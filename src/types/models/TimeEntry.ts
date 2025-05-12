@@ -4,7 +4,7 @@ export interface TimeEntry {
 	companyId?: string;
 	clockInTime: string;
 	clockOutTime?: string;
-	duration?: number; // Now in seconds
+	duration?: number; // In seconds
 	status:
 		| "active"
 		| "paused"

@@ -93,12 +93,12 @@ const TimeEntryScreen = ({ navigation }) => {
 	};
 
 	// Handle time entry submission
-	const handleSubmitTimeEntry = async (timeEntryId, notes) => {
+	const handleSubmitTimeEntry = async (timeEntryId, entry) => {
 		if (!timeEntryId || !companyId) {
 			throw new Error("Missing required data for submission");
 		}
 
-		await submitTimeEntryForApproval(timeEntryId, companyId, notes);
+		await submitTimeEntryForApproval(timeEntryId, companyId, entry);
 		fetchTimeEntries(); // Refresh the list to update status
 	};
 

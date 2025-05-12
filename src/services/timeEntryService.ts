@@ -275,7 +275,7 @@ export const resumeTimeEntry = async (
 export const submitTimeEntryForApproval = async (
 	timeEntryId: string,
 	companyId: string,
-	notes: string,
+	entry: any,
 ) => {
 	try {
 		const timeEntryRef = db
@@ -286,12 +286,7 @@ export const submitTimeEntryForApproval = async (
 
 		const timestamp = new Date().toISOString();
 
-		await timeEntryRef.update({
-			status: "pending_approval",
-			submittedAt: timestamp,
-			notes: notes,
-			submissionNotes: notes, // Store separately to preserve original notes
-		});
+		await timeEntryRef.update(entry);
 
 		return {
 			success: true,
