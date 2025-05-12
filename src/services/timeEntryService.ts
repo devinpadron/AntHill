@@ -22,27 +22,60 @@ export const clockIn = async (userId: string, companyId: string) => {
 
 export const clockOut = async (timeEntryId: string, companyId: string) => {
 	const clockOutTime = new Date().toISOString();
-	const timeEntryRef = db
-		.collection("Companies")
-		.doc(companyId)
-		.collection("TimeEntries")
-		.doc(timeEntryId);
 
-	const timeEntryDoc = await timeEntryRef.get();
-	const timeEntry = timeEntryDoc.data();
+	try {
+		const timeEntryRef = db
+			.collection("Companies")
+			.doc(companyId)
+			.collection("TimeEntries")
+			.doc(timeEntryId);
 
-	const duration = differenceInMinutes(
-		new Date(clockOutTime),
-		new Date(timeEntry.clockInTime),
-	);
+		const doc = await timeEntryRef.get();
+		if (!doc.exists) {
+			throw new Error("Time entry not found");
+		}
 
-	await timeEntryRef.update({
-		clockOutTime,
-		duration,
-		status: "completed",
-	});
+		const timeEntry = doc.data();
+		const startTime = new Date(timeEntry.clockInTime);
+		const endTime = new Date(clockOutTime);
 
-	return { ...timeEntry, clockOutTime, duration, status: "completed" };
+		// Calculate raw duration in seconds (not minutes)
+		const rawDurationSeconds = Math.round(
+			(endTime.getTime() - startTime.getTime()) / 1000,
+		);
+
+		// Calculate actual billable duration by subtracting paused time
+		let actualDuration = rawDurationSeconds;
+
+		// Deduct accumulated paused time (now in seconds)
+		if (timeEntry.totalPausedSeconds) {
+			actualDuration -= timeEntry.totalPausedSeconds;
+		}
+
+		// If we're currently paused, calculate the current pause duration too
+		if (timeEntry.status === "paused" && timeEntry.pauseStartTime) {
+			const currentPauseDuration = Math.round(
+				(endTime.getTime() -
+					new Date(timeEntry.pauseStartTime).getTime()) /
+					1000,
+			);
+			actualDuration -= currentPauseDuration;
+		}
+
+		// Ensure we don't have negative duration
+		const duration = Math.max(0, actualDuration);
+
+		await timeEntryRef.update({
+			clockOutTime,
+			duration,
+			status: "completed",
+		});
+
+		return { ...timeEntry, clockOutTime, duration, status: "completed" };
+	} catch (error) {
+		console.error("Error clocking out:", error);
+		throw error;
+	}
 };
 
 export const getActiveTimeEntry = async (userId: string, companyId: string) => {
@@ -59,10 +92,6 @@ export const getActiveTimeEntry = async (userId: string, companyId: string) => {
 	const timeEntryDoc = snapshot.docs[0];
 	return { id: timeEntryDoc.id, ...timeEntryDoc.data() };
 };
-
-function differenceInMinutes(clockOut: Date, clockIn: Date) {
-	return Math.floor((clockOut.getTime() - clockIn.getTime()) / 60000);
-}
 
 export const getTimeEntries = async (
 	userId: string,
@@ -99,7 +128,7 @@ export const subscribeToActiveTimeEntry = (
 		.doc(companyId)
 		.collection("TimeEntries")
 		.where("userId", "==", userId)
-		.where("status", "==", "active")
+		.where("status", "in", ["active", "paused"]) // Listen for both active and paused
 		.onSnapshot(
 			(snapshot) => {
 				const activeEntries = snapshot.docs.map((doc) => ({
@@ -142,4 +171,77 @@ export const getAllTimeEntries = async (
 		id: doc.id,
 		...doc.data(),
 	})) as TimeEntry[];
+};
+
+// Pause time entry
+export const pauseTimeEntry = async (
+	timeEntryId: string,
+	companyId: string,
+) => {
+	const pauseTime = new Date().toISOString();
+
+	try {
+		await db
+			.collection("Companies")
+			.doc(companyId)
+			.collection("TimeEntries")
+			.doc(timeEntryId)
+			.update({
+				status: "paused",
+				pauseStartTime: pauseTime,
+			});
+
+		return { success: true };
+	} catch (error) {
+		console.error("Error pausing time entry:", error);
+		throw error;
+	}
+};
+
+// Resume time entry
+export const resumeTimeEntry = async (
+	timeEntryId: string,
+	companyId: string,
+) => {
+	try {
+		// Get the current entry to calculate pause duration
+		const entryRef = db
+			.collection("Companies")
+			.doc(companyId)
+			.collection("TimeEntries")
+			.doc(timeEntryId);
+
+		const doc = await entryRef.get();
+
+		if (!doc.exists) {
+			throw new Error("Time entry not found");
+		}
+
+		const entry = doc.data();
+		const pauseStartTime = entry.pauseStartTime;
+
+		if (!pauseStartTime) {
+			throw new Error("No pause start time recorded");
+		}
+
+		// Calculate pause duration in seconds (not minutes)
+		const pauseDurationSeconds = Math.round(
+			(new Date().getTime() - new Date(pauseStartTime).getTime()) / 1000,
+		);
+
+		// Update entry with accumulated pause time in seconds
+		const totalPausedSeconds =
+			(entry.totalPausedSeconds || 0) + pauseDurationSeconds;
+
+		await entryRef.update({
+			status: "active",
+			pauseStartTime: null, // Clear pause start time
+			totalPausedSeconds: totalPausedSeconds,
+		});
+
+		return { success: true, totalPausedSeconds };
+	} catch (error) {
+		console.error("Error resuming time entry:", error);
+		throw error;
+	}
 };

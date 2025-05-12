@@ -3,8 +3,11 @@ import { useUser } from "../contexts/UserContext";
 import {
 	clockIn,
 	clockOut,
-	getAllTimeEntries,
+	pauseTimeEntry,
+	resumeTimeEntry,
+	getTimeEntries,
 	subscribeToActiveTimeEntry,
+	getAllTimeEntries,
 } from "../services/timeEntryService";
 import { startOfWeek, endOfWeek } from "date-fns";
 import { TimeEntry } from "../types";
@@ -16,6 +19,8 @@ export const useTimeTracking = () => {
 	);
 	const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
+	const [isPaused, setIsPaused] = useState(false);
+	const [isPausingOrResuming, setIsPausingOrResuming] = useState(false);
 
 	// Get all time entries for this user
 	const fetchTimeEntries = useCallback(async () => {
@@ -47,6 +52,7 @@ export const useTimeTracking = () => {
 			(active) => {
 				// Update active entry state
 				setActiveTimeEntry(active);
+				setIsPaused(active?.status === "paused" || false);
 
 				// If active status changed, refresh the list
 				if (
@@ -61,6 +67,34 @@ export const useTimeTracking = () => {
 		// Clean up subscription on unmount
 		return () => unsubscribe();
 	}, [userId, companyId, fetchTimeEntries]);
+
+	// Calculate weekly stats
+	const getWeeklyStats = useCallback(() => {
+		if (!timeEntries.length)
+			return { hours: 0, minutes: 0, seconds: 0, count: 0 };
+
+		const today = new Date();
+		const weekStart = startOfWeek(today, { weekStartsOn: 0 });
+		const weekEnd = endOfWeek(today, { weekStartsOn: 0 });
+
+		const thisWeekEntries = timeEntries.filter((entry) => {
+			const entryDate = new Date(entry.clockInTime);
+			return entryDate >= weekStart && entryDate <= weekEnd;
+		});
+
+		// Total seconds across all entries
+		const totalSeconds = thisWeekEntries.reduce(
+			(sum, entry) => sum + (entry.duration || 0),
+			0,
+		);
+
+		// Convert total seconds to hours, minutes, seconds
+		const hours = Math.floor(totalSeconds / 3600);
+		const minutes = Math.floor((totalSeconds % 3600) / 60);
+		const seconds = totalSeconds % 60;
+
+		return { hours, minutes, seconds, count: thisWeekEntries.length };
+	}, [timeEntries]);
 
 	// Clock in function
 	const handleClockIn = async () => {
@@ -82,7 +116,6 @@ export const useTimeTracking = () => {
 				activeTimeEntry.id,
 				companyId,
 			);
-			fetchTimeEntries(); // Refresh time entries after clocking out
 			return completedEntry;
 		} catch (error) {
 			console.error("Error clocking out:", error);
@@ -90,37 +123,51 @@ export const useTimeTracking = () => {
 		}
 	};
 
-	// Calculate weekly stats
-	const getWeeklyStats = useCallback(() => {
-		if (!timeEntries.length) return { hours: 0, minutes: 0, count: 0 };
+	// Pause timer function
+	const handlePauseTimer = async () => {
+		if (!activeTimeEntry || !activeTimeEntry.id) return;
 
-		const today = new Date();
-		const weekStart = startOfWeek(today, { weekStartsOn: 0 });
-		const weekEnd = endOfWeek(today, { weekStartsOn: 0 });
+		try {
+			setIsPausingOrResuming(true);
+			await pauseTimeEntry(activeTimeEntry.id, companyId);
+			// Don't need to set isPaused here as the Firestore listener will update it
+		} catch (error) {
+			console.error("Error pausing timer:", error);
+			// Show an alert or toast notification here
+			throw error;
+		} finally {
+			setIsPausingOrResuming(false);
+		}
+	};
 
-		const thisWeekEntries = timeEntries.filter((entry) => {
-			const entryDate = new Date(entry.clockInTime);
-			return entryDate >= weekStart && entryDate <= weekEnd;
-		});
+	// Resume timer function
+	const handleResumeTimer = async () => {
+		if (!activeTimeEntry || !activeTimeEntry.id) return;
 
-		const totalMinutes = thisWeekEntries.reduce(
-			(sum, entry) => sum + (entry.duration || 0),
-			0,
-		);
-
-		const hours = Math.floor(totalMinutes / 60);
-		const minutes = totalMinutes % 60;
-
-		return { hours, minutes, count: thisWeekEntries.length };
-	}, [timeEntries]);
+		try {
+			setIsPausingOrResuming(true);
+			await resumeTimeEntry(activeTimeEntry.id, companyId);
+			// Don't need to set isPaused here as the Firestore listener will update it
+		} catch (error) {
+			console.error("Error resuming timer:", error);
+			// Show an alert or toast notification here
+			throw error;
+		} finally {
+			setIsPausingOrResuming(false);
+		}
+	};
 
 	return {
 		activeTimeEntry,
 		timeEntries,
 		isClockedIn: !!activeTimeEntry,
 		isLoading,
+		isPaused,
+		isPausingOrResuming,
 		clockIn: handleClockIn,
 		clockOut: handleClockOut,
+		pauseTimer: handlePauseTimer,
+		resumeTimer: handleResumeTimer,
 		fetchTimeEntries,
 		weeklyStats: getWeeklyStats(),
 	};

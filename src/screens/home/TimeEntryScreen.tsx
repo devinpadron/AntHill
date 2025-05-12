@@ -1,5 +1,5 @@
 // Time Entry Screen Component
-import React from "react";
+import React, { useState } from "react";
 import {
 	View,
 	Text,
@@ -7,12 +7,17 @@ import {
 	TouchableOpacity,
 	FlatList,
 	SafeAreaView,
+	Alert,
+	ActivityIndicator,
+	RefreshControl, // Add this import
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import { format, startOfWeek, endOfWeek } from "date-fns";
+import { format, startOfWeek, endOfWeek, differenceInMinutes } from "date-fns";
 import TimeEntryCard from "../../components/time/TimeEntryCard";
 import { useTimeTracking } from "../../hooks/useTimeTracking";
+
+//TODO: Add a submit button to the time entry screen after clock-out that will open up a modal to submit the time entry for approval. This will be a separate component that will take the time entry details and allow the user to add notes or comments before submitting it for approval. The modal should have a cancel button to close it without submitting, and a submit button to send the time entry for approval. The modal should also show a loading indicator while the submission is in progress.
 
 // Time Entry Screen Component
 const TimeEntryScreen = ({ navigation }) => {
@@ -22,15 +27,58 @@ const TimeEntryScreen = ({ navigation }) => {
 		activeTimeEntry,
 		isLoading,
 		isClockedIn,
+		isPaused,
+		isPausingOrResuming,
 		clockIn,
 		clockOut,
+		pauseTimer,
+		resumeTimer,
 		weeklyStats,
+		fetchTimeEntries,
 	} = useTimeTracking();
+
+	// Add state for pull-to-refresh
+	const [refreshing, setRefreshing] = useState(false);
+
+	// Handle pull-to-refresh
+	const onRefresh = async () => {
+		setRefreshing(true);
+		try {
+			await fetchTimeEntries();
+		} catch (error) {
+			console.error("Error refreshing time entries:", error);
+		} finally {
+			setRefreshing(false);
+		}
+	};
 
 	// Weekly summary data
 	const today = new Date();
 	const weekStart = startOfWeek(today, { weekStartsOn: 0 });
 	const weekEnd = endOfWeek(today, { weekStartsOn: 0 });
+
+	// Handle clock out with confirmation
+	const handleClockOut = async () => {
+		Alert.alert("Clock Out", "Are you sure you want to clock out?", [
+			{
+				text: "Cancel",
+				style: "cancel",
+			},
+			{
+				text: "Clock Out",
+				style: "destructive",
+				onPress: async () => {
+					try {
+						await clockOut();
+						fetchTimeEntries();
+					} catch (error) {
+						console.error("Error clocking out:", error);
+						Alert.alert("Error", "Failed to clock out");
+					}
+				},
+			},
+		]);
+	};
 
 	// View time entry details
 	const viewTimeEntryDetails = (entryId) => {
@@ -46,6 +94,8 @@ const TimeEntryScreen = ({ navigation }) => {
 					<View style={styles.statItem}>
 						<Text style={styles.statValue}>
 							{weeklyStats.hours}h {weeklyStats.minutes}m
+							{weeklyStats.seconds > 0 &&
+								` ${weeklyStats.seconds}s`}
 						</Text>
 						<Text style={styles.statLabel}>Total Hours</Text>
 					</View>
@@ -69,27 +119,108 @@ const TimeEntryScreen = ({ navigation }) => {
 					<>
 						<View style={styles.activeClockStatus}>
 							<Icon
-								name="clock-outline"
+								name={
+									isPaused ? "pause-circle" : "clock-outline"
+								}
 								size={24}
-								color="#ff9500"
+								color={isPaused ? "#FFA500" : "#ff9500"}
 								style={styles.clockIcon}
 							/>
-							<Text style={styles.clockedInText}>
-								Clocked in at{" "}
+							<Text
+								style={[
+									styles.clockedInText,
+									isPaused && styles.pausedText,
+								]}
+							>
+								{isPaused ? "Timer paused" : "Clocked in at"}{" "}
 								{format(
 									new Date(activeTimeEntry.clockInTime),
 									"h:mm a",
 								)}
 							</Text>
 						</View>
-						<TouchableOpacity
-							style={[styles.clockButton, styles.clockOutButton]}
-							onPress={clockOut}
-						>
-							<Text style={styles.clockButtonText}>
-								CLOCK OUT
-							</Text>
-						</TouchableOpacity>
+
+						{/* Action buttons */}
+						<View style={styles.buttonRow}>
+							{isPausingOrResuming ? (
+								// Show loading button
+								<TouchableOpacity
+									style={[
+										styles.clockButton,
+										styles.loadingButton,
+									]}
+									disabled={true}
+								>
+									<ActivityIndicator
+										size="small"
+										color="white"
+										style={styles.buttonIcon}
+									/>
+									<Text style={styles.clockButtonText}>
+										{isPaused
+											? "RESUMING..."
+											: "PAUSING..."}
+									</Text>
+								</TouchableOpacity>
+							) : isPaused ? (
+								// Resume button
+								<TouchableOpacity
+									style={[
+										styles.clockButton,
+										styles.resumeButton,
+									]}
+									onPress={resumeTimer}
+								>
+									<Icon
+										name="play"
+										size={18}
+										color="white"
+										style={styles.buttonIcon}
+									/>
+									<Text style={styles.clockButtonText}>
+										RESUME
+									</Text>
+								</TouchableOpacity>
+							) : (
+								// Pause button
+								<TouchableOpacity
+									style={[
+										styles.clockButton,
+										styles.pauseButton,
+									]}
+									onPress={pauseTimer}
+								>
+									<Icon
+										name="pause"
+										size={18}
+										color="white"
+										style={styles.buttonIcon}
+									/>
+									<Text style={styles.clockButtonText}>
+										PAUSE
+									</Text>
+								</TouchableOpacity>
+							)}
+
+							<TouchableOpacity
+								style={[
+									styles.clockButton,
+									styles.clockOutButton,
+								]}
+								onPress={handleClockOut}
+								disabled={isPausingOrResuming}
+							>
+								<Icon
+									name="logout-variant"
+									size={18}
+									color="white"
+									style={styles.buttonIcon}
+								/>
+								<Text style={styles.clockButtonText}>
+									CLOCK OUT
+								</Text>
+							</TouchableOpacity>
+						</View>
 					</>
 				) : (
 					<>
@@ -108,6 +239,12 @@ const TimeEntryScreen = ({ navigation }) => {
 							style={[styles.clockButton, styles.clockInButton]}
 							onPress={clockIn}
 						>
+							<Icon
+								name="login-variant"
+								size={18}
+								color="white"
+								style={styles.buttonIcon}
+							/>
 							<Text style={styles.clockButtonText}>CLOCK IN</Text>
 						</TouchableOpacity>
 					</>
@@ -132,6 +269,17 @@ const TimeEntryScreen = ({ navigation }) => {
 								No time entries found
 							</Text>
 						</View>
+					}
+					// Add RefreshControl for pull-to-refresh
+					refreshControl={
+						<RefreshControl
+							refreshing={refreshing}
+							onRefresh={onRefresh}
+							colors={["#007AFF"]} // iOS refresh indicator color
+							tintColor="#007AFF" // Android refresh indicator color
+							title="Refreshing..." // Only shown on iOS
+							titleColor="#999" // Only shown on iOS
+						/>
 					}
 				/>
 			</View>
@@ -250,12 +398,18 @@ const styles = StyleSheet.create({
 		borderRadius: 8,
 		width: "100%",
 		alignItems: "center",
+		flexDirection: "row",
+		justifyContent: "center",
 	},
 	clockInButton: {
 		backgroundColor: "#34C759",
+		flexDirection: "row",
+		justifyContent: "center",
 	},
 	clockOutButton: {
 		backgroundColor: "#ff3b30",
+		flexDirection: "row",
+		justifyContent: "center",
 	},
 	clockButtonText: {
 		color: "white",
@@ -279,6 +433,33 @@ const styles = StyleSheet.create({
 	emptyText: {
 		fontSize: 16,
 		color: "#999",
+	},
+	buttonRow: {
+		flexDirection: "column",
+		justifyContent: "space-between",
+		width: "100%",
+		gap: 10,
+	},
+	pauseButton: {
+		backgroundColor: "#FFA500",
+		flexDirection: "row",
+		justifyContent: "center",
+	},
+	resumeButton: {
+		backgroundColor: "#34C759",
+		flexDirection: "row",
+		justifyContent: "center",
+	},
+	loadingButton: {
+		backgroundColor: "#999",
+		flexDirection: "row",
+		justifyContent: "center",
+	},
+	buttonIcon: {
+		marginRight: 8,
+	},
+	pausedText: {
+		color: "#FFA500",
 	},
 });
 

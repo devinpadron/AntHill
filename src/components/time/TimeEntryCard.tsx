@@ -14,24 +14,48 @@ const TimeEntryCard = ({ timeEntry, onPress }) => {
 
 	const clockOutTime = timeEntry.clockOutTime
 		? format(new Date(timeEntry.clockOutTime), "h:mm a")
-		: "Active";
+		: timeEntry.status === "paused"
+			? "Paused"
+			: "Active";
 
-	// Setup live timer for active entries
+	// Setup and manage timer for active entries
 	useEffect(() => {
+		// Clear any existing interval first
+		if (intervalRef.current) {
+			clearInterval(intervalRef.current);
+			intervalRef.current = null;
+		}
+
 		if (timeEntry.status === "active") {
 			// Calculate initial elapsed time in seconds
 			const startDate = new Date(timeEntry.clockInTime);
-			const initialElapsed = differenceInSeconds(new Date(), startDate);
+
+			// Account for any previous pause time (now using totalPausedSeconds directly)
+			const pauseOffset = timeEntry.totalPausedSeconds || 0;
+
+			const initialElapsed =
+				differenceInSeconds(new Date(), startDate) - pauseOffset;
 			setElapsedSeconds(initialElapsed);
 
 			// Update timer every second
 			intervalRef.current = setInterval(() => {
-				const currentElapsed = differenceInSeconds(
-					new Date(),
-					startDate,
-				);
+				const currentElapsed =
+					differenceInSeconds(new Date(), startDate) - pauseOffset;
 				setElapsedSeconds(currentElapsed);
-			}, 1000); // Update every second
+			}, 1000);
+		} else if (timeEntry.status === "paused") {
+			// For paused entries, calculate the elapsed time up until the pause
+			if (timeEntry.pauseStartTime) {
+				const startDate = new Date(timeEntry.clockInTime);
+				const pauseDate = new Date(timeEntry.pauseStartTime);
+
+				// Account for any previous pause time
+				const pauseOffset = timeEntry.totalPausedSeconds || 0;
+
+				const pausedElapsed =
+					differenceInSeconds(pauseDate, startDate) - pauseOffset;
+				setElapsedSeconds(pausedElapsed);
+			}
 		}
 
 		return () => {
@@ -39,7 +63,12 @@ const TimeEntryCard = ({ timeEntry, onPress }) => {
 				clearInterval(intervalRef.current);
 			}
 		};
-	}, [timeEntry.status, timeEntry.clockInTime]);
+	}, [
+		timeEntry.status,
+		timeEntry.clockInTime,
+		timeEntry.pauseStartTime,
+		timeEntry.totalPausedSeconds, // Change from totalPausedMinutes to totalPausedSeconds
+	]);
 
 	// Calculate hours and minutes
 	const getDurationValues = (totalSeconds) => {
@@ -49,24 +78,24 @@ const TimeEntryCard = ({ timeEntry, onPress }) => {
 		return { hours, minutes, seconds };
 	};
 
-	// For completed entries, use the stored duration (in minutes)
-	// For active entries, use the elapsed seconds
+	// For completed entries, use the stored duration (in seconds)
+	// For active/paused entries, use the elapsed seconds
 	const duration =
-		timeEntry.status === "active"
-			? getDurationValues(elapsedSeconds)
-			: getDurationValues((timeEntry.duration || 0) * 60); // Convert minutes to seconds
+		timeEntry.status === "completed" || timeEntry.status === "edited"
+			? getDurationValues(timeEntry.duration || 0) // No need to convert, already in seconds
+			: getDurationValues(Math.max(0, elapsedSeconds)); // Use calculated elapsed time
 
 	// Format duration string with seconds for active entries
-	const formatDurationString = (h, m, s, isActive) => {
+	const formatDurationString = (h, m, s, isActive, isPaused) => {
 		if (isActive) {
 			return `${h > 0 ? `${h}h ` : ""}${
 				m > 0 || h > 0 ? `${m}m ` : ""
-			}${s}s`;
+			}${s}s${isPaused ? " (paused)" : ""}`;
 		} else {
 			// For completed entries, don't show seconds
-			return `${h > 0 ? `${h}h ` : ""}${
-				m > 0 ? `${m}m` : h === 0 ? "0m" : ""
-			}`;
+			// Convert to decimal hours with one decimal place
+			const decimalHours = (h + m / 60).toFixed(2);
+			return `${decimalHours}h`;
 		}
 	};
 
@@ -74,7 +103,8 @@ const TimeEntryCard = ({ timeEntry, onPress }) => {
 		duration.hours,
 		duration.minutes,
 		duration.seconds,
-		timeEntry.status === "active",
+		timeEntry.status === "active" || timeEntry.status === "paused",
+		timeEntry.status === "paused",
 	);
 
 	// Status color
