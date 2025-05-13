@@ -24,6 +24,7 @@ export default {
 			infoPlist: {
 				NSPhotoLibraryUsageDescription:
 					"This app needs access to your photo library to allow you to select images for sharing.",
+				ITSAppUsesNonExemptEncryption: false,
 			},
 		},
 		android: {
