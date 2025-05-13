@@ -96,7 +96,10 @@ export default function Timesheet(
 				}
 
 				if (event.startTime) {
-					const startTime = moment(event.startTime, "HH:mm");
+					const startTime = moment(
+						event.startTime,
+						"YYYY-MM-DD HH:mm",
+					);
 					description = startTime.format("h:mm A");
 				}
 
@@ -193,9 +196,7 @@ export default function Timesheet(
 						<Text style={styles.entryDescription}>
 							{entry.description}
 						</Text>
-					) : (
-						<Text style={styles.allDayText}>All Day</Text>
-					)}
+					) : null}
 
 					{entry.hours > 0 && (
 						<Text style={styles.hoursValue}>{entry.hours} hrs</Text>
@@ -495,7 +496,7 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		fontWeight: "500",
 		color: "#333",
-		marginBottom: 6,
+		marginBottom: 0,
 	},
 	allDayText: {
 		fontSize: 14,
@@ -505,7 +506,8 @@ const styles = StyleSheet.create({
 	entryDescription: {
 		fontSize: 14,
 		color: "#666",
-		marginBottom: 4,
+		marginBottom: 0,
+		marginTop: 6,
 	},
 	hoursValue: {
 		fontSize: 14,

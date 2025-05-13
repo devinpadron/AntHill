@@ -1,7 +1,7 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import CalendarScreen from "../screens/home/Calendar";
-import EventDetails from "../screens/home/EventDetails";
-import EventSubmit from "../screens/home/EventSubmit";
+import CalendarScreen from "../screens/calendar/Calendar";
+import EventDetails from "../screens/calendar/EventDetails";
+import EventSubmit from "../screens/calendar/EventSubmit";
 
 const Stack = createNativeStackNavigator();
 

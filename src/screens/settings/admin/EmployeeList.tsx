@@ -13,10 +13,10 @@ import {
 import { TouchableOpacity } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useUser } from "../../contexts/UserContext";
-import { useEmployeeData } from "../../hooks/useEmployeeData";
-import { EmployeeItem } from "../../components/employeeList/EmployeeItem";
-import { handleEmployeeAction } from "../../utils/employeeUtils";
+import { useUser } from "../../../contexts/UserContext";
+import { useEmployeeData } from "../../../hooks/useEmployeeData";
+import { EmployeeItem } from "../../../components/employeeList/EmployeeItem";
+import { handleEmployeeAction } from "../../../utils/employeeUtils";
 
 // Enable LayoutAnimation on Android
 if (

@@ -73,6 +73,7 @@ export const useSignUp = (navigation: any) => {
 				lastName,
 				email,
 				companyId,
+				user.uid,
 			);
 
 			// Save user data

@@ -46,8 +46,6 @@ export const AttachmentUploader = ({
 
 	return (
 		<View style={styles.inputContainer}>
-			<Text style={styles.label}>Attachments</Text>
-
 			<View style={styles.uploadButtonsContainer}>
 				<TouchableOpacity
 					style={styles.uploadButton}
