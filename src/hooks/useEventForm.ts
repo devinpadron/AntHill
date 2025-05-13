@@ -148,7 +148,10 @@ export const useEventForm = (navigation, eventId?: string) => {
 	// Calculate event duration
 	const calculateDuration = useCallback(() => {
 		if (allDay || !hasEndTime) return null;
-		const hours = moment(endTime).diff(startTime, "minutes") / 60;
+		const realStartTime = moment(startTime).format(
+			moment(date).format("YYYY-MM-DD") + " HH:mm",
+		);
+		const hours = moment(endTime).diff(realStartTime, "minutes") / 60;
 		return hours.toFixed(2).toString();
 	}, [allDay, hasEndTime, startTime, endTime]);
 
@@ -360,10 +363,16 @@ export const useEventForm = (navigation, eventId?: string) => {
 				: null;
 
 			const eventData: Event = {
+				id: editID || "",
 				title,
 				date: moment(date).format("YYYY-MM-DD"),
-				startTime: !allDay ? moment(startTime).format("HH:mm") : null,
-				endTime: hasEndTime ? moment(endTime).format("HH:mm") : null,
+				startTime: !allDay
+					? moment(date)
+							.hours(startTime.getHours())
+							.minutes(startTime.getMinutes())
+							.toISOString(true)
+					: null,
+				endTime: hasEndTime ? moment(endTime).toISOString(true) : null,
 				locations: validatedLocations,
 				duration: calculateDuration(),
 				notes,
@@ -442,7 +451,7 @@ export const useEventForm = (navigation, eventId?: string) => {
 			);
 
 			await deleteEvent(editID, currentCompany);
-			navigation.pop();
+			navigation.pop(2);
 		} catch (error) {
 			Alert.alert("Error deleting event, please try again");
 			console.error(error);

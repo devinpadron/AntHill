@@ -4,4 +4,5 @@ export interface User {
 	email: string;
 	loggedInCompany: string;
 	companies: string[];
+	id: string;
 }

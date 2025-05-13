@@ -5,11 +5,15 @@ import { UserProvider } from "./src/contexts/UserContext";
 import { NotificationProvider } from "./src/contexts/NotificationContext";
 import { AppNavigator } from "./src/routes/AppNavigator";
 import { checkAndRunMigrations } from "./src/utils/dbMigrationUtils";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const App: React.FC = () => {
 	// Check and run migrations
 	useEffect(() => {
 		checkAndRunMigrations();
+
+		//For debuging and testing. Please leave commented when not using
+		//AsyncStorage.setItem("app_schema_version", "0");
 	}, []);
 
 	// Initialize the app

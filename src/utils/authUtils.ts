@@ -57,6 +57,7 @@ export const formatUserData = (
 	lastName: string,
 	email: string,
 	companyId: string,
+	userId: string,
 ) => {
 	return {
 		firstName: capitalize(firstName),
@@ -64,6 +65,7 @@ export const formatUserData = (
 		email: lowerCase(email),
 		loggedInCompany: companyId,
 		companies: [companyId],
+		id: userId,
 	};
 };
 
