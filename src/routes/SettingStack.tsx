@@ -1,9 +1,9 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import Settings from "../screens/settings/Settings";
 import ProfilePage from "../screens/settings/ProfilePage";
-import EmployeeList from "../screens/settings/EmployeeList";
-import PayrollReview from "../screens/settings/PayrollReview";
-import CompanyCustomForm from "../screens/settings/CompanyCustomForm";
+import EmployeeList from "../screens/settings/admin/EmployeeList";
+import PayrollReviewStack from "../routes/PayrollReviewStack";
+import CompanyCustomForm from "../screens/settings/admin/CompanyCustomForm";
 
 const Stack = createNativeStackNavigator();
 
@@ -27,7 +27,7 @@ const SettingStack = () => {
 			/>
 			<Stack.Screen
 				name="PayrollReview"
-				component={PayrollReview}
+				component={PayrollReviewStack}
 				options={{ headerShown: false, gestureEnabled: true }}
 			/>
 			<Stack.Screen

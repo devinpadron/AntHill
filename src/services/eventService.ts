@@ -179,3 +179,35 @@ export async function updateEvent(
 		throw e;
 	}
 }
+
+export const getEventsByIds = async (companyId: string, eventIds: string[]) => {
+	try {
+		if (!eventIds || eventIds.length === 0) {
+			return [];
+		}
+
+		// Due to Firestore limitations, we can't query with 'in' for large arrays
+		// So we'll fetch events one by one
+		const events = await Promise.all(
+			eventIds.map((eventId) =>
+				db
+					.collection("Companies")
+					.doc(companyId)
+					.collection("Events")
+					.doc(eventId)
+					.get()
+					.then((doc) => {
+						if (doc.exists) {
+							return { id: doc.id, ...doc.data() };
+						}
+						return null;
+					}),
+			),
+		);
+
+		return events.filter((event) => event !== null);
+	} catch (error) {
+		console.error("Error fetching events by IDs:", error);
+		throw error;
+	}
+};

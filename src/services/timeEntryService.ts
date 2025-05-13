@@ -1,6 +1,6 @@
 import db from "../constants/firestore";
 import { TimeEntry } from "../types";
-import { CollectionReference, Query } from "firebase/firestore";
+import * as FileSystem from "expo-file-system";
 
 export const clockIn = async (userId: string, companyId: string) => {
 	const timeEntryRef = db
@@ -294,6 +294,226 @@ export const submitTimeEntryForApproval = async (
 		};
 	} catch (error) {
 		console.error("Error submitting time entry:", error);
+		throw error;
+	}
+};
+
+export const getTimeEntry = async (companyId: string, timeEntryId: string) => {
+	try {
+		const doc = await db
+			.collection("Companies")
+			.doc(companyId)
+			.collection("TimeEntries")
+			.doc(timeEntryId)
+			.get();
+
+		if (!doc.exists) {
+			return null;
+		}
+
+		return { id: doc.id, ...doc.data() } as TimeEntry;
+	} catch (error) {
+		console.error("Error getting time entry:", error);
+		throw error;
+	}
+};
+
+export const updateTimeEntry = async (
+	timeEntryId: string,
+	companyId: string,
+	updates: any,
+) => {
+	try {
+		await db
+			.collection("Companies")
+			.doc(companyId)
+			.collection("TimeEntries")
+			.doc(timeEntryId)
+			.update(updates);
+
+		return { success: true };
+	} catch (error) {
+		console.error("Error updating time entry:", error);
+		throw error;
+	}
+};
+
+export const approveTimeEntry = async (
+	timeEntryId: string,
+	companyId: string,
+	approvalData: any,
+) => {
+	try {
+		await db
+			.collection("Companies")
+			.doc(companyId)
+			.collection("TimeEntries")
+			.doc(timeEntryId)
+			.update(approvalData);
+
+		return { success: true };
+	} catch (error) {
+		console.error("Error approving time entry:", error);
+		throw error;
+	}
+};
+
+export const exportTimeEntries = async (
+	companyId: string,
+	timeEntryIds: string[],
+	format: string = "txt",
+	employeeName: string = "Employee",
+	customForm?: any, // Add customForm parameter to access field definitions
+) => {
+	try {
+		const entries = await Promise.all(
+			timeEntryIds.map((id) => getTimeEntry(companyId, id)),
+		);
+
+		let content = "";
+		let fileName = "";
+
+		if (format === "txt") {
+			// Instead of a PDF, create a well-formatted text file
+			content = `TIME ENTRY REPORT FOR ${employeeName.toUpperCase()}\n`;
+			content += `Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}\n`;
+			content += `=================================================\n\n`;
+
+			entries.forEach((entry) => {
+				// Basic time entry details
+				content += `ENTRY ID: ${entry.id}\n`;
+				content += `DATE: ${new Date(
+					entry.clockInTime,
+				).toLocaleDateString()}\n`;
+				content += `CLOCK IN: ${new Date(
+					entry.clockInTime,
+				).toLocaleTimeString()}\n`;
+				content += `CLOCK OUT: ${
+					entry.clockOutTime
+						? new Date(entry.clockOutTime).toLocaleTimeString()
+						: "N/A"
+				}\n`;
+				content += `DURATION: ${(entry.duration / 3600).toFixed(
+					2,
+				)} hours\n`;
+				content += `STATUS: ${entry.status}\n`;
+
+				// Add notes if they exist
+				if (entry.notes) {
+					content += `\nNOTES:\n${entry.notes}\n`;
+				}
+
+				// Add form responses with proper labels
+				if (
+					entry.formResponses &&
+					Object.keys(entry.formResponses).length > 0
+				) {
+					content += "\nFORM RESPONSES:\n";
+					Object.entries(customForm[entry.id]).forEach(
+						([fieldLabel, value]) => {
+							// Try to get the label from customForm if available
+
+							content += `- ${fieldLabel}: ${value}\n`;
+						},
+					);
+				}
+
+				// Add edit history if it exists
+				if (entry.editHistory && entry.editHistory.length > 0) {
+					content += "\nEDIT HISTORY:\n";
+					entry.editHistory.forEach((edit: any) => {
+						content += `- ${new Date(
+							edit.timestamp,
+						).toLocaleString()} by ${
+							edit.editor.displayName || "Unknown"
+						}\n`;
+						if (edit.summary) {
+							content += `  Summary: ${edit.summary}\n`;
+						}
+						if (edit.changes) {
+							content += `  Changes: ${JSON.stringify(
+								edit.changes,
+							)}\n`;
+						}
+					});
+				}
+
+				content +=
+					"\n-------------------------------------------------\n\n";
+			});
+
+			fileName = `${employeeName.replace(/\s+/g, "_")}_time_entries.txt`;
+		} else if (format === "csv") {
+			// CSV Header remains the same
+			content =
+				"Date,Clock In,Clock Out,Duration (hours),Status,Notes,Form Responses,Edit History\n";
+
+			entries.forEach((entry) => {
+				const date = new Date(entry.clockInTime).toLocaleDateString();
+				const clockIn = new Date(
+					entry.clockInTime,
+				).toLocaleTimeString();
+				const clockOut = entry.clockOutTime
+					? new Date(entry.clockOutTime).toLocaleTimeString()
+					: "N/A";
+				const duration = (entry.duration / 3600).toFixed(2);
+
+				// Escape any commas in text fields
+				const notes = entry.notes
+					? `"${entry.notes.replace(/"/g, '""')}"`
+					: "";
+
+				// Format form responses using the field label mapping
+				let formResponsesStr = "";
+				if (
+					entry.formResponses &&
+					Object.keys(entry.formResponses).length > 0
+				) {
+					formResponsesStr =
+						'"' +
+						Object.entries(customForm[entry.id])
+							.map(([fieldLabel, value]) => {
+								// Use the label from our mapping if available, otherwise use the ID
+								return `${fieldLabel}: ${value}`;
+							})
+							.join("; ")
+							.replace(/"/g, '""') +
+						'"';
+				}
+				console.log(customForm[entry.id]);
+
+				// Format edit history (unchanged)
+				let editHistoryStr = "";
+				if (entry.editHistory && entry.editHistory.length > 0) {
+					editHistoryStr =
+						'"' +
+						entry.editHistory
+							.map(
+								(edit: any) =>
+									`${new Date(
+										edit.timestamp,
+									).toLocaleString()} - ${
+										edit.summary || "Edited"
+									}`,
+							)
+							.join("; ")
+							.replace(/"/g, '""') +
+						'"';
+				}
+
+				content += `${date},${clockIn},${clockOut},${duration},${entry.status},${notes},${formResponsesStr},${editHistoryStr}\n`;
+			});
+
+			fileName = `${employeeName.replace(/\s+/g, "_")}_time_entries.csv`;
+		}
+
+		// Save file using expo-file-system
+		const fileUri = FileSystem.documentDirectory + fileName;
+		await FileSystem.writeAsStringAsync(fileUri, content);
+
+		return fileUri;
+	} catch (error) {
+		console.error("Error exporting time entries:", error);
 		throw error;
 	}
 };

@@ -21,6 +21,21 @@ export interface TimeEntry {
 		startOverlap: string;
 		endOverlap: string;
 	}>;
+	formResponses?: {
+		[key: string]: string | number | boolean;
+	};
+	editHistory?: Array<{
+		timestamp: string;
+		editor: string;
+		previousClockInTime: string;
+		previousClockOutTime: string;
+		previousDuration: number;
+		previousFormResponses: {
+			[key: string]: string | number | boolean;
+		};
+		summary: string;
+		previousNotes?: string;
+	}>;
 	notes?: string;
 	submittedAt?: string;
 	submissionNotes?: string;

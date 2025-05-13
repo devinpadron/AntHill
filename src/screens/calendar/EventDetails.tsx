@@ -21,6 +21,7 @@ import { getRegionForMarkers, openMap, MapMarker } from "../../utils/mapUtils";
 // Components
 import { EventHeader } from "../../components/eventDetails/EventHeader";
 import { AttachmentGallery } from "../../components/eventDetails/AttachmentGallery";
+import { ScrollView } from "react-native-gesture-handler";
 
 // Types
 type RootStackParamList = {
@@ -127,10 +128,10 @@ const EventDetails = ({ navigation }) => {
 
 	return (
 		<View style={[{ flex: 1, paddingTop: insets.top }, styles.container]}>
-			<KeyboardAwareScrollView
+			<ScrollView
 				ref={scrollViewRef}
 				contentContainerStyle={{ flexGrow: 1 }}
-				extraScrollHeight={100}
+				automaticallyAdjustKeyboardInsets
 			>
 				<EventHeader
 					title={event.title}
@@ -284,7 +285,7 @@ const EventDetails = ({ navigation }) => {
 						</TouchableOpacity>
 					</View>
 				</View>
-			</KeyboardAwareScrollView>
+			</ScrollView>
 		</View>
 	);
 };

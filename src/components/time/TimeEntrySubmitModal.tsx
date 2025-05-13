@@ -15,7 +15,10 @@ import { getEventsByDate } from "../../services/eventService";
 import { useUser } from "../../contexts/UserContext";
 import moment from "moment";
 import { getCompanyPreferences } from "../../services/companyService";
-import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
+import BottomSheet, {
+	BottomSheetScrollView,
+	BottomSheetTextInput,
+} from "@gorhom/bottom-sheet";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CustomFormRender from "./CustomFormRender";
 
@@ -34,6 +37,8 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const insets = useSafeAreaInsets();
 
 	const bottomSheetRef = useRef(null);
+	const scrollViewRef = useRef(null);
+	const notesInputRef = useRef(null);
 	const snapPoints = useRef(["85%"]).current;
 
 	useEffect(() => {
@@ -45,7 +50,7 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	}, [visible]);
 
 	const handleClosePress = useCallback(() => {
-		Keyboard.dismiss();
+		Keyboard?.dismiss();
 		if (bottomSheetRef.current) {
 			bottomSheetRef.current.close();
 		}
@@ -257,6 +262,14 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 		}
 	};
 
+	const handleNotesFocus = () => {
+		setTimeout(() => {
+			if (scrollViewRef.current) {
+				scrollViewRef.current.scrollToEnd({ animated: true });
+			}
+		}, 300);
+	};
+
 	if (!timeEntry || !visible) return null;
 
 	return (
@@ -267,19 +280,23 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 			onClose={onClose}
 			handleIndicatorStyle={styles.sheetIndicator}
 			backgroundStyle={styles.sheetBackground}
+			keyboardBehavior="extend"
+			android_keyboardInputMode="adjustResize"
 		>
 			<View style={[styles.modalHeader, { paddingTop: 0 }]}>
 				<Text style={styles.modalTitle}>Submit Time Entry</Text>
 			</View>
 
 			<BottomSheetScrollView
+				ref={scrollViewRef}
 				contentContainerStyle={[
 					styles.scrollContent,
-					{ paddingBottom: insets.bottom + 20 },
+					{ paddingBottom: insets.bottom },
 				]}
 				keyboardShouldPersistTaps="handled"
 				nestedScrollEnabled={true}
 				scrollEnabled={!customForm?.fields.some((f) => f.isOpen)}
+				keyboardDismissMode="interactive"
 			>
 				<View style={styles.entryDetails}>
 					<View style={styles.detailRow}>
@@ -431,7 +448,8 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 				)}
 
 				<Text style={styles.notesLabel}>Notes/Comments:</Text>
-				<TextInput
+				<BottomSheetTextInput
+					ref={notesInputRef}
 					style={styles.notesInput}
 					multiline
 					numberOfLines={4}
@@ -439,6 +457,7 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 					value={notes}
 					onChangeText={setNotes}
 					editable={!isSubmitting}
+					onFocus={handleNotesFocus}
 				/>
 
 				{error && <Text style={styles.errorText}>{error}</Text>}

@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import CalendarStack from "./CalendarStack";
 import SettingStack from "./SettingStack";
-import TimeEntryScreen from "../screens/home/TimeEntryScreen";
+import ClockStack from "./ClockStack";
 
 const Tab = createBottomTabNavigator();
 
@@ -33,7 +33,7 @@ const HomeTabs = () => {
 			/>
 			<Tab.Screen
 				name="Clock"
-				component={TimeEntryScreen}
+				component={ClockStack}
 				options={{
 					headerShown: false,
 					tabBarIcon: ({ focused, color, size }) => (

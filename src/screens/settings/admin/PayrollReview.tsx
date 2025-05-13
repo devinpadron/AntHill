@@ -19,9 +19,9 @@ import {
 	parseISO,
 } from "date-fns";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import { useUser } from "../../contexts/UserContext";
-import { getAllTimeEntries } from "../../services/timeEntryService";
-import { getUser } from "../../services/userService";
+import { useUser } from "../../../contexts/UserContext";
+import { getAllTimeEntries } from "../../../services/timeEntryService";
+import { getUser } from "../../../services/userService";
 import DatePicker from "react-native-date-picker";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -151,20 +151,19 @@ const PayrollReview = ({ navigation }) => {
 
 	// Navigate to time entry details
 	const viewTimeEntryDetails = (employeeId, entryId) => {
-		//TODO: This will be implemented later
-		navigation.navigate("TimeEntryDetails", {
-			employeeId,
+		navigation.navigate("PayrollDetails", {
 			entryId,
-			isEmployeeView: false,
+			employeeId,
 		});
 	};
 
 	// Add this new function to navigate to TimeEntryDetails with all entries for an employee
 	const viewEmployeeTimeEntries = (employeeId, entries) => {
-		navigation.navigate("TimeEntryDetails", {
+		const entryId = entries.map((entry) => entry.id);
+
+		navigation.navigate("PayrollDetails", {
+			entryId,
 			employeeId,
-			entries,
-			isEmployeeView: true, // Flag to indicate this is a grouped view
 		});
 	};
 
@@ -296,6 +295,8 @@ const PayrollReview = ({ navigation }) => {
 				return "Rejected";
 			case "completed":
 				return "Not Submitted";
+			case "edited":
+				return "Edited";
 			default:
 				return "Active";
 		}
@@ -312,6 +313,8 @@ const PayrollReview = ({ navigation }) => {
 				return "#E57373"; // Red
 			case "completed":
 				return "#FF8A65"; // Light Red
+			case "edited":
+				return "#90CAF9"; // Orange
 			default:
 				return "#90CAF9"; // Blue
 		}

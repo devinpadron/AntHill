@@ -11,7 +11,7 @@ import {
 	ActivityIndicator,
 	Platform,
 } from "react-native";
-import { useUser } from "../../contexts/UserContext";
+import { useUser } from "../../../contexts/UserContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import DropDownPicker from "react-native-dropdown-picker";
@@ -19,7 +19,7 @@ import DraggableFlatList from "react-native-draggable-flatlist";
 import {
 	getCompanyPreferences,
 	updateCompanyPreferences,
-} from "../../services/companyService";
+} from "../../../services/companyService";
 
 // Form field types
 const FIELD_TYPES = [
@@ -299,7 +299,11 @@ const CompanyCustomForm = ({ navigation }) => {
 											<Text style={styles.fieldType}>
 												{item.type.toUpperCase()}
 											</Text>
-											<Text style={styles.fieldLabel}>
+											<Text
+												style={styles.fieldLabel}
+												numberOfLines={2}
+												ellipsizeMode="tail"
+											>
 												{item.label}
 											</Text>
 											{item.required && (
@@ -623,7 +627,7 @@ const CompanyCustomForm = ({ navigation }) => {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: "#f8f9fa",
+		backgroundColor: "white",
 	},
 	centered: {
 		justifyContent: "center",
@@ -742,11 +746,14 @@ const styles = StyleSheet.create({
 	fieldContent: {
 		flexDirection: "row",
 		justifyContent: "space-between",
+		alignItems: "flex-start",
 	},
 	fieldInfo: {
 		flexDirection: "row",
-		alignItems: "center",
+		alignItems: "flex-start",
 		flex: 1,
+		flexWrap: "wrap",
+		paddingRight: 10,
 	},
 	fieldType: {
 		fontSize: 12,
@@ -756,10 +763,21 @@ const styles = StyleSheet.create({
 		borderRadius: 4,
 		color: "#555",
 		marginRight: 8,
+		marginTop: 2,
 	},
 	fieldLabel: {
 		fontSize: 16,
 		color: "#333",
+		flex: 1,
+		flexShrink: 1,
+	},
+	fieldActions: {
+		flexDirection: "row",
+		alignItems: "center",
+		width: 70,
+		justifyContent: "space-between",
+		marginLeft: 8,
+		flexShrink: 0,
 	},
 	requiredBadge: {
 		backgroundColor: "#ff9500",
@@ -767,17 +785,13 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 6,
 		paddingVertical: 2,
 		borderRadius: 4,
+		marginTop: 2,
+		flexShrink: 0,
 	},
 	requiredText: {
 		fontSize: 10,
 		color: "white",
 		fontWeight: "600",
-	},
-	fieldActions: {
-		flexDirection: "row",
-		alignItems: "center",
-		width: 70,
-		justifyContent: "space-between",
 	},
 	addButton: {
 		flexDirection: "row",

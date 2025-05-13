@@ -111,6 +111,8 @@ const TimeEntryScreen = ({ navigation }) => {
 	// View time entry details
 	const viewTimeEntryDetails = (entryId) => {
 		// Future implementation
+		console.log("View time entry details:", entryId);
+		navigation.navigate("TimeEntryDetails", { entryId, userId });
 	};
 
 	// Update the renderTimeEntry function

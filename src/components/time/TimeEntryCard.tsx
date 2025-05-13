@@ -20,7 +20,7 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 
 	// Determine if entry can be submitted for approval
 	const canSubmit =
-		(timeEntry.status === "completed" || timeEntry.status === "edited") &&
+		timeEntry.status === "completed" &&
 		timeEntry.status !== "pending_approval";
 
 	// Setup and manage timer for active entries
