@@ -461,6 +461,43 @@ const CompanyCustomForm = ({ navigation }) => {
 							/>
 						</View>
 
+						{currentFieldType === "number" && (
+							<View style={styles.switchRow}>
+								<View style={styles.labelWithHelp}>
+									<Text style={styles.label}>
+										Show Total for Multiple Entries
+									</Text>
+									<TouchableOpacity
+										onPress={() =>
+											Alert.alert(
+												"Number Field Total",
+												"When enabled, this number field will show a sum total across all entries when viewing multiple time entries at once.",
+											)
+										}
+									>
+										<Ionicons
+											name="information-circle-outline"
+											size={20}
+											color="#777"
+										/>
+									</TouchableOpacity>
+								</View>
+								<Switch
+									value={editingField.showTotal || false}
+									onValueChange={(value) =>
+										setEditingField({
+											...editingField,
+											showTotal: value,
+										})
+									}
+									trackColor={{
+										false: "#767577",
+										true: "#007AFF",
+									}}
+								/>
+							</View>
+						)}
+
 						<TouchableOpacity
 							style={styles.saveFieldButton}
 							onPress={saveFieldChanges}
@@ -525,14 +562,24 @@ const CompanyCustomForm = ({ navigation }) => {
 									)}
 
 									{field.type === "number" && (
-										<TextInput
-											style={styles.previewInput}
-											placeholder={
-												field.placeholder || "0"
-											}
-											keyboardType="numeric"
-											editable={false}
-										/>
+										<View>
+											<TextInput
+												style={styles.previewInput}
+												placeholder={
+													field.placeholder || "0"
+												}
+												keyboardType="numeric"
+												editable={false}
+											/>
+											{field.showTotal && (
+												<Text
+													style={styles.previewTotal}
+												>
+													Will show totals across
+													multiple entries
+												</Text>
+											)}
+										</View>
 									)}
 
 									{field.type === "checkbox" && (
@@ -926,6 +973,11 @@ const styles = StyleSheet.create({
 		borderRadius: 6,
 		paddingHorizontal: 10,
 	},
+	previewTotal: {
+		fontSize: 14,
+		color: "#666",
+		marginTop: 4,
+	},
 	checkboxPreview: {
 		flexDirection: "row",
 		alignItems: "center",
@@ -962,6 +1014,10 @@ const styles = StyleSheet.create({
 	previewDateText: {
 		fontSize: 15,
 		color: "#999",
+	},
+	labelWithHelp: {
+		flexDirection: "row",
+		alignItems: "center",
 	},
 });
 

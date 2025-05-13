@@ -275,7 +275,7 @@ export async function updateCompanyPreferences(
 			.collection("Companies")
 			.doc(companyId)
 			.collection("Settings")
-			.doc("SubmitForm")
+			.doc("preferences")
 			.set(preferences, { merge: true });
 
 		return true;

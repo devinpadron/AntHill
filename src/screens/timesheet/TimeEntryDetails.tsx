@@ -33,6 +33,16 @@ import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import EditSheet from "../../components/time/EditSheet";
 
+// Define the structure of individual total items
+interface TotalItem {
+	value: number;
+	label: string;
+}
+
+interface Totals {
+	[key: string]: TotalItem;
+}
+
 const TimeEntryDetails = ({ route, navigation }) => {
 	// Extract params - handle both single ID and array of IDs
 	const { entryId, userId: passedUserId } = route.params;
@@ -44,10 +54,8 @@ const TimeEntryDetails = ({ route, navigation }) => {
 		userId: currentUserId,
 		companyId,
 		userPrivilege: role,
-		//isAdmin,
+		isAdmin,
 	} = useUser();
-
-	const isAdmin = true;
 
 	// State variables
 	const [isLoading, setIsLoading] = useState(true);
@@ -172,6 +180,43 @@ const TimeEntryDetails = ({ route, navigation }) => {
 		} finally {
 			setIsLoading(false);
 		}
+	};
+
+	// Make sure the function is properly typed to return Totals
+	const calculateNumberFieldTotals = (): Totals => {
+		const totals: Totals = {}; // Initialize with proper type
+
+		// Skip if no entries or no custom form
+		if (!timeEntries?.length || !customForm?.fields) return totals;
+
+		// Find all number fields that should show totals
+		const totalableFields = customForm.fields.filter(
+			(field) => field.type === "number" && field.showTotal === true,
+		);
+
+		// Skip if no totalable fields
+		if (!totalableFields.length) return totals;
+
+		// Sum up values across all entries
+		timeEntries.forEach((entry) => {
+			if (entry.formResponses) {
+				totalableFields.forEach((field) => {
+					const value = entry.formResponses[field.id];
+					if (value && !isNaN(parseFloat(value))) {
+						if (!totals[field.id]) {
+							totals[field.id] = {
+								value: 0,
+								label: field.label,
+							};
+						}
+						totals[field.id].value += parseFloat(value);
+					}
+				});
+			}
+		});
+
+		console.log("Calculated Totals:", totals);
+		return totals;
 	};
 
 	// Get status badge color
@@ -545,6 +590,7 @@ const TimeEntryDetails = ({ route, navigation }) => {
 			<ScrollView style={styles.scrollContainer}>
 				{/* Summary Card */}
 				<View style={styles.summaryCard}>
+					{/* Existing summary rows remain the same */}
 					<View style={styles.summaryRow}>
 						<Text style={styles.summaryLabel}>Employee:</Text>
 						<Text style={styles.summaryValue}>
@@ -613,6 +659,35 @@ const TimeEntryDetails = ({ route, navigation }) => {
 								: "N/A"}
 						</Text>
 					</View>
+
+					{/* Add Number Field Totals - only show when there are multiple entries */}
+					{timeEntries.length > 1 && (
+						<>
+							{Object.values(calculateNumberFieldTotals()).map(
+								(total: TotalItem) => (
+									<View
+										key={total.label}
+										style={[
+											styles.summaryRow,
+											styles.totalSummaryRow,
+										]}
+									>
+										<Text style={styles.summaryLabel}>
+											{total.label} Total:
+										</Text>
+										<Text
+											style={[
+												styles.summaryValue,
+												styles.totalValue,
+											]}
+										>
+											{total.value.toFixed(2)}
+										</Text>
+									</View>
+								),
+							)}
+						</>
+					)}
 				</View>
 
 				{/* Manager Actions */}
@@ -1178,6 +1253,9 @@ const styles = StyleSheet.create({
 		marginBottom: 12,
 		alignItems: "center",
 	},
+	totalSummaryRow: {
+		marginTop: 8,
+	},
 	summaryLabel: {
 		fontSize: 16,
 		color: "#666",
@@ -1189,6 +1267,10 @@ const styles = StyleSheet.create({
 		fontWeight: "500",
 		textAlign: "right",
 		flex: 1,
+	},
+	totalValue: {
+		fontWeight: "600",
+		color: "#007AFF",
 	},
 	statusContainer: {
 		flexDirection: "row",
