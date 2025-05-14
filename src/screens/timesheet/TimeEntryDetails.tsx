@@ -490,7 +490,9 @@ const TimeEntryDetails = ({ route, navigation }) => {
 					const shareResult = await Share.share({
 						url: "file://" + fileUri,
 						title: `Time Entries - ${
-							employeeUser?.displayName || "Employee"
+							employeeUser?.firstName +
+								" " +
+								employeeUser?.lastName || "Employee"
 						}`,
 					});
 				}
@@ -591,7 +593,7 @@ const TimeEntryDetails = ({ route, navigation }) => {
 					: `Time Entries Rejected - ${dateRanges.join(", ")}`;
 
 			let message = `
-Dear ${employeeUser.displayName},
+Dear ${employeeUser.firstName + " " + employeeUser.lastName},
 
 Your time entries for ${dateRanges.join(", ")} have been ${status}.
 `;

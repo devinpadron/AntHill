@@ -94,7 +94,9 @@ export const useEventForm = (navigation, eventId?: string) => {
 				setAllDay(!data.startTime);
 
 				if (data.startTime) {
-					setStartTime(moment(data.startTime, "HH:mm").toDate());
+					setStartTime(
+						moment(data.startTime, "YYYY-MM-DD HH:mm").toDate(),
+					);
 				}
 
 				setHasEndTime(!!data.endTime);
@@ -116,7 +118,7 @@ export const useEventForm = (navigation, eventId?: string) => {
 					date: moment(data.date).toDate(),
 					allDay: !data.startTime,
 					startTime: data.startTime
-						? moment(data.startTime, "HH:mm").toDate()
+						? moment(data.startTime, "YYYY-MM-DD HH:mm").toDate()
 						: new Date(),
 					hasEndTime: !!data.endTime,
 					endTime: data.endTime

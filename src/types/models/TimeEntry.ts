@@ -26,7 +26,10 @@ export interface TimeEntry {
 	};
 	editHistory?: Array<{
 		timestamp: string;
-		editor: string;
+		editor: {
+			userId: string;
+			displayName: string;
+		};
 		previousClockInTime: string;
 		previousClockOutTime: string;
 		previousDuration: number;
