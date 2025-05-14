@@ -32,11 +32,25 @@ import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import EditSheet from "../../components/time/EditSheet";
+import { useCompany } from "../../contexts/CompanyContext";
+
+// Add this helper function near the top of the component
+const calculateMultipliedValue = (value, multiplier) => {
+	if (!value || !multiplier) return null;
+
+	const numValue = parseFloat(value);
+	if (isNaN(numValue)) return null;
+
+	const result = numValue * multiplier;
+	return result % 1 !== 0 ? result.toFixed(2) : result.toString();
+};
 
 // Define the structure of individual total items
 interface TotalItem {
 	value: number;
 	label: string;
+	unit?: string;
+	multiplier?: number | null;
 }
 
 interface Totals {
@@ -56,6 +70,8 @@ const TimeEntryDetails = ({ route, navigation }) => {
 		userPrivilege: role,
 		isAdmin,
 	} = useUser();
+
+	const { preferences, companyData } = useCompany();
 
 	// State variables
 	const [isLoading, setIsLoading] = useState(true);
@@ -203,19 +219,25 @@ const TimeEntryDetails = ({ route, navigation }) => {
 				totalableFields.forEach((field) => {
 					const value = entry.formResponses[field.id];
 					if (value && !isNaN(parseFloat(value))) {
+						const numValue = parseFloat(value);
+
+						// Initialize if not exists
 						if (!totals[field.id]) {
 							totals[field.id] = {
 								value: 0,
 								label: field.label,
+								unit: field.unit || "",
+								multiplier: field.useMultiplier
+									? field.multiplier
+									: null,
 							};
 						}
-						totals[field.id].value += parseFloat(value);
+						totals[field.id].value += numValue;
 					}
 				});
 			}
 		});
 
-		console.log("Calculated Totals:", totals);
 		return totals;
 	};
 
@@ -232,6 +254,8 @@ const TimeEntryDetails = ({ route, navigation }) => {
 				return "#d1ecf1"; // Blue
 			case "paused":
 				return "#fff3cd"; // Orange
+			case "rejected":
+				return "#f8d7da"; // Red
 			default:
 				return "#f8d7da"; // Grey
 		}
@@ -250,6 +274,8 @@ const TimeEntryDetails = ({ route, navigation }) => {
 				return "Active";
 			case "paused":
 				return "Paused";
+			case "rejected":
+				return "Rejected";
 			default:
 				return "Not Submitted";
 		}
@@ -324,13 +350,12 @@ const TimeEntryDetails = ({ route, navigation }) => {
 				} approved.`,
 				[
 					{
-						text: "Email Employee",
-						onPress: () => handleEmailEmployee(selectedIds),
-					},
-					{
 						text: "OK",
 						onPress: () => {
-							loadTimeEntries(), setSelectAll(false);
+							// Send approval email automatically
+							handleEmailEmployee(selectedIds, "approved");
+							loadTimeEntries();
+							setSelectAll(false);
 						},
 					},
 				],
@@ -341,6 +366,85 @@ const TimeEntryDetails = ({ route, navigation }) => {
 		} finally {
 			setIsApproving(false);
 		}
+	};
+
+	// Add this new function after handleApproveEntries
+	const handleRejectEntries = async () => {
+		const selectedIds = getSelectedEntryIds();
+		if (selectedIds.length === 0) {
+			Alert.alert(
+				"Selection Required",
+				"Please select at least one entry to reject.",
+			);
+			return;
+		}
+
+		// Ask for rejection reason
+		Alert.prompt(
+			"Rejection Reason",
+			"Please provide a reason for rejecting these entries:",
+			[
+				{
+					text: "Cancel",
+					style: "cancel",
+				},
+				{
+					text: "Reject",
+					onPress: async (rejectionReason) => {
+						try {
+							setIsApproving(true); // Reuse the loading indicator
+
+							await Promise.all(
+								selectedIds.map((id) =>
+									updateTimeEntry(id, companyId, {
+										status: "rejected",
+										rejectedBy: currentUserId,
+										rejectedAt: new Date().toISOString(),
+										rejectionReason:
+											rejectionReason ||
+											"No reason provided",
+									}),
+								),
+							);
+
+							Alert.alert(
+								"Success",
+								`${selectedIds.length} time ${
+									selectedIds.length > 1 ? "entries" : "entry"
+								} rejected.`,
+								[
+									{
+										text: "OK",
+										onPress: () => {
+											// Send rejection email automatically
+											handleEmailEmployee(
+												selectedIds,
+												"rejected",
+												rejectionReason,
+											);
+											loadTimeEntries();
+											setSelectAll(false);
+										},
+									},
+								],
+							);
+						} catch (error) {
+							console.error(
+								"Error rejecting time entries:",
+								error,
+							);
+							Alert.alert(
+								"Error",
+								"Failed to reject selected time entries",
+							);
+						} finally {
+							setIsApproving(false);
+						}
+					},
+				},
+			],
+			"plain-text",
+		);
 	};
 
 	// Handle exporting time entries
@@ -400,8 +504,12 @@ const TimeEntryDetails = ({ route, navigation }) => {
 		}
 	};
 
-	// Handle emailing employee with approved entries
-	const handleEmailEmployee = async (entryIds = null) => {
+	// Update email function to handle both approve and reject cases
+	const handleEmailEmployee = async (
+		entryIds = null,
+		status = "approved",
+		rejectionReason = null,
+	) => {
 		const idsToEmail = entryIds || getSelectedEntryIds();
 		if (idsToEmail.length === 0) {
 			Alert.alert(
@@ -432,27 +540,104 @@ const TimeEntryDetails = ({ route, navigation }) => {
 				)
 				.filter((date, index, self) => self.indexOf(date) === index);
 
+			// Build entry list for email
+			let entryList = "";
+			entries.forEach((entry) => {
+				entryList += `- ${format(
+					new Date(entry.clockInTime),
+					"EEE, MMM d, yyyy",
+				)} (${format(new Date(entry.clockInTime), "h:mm a")} - ${
+					entry.clockOutTime
+						? format(new Date(entry.clockOutTime), "h:mm a")
+						: "N/A"
+				})\n`;
+				entryList += `  Duration: ${formatDuration(entry.duration)} (${(
+					entry.duration / 3600
+				).toFixed(2)} hrs)\n`;
+
+				// Add entry notes if available
+				if (entry.notes) {
+					entryList += `  Notes: ${entry.notes}\n`;
+				}
+
+				entryList += "\n";
+			});
+
+			// Build summary of number field totals
+			let fieldTotals = "";
+			const totals = calculateNumberFieldTotals();
+			Object.values(totals).forEach((total) => {
+				const hasMultiplier =
+					total.multiplier && !isNaN(total.multiplier);
+				const multipliedValue = hasMultiplier
+					? total.value * total.multiplier
+					: null;
+
+				fieldTotals += `- ${total.label}: ${total.value.toFixed(2)}`;
+				if (hasMultiplier) {
+					fieldTotals += ` (${multipliedValue.toFixed(2)}${
+						total.unit ? ` ${total.unit}` : ""
+					})`;
+				} else if (total.unit) {
+					fieldTotals += ` ${total.unit}`;
+				}
+				fieldTotals += "\n";
+			});
+
+			// Set subject and message based on status
+			const subject =
+				status === "approved"
+					? `Time Entries Approved - ${dateRanges.join(", ")}`
+					: `Time Entries Rejected - ${dateRanges.join(", ")}`;
+
+			let message = `
+Dear ${employeeUser.displayName},
+
+Your time entries for ${dateRanges.join(", ")} have been ${status}.
+`;
+
+			// Add rejection reason if applicable
+			if (status === "rejected" && rejectionReason) {
+				message += `
+Reason for rejection: ${rejectionReason}
+`;
+			}
+
+			message += `
+--- SUMMARY ---
+Total hours: ${totalHours}
+Total duration: ${formatDuration(totalDurationSeconds)}
+
+${fieldTotals ? `--- FIELD TOTALS ---\n${fieldTotals}` : ""}
+
+--- ${status.toUpperCase()} ENTRIES ---
+${entryList}
+
+${
+	status === "approved"
+		? "Thank you for your work!"
+		: "Please review and resubmit these entries."
+}
+
+Best regards,
+${companyData.name || "Management"}
+    `;
+
+			// Check if email is available
 			const isAvailable = await MailComposer.isAvailableAsync();
 			if (!isAvailable) {
-				Alert.alert("Error", "Email is not available on this device");
+				Alert.alert(
+					"Info",
+					`Email is not available. Email would contain:\n\nSubject: ${subject}`,
+				);
+				console.log(message);
 				return;
 			}
 
 			await MailComposer.composeAsync({
 				recipients: [employeeUser.email],
-				subject: `Time Entries Approved - ${dateRanges.join(", ")}`,
-				body: `
-          Dear ${employeeUser.displayName},
-          
-          Your time entries for ${dateRanges.join(", ")} have been approved.
-          
-          Total hours: ${totalHours}
-          
-          Thank you for your work!
-          
-          Best regards,
-          ${employeeUser.companyName || "Management"}
-        `,
+				subject: subject,
+				body: message,
 			});
 		} catch (error) {
 			console.error("Error sending email:", error);
@@ -664,27 +849,48 @@ const TimeEntryDetails = ({ route, navigation }) => {
 					{timeEntries.length > 1 && (
 						<>
 							{Object.values(calculateNumberFieldTotals()).map(
-								(total: TotalItem) => (
-									<View
-										key={total.label}
-										style={[
-											styles.summaryRow,
-											styles.totalSummaryRow,
-										]}
-									>
-										<Text style={styles.summaryLabel}>
-											{total.label} Total:
-										</Text>
-										<Text
+								(total: TotalItem) => {
+									// Calculate multiplied value if applicable
+									const hasMultiplier =
+										total.multiplier &&
+										!isNaN(total.multiplier);
+									const multipliedValue = hasMultiplier
+										? total.value * total.multiplier
+										: null;
+
+									return (
+										<View
+											key={total.label}
 											style={[
-												styles.summaryValue,
-												styles.totalValue,
+												styles.summaryRow,
+												styles.totalSummaryRow,
 											]}
 										>
-											{total.value.toFixed(2)}
-										</Text>
-									</View>
-								),
+											<Text style={styles.summaryLabel}>
+												{total.label} Total:
+											</Text>
+											<Text
+												style={[
+													styles.summaryValue,
+													styles.totalValue,
+												]}
+											>
+												{total.value.toFixed(2)}
+												{hasMultiplier
+													? ` (${multipliedValue.toFixed(
+															2,
+														)}${
+															total.unit
+																? ` ${total.unit}`
+																: ""
+														})`
+													: total.unit
+														? ` ${total.unit}`
+														: ""}
+											</Text>
+										</View>
+									);
+								},
 							)}
 						</>
 					)}
@@ -743,7 +949,7 @@ const TimeEntryDetails = ({ route, navigation }) => {
 											color="#fff"
 										/>
 										<Text style={styles.buttonText}>
-											Approve Selected
+											Approve
 										</Text>
 									</>
 								)}
@@ -752,19 +958,21 @@ const TimeEntryDetails = ({ route, navigation }) => {
 							<TouchableOpacity
 								style={[
 									styles.managerActionButton,
-									styles.emailButton,
+									styles.rejectButton,
+									isApproving && styles.disabledButton,
 								]}
-								onPress={() => handleEmailEmployee()}
-								disabled={getSelectedEntryIds().length === 0}
+								onPress={handleRejectEntries}
+								disabled={
+									isApproving ||
+									getSelectedEntryIds().length === 0
+								}
 							>
 								<Icon
-									name="email-outline"
+									name="close-circle"
 									size={18}
 									color="#fff"
 								/>
-								<Text style={styles.buttonText}>
-									Email Employee
-								</Text>
+								<Text style={styles.buttonText}>Reject</Text>
 							</TouchableOpacity>
 						</View>
 					</View>
@@ -937,7 +1145,32 @@ const TimeEntryDetails = ({ route, navigation }) => {
 												>
 													{field.label}
 												</Text>
-												{field.type === "checkbox" ? (
+												{field.type === "number" &&
+												field.useMultiplier &&
+												field.multiplier ? (
+													<View>
+														<Text
+															style={
+																styles.formFieldValue
+															}
+														>
+															{response}{" "}
+														</Text>
+														<Text
+															style={
+																styles.multiplierValue
+															}
+														>
+															(
+															{calculateMultipliedValue(
+																response,
+																field.multiplier,
+															)}{" "}
+															{field.unit || ""})
+														</Text>
+													</View>
+												) : field.type ===
+												  "checkbox" ? (
 													<Text
 														style={
 															styles.formFieldValue
@@ -1045,21 +1278,25 @@ const TimeEntryDetails = ({ route, navigation }) => {
 
 							{/* Actions */}
 							<View style={styles.entryActions}>
-								{isAdmin && (
-									<TouchableOpacity
-										style={styles.editButton}
-										onPress={() => handleEditEntry(entry)}
-									>
-										<Icon
-											name="pencil"
-											size={16}
-											color="#007AFF"
-										/>
-										<Text style={styles.editButtonText}>
-											Edit
-										</Text>
-									</TouchableOpacity>
-								)}
+								{(isAdmin ||
+									preferences?.allowUserEventEditing) &&
+									entry.status !== "approved" && (
+										<TouchableOpacity
+											style={styles.editButton}
+											onPress={() =>
+												handleEditEntry(entry)
+											}
+										>
+											<Icon
+												name="pencil"
+												size={16}
+												color="#007AFF"
+											/>
+											<Text style={styles.editButtonText}>
+												Edit
+											</Text>
+										</TouchableOpacity>
+									)}
 							</View>
 						</View>
 					</View>
@@ -1339,6 +1576,9 @@ const styles = StyleSheet.create({
 	emailButton: {
 		backgroundColor: "#007AFF",
 	},
+	rejectButton: {
+		backgroundColor: "#FF3B30",
+	},
 	disabledButton: {
 		opacity: 0.5,
 	},
@@ -1445,6 +1685,10 @@ const styles = StyleSheet.create({
 	formFieldValue: {
 		fontSize: 15,
 		color: "#333",
+	},
+	multiplierValue: {
+		fontSize: 14,
+		color: "#007AFF",
 	},
 	editHistorySection: {
 		marginTop: 16,

@@ -16,10 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import DropDownPicker from "react-native-dropdown-picker";
 import DraggableFlatList from "react-native-draggable-flatlist";
-import {
-	getCompanyPreferences,
-	updateCompanyPreferences,
-} from "../../../services/companyService";
+import { useCompany } from "../../../contexts/CompanyContext";
 
 // Form field types
 const FIELD_TYPES = [
@@ -35,17 +32,11 @@ const FIELD_TYPES = [
 const CompanyCustomForm = ({ navigation }) => {
 	const insets = useSafeAreaInsets();
 	const { companyId } = useUser();
+	const { preferences, updatePreferences, isLoading } = useCompany();
 
 	// Form state
-	const [isLoading, setIsLoading] = useState(true);
 	const [isSaving, setIsSaving] = useState(false);
-	const [customForm, setCustomForm] = useState({
-		title: "Time Entry Form",
-		description:
-			"Please complete this form when submitting your time entry",
-		fields: [],
-		isEnabled: true,
-	});
+	const [customForm, setCustomForm] = useState(preferences.timeEntryForm);
 
 	// UI state
 	const [editingField, setEditingField] = useState(null);
@@ -60,21 +51,17 @@ const CompanyCustomForm = ({ navigation }) => {
 			if (!companyId) return;
 
 			try {
-				setIsLoading(true);
-				const preferences = await getCompanyPreferences(companyId);
-
 				if (preferences?.timeEntryForm) {
 					setCustomForm(preferences.timeEntryForm);
 				}
 			} catch (error) {
 				console.error("Failed to load company preferences:", error);
 				Alert.alert("Error", "Failed to load company preferences");
-			} finally {
-				setIsLoading(false);
 			}
 		};
-
+		console.log("before", customForm);
 		loadPreferences();
+		console.log("after", customForm);
 	}, [companyId]);
 
 	// Save form configuration
@@ -83,7 +70,8 @@ const CompanyCustomForm = ({ navigation }) => {
 
 		try {
 			setIsSaving(true);
-			await updateCompanyPreferences(companyId, {
+			updatePreferences({
+				...preferences,
 				timeEntryForm: customForm,
 			});
 			Alert.alert(
@@ -195,6 +183,15 @@ const CompanyCustomForm = ({ navigation }) => {
 		setCustomForm({ ...customForm, isEnabled: !customForm.isEnabled });
 	};
 
+	const calculateMultiplied = (value, multiplier) => {
+		if (!multiplier) return value;
+		const numValue = parseFloat(value);
+		if (isNaN(numValue)) return "";
+
+		const result = numValue * multiplier;
+		return result % 1 !== 0 ? result.toFixed(2) : result;
+	};
+
 	if (isLoading) {
 		return (
 			<View style={[styles.container, styles.centered]}>
@@ -280,7 +277,7 @@ const CompanyCustomForm = ({ navigation }) => {
 					) : (
 						<DraggableFlatList
 							data={customForm.fields}
-							keyExtractor={(item) => item.id}
+							keyExtractor={(item: any) => item.id}
 							scrollEnabled={false}
 							onDragEnd={onDragEnd}
 							renderItem={({ item, drag, isActive }) => (
@@ -462,40 +459,163 @@ const CompanyCustomForm = ({ navigation }) => {
 						</View>
 
 						{currentFieldType === "number" && (
-							<View style={styles.switchRow}>
-								<View style={styles.labelWithHelp}>
-									<Text style={styles.label}>
-										Show Total for Multiple Entries
-									</Text>
-									<TouchableOpacity
-										onPress={() =>
-											Alert.alert(
-												"Number Field Total",
-												"When enabled, this number field will show a sum total across all entries when viewing multiple time entries at once.",
-											)
+							<>
+								<View style={styles.switchRow}>
+									<View style={styles.labelWithHelp}>
+										<Text style={styles.label}>
+											Show Total for Multiple Entries
+										</Text>
+										<TouchableOpacity
+											onPress={() =>
+												Alert.alert(
+													"Number Field Total",
+													"When enabled, this number field will show a sum total across all entries when viewing multiple time entries at once.",
+												)
+											}
+										>
+											<Ionicons
+												name="information-circle-outline"
+												size={20}
+												color="#777"
+											/>
+										</TouchableOpacity>
+									</View>
+									<Switch
+										value={editingField.showTotal || false}
+										onValueChange={(value) =>
+											setEditingField({
+												...editingField,
+												showTotal: value,
+											})
 										}
-									>
-										<Ionicons
-											name="information-circle-outline"
-											size={20}
-											color="#777"
-										/>
-									</TouchableOpacity>
+										trackColor={{
+											false: "#767577",
+											true: "#007AFF",
+										}}
+									/>
 								</View>
-								<Switch
-									value={editingField.showTotal || false}
-									onValueChange={(value) =>
-										setEditingField({
-											...editingField,
-											showTotal: value,
-										})
-									}
-									trackColor={{
-										false: "#767577",
-										true: "#007AFF",
-									}}
-								/>
-							</View>
+
+								{/* Add Multiplier Section */}
+								<View style={styles.switchRow}>
+									<View style={styles.labelWithHelp}>
+										<Text style={styles.label}>
+											Use Multiplier
+										</Text>
+										<TouchableOpacity
+											onPress={() =>
+												Alert.alert(
+													"Value Multiplier",
+													"When enabled, entered values will be multiplied by the specified factor and shown alongside the original value.",
+												)
+											}
+										>
+											<Ionicons
+												name="information-circle-outline"
+												size={20}
+												color="#777"
+											/>
+										</TouchableOpacity>
+									</View>
+									<Switch
+										value={
+											editingField.useMultiplier || false
+										}
+										onValueChange={(value) =>
+											setEditingField({
+												...editingField,
+												useMultiplier: value,
+											})
+										}
+										trackColor={{
+											false: "#767577",
+											true: "#007AFF",
+										}}
+									/>
+								</View>
+
+								{/* Multiplier Input Fields */}
+								{editingField.useMultiplier && (
+									<View style={styles.multiplierContainer}>
+										<View style={styles.formControl}>
+											<Text style={styles.label}>
+												Multiplier Value
+											</Text>
+											<TextInput
+												style={styles.input}
+												value={
+													editingField.multiplierText ||
+													""
+												}
+												onChangeText={(text) => {
+													// Handle special cases for decimal inputs
+													if (
+														text === "." ||
+														text === ","
+													) {
+														// Start with "0." when user types just a decimal point
+														setEditingField({
+															...editingField,
+															multiplier: 0, // Store as 0 temporarily
+															multiplierText:
+																"0.", // Keep the raw text for display
+														});
+													} else if (text === "") {
+														// Handle empty input
+														setEditingField({
+															...editingField,
+															multiplier: null,
+															multiplierText: "",
+														});
+													} else if (
+														/^-?\d*\.?\d*$/.test(
+															text,
+														)
+													) {
+														// Valid number or number being typed (like "0." or "1.")
+														const numValue =
+															text.endsWith(".")
+																? parseFloat(
+																		text +
+																			"0",
+																	) // Add a temporary 0 for parsing
+																: parseFloat(
+																		text,
+																	);
+
+														setEditingField({
+															...editingField,
+															multiplier:
+																numValue,
+															multiplierText:
+																text, // Store original text to preserve trailing decimal
+														});
+													}
+													// Ignore invalid inputs
+												}}
+												placeholder="e.g. 0.8"
+												keyboardType="numeric"
+											/>
+										</View>
+
+										<View style={styles.formControl}>
+											<Text style={styles.label}>
+												Unit (Optional)
+											</Text>
+											<TextInput
+												style={styles.input}
+												value={editingField.unit || ""}
+												onChangeText={(text) =>
+													setEditingField({
+														...editingField,
+														unit: text,
+													})
+												}
+												placeholder="e.g. miles, hours, etc."
+											/>
+										</View>
+									</View>
+								)}
+							</>
 						)}
 
 						<TouchableOpacity
@@ -571,6 +691,29 @@ const CompanyCustomForm = ({ navigation }) => {
 												keyboardType="numeric"
 												editable={false}
 											/>
+											{field.useMultiplier && (
+												<View
+													style={
+														styles.previewMultiplier
+													}
+												>
+													<Text
+														style={
+															styles.previewMultiplierText
+														}
+													>
+														Example: 10 (
+														{calculateMultiplied(
+															10,
+															field.multiplier,
+														)}
+														{field.unit
+															? ` ${field.unit}`
+															: ""}
+														)
+													</Text>
+												</View>
+											)}
 											{field.showTotal && (
 												<Text
 													style={styles.previewTotal}
@@ -1018,6 +1161,16 @@ const styles = StyleSheet.create({
 	labelWithHelp: {
 		flexDirection: "row",
 		alignItems: "center",
+	},
+	multiplierContainer: {
+		marginTop: 16,
+	},
+	previewMultiplier: {
+		marginTop: 4,
+	},
+	previewMultiplierText: {
+		fontSize: 14,
+		color: "#666",
 	},
 });
 

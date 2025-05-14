@@ -1,29 +1,34 @@
 import React, { useEffect } from "react";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { SafeAreaProvider } from "react-native-safe-area-context";
-import { UserProvider } from "./src/contexts/UserContext";
-import { NotificationProvider } from "./src/contexts/NotificationContext";
+import { NavigationContainer } from "@react-navigation/native";
 import { AppNavigator } from "./src/routes/AppNavigator";
-import { checkAndRunMigrations } from "./src/utils/dbMigrationUtils";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { UserProvider, useUser } from "./src/contexts/UserContext";
+import { CompanyProvider, useCompany } from "./src/contexts/CompanyContext";
+import { Gesture, GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+
+// Component to initialize the company context after user auth
+const CompanyInitializer = () => {
+	const { user } = useUser();
+	const { setActiveCompany } = useCompany();
+
+	useEffect(() => {
+		if (user?.loggedInCompany) {
+			setActiveCompany(user.loggedInCompany);
+		}
+	}, [user?.loggedInCompany]);
+
+	return null;
+};
 
 const App: React.FC = () => {
-	// Check and run migrations
-	useEffect(() => {
-		checkAndRunMigrations();
-
-		//For debuging and testing. Please leave commented when not using
-		//AsyncStorage.setItem("app_schema_version", "0");
-	}, []);
-
-	// Initialize the app
 	return (
 		<GestureHandlerRootView style={{ flex: 1 }}>
 			<SafeAreaProvider>
 				<UserProvider>
-					<NotificationProvider>
+					<CompanyProvider>
+						<CompanyInitializer />
 						<AppNavigator />
-					</NotificationProvider>
+					</CompanyProvider>
 				</UserProvider>
 			</SafeAreaProvider>
 		</GestureHandlerRootView>

@@ -70,11 +70,12 @@ const SignUpPage = ({ navigation }) => {
 				/>
 			)}
 
-			<ToggleSwitch
+			{/* Uncomment this if you want to use the toggle switch for personal account */}
+			{/* <ToggleSwitch
 				value={isSolo}
 				onValueChange={togglePersonalAccount}
 				label="Personal Account"
-			/>
+			/> */}
 
 			<Button
 				title="Sign Up"

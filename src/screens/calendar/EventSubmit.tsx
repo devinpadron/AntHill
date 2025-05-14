@@ -24,6 +24,7 @@ import { LocationInput } from "../../components/eventSubmit/LocationInput";
 import { AttachmentUploader } from "../../components/eventSubmit/AttachmentUploader";
 import { useUser } from "../../contexts/UserContext";
 import { Button } from "../../components/ui/Button";
+import { set } from "lodash";
 
 const EventSubmit = ({ navigation }) => {
 	const insets = useSafeAreaInsets();
@@ -209,7 +210,9 @@ const EventSubmit = ({ navigation }) => {
 									toggleDatePicker("date");
 									setDate(date);
 								}}
-								onCancel={() => toggleDatePicker("date")}
+								onCancel={() => {
+									toggleDatePicker("date");
+								}}
 							/>
 						</View>
 
@@ -269,9 +272,9 @@ const EventSubmit = ({ navigation }) => {
 											toggleDatePicker("startTime");
 											setStartTime(date);
 										}}
-										onCancel={() =>
-											toggleDatePicker("startTime")
-										}
+										onCancel={() => {
+											toggleDatePicker("startTime");
+										}}
 									/>
 								</View>
 
@@ -332,9 +335,9 @@ const EventSubmit = ({ navigation }) => {
 												toggleDatePicker("endTime");
 												setEndTime(date);
 											}}
-											onCancel={() =>
-												toggleDatePicker("endTime")
-											}
+											onCancel={() => {
+												toggleDatePicker("endTime");
+											}}
 										/>
 									</View>
 								)}

@@ -24,16 +24,9 @@ import { getAllTimeEntries } from "../../../services/timeEntryService";
 import { getUser } from "../../../services/userService";
 import DatePicker from "react-native-date-picker";
 import { Ionicons } from "@expo/vector-icons";
+import { useCompany } from "../../../contexts/CompanyContext";
 
 const PayrollReview = ({ navigation }) => {
-	// State for date range
-	const [startDate, setStartDate] = useState(() =>
-		startOfWeek(new Date(), { weekStartsOn: 0 }),
-	);
-	const [endDate, setEndDate] = useState(() =>
-		endOfWeek(new Date(), { weekStartsOn: 0 }),
-	);
-
 	// UI state
 	const [isLoading, setIsLoading] = useState(true);
 	const [timeEntries, setTimeEntries] = useState([]);
@@ -43,6 +36,19 @@ const PayrollReview = ({ navigation }) => {
 
 	// User context
 	const { userId, companyId } = useUser();
+	const { preferences } = useCompany();
+
+	// State for date range
+
+	const [startDate, setStartDate] = useState(() => {
+		// Use company preference for week start day if available, otherwise default to Sunday (0)
+		const weekStartsOn = preferences?.workWeekStarts == "sunday" ? 0 : 1;
+		return startOfWeek(new Date(), { weekStartsOn });
+	});
+	const [endDate, setEndDate] = useState(() => {
+		const weekStartsOn = preferences?.workWeekStarts == "sunday" ? 0 : 1;
+		return endOfWeek(new Date(), { weekStartsOn });
+	});
 
 	// Fetch time entries when date range changes
 	useEffect(() => {
@@ -731,7 +737,8 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		fontWeight: "600",
 		color: "#007AFF",
-		marginRight: 8,
+		marginLeft: 50,
+		paddingRight: 16,
 	},
 	entriesContainer: {
 		paddingHorizontal: 12,
