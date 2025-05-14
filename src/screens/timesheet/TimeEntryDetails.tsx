@@ -542,7 +542,7 @@ const TimeEntryDetails = ({ route, navigation }) => {
 				)
 				.filter((date, index, self) => self.indexOf(date) === index);
 
-			// Build entry list for email
+			// Build entry list for email including connected events
 			let entryList = "";
 			entries.forEach((entry) => {
 				entryList += `- ${format(
@@ -560,6 +560,41 @@ const TimeEntryDetails = ({ route, navigation }) => {
 				// Add entry notes if available
 				if (entry.notes) {
 					entryList += `  Notes: ${entry.notes}\n`;
+				}
+
+				// Add connected events if available
+				if (entry.connectedEvents && entry.connectedEvents.length > 0) {
+					entryList += `  Connected Events:\n`;
+					entry.connectedEvents.forEach((connEvent) => {
+						// Get event details
+						const fullEvent = getEventById(connEvent.eventId);
+						const eventTitle =
+							connEvent.eventTitle ||
+							fullEvent?.title ||
+							"Unknown Event";
+
+						entryList += `    • ${eventTitle}\n`;
+
+						// Add time if available
+						if (fullEvent?.startTime) {
+							entryList += `      ${format(
+								new Date(fullEvent.startTime),
+								"h:mm a",
+							)}`;
+							if (fullEvent.endTime) {
+								entryList += ` - ${format(
+									new Date(fullEvent.endTime),
+									"h:mm a",
+								)}`;
+							}
+							entryList += `\n`;
+						}
+
+						// Add location if available
+						if (fullEvent?.location) {
+							entryList += `      Location: ${fullEvent.location}\n`;
+						}
+					});
 				}
 
 				entryList += "\n";
