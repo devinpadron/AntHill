@@ -26,6 +26,16 @@ const CustomFormRender = ({
 
 	const [multiSelect, setMultiSelect] = useState([]);
 
+	// Helper function to calculate multiplied value
+	const calculateMultiplied = (value, multiplier) => {
+		if (!multiplier) return value;
+		const numValue = parseFloat(value);
+		if (isNaN(numValue)) return "";
+
+		const result = numValue * multiplier;
+		return result % 1 !== 0 ? result.toFixed(2) : result;
+	};
+
 	// Render specific field input based on field type
 	const renderFieldInput = (field) => {
 		switch (field.type) {
@@ -41,13 +51,32 @@ const CustomFormRender = ({
 
 			case "number":
 				return (
-					<TextInput
-						style={styles.textInput}
-						placeholder={field.placeholder || ""}
-						value={formResponses[field.id] || ""}
-						onChangeText={(text) => onFieldChange(field.id, text)}
-						keyboardType="numeric"
-					/>
+					<View>
+						<TextInput
+							style={styles.textInput}
+							placeholder={field.placeholder || ""}
+							value={formResponses[field.id] || ""}
+							onChangeText={(text) =>
+								onFieldChange(field.id, text)
+							}
+							keyboardType="numeric"
+						/>
+
+						{field.useMultiplier &&
+							formResponses[field.id] &&
+							!isNaN(parseFloat(formResponses[field.id])) && (
+								<View style={styles.multiplierResult}>
+									<Text style={styles.multiplierText}>
+										{formResponses[field.id]} (
+										{calculateMultiplied(
+											formResponses[field.id],
+											field.multiplier,
+										)}
+										{field.unit ? ` ${field.unit}` : ""})
+									</Text>
+								</View>
+							)}
+					</View>
 				);
 
 			case "checkbox":
@@ -488,6 +517,13 @@ const styles = StyleSheet.create({
 		color: "#FF3B30",
 		fontSize: 12,
 		marginTop: 4,
+	},
+	multiplierResult: {
+		marginTop: 8,
+	},
+	multiplierText: {
+		fontSize: 14,
+		color: "#333",
 	},
 });
 

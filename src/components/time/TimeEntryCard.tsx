@@ -123,6 +123,8 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 				return "#FFA500"; // Orange for pending
 			case "edited":
 				return "#007AFF";
+			case "rejected":
+				return "#FF3B30"; // Red for rejected
 			default:
 				return "#34C759";
 		}

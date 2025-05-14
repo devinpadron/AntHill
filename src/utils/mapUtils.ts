@@ -48,6 +48,9 @@ export const getRegionForMarkers = (markers: MapMarker[]) => {
 };
 
 export const openMap = ({ latitude, longitude, label }: MapMarker) => {
+	if (!label) {
+		label = "Event";
+	}
 	const scheme = Platform.select({
 		ios: `maps://?q=${label}&ll=${latitude},${longitude}`,
 		android: `geo:${latitude},${longitude}?q=${latitude},${longitude}(${label})`,

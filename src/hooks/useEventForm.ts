@@ -100,7 +100,9 @@ export const useEventForm = (navigation, eventId?: string) => {
 				setHasEndTime(!!data.endTime);
 
 				if (data.endTime) {
-					setEndTime(moment(data.endTime, "HH:mm").toDate());
+					setEndTime(
+						moment(data.endTime, "YYYY-MM-DD HH:mm").toDate(),
+					);
 				}
 
 				setLocations(data.locations);
@@ -118,7 +120,7 @@ export const useEventForm = (navigation, eventId?: string) => {
 						: new Date(),
 					hasEndTime: !!data.endTime,
 					endTime: data.endTime
-						? moment(data.endTime, "HH:mm").toDate()
+						? moment(data.endTime, "YYYY-MM-DD HH:mm").toDate()
 						: new Date(),
 					locations: data.locations || {},
 					assignedWorkers: data.assignedWorkers || [],
@@ -272,7 +274,21 @@ export const useEventForm = (navigation, eventId?: string) => {
 			const newValue = !prev;
 
 			if (newValue) {
-				setEndTime(new Date());
+				// Create a new date that keeps the user's selected date but sets the time
+				const newEndTime = new Date(date);
+
+				// If there's a start time, set end time to 1 hour after start time
+				if (!allDay && startTime) {
+					newEndTime.setHours(startTime.getHours() + 1);
+					newEndTime.setMinutes(startTime.getMinutes());
+				} else {
+					// Default to current time if no start time
+					const now = new Date();
+					newEndTime.setHours(now.getHours());
+					newEndTime.setMinutes(now.getMinutes());
+				}
+
+				setEndTime(newEndTime);
 				setOpenEndTime(true);
 			} else {
 				setEndTime(null);
@@ -280,7 +296,7 @@ export const useEventForm = (navigation, eventId?: string) => {
 
 			return newValue;
 		});
-	}, []);
+	}, [date, startTime, allDay]);
 
 	// Add file to upload queue
 	const addToUploadQueue = useCallback((newFiles: FileUpload[]) => {

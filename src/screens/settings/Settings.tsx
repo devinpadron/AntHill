@@ -3,27 +3,15 @@ import { View, Text, StyleSheet, StatusBar, Alert } from "react-native";
 import { SettingsItem } from "../../components/settings/SettingsItem";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUser } from "../../contexts/UserContext";
+import { useCompany } from "../../contexts/CompanyContext";
 
 const Settings = ({ navigation }: any) => {
 	const insets = useSafeAreaInsets();
 
-	const { user: userData, isAdmin, logout } = useUser();
+	const { isAdmin, logout, companyId } = useUser();
+	const { preferences, isLoading } = useCompany();
 
-	const pushProfile = () => {
-		navigation.push("Profile");
-	};
-
-	const pushEmployeeList = () => {
-		navigation.push("EmployeeList");
-	};
-
-	const pushPayrollReview = () => {
-		navigation.push("PayrollReview");
-	};
-
-	const pushCompanyCustomForm = () => {
-		navigation.push("CompanyCustomForm");
-	};
+	//TODO: move useCompany to context
 
 	const handleLogout = () => {
 		Alert.alert("Logout", "Are you sure you want to logout?", [
@@ -41,6 +29,10 @@ const Settings = ({ navigation }: any) => {
 		]);
 	};
 
+	if (isLoading) {
+		return null; // or a loading spinner
+	}
+
 	return (
 		<View style={[{ flex: 1, paddingTop: insets.top }, styles.container]}>
 			<StatusBar barStyle="dark-content" />
@@ -50,23 +42,32 @@ const Settings = ({ navigation }: any) => {
 
 			<View style={styles.section}>
 				<Text style={styles.sectionTitle}>ACCOUNT INFORMATION</Text>
-				<SettingsItem title="Profile" onPress={pushProfile} />
+				<SettingsItem
+					title="Profile"
+					onPress={() => navigation.push("Profile")}
+				/>
 			</View>
 
 			{isAdmin ? (
 				<View style={styles.section}>
 					<Text style={styles.sectionTitle}>ADMIN</Text>
 					<SettingsItem
-						title="Employee List"
-						onPress={pushEmployeeList}
+						title="Company Preferences"
+						onPress={() => navigation.push("CompanyPreferences")}
 					/>
 					<SettingsItem
-						title="Payroll Review"
-						onPress={pushPayrollReview}
+						title="Employee List"
+						onPress={() => navigation.push("EmployeeList")}
 					/>
+					{preferences.enableTimeSheet && (
+						<SettingsItem
+							title="Payroll Review"
+							onPress={() => navigation.push("PayrollReview")}
+						/>
+					)}
 					<SettingsItem
 						title="Custom Submission Form"
-						onPress={pushCompanyCustomForm}
+						onPress={() => navigation.push("CompanyCustomForm")}
 					/>
 				</View>
 			) : null}

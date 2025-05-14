@@ -69,7 +69,8 @@
 		"react-navigation-stack": "^2.10.4",
 		"webpack-config": "^7.5.0",
 		"expo-sharing": "~13.0.1",
-		"expo-mail-composer": "~14.0.2"
+		"expo-mail-composer": "~14.0.2",
+		"expo-clipboard": "~7.0.1"
 	},
 	"devDependencies": {
 		"@babel/core": "^7.24.0",
