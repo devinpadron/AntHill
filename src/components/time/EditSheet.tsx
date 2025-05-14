@@ -27,6 +27,10 @@ import DatePicker from "react-native-date-picker";
 import DropDownPicker from "react-native-dropdown-picker";
 import { format, differenceInSeconds } from "date-fns";
 import { useUser } from "../../contexts/UserContext";
+import { AttachmentUploader } from "../eventSubmit/AttachmentUploader";
+import { FileUpload } from "../../types";
+import { uploadFile } from "../../utils/fileUtils";
+import { deleteTimeEntryAttachments } from "../../services/timeEntryService";
 
 // Define interface for component props
 interface EditSheetProps {
@@ -40,6 +44,7 @@ interface EditSheetProps {
 	setEditChangeSummary: (value: string) => void;
 	onClose: () => void;
 	onSave: (updates: any) => void;
+	onDelete?: (timeEntryId: string) => void; // Add this new prop
 }
 
 // Use forwardRef with proper typing
@@ -56,6 +61,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 			setEditChangeSummary,
 			onClose,
 			onSave,
+			onDelete, // Add this new prop
 		},
 		ref,
 	) => {
@@ -72,6 +78,11 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 		const [showInPicker, setShowInPicker] = useState(false);
 		const [showOutPicker, setShowOutPicker] = useState(false);
 		const [formResponses, setFormResponses] = useState<any>({});
+		const [uploadingFiles, setUploadingFiles] = useState<string[]>([]);
+		const [uploadProgress, setUploadProgress] = useState<
+			Record<string, number>
+		>({});
+		const [deletionQueue, setDeletionQueue] = useState<string[]>([]);
 
 		const { userId, user } = useUser();
 
@@ -127,6 +138,53 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 			}));
 		};
 
+		// Update this function to correctly check for file IDs
+		const handleFileDelete = (fieldId: string, file: FileUpload) => {
+			// Files from Firebase have either 'id' or are identified by their path/name
+			if (file.path || file.id) {
+				// Add the file identifier (path or id) to the deletion queue
+				const fileIdentifier = file.id || file.path;
+				const updatedDeletionQueue = [...deletionQueue, fileIdentifier];
+
+				// Also add the thumbnail path if it exists (for videos/images)
+				if (file.thumbnailPath) {
+					updatedDeletionQueue.push(file.thumbnailPath);
+					console.log(
+						`Added thumbnail to deletion queue: ${file.thumbnailPath}`,
+					);
+				}
+
+				setDeletionQueue(updatedDeletionQueue);
+				console.log(`Added file to deletion queue: ${fileIdentifier}`);
+			} else {
+				// For new files that haven't been uploaded yet (only have URI)
+				const updatedFiles = (formResponses[fieldId] || []).filter(
+					(f: FileUpload) => f.uri !== file.uri,
+				);
+				handleFormResponseChange(fieldId, updatedFiles);
+			}
+		};
+
+		// Also update the undelete handler
+		const handleFileUndelete = (fieldId: string, file: FileUpload) => {
+			const fileIdentifier = file.id || file.path;
+			if (fileIdentifier) {
+				// Remove both the file and its thumbnail (if exists) from deletion queue
+				let updatedQueue = deletionQueue.filter(
+					(id) => id !== fileIdentifier,
+				);
+
+				// Also remove thumbnail path if it exists
+				if (file.thumbnailPath) {
+					updatedQueue = updatedQueue.filter(
+						(id) => id !== file.thumbnailPath,
+					);
+				}
+
+				setDeletionQueue(updatedQueue);
+			}
+		};
+
 		// Toggle dropdown open state
 		const toggleDropdown = (
 			fieldId: string,
@@ -149,7 +207,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 		};
 
 		// Handle save with all updated values
-		const handleSaveChanges = () => {
+		const handleSaveChanges = async () => {
 			if (!editChangeSummary.trim()) {
 				Alert.alert("Required", "Please provide a summary of changes");
 				return;
@@ -164,50 +222,211 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 				return;
 			}
 
-			const updates = {
-				notes: editNotes,
-				clockInTime: clockInDate.toISOString(),
-				clockOutTime: clockOutDate.toISOString(),
-				duration: duration,
-				formResponses: formResponses,
-				status: "edited",
-				editHistory: timeEntry.editHistory
-					? [
-							...timeEntry.editHistory,
-							{
-								timestamp: new Date().toISOString(),
-								editor: {
-									userId: userId, // Assuming userId is the editor's ID
-									displayName:
-										user.firstName + " " + user.lastName,
-								}, // This should come from context or props
-								summary: editChangeSummary,
-								previousClockInTime: timeEntry.clockInTime,
-								previousClockOutTime: timeEntry.clockOutTime,
-								previousDuration: timeEntry.duration,
-								previousNotes: timeEntry.notes,
-								previousFormResponses: timeEntry.formResponses,
-							},
-						]
-					: [
-							{
-								timestamp: new Date().toISOString(),
-								editor: {
-									userId: userId, // Assuming userId is the editor's ID
-									displayName:
-										user.firstName + " " + user.lastName,
-								}, // This should come from context or props
-								summary: editChangeSummary,
-								previousClockInTime: timeEntry.clockInTime,
-								previousClockOutTime: timeEntry.clockOutTime,
-								previousDuration: timeEntry.duration,
-								previousNotes: timeEntry.notes,
-								previousFormResponses: timeEntry.formResponses,
-							},
-						],
-			};
+			try {
+				// Process any new file uploads in custom form fields
+				const newFormResponses = { ...formResponses };
+				let hasFilesToUpload = false;
+				const filesToUpload: {
+					fieldId: string;
+					files: FileUpload[];
+				}[] = [];
 
-			onSave(updates);
+				// Identify fields with new files to upload
+				if (customForm && customForm.fields) {
+					for (const field of customForm.fields) {
+						if (
+							(field.type === "document" ||
+								field.type === "media") &&
+							newFormResponses[field.id]
+						) {
+							// Filter out files in the deletion queue
+							let files = newFormResponses[field.id];
+							if (files && Array.isArray(files)) {
+								// Remove files that are in the deletion queue
+								files = files.filter((file) => {
+									const fileIdentifier = file.id || file.path;
+									return (
+										!fileIdentifier ||
+										!deletionQueue.includes(fileIdentifier)
+									);
+								});
+								newFormResponses[field.id] = files;
+
+								// Find files that need to be uploaded
+								const newFiles = files.filter(
+									(file) => !file.id && file.uri,
+								);
+								if (newFiles.length > 0) {
+									hasFilesToUpload = true;
+									filesToUpload.push({
+										fieldId: field.id,
+										files: newFiles,
+									});
+								}
+							}
+						}
+					}
+				}
+
+				// If there are files in the deletion queue, delete them
+
+				if (deletionQueue.length > 0) {
+					try {
+						await deleteTimeEntryAttachments(deletionQueue);
+					} catch (error) {
+						console.error("Error deleting attachments:", error);
+					}
+				}
+
+				// Process uploads (existing code)
+				if (hasFilesToUpload) {
+					try {
+						// Get all files that need to be uploaded
+						const allFilesToUpload = filesToUpload.flatMap(
+							(item) => item.files,
+						);
+
+						// Start tracking uploads
+						setUploadingFiles(
+							allFilesToUpload.map((file) => file.uri),
+						);
+
+						// Upload each file
+						for (const fileGroup of filesToUpload) {
+							const uploadedFiles = await Promise.all(
+								fileGroup.files.map(async (file) => {
+									try {
+										const uploadedFile = await uploadFile(
+											file,
+											timeEntry.id, // Using time entry ID as reference
+											user.loggedInCompany, // Assuming this is the company ID
+											(uri, progress) => {
+												setUploadProgress((prev) => ({
+													...prev,
+													[uri]: progress,
+												}));
+											},
+										);
+										return uploadedFile;
+									} catch (error) {
+										console.error(
+											"Error uploading file:",
+											error,
+										);
+										return file; // Return original file on error
+									}
+								}),
+							);
+
+							// Update form responses with uploaded files
+							const existingFiles = newFormResponses[
+								fileGroup.fieldId
+							].filter((file) => file.id || file.url);
+							newFormResponses[fileGroup.fieldId] = [
+								...existingFiles,
+								...uploadedFiles,
+							];
+						}
+					} catch (error) {
+						console.error("Error processing file uploads:", error);
+						Alert.alert(
+							"Error",
+							"Failed to upload some files. Please try again.",
+						);
+						return;
+					} finally {
+						setUploadingFiles([]);
+						setUploadProgress({});
+					}
+				}
+
+				// Update the time entry with the updated form responses
+				const updates = {
+					notes: editNotes,
+					clockInTime: clockInDate.toISOString(),
+					clockOutTime: clockOutDate.toISOString(),
+					duration: duration,
+					formResponses: newFormResponses,
+					status: "edited",
+					editHistory: timeEntry.editHistory
+						? [
+								...timeEntry.editHistory,
+								{
+									timestamp: new Date().toISOString(),
+									editor: {
+										userId: userId,
+										displayName:
+											user.firstName +
+											" " +
+											user.lastName,
+									},
+									summary: editChangeSummary,
+									previousClockInTime: timeEntry.clockInTime,
+									previousClockOutTime:
+										timeEntry.clockOutTime,
+									previousDuration: timeEntry.duration,
+									previousNotes: timeEntry.notes,
+									previousFormResponses:
+										timeEntry.formResponses,
+								},
+							]
+						: [
+								{
+									timestamp: new Date().toISOString(),
+									editor: {
+										userId: userId,
+										displayName:
+											user.firstName +
+											" " +
+											user.lastName,
+									},
+									summary: editChangeSummary,
+									previousClockInTime: timeEntry.clockInTime,
+									previousClockOutTime:
+										timeEntry.clockOutTime,
+									previousDuration: timeEntry.duration,
+									previousNotes: timeEntry.notes,
+									previousFormResponses:
+										timeEntry.formResponses,
+								},
+							],
+				};
+
+				onSave(updates);
+
+				// Reset the deletion queue
+				setDeletionQueue([]);
+			} catch (error) {
+				console.error("Error saving changes:", error);
+				Alert.alert(
+					"Error",
+					"Failed to save changes. Please try again.",
+				);
+			}
+		};
+
+		// Add this function inside the EditSheet component
+		const handleDeletePress = () => {
+			Alert.alert(
+				"Delete Time Entry",
+				"Are you sure you want to delete this time entry? This action cannot be undone.",
+				[
+					{
+						text: "Cancel",
+						style: "cancel",
+					},
+					{
+						text: "Delete",
+						onPress: () => {
+							if (onDelete && timeEntry?.id) {
+								onDelete(timeEntry.id);
+								onClose();
+							}
+						},
+						style: "destructive",
+					},
+				],
+			);
 		};
 
 		// Render form field based on type
@@ -402,6 +621,74 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 								}}
 							/>
 						</>
+					);
+
+				case "document":
+					return (
+						<View style={styles.fieldAttachmentContainer}>
+							<AttachmentUploader
+								files={value || []}
+								onFilesAdded={(files) => {
+									// Only accept documents (not images or videos)
+									const docFiles = files.filter(
+										(file) =>
+											!file.type.startsWith("image/") &&
+											!file.type.startsWith("video/"),
+									);
+									if (docFiles.length) {
+										handleFormResponseChange(field.id, [
+											...(value || []),
+											...docFiles,
+										]);
+									}
+								}}
+								onFileDelete={(file) =>
+									handleFileDelete(field.id, file)
+								}
+								onFileUndelete={(file) =>
+									handleFileUndelete(field.id, file)
+								}
+								deletionQueue={deletionQueue}
+								uploadingFiles={uploadingFiles}
+								uploadProgress={uploadProgress}
+								docOnly={true}
+								deletionQueueType="path"
+							/>
+						</View>
+					);
+
+				case "media":
+					return (
+						<View style={styles.fieldAttachmentContainer}>
+							<AttachmentUploader
+								files={value || []}
+								onFilesAdded={(files) => {
+									// Only accept images and videos
+									const mediaFiles = files.filter(
+										(file) =>
+											file.type.startsWith("image/") ||
+											file.type.startsWith("video/"),
+									);
+									if (mediaFiles.length) {
+										handleFormResponseChange(field.id, [
+											...(value || []),
+											...mediaFiles,
+										]);
+									}
+								}}
+								onFileDelete={(file) =>
+									handleFileDelete(field.id, file)
+								}
+								onFileUndelete={(file) =>
+									handleFileUndelete(field.id, file)
+								}
+								deletionQueue={deletionQueue}
+								uploadingFiles={uploadingFiles}
+								uploadProgress={uploadProgress}
+								mediaOnly={true}
+								deletionQueueType="path"
+							/>
+						</View>
 					);
 
 				default:
@@ -635,6 +922,24 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 							</Text>
 						</TouchableOpacity>
 					</View>
+
+					{onDelete && (
+						<View style={styles.deleteButtonContainer}>
+							<TouchableOpacity
+								style={styles.deleteButton}
+								onPress={handleDeletePress}
+							>
+								<Icon
+									name="delete-outline"
+									size={20}
+									color="#fff"
+								/>
+								<Text style={styles.deleteButtonText}>
+									Delete Time Entry
+								</Text>
+							</TouchableOpacity>
+						</View>
+					)}
 				</BottomSheetScrollView>
 			</BottomSheet>
 		);
@@ -841,6 +1146,34 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		fontWeight: "600",
 		color: "#fff",
+	},
+	deleteButtonContainer: {
+		marginTop: 16,
+		alignItems: "center",
+	},
+	deleteButton: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		backgroundColor: "#FF3B30",
+		paddingVertical: 12,
+		paddingHorizontal: 20,
+		borderRadius: 8,
+	},
+	deleteButtonText: {
+		fontSize: 16,
+		fontWeight: "600",
+		color: "#fff",
+		marginLeft: 8,
+	},
+	fieldAttachmentContainer: {
+		marginTop: 8,
+		marginBottom: 16,
+		borderWidth: 1,
+		borderColor: "#eee",
+		borderRadius: 8,
+		padding: 12,
+		backgroundColor: "#fff",
 	},
 });
 

@@ -28,4 +28,5 @@ export interface FileUpload {
 	id?: string;
 	duration?: number; // Duration in seconds for videos
 	thumbnailUrl?: string; // URL for the thumbnail image
+	thumbnailPath?: string; // Path for the thumbnail image
 }

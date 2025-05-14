@@ -25,6 +25,8 @@ import { getUser } from "../../../services/userService";
 import DatePicker from "react-native-date-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useCompany } from "../../../contexts/CompanyContext";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback } from "react";
 
 const PayrollReview = ({ navigation }) => {
 	// UI state
@@ -50,10 +52,16 @@ const PayrollReview = ({ navigation }) => {
 		return endOfWeek(new Date(), { weekStartsOn });
 	});
 
-	// Fetch time entries when date range changes
-	useEffect(() => {
-		fetchTimeEntries();
-	}, [startDate, endDate, companyId]);
+	// Fetch time entries when screen comes into focus
+	useFocusEffect(
+		useCallback(() => {
+			// This will execute when the screen comes into focus
+			fetchTimeEntries();
+			return () => {
+				// Optional cleanup function
+			};
+		}, [startDate, endDate, companyId]),
+	);
 
 	// Fetch time entries for the selected date range
 	const fetchTimeEntries = async () => {

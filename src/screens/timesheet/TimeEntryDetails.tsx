@@ -25,6 +25,7 @@ import {
 	updateTimeEntry,
 	approveTimeEntry,
 	exportTimeEntries,
+	deleteTimeEntry,
 } from "../../services/timeEntryService";
 import { getUser } from "../../services/userService";
 import { getCompanyPreferences } from "../../services/companyService";
@@ -714,6 +715,26 @@ ${companyData.name || "Management"}
 		}
 	};
 
+	const handleDeleteTimeEntry = async (timeEntryId) => {
+		try {
+			// Call your API or Firestore function to delete the time entry
+			await deleteTimeEntry(timeEntryId, companyId);
+
+			// Update the local state to remove the deleted entry
+			setTimeEntries((prevEntries) =>
+				prevEntries.filter((entry) => entry.id !== timeEntryId),
+			);
+
+			navigation.goBack();
+
+			// Show success message
+			Alert.alert("Success", "Time entry deleted successfully");
+		} catch (error) {
+			console.error("Error deleting time entry:", error);
+			Alert.alert("Error", "Failed to delete time entry");
+		}
+	};
+
 	const createFormFieldMap = (entries) => {
 		// If no entries or no custom form, return empty object
 		if (!entries.length || !customForm) return {};
@@ -828,7 +849,6 @@ ${companyData.name || "Management"}
 			<ScrollView style={styles.scrollContainer}>
 				{/* Summary Card */}
 				<View style={styles.summaryCard}>
-					{/* Existing summary rows remain the same */}
 					<View style={styles.summaryRow}>
 						<Text style={styles.summaryLabel}>Employee:</Text>
 						<Text style={styles.summaryValue}>
@@ -1507,6 +1527,7 @@ ${companyData.name || "Management"}
 				setEditChangeSummary={setEditChangeSummary}
 				onClose={handleEditSheetClose}
 				onSave={saveEditedEntry}
+				onDelete={handleDeleteTimeEntry} // Add this prop
 			/>
 
 			{/* Export Bottom Sheet */}

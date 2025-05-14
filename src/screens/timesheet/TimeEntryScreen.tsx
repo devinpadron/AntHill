@@ -19,6 +19,8 @@ import TimeEntrySubmitModal from "../../components/time/TimeEntrySubmitModal";
 import { useTimeTracking } from "../../hooks/useTimeTracking";
 import { submitTimeEntryForApproval } from "../../services/timeEntryService";
 import { useUser } from "../../contexts/UserContext";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback } from "react";
 
 // Time Entry Screen Component
 const TimeEntryScreen = ({ navigation }) => {
@@ -45,6 +47,18 @@ const TimeEntryScreen = ({ navigation }) => {
 	// Add state for time entry submission modal
 	const [submitModalVisible, setSubmitModalVisible] = useState(false);
 	const [selectedTimeEntry, setSelectedTimeEntry] = useState(null);
+
+	// Add this useFocusEffect to refresh data when screen comes into focus
+	useFocusEffect(
+		useCallback(() => {
+			// This will execute when the screen comes into focus
+			fetchTimeEntries();
+			setSubmitModalVisible(false); // Close the modal if it was open
+			return () => {
+				// Optional cleanup function
+			};
+		}, [fetchTimeEntries]),
+	);
 
 	// Handle pull-to-refresh
 	const onRefresh = async () => {

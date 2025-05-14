@@ -19,8 +19,9 @@ type AttachmentUploaderProps = {
 	deletionQueue: string[];
 	uploadingFiles?: string[];
 	uploadProgress?: Record<string, number>;
-	docOnly?: boolean; // Add this prop
-	mediaOnly?: boolean; // Add this prop
+	docOnly?: boolean;
+	mediaOnly?: boolean;
+	deletionQueueType?: "id" | "path";
 };
 
 export const AttachmentUploader = ({
@@ -31,10 +32,21 @@ export const AttachmentUploader = ({
 	deletionQueue,
 	uploadingFiles = [],
 	uploadProgress = {},
-	docOnly = false, // Add default value
-	mediaOnly = false, // Add default value
+	docOnly = false,
+	mediaOnly = false,
+	deletionQueueType = "id",
 }: AttachmentUploaderProps) => {
 	const [isLoading, setIsLoading] = React.useState(false);
+
+	const isFileInDeletionQueue = (file: FileUpload): boolean => {
+		if (!file) return false;
+
+		if (deletionQueueType === "path") {
+			return file.path ? deletionQueue.includes(file.path) : false;
+		} else {
+			return file.id ? deletionQueue.includes(file.id) : false;
+		}
+	};
 
 	const handleDocumentUpload = async () => {
 		setIsLoading(true);
@@ -181,10 +193,7 @@ export const AttachmentUploader = ({
 
 										{!isUploading(file) && (
 											<>
-												{file.id &&
-												deletionQueue.includes(
-													file.id,
-												) ? (
+												{isFileInDeletionQueue(file) ? (
 													<View
 														style={
 															styles.thumbnailDeleteOverlay
@@ -278,8 +287,7 @@ export const AttachmentUploader = ({
 
 									{!isUploading(file) && (
 										<>
-											{file.id &&
-											deletionQueue.includes(file.id) ? (
+											{isFileInDeletionQueue(file) ? (
 												<TouchableOpacity
 													onPress={() =>
 														onFileUndelete(file)

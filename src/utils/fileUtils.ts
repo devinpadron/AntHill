@@ -53,10 +53,11 @@ export const uploadFile = async (
 
 		// Generate thumbnail for videos
 		let thumbnailUrl = null;
+		let thumbnailPath = null;
 		if (file.type.startsWith("video/")) {
 			const thumbnailUri = await generateVideoThumbnail(file.uri);
 			if (thumbnailUri) {
-				const thumbnailPath = `companies/${companyId}/events/${eventId}/thumbnails/${file.name.replace(
+				thumbnailPath = `companies/${companyId}/events/${eventId}/thumbnails/${file.name.replace(
 					/\.[^/.]+$/,
 					"",
 				)}_thumb.jpg`;
@@ -96,6 +97,7 @@ export const uploadFile = async (
 			path: storagePath,
 			uploadTime: Date.now(),
 			...(thumbnailUrl && { thumbnailUrl }),
+			thumbnailPath,
 		};
 	} catch (error) {
 		console.error("Upload error:", error);
@@ -123,11 +125,18 @@ export const pickDocuments = async (): Promise<FileUpload[]> => {
 	}
 };
 
-export const pickMedia = async (): Promise<FileUpload[]> => {
+//TODO: Switch to a different library for image picking cuz this is slow af
+export const pickMedia = async (limit = 10): Promise<FileUpload[]> => {
+	// Add loading indicator in UI where this function is called
+
 	const options: ImagePicker.ImageLibraryOptions = {
-		mediaType: "mixed", // Changed from "photo" to "mixed" to allow both photos and videos
-		quality: 0.8,
-		selectionLimit: 0,
+		mediaType: "mixed",
+		quality: 0.7, // Reduced quality
+		selectionLimit: limit, // Limit selection count
+		videoQuality: "low", // Lower video quality
+		includeBase64: false, // Ensure this is off
+		maxWidth: 1200, // Limit image dimensions
+		maxHeight: 1200,
 	};
 
 	try {
@@ -141,18 +150,18 @@ export const pickMedia = async (): Promise<FileUpload[]> => {
 					name: asset.fileName!,
 					type:
 						asset.type ||
-						(asset.type?.includes("video")
+						(asset.uri?.includes("video")
 							? "video/mp4"
 							: "image/jpeg"),
 					url: asset.uri,
-					// Add duration for videos if available
+					size: asset.fileSize, // Track file size
 					...(asset.duration && { duration: asset.duration }),
 				}));
 		}
 
 		return [];
 	} catch (err) {
-		console.error(err);
+		console.error("Media picker error:", err);
 		return [];
 	}
 };

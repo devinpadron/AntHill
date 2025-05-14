@@ -32,7 +32,6 @@ const CalendarScreen = ({ navigation }: { navigation: any }) => {
 		setFilterType(isAdmin ? FilterType.ALL : FilterType.MY);
 	}, [isLoading, isAdmin]);
 
-	// The rest of your component remains the same
 	const handleFilterChange = (type: FilterType) => {
 		if (!isAdmin) return;
 

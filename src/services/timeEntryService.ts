@@ -1,6 +1,7 @@
 import db from "../constants/firestore";
 import { TimeEntry } from "../types";
 import * as FileSystem from "expo-file-system";
+import storage, { list } from "@react-native-firebase/storage";
 
 export const clockIn = async (userId: string, companyId: string) => {
 	const timeEntryRef = db
@@ -444,7 +445,6 @@ export const exportTimeEntries = async (
 
 			fileName = `${employeeName.replace(/\s+/g, "_")}_time_entries.txt`;
 		} else if (format === "csv") {
-			// CSV Header remains the same
 			content =
 				"Date,Clock In,Clock Out,Duration (hours),Status,Notes,Form Responses,Edit History\n";
 
@@ -515,5 +515,51 @@ export const exportTimeEntries = async (
 	} catch (error) {
 		console.error("Error exporting time entries:", error);
 		throw error;
+	}
+};
+
+export const deleteTimeEntry = async (
+	timeEntryId: string,
+	companyId: string,
+) => {
+	try {
+		await db
+			.collection("Companies")
+			.doc(companyId)
+			.collection("TimeEntries")
+			.doc(timeEntryId)
+			.delete();
+
+		storage()
+			.ref(`companies/${companyId}/events/${timeEntryId}`)
+			.listAll()
+			.then((listResult) => {
+				listResult.prefixes.forEach((folderRef) => {
+					//console.log(folderRef);
+					folderRef.listAll().then((subListResult) => {
+						subListResult.items.forEach((fileRef) => {
+							//console.log(fileRef);
+							fileRef.delete();
+						});
+					});
+				});
+			});
+
+		return { success: true };
+	} catch (error) {
+		console.error("Error deleting time entry:", error);
+		throw error;
+	}
+};
+
+export const deleteTimeEntryAttachments = async (attachments: string[]) => {
+	try {
+		for (const attachment of attachments) {
+			const fileRef = storage().ref(attachment).delete();
+		}
+		return true;
+	} catch (e) {
+		console.error("Error deleting attachments:", e);
+		throw e;
 	}
 };

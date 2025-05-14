@@ -29,6 +29,7 @@ export async function addAttachments(
 				id: docRef.id,
 				duration: attachment.duration || null,
 				thumbnailUrl: attachment.thumbnailUrl || null,
+				thumbnailPath: attachment.thumbnailPath || null,
 			});
 		}
 
@@ -95,6 +96,10 @@ export async function deleteEventAttachments(
 		attachmentsSnapshot.docs.forEach((doc) => {
 			if (attachments.find((attachment) => attachment === doc.id)) {
 				storage().ref(doc.data().path).delete();
+				if (doc.data().thumbnailPath) {
+					// Check if thumbnailPath exists before deleting
+					storage().ref(doc.data().thumbnailPath).delete();
+				}
 				batch.delete(doc.ref);
 			}
 		});
