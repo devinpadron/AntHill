@@ -52,6 +52,7 @@ const EventSubmit = ({ navigation }) => {
 		setNotes,
 		files,
 		originalValues,
+		uploadProgress,
 
 		// UI state
 		openSelect,
@@ -409,6 +410,8 @@ const EventSubmit = ({ navigation }) => {
 									onFileDelete={deleteFile}
 									onFileUndelete={undoDeleteFile}
 									deletionQueue={deletionQueue}
+									uploadingFiles={Object.keys(uploadProgress)} // Pass files that are uploading
+									uploadProgress={uploadProgress} // Pass the upload progress
 								/>
 							</View>
 						)}

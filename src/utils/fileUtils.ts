@@ -37,6 +37,7 @@ export const uploadFile = async (
 	file: FileUpload,
 	eventId: string,
 	companyId: string,
+	onProgress?: (uri: string, progress: number) => void, // Add progress callback
 ): Promise<FileUpload> => {
 	try {
 		// Determine file category based on type
@@ -74,11 +75,16 @@ export const uploadFile = async (
 			Platform.OS === "ios" ? file.uri.replace("file://", "") : file.uri;
 		const task = storageRef.putFile(uploadUri);
 
-		// Monitor upload progress
+		// Monitor upload progress with callback
 		task.on("state_changed", (snapshot) => {
 			const progress =
 				(snapshot.bytesTransferred / snapshot.totalBytes) * 100;
 			console.log(`Upload is ${progress}% complete`);
+
+			// Call the progress callback if provided
+			if (onProgress) {
+				onProgress(file.uri, progress);
+			}
 		});
 
 		await task;

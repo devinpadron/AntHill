@@ -5,6 +5,7 @@ import {
 	StyleSheet,
 	TouchableOpacity,
 	ImageBackground,
+	ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { FileUpload } from "../../types";
@@ -16,6 +17,8 @@ type AttachmentUploaderProps = {
 	onFileDelete: (file: FileUpload) => void;
 	onFileUndelete: (file: FileUpload) => void;
 	deletionQueue: string[];
+	uploadingFiles?: string[];
+	uploadProgress?: Record<string, number>;
 };
 
 export const AttachmentUploader = ({
@@ -24,6 +27,8 @@ export const AttachmentUploader = ({
 	onFileDelete,
 	onFileUndelete,
 	deletionQueue,
+	uploadingFiles = [],
+	uploadProgress = {},
 }: AttachmentUploaderProps) => {
 	const [isLoading, setIsLoading] = React.useState(false);
 
@@ -45,16 +50,17 @@ export const AttachmentUploader = ({
 		}
 	};
 
-	// Update the file filtering logic to separate videos
 	const imageFiles = files.filter((file) => file.type.startsWith("image/"));
 	const videoFiles = files.filter((file) => file.type.startsWith("video/"));
-	const mediaFiles = [...imageFiles, ...videoFiles]; // Combine images and videos
+	const mediaFiles = [...imageFiles, ...videoFiles];
 	const documentFiles = files.filter(
 		(file) =>
 			!file.type.startsWith("image/") && !file.type.startsWith("video/"),
 	);
 
 	const isVideo = (file: FileUpload) => file.type.startsWith("video/");
+	const isUploading = (file: FileUpload) => uploadingFiles.includes(file.uri);
+	const getProgress = (file: FileUpload) => uploadProgress[file.uri] || 0;
 
 	return (
 		<View style={styles.inputContainer}>
@@ -76,7 +82,6 @@ export const AttachmentUploader = ({
 				</TouchableOpacity>
 			</View>
 
-			{/* Loading indicator */}
 			{isLoading && (
 				<View style={{ alignItems: "center", marginBottom: 10 }}>
 					<Ionicons
@@ -89,11 +94,9 @@ export const AttachmentUploader = ({
 					</Text>
 				</View>
 			)}
-			{/* Display files if any */}
 
 			{files.length > 0 && (
 				<View style={styles.filesContainer}>
-					{/* Combined Media Grid (Images + Videos) */}
 					{mediaFiles.length > 0 && (
 						<View style={styles.imageGrid}>
 							{mediaFiles.map((file, index) => (
@@ -110,64 +113,113 @@ export const AttachmentUploader = ({
 										}}
 										style={styles.thumbnail}
 									>
-										{/* Video indicator overlay */}
-										{isVideo(file) && (
-											<View style={styles.videoIndicator}>
-												<Ionicons
-													name="play-circle"
-													size={28}
+										{isUploading(file) && (
+											<View
+												style={styles.uploadingOverlay}
+											>
+												<ActivityIndicator
+													size="small"
 													color="#fff"
 												/>
-											</View>
-										)}
-
-										{file.id &&
-										deletionQueue.includes(file.id) ? (
-											<View
-												style={
-													styles.thumbnailDeleteOverlay
-												}
-											>
-												<TouchableOpacity
-													onPress={() =>
-														onFileUndelete(file)
-													}
+												<View
 													style={
-														styles.fileDeleteButton
+														styles.progressContainer
 													}
 												>
 													<View
-														style={
-															styles.deleteButtonCircle
-														}
-													>
-														<Ionicons
-															name="arrow-undo-circle"
-															size={24}
-															color="red"
-														/>
-													</View>
-												</TouchableOpacity>
+														style={[
+															styles.progressBar,
+															{
+																width: `${getProgress(
+																	file,
+																)}%`,
+															},
+														]}
+													/>
+												</View>
+												<Text
+													style={styles.progressText}
+												>
+													{Math.round(
+														getProgress(file),
+													)}
+													%
+												</Text>
 											</View>
-										) : (
-											<TouchableOpacity
-												onPress={() =>
-													onFileDelete(file)
-												}
-												style={styles.fileDeleteButton}
-											>
+										)}
+
+										{isVideo(file) &&
+											!isUploading(file) && (
 												<View
 													style={
-														styles.deleteButtonCircle
+														styles.videoIndicator
 													}
 												>
 													<Ionicons
-														name="close-circle"
-														size={24}
-														color="red"
+														name="play-circle"
+														size={28}
+														color="#fff"
 													/>
 												</View>
-											</TouchableOpacity>
+											)}
+
+										{!isUploading(file) && (
+											<>
+												{file.id &&
+												deletionQueue.includes(
+													file.id,
+												) ? (
+													<View
+														style={
+															styles.thumbnailDeleteOverlay
+														}
+													>
+														<TouchableOpacity
+															onPress={() =>
+																onFileUndelete(
+																	file,
+																)
+															}
+															style={
+																styles.fileDeleteButton
+															}
+														>
+															<View
+																style={
+																	styles.deleteButtonCircle
+																}
+															>
+																<Ionicons
+																	name="arrow-undo-circle"
+																	size={24}
+																	color="red"
+																/>
+															</View>
+														</TouchableOpacity>
+													</View>
+												) : (
+													<TouchableOpacity
+														onPress={() =>
+															onFileDelete(file)
+														}
+														style={
+															styles.fileDeleteButton
+														}
+													>
+														<View
+															style={
+																styles.deleteButtonCircle
+															}
+														>
+															<Ionicons
+																name="close-circle"
+																size={24}
+																color="red"
+															/>
+														</View>
+													</TouchableOpacity>
+												)}
+											</>
 										)}
 									</ImageBackground>
 								</View>
@@ -175,7 +227,6 @@ export const AttachmentUploader = ({
 						</View>
 					)}
 
-					{/* Document List */}
 					{documentFiles.length > 0 && (
 						<View style={styles.documentList}>
 							{documentFiles.map((file, index) => (
@@ -183,42 +234,86 @@ export const AttachmentUploader = ({
 									key={`doc-${index}`}
 									style={styles.documentItem}
 								>
-									<Ionicons
-										name="document-outline"
-										size={24}
-										color="#555"
-										style={styles.documentIcon}
-									/>
+									{isUploading(file) ? (
+										<ActivityIndicator
+											size="small"
+											color="#555"
+											style={styles.documentIcon}
+										/>
+									) : (
+										<Ionicons
+											name="document-outline"
+											size={24}
+											color="#555"
+											style={styles.documentIcon}
+										/>
+									)}
+
 									<Text
 										numberOfLines={1}
 										style={styles.documentFilename}
 									>
 										{file.name}
+										{isUploading(file) &&
+											` (${Math.round(
+												getProgress(file),
+											)}%)`}
 									</Text>
 
-									{file.id &&
-									deletionQueue.includes(file.id) ? (
-										<TouchableOpacity
-											onPress={() => onFileUndelete(file)}
-											style={styles.documentDeleteButton}
+									{!isUploading(file) && (
+										<>
+											{file.id &&
+											deletionQueue.includes(file.id) ? (
+												<TouchableOpacity
+													onPress={() =>
+														onFileUndelete(file)
+													}
+													style={
+														styles.documentDeleteButton
+													}
+												>
+													<Ionicons
+														name="arrow-undo-circle"
+														size={24}
+														color="red"
+													/>
+												</TouchableOpacity>
+											) : (
+												<TouchableOpacity
+													onPress={() =>
+														onFileDelete(file)
+													}
+													style={
+														styles.documentDeleteButton
+													}
+												>
+													<Ionicons
+														name="close-circle"
+														size={24}
+														color="red"
+													/>
+												</TouchableOpacity>
+											)}
+										</>
+									)}
+
+									{isUploading(file) && (
+										<View
+											style={
+												styles.docProgressBarContainer
+											}
 										>
-											<Ionicons
-												name="arrow-undo-circle"
-												size={24}
-												color="red"
+											<View
+												style={[
+													styles.docProgressBar,
+													{
+														width: `${getProgress(
+															file,
+														)}%`,
+													},
+												]}
 											/>
-										</TouchableOpacity>
-									) : (
-										<TouchableOpacity
-											onPress={() => onFileDelete(file)}
-											style={styles.documentDeleteButton}
-										>
-											<Ionicons
-												name="close-circle"
-												size={24}
-												color="red"
-											/>
-										</TouchableOpacity>
+										</View>
 									)}
 								</View>
 							))}
@@ -345,5 +440,46 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		backgroundColor: "rgba(0, 0, 0, 0.3)",
 		borderRadius: 8,
+	},
+	uploadingOverlay: {
+		position: "absolute",
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
+		backgroundColor: "rgba(0, 0, 0, 0.5)",
+		borderRadius: 8,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	progressContainer: {
+		width: "80%",
+		height: 6,
+		backgroundColor: "rgba(255, 255, 255, 0.3)",
+		borderRadius: 3,
+		marginTop: 8,
+	},
+	progressBar: {
+		height: "100%",
+		backgroundColor: "#4CAF50",
+		borderRadius: 3,
+	},
+	progressText: {
+		color: "white",
+		fontSize: 12,
+		marginTop: 4,
+		fontWeight: "bold",
+	},
+	docProgressBarContainer: {
+		position: "absolute",
+		bottom: 0,
+		left: 0,
+		right: 0,
+		height: 3,
+		backgroundColor: "#f0f0f0",
+	},
+	docProgressBar: {
+		height: "100%",
+		backgroundColor: "#007AFF",
 	},
 });
