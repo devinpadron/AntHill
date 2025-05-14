@@ -21,6 +21,7 @@ import BottomSheet, {
 } from "@gorhom/bottom-sheet";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CustomFormRender from "./CustomFormRender";
+import { uploadFile } from "../../utils/fileUtils";
 
 const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const [notes, setNotes] = useState("");
@@ -34,6 +35,10 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const [customForm, setCustomForm] = useState(null);
 	const [formResponses, setFormResponses] = useState({});
 	const [formErrors, setFormErrors] = useState({});
+	const [uploadingFiles, setUploadingFiles] = useState<string[]>([]);
+	const [uploadProgress, setUploadProgress] = useState<
+		Record<string, number>
+	>({});
 	const insets = useSafeAreaInsets();
 
 	const bottomSheetRef = useRef(null);
@@ -228,6 +233,79 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 		return isValid;
 	};
 
+	const handleFormSubmit = async (enrichedTimeEntry) => {
+		const allFiles = [];
+
+		if (customForm && enrichedTimeEntry.formResponses) {
+			Object.entries(enrichedTimeEntry.formResponses).forEach(
+				([fieldId, value]) => {
+					const field = customForm.fields.find(
+						(f) => f.id === fieldId,
+					);
+					if (
+						(field?.type === "document" ||
+							field?.type === "media") &&
+						Array.isArray(value)
+					) {
+						allFiles.push(...value);
+					}
+				},
+			);
+		}
+
+		if (allFiles.length > 0) {
+			try {
+				const uploadedFiles = {};
+
+				setUploadingFiles(allFiles.map((f) => f.uri));
+
+				await Promise.all(
+					allFiles.map(async (file) => {
+						const uploadedFile = await uploadFile(
+							file,
+							timeEntry.id,
+							companyId,
+							(uri, progress) => {
+								setUploadProgress((prev) => ({
+									...prev,
+									[uri]: progress,
+								}));
+							},
+						);
+						uploadedFiles[file.uri] = uploadedFile;
+					}),
+				);
+
+				const updatedFormResponses = {
+					...enrichedTimeEntry.formResponses,
+				};
+
+				Object.keys(updatedFormResponses).forEach((fieldId) => {
+					const value = updatedFormResponses[fieldId];
+					if (
+						Array.isArray(value) &&
+						value.length > 0 &&
+						value[0].uri
+					) {
+						updatedFormResponses[fieldId] = value.map(
+							(file) => uploadedFiles[file.uri] || file,
+						);
+					}
+				});
+
+				return {
+					...enrichedTimeEntry,
+					formResponses: updatedFormResponses,
+				};
+			} finally {
+				setUploadingFiles([]);
+				setUploadProgress({});
+			}
+		}
+
+		return enrichedTimeEntry;
+	};
+
 	const handleSubmit = async () => {
 		try {
 			setIsSubmitting(true);
@@ -250,7 +328,9 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 				formResponses: customForm ? formResponses : null,
 			};
 
-			await onSubmit(enrichedTimeEntry.id, enrichedTimeEntry);
+			const finalTimeEntry = await handleFormSubmit(enrichedTimeEntry);
+
+			await onSubmit(timeEntry.id, finalTimeEntry);
 
 			setNotes("");
 			handleClosePress();
@@ -444,6 +524,8 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 						formErrors={formErrors}
 						onFieldChange={handleFieldChange}
 						setCustomForm={setCustomForm}
+						uploadingFiles={uploadingFiles}
+						uploadProgress={uploadProgress}
 					/>
 				)}
 

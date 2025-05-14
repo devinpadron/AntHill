@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import DropDownPicker from "react-native-dropdown-picker";
 import DraggableFlatList from "react-native-draggable-flatlist";
 import { useCompany } from "../../../contexts/CompanyContext";
+import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
 // Form field types
 const FIELD_TYPES = [
@@ -27,6 +28,8 @@ const FIELD_TYPES = [
 	{ label: "Multi-Select", value: "multiSelect" },
 	{ label: "Date", value: "date" },
 	{ label: "Time", value: "time" },
+	{ label: "Document Upload", value: "document" },
+	{ label: "Media Upload", value: "media" },
 ];
 
 const CompanyCustomForm = ({ navigation }) => {
@@ -804,6 +807,50 @@ const CompanyCustomForm = ({ navigation }) => {
 											/>
 										</View>
 									)}
+
+									{field.type === "document" && (
+										<View>
+											<TouchableOpacity
+												style={styles.previewFileUpload}
+											>
+												<Icon
+													name="file-upload-outline"
+													size={24}
+													color="#555"
+												/>
+												<Text
+													style={
+														styles.previewUploadText
+													}
+												>
+													{field.placeholder ||
+														"Upload Documents"}
+												</Text>
+											</TouchableOpacity>
+										</View>
+									)}
+
+									{field.type === "media" && (
+										<View>
+											<TouchableOpacity
+												style={styles.previewFileUpload}
+											>
+												<Icon
+													name="image-plus"
+													size={24}
+													color="#555"
+												/>
+												<Text
+													style={
+														styles.previewUploadText
+													}
+												>
+													{field.placeholder ||
+														"Upload Images/Videos"}
+												</Text>
+											</TouchableOpacity>
+										</View>
+									)}
 								</View>
 							))}
 						</View>
@@ -1171,6 +1218,21 @@ const styles = StyleSheet.create({
 	previewMultiplierText: {
 		fontSize: 14,
 		color: "#666",
+	},
+	previewFileUpload: {
+		height: 100,
+		borderWidth: 1,
+		borderColor: "#ccc",
+		borderStyle: "dashed",
+		borderRadius: 8,
+		justifyContent: "center",
+		alignItems: "center",
+		backgroundColor: "#f9f9f9",
+	},
+	previewUploadText: {
+		marginTop: 8,
+		color: "#666",
+		fontSize: 14,
 	},
 });
 

@@ -356,7 +356,16 @@ export const useEventForm = (navigation, eventId?: string) => {
 
 				const uploadedFiles = await Promise.all(uploadPromises);
 
-				// ... rest of function remains the same
+				// Add this line to save the attachment information to the event
+				if (uploadedFiles.length > 0) {
+					await addAttachments(
+						currentCompany,
+						eventId,
+						uploadedFiles,
+					);
+				}
+
+				return uploadedFiles;
 			} catch (error) {
 				console.error("Error uploading files:", error);
 				// ... error handling

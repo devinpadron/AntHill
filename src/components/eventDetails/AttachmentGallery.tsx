@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import {
 	View,
 	Text,
@@ -7,26 +7,19 @@ import {
 	ImageBackground,
 	TouchableOpacity,
 	Linking,
-	Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import ImageView from "react-native-image-viewing";
-import { VideoView, useVideoPlayer } from "expo-video";
 import { FileUpload } from "../../types";
+import MediaViewer from "../media/MediaViewer";
 
 type AttachmentGalleryProps = {
 	attachments: FileUpload[];
 };
 
 export const AttachmentGallery = ({ attachments }: AttachmentGalleryProps) => {
-	const [visible, setIsVisible] = useState(false);
-	const [imageIndex, setImageIndex] = useState(0);
-	const [videoModalVisible, setVideoModalVisible] = useState(false);
-	const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
-	const videoRef = useRef(null);
-	const player = useVideoPlayer(selectedVideo, (player) => {
-		player.play();
-	});
+	const [mediaViewerVisible, setMediaViewerVisible] = useState(false);
+	const [selectedMediaItems, setSelectedMediaItems] = useState<any[]>([]);
+	const [mediaIndex, setMediaIndex] = useState(0);
 
 	// Separate files by type
 	const imageFiles = attachments.filter((file) =>
@@ -40,15 +33,37 @@ export const AttachmentGallery = ({ attachments }: AttachmentGalleryProps) => {
 			!file.type.startsWith("image/") && !file.type.startsWith("video/"),
 	);
 
-	const images = imageFiles.map((file) => ({ uri: file.url }));
-
 	if (attachments.length === 0) {
 		return null;
 	}
 
-	const handleVideoPress = (videoUrl) => {
-		setSelectedVideo(videoUrl);
-		setVideoModalVisible(true);
+	// Handler for opening image viewer
+	const handleImagePress = (index: number) => {
+		// Prepare media items array with image files
+		const mediaItems = imageFiles.map((file) => ({
+			uri: file.url,
+			type: file.type,
+			name: file.name,
+		}));
+
+		setSelectedMediaItems(mediaItems);
+		setMediaIndex(index);
+		setMediaViewerVisible(true);
+	};
+
+	// Handler for opening video viewer
+	const handleVideoPress = (index: number) => {
+		// Prepare media items array with video files
+		const mediaItems = videoFiles.map((file) => ({
+			uri: file.url,
+			type: file.type,
+			name: file.name,
+			thumbnailUrl: file.thumbnailUrl,
+		}));
+
+		setSelectedMediaItems(mediaItems);
+		setMediaIndex(index);
+		setMediaViewerVisible(true);
 	};
 
 	return (
@@ -57,12 +72,6 @@ export const AttachmentGallery = ({ attachments }: AttachmentGalleryProps) => {
 			{imageFiles.length > 0 && (
 				<>
 					<Text style={styles.sectionTitle}>Images</Text>
-					<ImageView
-						images={images}
-						imageIndex={imageIndex}
-						visible={visible}
-						onRequestClose={() => setIsVisible(false)}
-					/>
 					<View style={styles.imageGrid}>
 						{imageFiles.map((file, index) => (
 							<View
@@ -70,10 +79,7 @@ export const AttachmentGallery = ({ attachments }: AttachmentGalleryProps) => {
 								style={styles.thumbnailContainer}
 							>
 								<TouchableOpacity
-									onPress={() => {
-										setImageIndex(index);
-										setIsVisible(true);
-									}}
+									onPress={() => handleImagePress(index)}
 								>
 									<ImageBackground
 										style={styles.thumbnail}
@@ -98,7 +104,7 @@ export const AttachmentGallery = ({ attachments }: AttachmentGalleryProps) => {
 								style={styles.videoThumbnailContainer}
 							>
 								<TouchableOpacity
-									onPress={() => handleVideoPress(file.url)}
+									onPress={() => handleVideoPress(index)}
 								>
 									{file.thumbnailUrl ? (
 										<ImageBackground
@@ -181,47 +187,13 @@ export const AttachmentGallery = ({ attachments }: AttachmentGalleryProps) => {
 				</>
 			)}
 
-			{/* Video Playback Modal */}
-			<Modal
-				visible={videoModalVisible}
-				transparent={true}
-				animationType="slide"
-				onRequestClose={() => {
-					setVideoModalVisible(false);
-					if (player) {
-						player.pause();
-					}
-				}}
-				onShow={() => {
-					if (player) {
-						player.play();
-					}
-				}}
-			>
-				<View style={styles.videoModalContainer}>
-					<TouchableOpacity
-						style={styles.closeButton}
-						onPress={() => {
-							setVideoModalVisible(false);
-							// Make sure to pause the video when closing
-							if (player) {
-								player.pause();
-							}
-						}}
-					>
-						<Ionicons name="close-circle" size={36} color="white" />
-					</TouchableOpacity>
-
-					{selectedVideo && (
-						<VideoView
-							ref={videoRef}
-							player={player}
-							style={styles.videoPlayer}
-							contentFit="contain"
-						/>
-					)}
-				</View>
-			</Modal>
+			{/* Unified Media Viewer for both images and videos */}
+			<MediaViewer
+				visible={mediaViewerVisible}
+				media={selectedMediaItems}
+				initialIndex={mediaIndex}
+				onClose={() => setMediaViewerVisible(false)}
+			/>
 		</View>
 	);
 };
@@ -319,21 +291,5 @@ const styles = StyleSheet.create({
 	documentFilename: {
 		flex: 1,
 		fontSize: 14,
-	},
-	videoModalContainer: {
-		flex: 1,
-		backgroundColor: "black",
-		justifyContent: "center",
-	},
-	videoPlayer: {
-		width: "100%",
-		height: 300,
-		alignSelf: "center",
-	},
-	closeButton: {
-		position: "absolute",
-		top: 40,
-		right: 20,
-		zIndex: 10,
 	},
 });

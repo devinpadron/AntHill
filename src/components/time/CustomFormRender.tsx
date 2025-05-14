@@ -5,22 +5,38 @@ import {
 	TextInput,
 	TouchableOpacity,
 	StyleSheet,
+	Image,
 } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import DatePicker from "react-native-date-picker";
 import { format } from "date-fns";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { set } from "lodash";
+import { AttachmentUploader } from "../eventSubmit/AttachmentUploader";
+import { FileUpload } from "../../types";
+
+// Update the props interface to include the missing properties
+interface CustomFormRenderProps {
+	customForm: any;
+	formResponses: any;
+	formErrors: any;
+	onFieldChange: (fieldId: string, value: any) => void;
+	setCustomForm: React.Dispatch<React.SetStateAction<any>>;
+	uploadingFiles?: string[]; // Add this prop
+	uploadProgress?: Record<string, number>; // Add this prop
+}
 
 /**
  * CustomFormRender - A component to render dynamic form fields
  */
-const CustomFormRender = ({
+const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 	customForm,
 	formResponses,
 	formErrors,
 	onFieldChange,
 	setCustomForm,
+	uploadingFiles = [], // Provide default value
+	uploadProgress = {}, // Provide default value
 }) => {
 	if (!customForm) return null;
 
@@ -372,6 +388,74 @@ const CustomFormRender = ({
 					</TouchableOpacity>
 				);
 
+			case "document":
+				return (
+					<View style={styles.uploaderContainer}>
+						<AttachmentUploader
+							files={formResponses[field.id] || []}
+							onFilesAdded={(files) => {
+								// Only accept documents (not images or videos)
+								const docFiles = files.filter(
+									(file) =>
+										!file.type.startsWith("image/") &&
+										!file.type.startsWith("video/"),
+								);
+								if (docFiles.length) {
+									onFieldChange(field.id, [
+										...(formResponses[field.id] || []),
+										...docFiles,
+									]);
+								}
+							}}
+							onFileDelete={(file) => {
+								const updatedFiles = (
+									formResponses[field.id] || []
+								).filter((f) => f.uri !== file.uri);
+								onFieldChange(field.id, updatedFiles);
+							}}
+							onFileUndelete={() => {}} // Not needed for new uploads
+							deletionQueue={[]}
+							uploadingFiles={uploadingFiles} // Updated to use prop
+							uploadProgress={uploadProgress} // Updated to use prop
+							docOnly={true} // New prop to restrict to documents only
+						/>
+					</View>
+				);
+
+			case "media":
+				return (
+					<View style={styles.uploaderContainer}>
+						<AttachmentUploader
+							files={formResponses[field.id] || []}
+							onFilesAdded={(files) => {
+								// Only accept images and videos
+								const mediaFiles = files.filter(
+									(file) =>
+										file.type.startsWith("image/") ||
+										file.type.startsWith("video/"),
+								);
+								if (mediaFiles.length) {
+									onFieldChange(field.id, [
+										...(formResponses[field.id] || []),
+										...mediaFiles,
+									]);
+								}
+							}}
+							onFileDelete={(file) => {
+								const updatedFiles = (
+									formResponses[field.id] || []
+								).filter((f) => f.uri !== file.uri);
+								onFieldChange(field.id, updatedFiles);
+							}}
+							onFileUndelete={() => {}} // Not needed for new uploads
+							deletionQueue={[]}
+							uploadingFiles={uploadingFiles} // Updated to use prop
+							uploadProgress={uploadProgress} // Updated to use prop
+							mediaOnly={true} // New prop to restrict to media only
+						/>
+					</View>
+				);
+
 			default:
 				return null;
 		}
@@ -524,6 +608,36 @@ const styles = StyleSheet.create({
 	multiplierText: {
 		fontSize: 14,
 		color: "#333",
+	},
+	uploaderContainer: {
+		marginVertical: 10,
+	},
+	filePreviewContainer: {
+		marginTop: 8,
+		flexDirection: "row",
+		flexWrap: "wrap",
+		gap: 8,
+	},
+	filePreview: {
+		width: 80,
+		height: 80,
+		borderRadius: 4,
+		backgroundColor: "#f0f0f0",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	imagePreview: {
+		width: 80,
+		height: 80,
+		borderRadius: 4,
+		resizeMode: "cover",
+	},
+	docPreviewText: {
+		fontSize: 10,
+		color: "#666",
+		textAlign: "center",
+		marginTop: 4,
+		paddingHorizontal: 2,
 	},
 });
 

@@ -19,6 +19,8 @@ type AttachmentUploaderProps = {
 	deletionQueue: string[];
 	uploadingFiles?: string[];
 	uploadProgress?: Record<string, number>;
+	docOnly?: boolean; // Add this prop
+	mediaOnly?: boolean; // Add this prop
 };
 
 export const AttachmentUploader = ({
@@ -29,6 +31,8 @@ export const AttachmentUploader = ({
 	deletionQueue,
 	uploadingFiles = [],
 	uploadProgress = {},
+	docOnly = false, // Add default value
+	mediaOnly = false, // Add default value
 }: AttachmentUploaderProps) => {
 	const [isLoading, setIsLoading] = React.useState(false);
 
@@ -43,10 +47,10 @@ export const AttachmentUploader = ({
 
 	const handleImageUpload = async () => {
 		setIsLoading(true);
-		const images = await pickMedia();
+		const media = await pickMedia();
 		setIsLoading(false);
-		if (images.length > 0) {
-			onFilesAdded(images);
+		if (media.length > 0) {
+			onFilesAdded(media);
 		}
 	};
 
@@ -65,21 +69,33 @@ export const AttachmentUploader = ({
 	return (
 		<View style={styles.inputContainer}>
 			<View style={styles.uploadButtonsContainer}>
-				<TouchableOpacity
-					style={styles.uploadButton}
-					onPress={handleDocumentUpload}
-				>
-					<Ionicons name="document-outline" size={24} color="#555" />
-					<Text style={styles.uploadButtonText}>Upload Files</Text>
-				</TouchableOpacity>
+				{!mediaOnly && (
+					<TouchableOpacity
+						style={styles.uploadButton}
+						onPress={handleDocumentUpload}
+					>
+						<Ionicons
+							name="document-outline"
+							size={24}
+							color="#555"
+						/>
+						<Text style={styles.uploadButtonText}>
+							Upload Files
+						</Text>
+					</TouchableOpacity>
+				)}
 
-				<TouchableOpacity
-					style={styles.uploadButton}
-					onPress={handleImageUpload}
-				>
-					<Ionicons name="image-outline" size={24} color="#555" />
-					<Text style={styles.uploadButtonText}>Upload Media</Text>
-				</TouchableOpacity>
+				{!docOnly && (
+					<TouchableOpacity
+						style={styles.uploadButton}
+						onPress={handleImageUpload}
+					>
+						<Ionicons name="image-outline" size={24} color="#555" />
+						<Text style={styles.uploadButtonText}>
+							Upload Media
+						</Text>
+					</TouchableOpacity>
+				)}
 			</View>
 
 			{isLoading && (

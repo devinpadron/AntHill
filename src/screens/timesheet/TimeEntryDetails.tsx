@@ -13,6 +13,8 @@ import {
 	Switch,
 	Dimensions,
 	Keyboard,
+	Image,
+	Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
@@ -33,6 +35,7 @@ import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import EditSheet from "../../components/time/EditSheet";
 import { useCompany } from "../../contexts/CompanyContext";
+import MediaViewer from "../../components/media/MediaViewer";
 
 // Add this helper function near the top of the component
 const calculateMultipliedValue = (value, multiplier) => {
@@ -89,6 +92,8 @@ const TimeEntryDetails = ({ route, navigation }) => {
 	const [editNotes, setEditNotes] = useState("");
 	const [editDuration, setEditDuration] = useState("");
 	const [editChangeSummary, setEditChangeSummary] = useState("");
+	const [mediaViewerVisible, setMediaViewerVisible] = useState(false);
+	const [selectedMedia, setSelectedMedia] = useState(null);
 
 	// Check if current user is a manager or admin
 
@@ -774,6 +779,17 @@ ${companyData.name || "Management"}
 		return connectedEvents.find((event) => event.id === eventId) || null;
 	};
 
+	// Open media viewer
+	const handleOpenMedia = (file) => {
+		setSelectedMedia({
+			uri: file.url || file.uri,
+			type: file.type,
+			name: file.name,
+			thumbnailUrl: file.thumbnailUrl,
+		});
+		setMediaViewerVisible(true);
+	};
+
 	// If still loading, show loading indicator
 	if (isLoading) {
 		return (
@@ -1256,6 +1272,145 @@ ${companyData.name || "Management"}
 																)
 															: "N/A"}
 													</Text>
+												) : field.type === "document" ||
+												  field.type === "media" ? (
+													<View>
+														{response &&
+														Array.isArray(
+															response,
+														) &&
+														response.length > 0 ? (
+															<View
+																style={
+																	styles.fileResponseGrid
+																}
+															>
+																{response.map(
+																	(
+																		file,
+																		idx,
+																	) => (
+																		<TouchableOpacity
+																			key={
+																				idx
+																			}
+																			style={
+																				styles.fileResponseItem
+																			}
+																			onPress={() => {
+																				// Open file viewer based on type
+																				if (
+																					file.url
+																				) {
+																					if (
+																						file.type.startsWith(
+																							"image/",
+																						) ||
+																						file.type.startsWith(
+																							"video/",
+																						)
+																					) {
+																						// Open media viewer
+																						handleOpenMedia(
+																							file,
+																						);
+																					} else {
+																						// Open document
+																						Linking.openURL(
+																							file.url,
+																						);
+																					}
+																				}
+																			}}
+																		>
+																			{file.type.startsWith(
+																				"image/",
+																			) ? (
+																				<Image
+																					source={{
+																						uri:
+																							file.url ||
+																							file.uri,
+																					}}
+																					style={
+																						styles.fileResponseImage
+																					}
+																				/>
+																			) : file.type.startsWith(
+																					"video/",
+																			  ) ? (
+																				<View
+																					style={
+																						styles.fileResponseVideo
+																					}
+																				>
+																					<Image
+																						source={{
+																							uri:
+																								file.thumbnailUrl ||
+																								file.url ||
+																								file.uri,
+																						}}
+																						style={
+																							styles.fileResponseImage
+																						}
+																					/>
+																					<View
+																						style={
+																							styles.videoOverlay
+																						}
+																					>
+																						<Icon
+																							name="play-circle"
+																							size={
+																								28
+																							}
+																							color="#fff"
+																						/>
+																					</View>
+																				</View>
+																			) : (
+																				<View
+																					style={
+																						styles.fileResponseDoc
+																					}
+																				>
+																					<Icon
+																						name="file-document-outline"
+																						size={
+																							28
+																						}
+																						color="#666"
+																					/>
+																					<Text
+																						style={
+																							styles.fileResponseName
+																						}
+																						numberOfLines={
+																							2
+																						}
+																					>
+																						{
+																							file.name
+																						}
+																					</Text>
+																				</View>
+																			)}
+																		</TouchableOpacity>
+																	),
+																)}
+															</View>
+														) : (
+															<Text
+																style={
+																	styles.formFieldValue
+																}
+															>
+																No files
+																uploaded
+															</Text>
+														)}
+													</View>
 												) : (
 													<Text
 														style={
@@ -1448,6 +1603,12 @@ ${companyData.name || "Management"}
 					</View>
 				</BottomSheetScrollView>
 			</BottomSheet>
+
+			<MediaViewer
+				visible={mediaViewerVisible}
+				media={selectedMedia}
+				onClose={() => setMediaViewerVisible(false)}
+			/>
 		</View>
 	);
 };
@@ -1872,6 +2033,50 @@ const styles = StyleSheet.create({
 	selectedExportOptionText: {
 		color: "#007AFF",
 		fontWeight: "500",
+	},
+	fileResponseGrid: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		gap: 10,
+		marginTop: 8,
+	},
+	fileResponseItem: {
+		width: 80,
+		height: 80,
+		borderRadius: 8,
+		overflow: "hidden",
+		borderWidth: 1,
+		borderColor: "#eee",
+	},
+	fileResponseImage: {
+		width: "100%",
+		height: "100%",
+		resizeMode: "cover",
+	},
+	videoOverlay: {
+		...StyleSheet.absoluteFillObject,
+		backgroundColor: "rgba(0,0,0,0.3)",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	fileResponseDoc: {
+		width: "100%",
+		height: "100%",
+		justifyContent: "center",
+		alignItems: "center",
+		backgroundColor: "#f5f5f5",
+	},
+	fileResponseVideo: {
+		width: "100%",
+		height: "100%",
+		position: "relative",
+	},
+	fileResponseName: {
+		fontSize: 10,
+		color: "#666",
+		textAlign: "center",
+		paddingHorizontal: 4,
+		marginTop: 4,
 	},
 });
 

@@ -8,6 +8,7 @@ export async function addAttachments(
 	eventId: string,
 	attachments: FileUpload[],
 ) {
+	console.log("Adding attachments:", attachments);
 	try {
 		const batch = db.batch();
 		const attachmentsRef = db
@@ -26,8 +27,8 @@ export async function addAttachments(
 				uploadTime: attachment.uploadTime,
 				path: attachment.path,
 				id: docRef.id,
-				duration: attachment.duration,
-				thumbnailUrl: attachment.thumbnailUrl,
+				duration: attachment.duration || null,
+				thumbnailUrl: attachment.thumbnailUrl || null,
 			});
 		}
 
