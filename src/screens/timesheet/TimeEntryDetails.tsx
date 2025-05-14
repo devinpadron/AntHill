@@ -564,7 +564,7 @@ const TimeEntryDetails = ({ route, navigation }) => {
 
 				// Add connected events if available
 				if (entry.connectedEvents && entry.connectedEvents.length > 0) {
-					entryList += `  Connected Events:\n`;
+					entryList += `  Events:\n`;
 					entry.connectedEvents.forEach((connEvent) => {
 						// Get event details
 						const fullEvent = getEventById(connEvent.eventId);
