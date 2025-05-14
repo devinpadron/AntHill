@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { FileUpload } from "../../types";
-import { pickDocuments, pickImages } from "../../utils/fileUtils";
+import { pickDocuments, pickMedia } from "../../utils/fileUtils";
 
 type AttachmentUploaderProps = {
 	files: FileUpload[];
@@ -25,24 +25,36 @@ export const AttachmentUploader = ({
 	onFileUndelete,
 	deletionQueue,
 }: AttachmentUploaderProps) => {
+	const [isLoading, setIsLoading] = React.useState(false);
+
 	const handleDocumentUpload = async () => {
+		setIsLoading(true);
 		const documents = await pickDocuments();
+		setIsLoading(false);
 		if (documents.length > 0) {
 			onFilesAdded(documents);
 		}
 	};
 
 	const handleImageUpload = async () => {
-		const images = await pickImages();
+		setIsLoading(true);
+		const images = await pickMedia();
+		setIsLoading(false);
 		if (images.length > 0) {
 			onFilesAdded(images);
 		}
 	};
 
+	// Update the file filtering logic to separate videos
 	const imageFiles = files.filter((file) => file.type.startsWith("image/"));
+	const videoFiles = files.filter((file) => file.type.startsWith("video/"));
+	const mediaFiles = [...imageFiles, ...videoFiles]; // Combine images and videos
 	const documentFiles = files.filter(
-		(file) => !file.type.startsWith("image/"),
+		(file) =>
+			!file.type.startsWith("image/") && !file.type.startsWith("video/"),
 	);
+
+	const isVideo = (file: FileUpload) => file.type.startsWith("video/");
 
 	return (
 		<View style={styles.inputContainer}>
@@ -60,24 +72,55 @@ export const AttachmentUploader = ({
 					onPress={handleImageUpload}
 				>
 					<Ionicons name="image-outline" size={24} color="#555" />
-					<Text style={styles.uploadButtonText}>Choose Images</Text>
+					<Text style={styles.uploadButtonText}>Upload Media</Text>
 				</TouchableOpacity>
 			</View>
 
+			{/* Loading indicator */}
+			{isLoading && (
+				<View style={{ alignItems: "center", marginBottom: 10 }}>
+					<Ionicons
+						name="cloud-upload-outline"
+						size={24}
+						color="#555"
+					/>
+					<Text style={{ color: "#555" }}>
+						Uploading files, please wait...
+					</Text>
+				</View>
+			)}
+			{/* Display files if any */}
+
 			{files.length > 0 && (
 				<View style={styles.filesContainer}>
-					{/* Image Grid */}
-					{imageFiles.length > 0 && (
+					{/* Combined Media Grid (Images + Videos) */}
+					{mediaFiles.length > 0 && (
 						<View style={styles.imageGrid}>
-							{imageFiles.map((file, index) => (
+							{mediaFiles.map((file, index) => (
 								<View
-									key={`img-${index}`}
+									key={`media-${index}`}
 									style={styles.thumbnailContainer}
 								>
 									<ImageBackground
-										source={{ uri: file.url || file.uri }}
+										source={{
+											uri:
+												file.thumbnailUrl ||
+												file.url ||
+												file.uri,
+										}}
 										style={styles.thumbnail}
 									>
+										{/* Video indicator overlay */}
+										{isVideo(file) && (
+											<View style={styles.videoIndicator}>
+												<Ionicons
+													name="play-circle"
+													size={28}
+													color="#fff"
+												/>
+											</View>
+										)}
+
 										{file.id &&
 										deletionQueue.includes(file.id) ? (
 											<View
@@ -291,5 +334,16 @@ const styles = StyleSheet.create({
 	},
 	documentDeleteButton: {
 		padding: 5,
+	},
+	videoIndicator: {
+		position: "absolute",
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
+		justifyContent: "center",
+		alignItems: "center",
+		backgroundColor: "rgba(0, 0, 0, 0.3)",
+		borderRadius: 8,
 	},
 });

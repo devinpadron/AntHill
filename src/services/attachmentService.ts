@@ -26,6 +26,8 @@ export async function addAttachments(
 				uploadTime: attachment.uploadTime,
 				path: attachment.path,
 				id: docRef.id,
+				duration: attachment.duration,
+				thumbnailUrl: attachment.thumbnailUrl,
 			});
 		}
 

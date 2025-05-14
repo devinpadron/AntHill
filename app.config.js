@@ -36,6 +36,7 @@ export default {
 			"@react-native-firebase/app",
 			"@react-native-firebase/auth",
 			"@react-native-firebase/crashlytics",
+			"expo-video",
 			[
 				"expo-build-properties",
 				{
