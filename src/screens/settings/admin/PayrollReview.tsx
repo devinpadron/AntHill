@@ -283,6 +283,9 @@ const PayrollReview = ({ navigation }) => {
 						</Text>
 					</View>
 
+					{/* Add flexible spacer */}
+					<View style={{ flex: 1 }} />
+
 					<View
 						style={[
 							styles.statusBadge,
@@ -466,23 +469,46 @@ const PayrollReview = ({ navigation }) => {
 										)
 									}
 								>
-									<View style={styles.employeeInfo}>
-										<View style={styles.employeeAvatar}>
-											<Text style={styles.avatarText}>
-												{employeeGroup.displayName
-													.charAt(0)
-													.toUpperCase()}
-											</Text>
-										</View>
-										<View>
-											<Text style={styles.employeeName}>
-												{employeeGroup.displayName}
-											</Text>
-											<Text style={styles.employeeEmail}>
-												{employeeGroup.email}
-											</Text>
-										</View>
+									<View style={styles.employeeAvatar}>
+										<Text style={styles.avatarText}>
+											{employeeGroup.displayName
+												.charAt(0)
+												.toUpperCase()}
+										</Text>
 									</View>
+
+									{/* Force minimum width and make sure text is visible */}
+									<View
+										style={[
+											styles.employeeTextContainer,
+											{ minWidth: 150 },
+										]}
+									>
+										<Text
+											style={[
+												styles.employeeName,
+												{ opacity: 1 },
+											]}
+											numberOfLines={1}
+											ellipsizeMode="tail"
+										>
+											{employeeGroup.displayName ||
+												"Unknown"}
+										</Text>
+										<Text
+											style={[
+												styles.employeeEmail,
+												{ opacity: 1 },
+											]}
+											numberOfLines={1}
+											ellipsizeMode="tail"
+										>
+											{employeeGroup.email || "No email"}
+										</Text>
+									</View>
+
+									{/* Add spacing between name and hours */}
+									<View style={{ width: 8 }} />
 
 									<Text style={styles.employeeHours}>
 										{
@@ -696,17 +722,19 @@ const styles = StyleSheet.create({
 	employeeHeaderMain: {
 		flex: 1,
 		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
+		alignItems: "center", // Center items vertically
 	},
 	employeeInfo: {
 		flexDirection: "row",
 		alignItems: "center",
+		flex: 1, // Add flex to make it take available space
+		marginRight: 8, // Add margin to prevent overlap
 	},
 	collapseButton: {
 		paddingLeft: 16,
 		alignItems: "center",
 		justifyContent: "center",
+		flexShrink: 0, // Prevent button from shrinking
 	},
 	employeeAvatar: {
 		width: 40,
@@ -716,6 +744,7 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 		alignItems: "center",
 		marginRight: 12,
+		flexShrink: 0, // Prevent avatar from shrinking
 	},
 	avatarText: {
 		color: "white",
@@ -727,15 +756,29 @@ const styles = StyleSheet.create({
 		height: 40,
 		borderRadius: 20,
 	},
+	employeeTextContainer: {
+		flex: 1,
+		marginRight: 8,
+		justifyContent: "center",
+		// Add these debugging styles to see container boundaries
+		// backgroundColor: '#f0f0f0', // Uncomment to debug layout
+		minWidth: 10, // Ensure container has minimum width
+	},
 	employeeName: {
 		fontSize: 16,
 		fontWeight: "600",
-		color: "#333",
+		color: "#333", // Make sure color contrasts with background
 		marginBottom: 2,
+		marginRight: 0,
+		opacity: 1,
+		includeFontPadding: false, // Fix Android text rendering
 	},
 	employeeEmail: {
 		fontSize: 12,
 		color: "#666",
+		// Add these to ensure text is visible
+		opacity: 1,
+		includeFontPadding: false, // Fix Android text rendering
 	},
 	employeeHeaderRight: {
 		flexDirection: "row",
@@ -745,9 +788,11 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		fontWeight: "600",
 		color: "#007AFF",
-		marginLeft: 50,
-		paddingRight: 16,
+		marginLeft: 8,
+		paddingLeft: 8,
+		flexShrink: 0, // Prevent hours from shrinking
 	},
+
 	entriesContainer: {
 		paddingHorizontal: 12,
 		paddingVertical: 8,
@@ -775,9 +820,12 @@ const styles = StyleSheet.create({
 	timeEntryDetails: {
 		flexDirection: "row",
 		alignItems: "center",
+		flexWrap: "nowrap", // Ensure row doesn't wrap
+		width: "100%", // Ensure it takes full width
 	},
 	timeColumn: {
 		marginRight: 12,
+		flexShrink: 0, // Prevent time columns from shrinking
 	},
 	timeLabel: {
 		fontSize: 12,
@@ -789,12 +837,14 @@ const styles = StyleSheet.create({
 	},
 	arrow: {
 		marginHorizontal: 4,
+		flexShrink: 0, // Prevent arrow from shrinking
 	},
 	statusBadge: {
 		paddingVertical: 4,
 		paddingHorizontal: 8,
 		borderRadius: 12,
-		marginLeft: "auto",
+		// Removed marginLeft: "auto" and replaced with flex layout
+		flexShrink: 0, // Prevent badge from shrinking
 	},
 	statusText: {
 		fontSize: 12,
