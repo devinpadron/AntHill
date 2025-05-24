@@ -23,7 +23,6 @@ export interface CompanyData {
 	id: string;
 	name: string;
 	accessCode: string;
-	personal: boolean;
 }
 
 interface CompanyContextType {
@@ -103,7 +102,6 @@ export const CompanyProvider: React.FC<CompanyProviderProps> = ({
 					id: activeCompanyId,
 					name: data?.name || "Unknown Company",
 					accessCode: data?.accessCode || "",
-					personal: data?.personal || false,
 				});
 
 				// Get company preferences

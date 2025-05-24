@@ -8,7 +8,6 @@ export const validateSignupFields = (
 	password: string,
 	confirmPassword: string,
 	accessCode: string,
-	isSolo: boolean,
 ) => {
 	if (!firstName.trim()) {
 		Alert.alert("First name is required.");
@@ -43,8 +42,8 @@ export const validateSignupFields = (
 		return false;
 	}
 
-	// If not a personal account, access code is required
-	if (!isSolo && !accessCode.trim()) {
+	// Access code is required
+	if (!accessCode.trim()) {
 		Alert.alert("Company code is required.");
 		return false;
 	}

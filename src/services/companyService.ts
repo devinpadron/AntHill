@@ -68,7 +68,6 @@ export async function addUserToCompany(
 	company: string,
 	userID: string,
 	role: Role = Role.USER,
-	personal: boolean = false,
 ) {
 	try {
 		await db
@@ -77,66 +76,9 @@ export async function addUserToCompany(
 			.collection("Users")
 			.doc(userID)
 			.set({ role: role });
-
-		if (personal) {
-			await db
-				.collection("Companies")
-				.doc(company)
-				.set({ personal: true });
-
-			await db
-				.collection("Companies")
-				.doc(company)
-				.collection("Users")
-				.doc(userID)
-				.set({ role: role });
-		}
 		return true;
 	} catch (e) {
 		console.error("Error adding user to company", e);
-		return false;
-	}
-}
-
-export async function isPersonal(company: string) {
-	try {
-		const companyEntry = await db
-			.collection("Companies")
-			.doc(company)
-			.get();
-		if (companyEntry.data().personal) {
-			return true;
-		}
-		return false;
-	} catch (e) {
-		console.error("Error getting company", e);
-		return null;
-	}
-}
-
-//
-export async function deleteSoloCompany(company: string) {
-	try {
-		const users = await db
-			.collection("Companies")
-			.doc(company)
-			.collection("Users")
-			.get();
-		for (const user of users.docs) {
-			await user.ref.delete();
-		}
-		const events = await db
-			.collection("Companies")
-			.doc(company)
-			.collection("Events")
-			.get();
-		for (const event of events.docs) {
-			await event.ref.delete();
-		}
-		await db.collection("Companies").doc(company).delete();
-		return true;
-	} catch (e) {
-		console.error("Error deleting company", e);
 		return false;
 	}
 }

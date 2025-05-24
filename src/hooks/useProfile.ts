@@ -6,10 +6,8 @@ import {
 	deleteUser,
 } from "../services/userService";
 import {
-	isPersonal,
 	joinCompanyWithAccessCode,
 	removeUserFromCompany,
-	deleteSoloCompany,
 } from "../services/companyService";
 import { Alert } from "react-native";
 import { showPrompt } from "../utils/alertUtils";
@@ -19,21 +17,8 @@ import { useUser } from "../contexts/UserContext";
 
 export const useProfile = () => {
 	const [isLoading, setIsLoading] = useState(true);
-	const [isSolo, setIsSolo] = useState(false);
 
 	const { user: userData, userId, isLoading: userLoading } = useUser();
-
-	// Check if personal account
-	useEffect(() => {
-		const fillData = async () => {
-			if (userData) {
-				const result = await isPersonal(userData.loggedInCompany);
-				setIsSolo(result);
-				setIsLoading(false);
-			}
-		};
-		fillData();
-	}, [userData]);
 
 	// Update user name
 	const updateName = async (firstName: string, lastName: string) => {
@@ -151,10 +136,6 @@ export const useProfile = () => {
 	// Delete account
 	const deleteAccount = async () => {
 		try {
-			if (isSolo) {
-				await deleteSoloCompany(userData.loggedInCompany);
-				await deleteUser(userId);
-			}
 			await removeUserFromCompany(userData.loggedInCompany, userId);
 			return true;
 		} catch (error) {
@@ -167,7 +148,6 @@ export const useProfile = () => {
 		isLoading,
 		userData,
 		userId,
-		isSolo,
 		updateName,
 		handleCompanyChange,
 		joinCompany,

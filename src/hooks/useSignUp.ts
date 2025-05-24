@@ -22,7 +22,6 @@ export const useSignUp = (navigation: any) => {
 	const [confPassword, setConfPassword] = useState("");
 	const [accessCode, setAccessCode] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
-	const [isSolo, setIsSolo] = useState(false);
 
 	const handleSignUp = async () => {
 		// Validate all fields
@@ -34,20 +33,17 @@ export const useSignUp = (navigation: any) => {
 				password,
 				confPassword,
 				accessCode,
-				isSolo,
 			)
 		) {
 			return;
 		}
 
-		// Check company code if not personal account
+		// Check company code
 		let company = "";
-		if (!isSolo) {
-			company = await compareAccessCode(accessCode);
-			if (!company) {
-				Alert.alert("Invalid Access Code");
-				return;
-			}
+		company = await compareAccessCode(accessCode);
+		if (!company) {
+			Alert.alert("Invalid Access Code");
+			return;
 		}
 
 		setIsLoading(true);
@@ -66,8 +62,8 @@ export const useSignUp = (navigation: any) => {
 			});
 
 			// Prepare user data based on account type
-			const companyId = isSolo ? user.uid : company;
-			const role = isSolo ? Role.OWNER : Role.USER;
+			const companyId = company;
+			const role = Role.USER;
 			const userData = formatUserData(
 				firstName,
 				lastName,
@@ -78,7 +74,7 @@ export const useSignUp = (navigation: any) => {
 
 			// Save user data
 			await addUser(userData, user.uid);
-			await addUserToCompany(companyId, user.uid, role, isSolo);
+			await addUserToCompany(companyId, user.uid, role);
 
 			// Send verification email
 			await user.sendEmailVerification();
@@ -91,11 +87,6 @@ export const useSignUp = (navigation: any) => {
 		} finally {
 			setIsLoading(false);
 		}
-	};
-
-	const togglePersonalAccount = () => {
-		setIsSolo(!isSolo);
-		setAccessCode("");
 	};
 
 	return {
@@ -112,8 +103,6 @@ export const useSignUp = (navigation: any) => {
 		accessCode,
 		setAccessCode,
 		isLoading,
-		isSolo,
-		togglePersonalAccount,
 		handleSignUp,
 	};
 };

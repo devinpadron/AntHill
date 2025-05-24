@@ -22,8 +22,6 @@ const SignUpPage = ({ navigation }) => {
 		accessCode,
 		setAccessCode,
 		isLoading,
-		isSolo,
-		togglePersonalAccount,
 		handleSignUp,
 	} = useSignUp(navigation);
 
@@ -62,20 +60,11 @@ const SignUpPage = ({ navigation }) => {
 				secureTextEntry
 			/>
 
-			{!isSolo && (
-				<FormInput
-					placeholder="Company Code:"
-					value={accessCode}
-					onChangeText={setAccessCode}
-				/>
-			)}
-
-			{/* Uncomment this if you want to use the toggle switch for personal account */}
-			{/* <ToggleSwitch
-				value={isSolo}
-				onValueChange={togglePersonalAccount}
-				label="Personal Account"
-			/> */}
+			<FormInput
+				placeholder="Company Code:"
+				value={accessCode}
+				onChangeText={setAccessCode}
+			/>
 
 			<Button
 				title="Sign Up"

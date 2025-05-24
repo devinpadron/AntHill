@@ -61,7 +61,6 @@ const EventSubmit = ({ navigation }) => {
 		openEndTime,
 		isLoading,
 		isEditing,
-		personal,
 		availableWorkers,
 		setAvailableWorkers,
 		editingLabelForAddress,
@@ -401,20 +400,18 @@ const EventSubmit = ({ navigation }) => {
 						</View>
 
 						{/* Attachments Section */}
-						{!personal && (
-							<View style={styles.attachmentsContainer}>
-								<Text style={styles.label}>Attachments</Text>
-								<AttachmentUploader
-									files={files}
-									onFilesAdded={addToUploadQueue}
-									onFileDelete={deleteFile}
-									onFileUndelete={undoDeleteFile}
-									deletionQueue={deletionQueue}
-									uploadingFiles={Object.keys(uploadProgress)} // Pass files that are uploading
-									uploadProgress={uploadProgress} // Pass the upload progress
-								/>
-							</View>
-						)}
+						<View style={styles.attachmentsContainer}>
+							<Text style={styles.label}>Attachments</Text>
+							<AttachmentUploader
+								files={files}
+								onFilesAdded={addToUploadQueue}
+								onFileDelete={deleteFile}
+								onFileUndelete={undoDeleteFile}
+								deletionQueue={deletionQueue}
+								uploadingFiles={Object.keys(uploadProgress)} // Pass files that are uploading
+								uploadProgress={uploadProgress} // Pass the upload progress
+							/>
+						</View>
 					</View>
 				</View>
 

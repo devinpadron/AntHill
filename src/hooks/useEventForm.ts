@@ -7,7 +7,6 @@ import {
 	subscribeEvent,
 	updateEvent,
 } from "../services/eventService";
-import { isPersonal } from "../services/companyService";
 import {
 	addAttachments,
 	deleteEventAttachments,
@@ -60,7 +59,6 @@ export const useEventForm = (navigation, eventId?: string) => {
 	const [isLoading, setIsLoading] = useState(false);
 	const [isEditing, setIsEditing] = useState(!!eventId);
 	const [editID, setEditID] = useState<string | null>(eventId || null);
-	const [personal, setPersonal] = useState(false);
 
 	// Files state
 	const [uploadQueue, setUploadQueue] = useState<FileUpload[]>([]);
@@ -73,16 +71,6 @@ export const useEventForm = (navigation, eventId?: string) => {
 
 	// Load user data
 	const { user, companyId: currentCompany } = useUser();
-
-	// Check if personal account
-	useEffect(() => {
-		const checkPersonal = async () => {
-			if (!currentCompany) return;
-			const result = await isPersonal(currentCompany);
-			setPersonal(result);
-		};
-		checkPersonal();
-	}, [currentCompany]);
 
 	// Load event data if editing
 	useEffect(() => {
@@ -607,7 +595,6 @@ export const useEventForm = (navigation, eventId?: string) => {
 		openEndTime,
 		isLoading,
 		isEditing,
-		personal,
 		availableWorkers,
 		setAvailableWorkers,
 		editingLabelForAddress,
