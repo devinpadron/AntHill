@@ -231,17 +231,7 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 			)}
 
 			{/* Status badges and submit button */}
-			{timeEntry.status === "pending_approval" ? (
-				<View style={styles.statusBadge}>
-					<Icon
-						name="clock-check-outline"
-						size={16}
-						color="#FFA500"
-						style={styles.icon}
-					/>
-					<Text style={styles.pendingText}>Pending Approval</Text>
-				</View>
-			) : canSubmit && onSubmit ? (
+			{canSubmit && onSubmit ? (
 				<TouchableOpacity
 					style={styles.submitButton}
 					onPress={handleSubmit}

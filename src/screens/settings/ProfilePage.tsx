@@ -14,7 +14,6 @@ const ProfilePage = ({ navigation }) => {
 	const {
 		isLoading,
 		userData,
-		isSolo,
 		updateName,
 		handleCompanyChange,
 		joinCompany,
@@ -143,9 +142,7 @@ const ProfilePage = ({ navigation }) => {
 
 	// Handle account deletion
 	const handleDeleteAccount = async () => {
-		const title = isSolo
-			? "Delete Account?"
-			: `Delete ${userData?.loggedInCompany} Data?`;
+		const title = `Delete ${userData?.loggedInCompany} Data?`;
 
 		showConfirmation(
 			title,
@@ -208,7 +205,7 @@ const ProfilePage = ({ navigation }) => {
 						labelField="label"
 						valueField="value"
 						style={styles.dropdown}
-						disable={isSolo || userData.companies.length <= 1}
+						disable={userData.companies.length <= 1}
 					/>
 
 					<Button

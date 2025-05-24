@@ -19,19 +19,33 @@ export const ProfileHeader = ({
 		<TouchableOpacity style={styles.backButton} onPress={onBackPress}>
 			<Ionicons name="chevron-back" size={28} color="#000" />
 		</TouchableOpacity>
-		<TouchableOpacity onPress={onNamePress}>
-			<Text style={[styles.headerTitle, styles.underline]}>
-				{firstName} {lastName}
-			</Text>
-		</TouchableOpacity>
+
+		<View style={styles.nameContainer}>
+			<TouchableOpacity onPress={onNamePress}>
+				<Text
+					style={[styles.headerTitle, styles.underline]}
+					numberOfLines={2}
+					ellipsizeMode="tail"
+				>
+					{firstName} {lastName}
+				</Text>
+			</TouchableOpacity>
+		</View>
 	</View>
 );
 
 const styles = StyleSheet.create({
 	header: {
-		display: "flex",
+		flexDirection: "row",
+		alignItems: "center",
 		marginBottom: 24,
-		justifyContent: "center",
+		paddingHorizontal: 20,
+		position: "relative",
+	},
+	nameContainer: {
+		flex: 1,
+		alignItems: "center",
+		paddingHorizontal: 40, // Add padding to prevent overlap with back button
 	},
 	headerTitle: {
 		fontSize: 24,
@@ -42,6 +56,7 @@ const styles = StyleSheet.create({
 		position: "absolute",
 		left: 20,
 		zIndex: 1,
+		padding: 5, // Add some padding for easier touch
 	},
 	underline: {
 		textDecorationLine: "underline",

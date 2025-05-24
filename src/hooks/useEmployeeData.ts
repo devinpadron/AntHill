@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { getUser, getUserPrivilege } from "../services/userService";
+import { batchGetUserPrivileges, batchGetUsers } from "../services/userService";
 import { subscribeAllUsersInCompany } from "../services/companyService";
 import { useUser } from "../contexts/UserContext";
 import { Role } from "../types";
@@ -27,21 +27,40 @@ export const useEmployeeData = () => {
 			const unsubscribe = subscribeAllUsersInCompany(
 				companyId,
 				async (snapshot) => {
+					// Extract all user IDs first
+					const userIds = snapshot.docs
+						.filter((doc) => doc.exists)
+						.map((doc) => doc.id);
+
+					if (userIds.length === 0) {
+						setEmployees({});
+						setRefreshing(false);
+						return;
+					}
+
+					// Batch fetch user data and privileges
+					const [usersData, userPrivileges] = await Promise.all([
+						batchGetUsers(userIds),
+						batchGetUserPrivileges(userIds, companyId),
+					]);
+
+					// Combine the data
 					const newEmployees: EmployeeMap = {};
-					for (const doc of snapshot.docs) {
-						if (!doc.exists) continue;
-						const data = await getUser(doc.id);
-						const role = await getUserPrivilege(doc.id, companyId);
-						if (data) {
-							newEmployees[doc.id] = {
-								id: doc.id,
-								firstName: data.firstName,
-								lastName: data.lastName,
-								email: data.email,
-								role: role || Role.USER,
+					userIds.forEach((userId) => {
+						const userData = usersData[userId];
+						const userRole = userPrivileges[userId] || Role.USER;
+
+						if (userData) {
+							newEmployees[userId] = {
+								id: userId,
+								firstName: userData.firstName,
+								lastName: userData.lastName,
+								email: userData.email,
+								role: userRole,
 							};
 						}
-					}
+					});
+
 					setEmployees(newEmployees);
 					setRefreshing(false);
 				},

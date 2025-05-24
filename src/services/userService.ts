@@ -155,3 +155,73 @@ export async function deleteCompanyFromUser(userID: string, companyID: string) {
 		throw e;
 	}
 }
+
+// Batch get user data using Promise.all for React Native Firebase
+export const batchGetUsers = async (
+	userIds: string[],
+): Promise<Record<string, any>> => {
+	try {
+		if (userIds.length === 0) return {};
+
+		// Use Promise.all to fetch documents in parallel
+		const userPromises = userIds.map((id) =>
+			db.collection("Users").doc(id).get(),
+		);
+
+		const userSnapshots = await Promise.all(userPromises);
+
+		// Process results into dictionary format
+		return userIds.reduce(
+			(acc, id, index) => {
+				const snapshot = userSnapshots[index];
+				if (snapshot.exists && snapshot.data()) {
+					acc[id] = snapshot.data();
+				}
+				return acc;
+			},
+			{} as Record<string, any>,
+		);
+	} catch (error) {
+		console.error("Error batch fetching users:", error);
+		return {};
+	}
+};
+
+// Batch get user privileges using Promise.all for React Native Firebase
+export const batchGetUserPrivileges = async (
+	userIds: string[],
+	companyId: string,
+): Promise<Record<string, string>> => {
+	try {
+		if (userIds.length === 0 || !companyId) return {};
+
+		// Use Promise.all to fetch documents in parallel
+		const privilegePromises = userIds.map((id) =>
+			db
+				.collection("Companies")
+				.doc(companyId)
+				.collection("Users")
+				.doc(id)
+				.get(),
+		);
+
+		const privilegeSnapshots = await Promise.all(privilegePromises);
+
+		// Process results into dictionary format
+		return userIds.reduce(
+			(acc, id, index) => {
+				const snapshot = privilegeSnapshots[index];
+				if (snapshot.exists && snapshot.data()) {
+					acc[id] = snapshot.data().role || "";
+				} else {
+					acc[id] = "";
+				}
+				return acc;
+			},
+			{} as Record<string, string>,
+		);
+	} catch (error) {
+		console.error("Error batch fetching user privileges:", error);
+		return {};
+	}
+};
