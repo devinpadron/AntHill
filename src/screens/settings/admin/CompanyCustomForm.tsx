@@ -378,7 +378,7 @@ const CompanyCustomForm = ({ navigation }) => {
 						<View style={styles.formControl}>
 							<Text style={styles.label}>Field Label</Text>
 							<TextInput
-								style={styles.input}
+								style={styles.expandableInput}
 								value={editingField.label}
 								onChangeText={(text) =>
 									setEditingField({
@@ -387,6 +387,9 @@ const CompanyCustomForm = ({ navigation }) => {
 									})
 								}
 								placeholder="Enter field label"
+								multiline
+								numberOfLines={1}
+								textAlignVertical="center"
 							/>
 						</View>
 
@@ -423,7 +426,12 @@ const CompanyCustomForm = ({ navigation }) => {
 									})
 								}
 								placeholder="Enter placeholder text"
+								maxLength={100} // Add character limit
 							/>
+							<Text style={styles.charCount}>
+								{editingField.placeholder?.length || 0}/100
+								characters
+							</Text>
 						</View>
 
 						{["select", "multiSelect"].includes(
@@ -1008,6 +1016,17 @@ const styles = StyleSheet.create({
 		flex: 1,
 		flexShrink: 1,
 	},
+	expandableInput: {
+		minHeight: 48,
+		borderWidth: 1,
+		borderColor: "#ccc",
+		borderRadius: 8,
+		paddingHorizontal: 12,
+		paddingVertical: 8,
+		fontSize: 16,
+		backgroundColor: "white",
+		textAlignVertical: "center",
+	},
 	fieldActions: {
 		flexDirection: "row",
 		alignItems: "center",
@@ -1046,6 +1065,12 @@ const styles = StyleSheet.create({
 		color: "#007AFF",
 		fontWeight: "500",
 		fontSize: 16,
+	},
+	charCount: {
+		fontSize: 12,
+		color: "#666",
+		textAlign: "right",
+		marginTop: 4,
 	},
 	fieldEditor: {
 		backgroundColor: "white",

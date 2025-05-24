@@ -58,9 +58,10 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 			case "text":
 				return (
 					<TextInput
-						style={styles.textInput}
+						style={styles.expandableInput}
 						placeholder={field.placeholder || ""}
 						value={formResponses[field.id] || ""}
+						multiline
 						onChangeText={(text) => onFieldChange(field.id, text)}
 					/>
 				);
@@ -638,6 +639,17 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 		marginTop: 4,
 		paddingHorizontal: 2,
+	},
+	expandableInput: {
+		minHeight: 48,
+		borderWidth: 1,
+		borderColor: "#ccc",
+		borderRadius: 8,
+		paddingHorizontal: 12,
+		paddingVertical: 8,
+		fontSize: 16,
+		backgroundColor: "white",
+		textAlignVertical: "center",
 	},
 });
 

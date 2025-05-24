@@ -16,7 +16,7 @@ import { reAuth, sendResetPassword } from "../services/authService";
 import { useUser } from "../contexts/UserContext";
 
 export const useProfile = () => {
-	const [isLoading, setIsLoading] = useState(true);
+	const [isLoading, setIsLoading] = useState(false);
 
 	const { user: userData, userId, isLoading: userLoading } = useUser();
 
