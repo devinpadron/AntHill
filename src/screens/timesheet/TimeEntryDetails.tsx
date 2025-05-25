@@ -1490,10 +1490,10 @@ ${companyData.name || "Management"}
 
 							{/* Actions */}
 							<View style={styles.entryActions}>
-								{((isAdmin ||
+								{(isAdmin ||
 									preferences?.allowUserEventEditing) &&
-									entry.status !== "approved") ||
-									(entry.status !== "active" && (
+									(entry.status !== "approved" ||
+										entry.status !== "active") && (
 										<TouchableOpacity
 											style={styles.editButton}
 											onPress={() =>
@@ -1509,7 +1509,7 @@ ${companyData.name || "Management"}
 												Edit
 											</Text>
 										</TouchableOpacity>
-									))}
+									)}
 							</View>
 						</View>
 					</View>

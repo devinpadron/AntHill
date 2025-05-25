@@ -12,7 +12,6 @@ import LoadingScreen from "../LoadingScreen";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import moment from "moment";
 import MapView, { Marker } from "react-native-maps";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
 // Custom hooks and utilities
 import { useEventDetails } from "../../hooks/useEventDetails";
@@ -20,8 +19,8 @@ import { getRegionForMarkers, openMap, MapMarker } from "../../utils/mapUtils";
 
 // Components
 import { EventHeader } from "../../components/eventDetails/EventHeader";
-import { AttachmentGallery } from "../../components/eventDetails/AttachmentGallery";
 import { ScrollView } from "react-native-gesture-handler";
+import AttachmentGallery from "../../components/ui/AttachmentGallery";
 
 // Types
 type RootStackParamList = {
@@ -48,11 +47,11 @@ const EventDetails = ({ navigation }) => {
 	const {
 		user,
 		event,
+		attachments,
 		workerList,
 		localNotes,
 		setLocalNotes,
 		isLoading,
-		attachments,
 		saveNotes,
 		hasEditPermission,
 	} = useEventDetails(eventId);
@@ -225,10 +224,12 @@ const EventDetails = ({ navigation }) => {
 								))}
 							</MapView>
 						)}
-					</View>
 
-					{/* Attachments */}
-					<AttachmentGallery attachments={attachments} />
+						{/* Display attachments */}
+						{attachments && attachments.length > 0 && (
+							<AttachmentGallery attachments={attachments} />
+						)}
+					</View>
 
 					{/* User Notes */}
 					<View>
@@ -355,6 +356,28 @@ const styles = StyleSheet.create({
 		fontStyle: "italic",
 		color: "#999",
 		fontWeight: "400",
+	},
+	card: {
+		backgroundColor: "#FFFFFF",
+		borderRadius: 8,
+		marginHorizontal: 12,
+		marginVertical: 8,
+		padding: 16,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.2,
+		shadowRadius: 2,
+		elevation: 2,
+	},
+	title: {
+		fontSize: 18,
+		fontWeight: "bold",
+		marginBottom: 12,
+	},
+	sectionTitle: {
+		fontSize: 16,
+		fontWeight: "600",
+		marginBottom: 12,
 	},
 });
 

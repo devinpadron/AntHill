@@ -5,15 +5,12 @@ import {
 	TextInput,
 	TouchableOpacity,
 	StyleSheet,
-	Image,
 } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import DatePicker from "react-native-date-picker";
 import { format } from "date-fns";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import { set } from "lodash";
-import { AttachmentUploader } from "../eventSubmit/AttachmentUploader";
-import { FileUpload } from "../../types";
+import AttachmentsSelector from "../ui/AttachmentsSelector";
 
 // Update the props interface to include the missing properties
 interface CustomFormRenderProps {
@@ -22,8 +19,6 @@ interface CustomFormRenderProps {
 	formErrors: any;
 	onFieldChange: (fieldId: string, value: any) => void;
 	setCustomForm: React.Dispatch<React.SetStateAction<any>>;
-	uploadingFiles?: string[]; // Add this prop
-	uploadProgress?: Record<string, number>; // Add this prop
 }
 
 /**
@@ -35,12 +30,13 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 	formErrors,
 	onFieldChange,
 	setCustomForm,
-	uploadingFiles = [], // Provide default value
-	uploadProgress = {}, // Provide default value
 }) => {
 	if (!customForm) return null;
 
 	const [multiSelect, setMultiSelect] = useState([]);
+	const [attachmentDeletionQueue, setAttachmentDeletionQueue] = useState<
+		string[]
+	>([]);
 
 	// Helper function to calculate multiplied value
 	const calculateMultiplied = (value, multiplier) => {
@@ -392,33 +388,15 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 			case "document":
 				return (
 					<View style={styles.uploaderContainer}>
-						<AttachmentUploader
-							files={formResponses[field.id] || []}
-							onFilesAdded={(files) => {
-								// Only accept documents (not images or videos)
-								const docFiles = files.filter(
-									(file) =>
-										!file.type.startsWith("image/") &&
-										!file.type.startsWith("video/"),
-								);
-								if (docFiles.length) {
-									onFieldChange(field.id, [
-										...(formResponses[field.id] || []),
-										...docFiles,
-									]);
-								}
-							}}
-							onFileDelete={(file) => {
-								const updatedFiles = (
-									formResponses[field.id] || []
-								).filter((f) => f.uri !== file.uri);
-								onFieldChange(field.id, updatedFiles);
-							}}
-							onFileUndelete={() => {}} // Not needed for new uploads
-							deletionQueue={[]}
-							uploadingFiles={uploadingFiles} // Updated to use prop
-							uploadProgress={uploadProgress} // Updated to use prop
-							docOnly={true} // New prop to restrict to documents only
+						<AttachmentsSelector
+							showDocuments
+							showMedia={false}
+							attachments={formResponses[field.id] || []}
+							setAttachments={(attachments) =>
+								onFieldChange(field.id, attachments)
+							}
+							deletionQueue={attachmentDeletionQueue}
+							setDeletionQueue={setAttachmentDeletionQueue}
 						/>
 					</View>
 				);
@@ -426,33 +404,15 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 			case "media":
 				return (
 					<View style={styles.uploaderContainer}>
-						<AttachmentUploader
-							files={formResponses[field.id] || []}
-							onFilesAdded={(files) => {
-								// Only accept images and videos
-								const mediaFiles = files.filter(
-									(file) =>
-										file.type.startsWith("image/") ||
-										file.type.startsWith("video/"),
-								);
-								if (mediaFiles.length) {
-									onFieldChange(field.id, [
-										...(formResponses[field.id] || []),
-										...mediaFiles,
-									]);
-								}
-							}}
-							onFileDelete={(file) => {
-								const updatedFiles = (
-									formResponses[field.id] || []
-								).filter((f) => f.uri !== file.uri);
-								onFieldChange(field.id, updatedFiles);
-							}}
-							onFileUndelete={() => {}} // Not needed for new uploads
-							deletionQueue={[]}
-							uploadingFiles={uploadingFiles} // Updated to use prop
-							uploadProgress={uploadProgress} // Updated to use prop
-							mediaOnly={true} // New prop to restrict to media only
+						<AttachmentsSelector
+							showDocuments={false}
+							showMedia
+							attachments={formResponses[field.id] || []}
+							setAttachments={(attachments) =>
+								onFieldChange(field.id, attachments)
+							}
+							deletionQueue={attachmentDeletionQueue}
+							setDeletionQueue={setAttachmentDeletionQueue}
 						/>
 					</View>
 				);

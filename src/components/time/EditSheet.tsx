@@ -11,11 +11,8 @@ import {
 	TextInput,
 	TouchableOpacity,
 	StyleSheet,
-	Dimensions,
 	Switch,
-	Platform,
 	Alert,
-	Keyboard,
 } from "react-native";
 import BottomSheet, {
 	BottomSheetScrollView,
@@ -24,13 +21,9 @@ import BottomSheet, {
 import Icon from "react-native-vector-icons/MaterialIcons";
 import { BottomSheetMethods } from "@gorhom/bottom-sheet/lib/typescript/types";
 import DatePicker from "react-native-date-picker";
-import DropDownPicker from "react-native-dropdown-picker";
 import { format, differenceInSeconds } from "date-fns";
 import { useUser } from "../../contexts/UserContext";
-import { AttachmentUploader } from "../eventSubmit/AttachmentUploader";
-import { FileUpload } from "../../types";
-import { uploadFile } from "../../utils/fileUtils";
-import { deleteTimeEntryAttachments } from "../../services/timeEntryService";
+import CustomFormRender from "./CustomFormRender";
 
 // Define interface for component props
 interface EditSheetProps {
@@ -44,7 +37,7 @@ interface EditSheetProps {
 	setEditChangeSummary: (value: string) => void;
 	onClose: () => void;
 	onSave: (updates: any) => void;
-	onDelete?: (timeEntryId: string) => void; // Add this new prop
+	onDelete?: (timeEntryId: string) => void;
 }
 
 // Use forwardRef with proper typing
@@ -61,7 +54,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 			setEditChangeSummary,
 			onClose,
 			onSave,
-			onDelete, // Add this new prop
+			onDelete,
 		},
 		ref,
 	) => {
@@ -78,11 +71,12 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 		const [showInPicker, setShowInPicker] = useState(false);
 		const [showOutPicker, setShowOutPicker] = useState(false);
 		const [formResponses, setFormResponses] = useState<any>({});
-		const [uploadingFiles, setUploadingFiles] = useState<string[]>([]);
-		const [uploadProgress, setUploadProgress] = useState<
-			Record<string, number>
-		>({});
-		const [deletionQueue, setDeletionQueue] = useState<string[]>([]);
+
+		// State for form errors
+		const [formErrors, setFormErrors] = useState<Record<string, string>>(
+			{},
+		);
+		const [formState, setFormState] = useState(customForm);
 
 		const { userId, user } = useUser();
 
@@ -121,6 +115,19 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 			}
 		}, [timeEntry]);
 
+		// Initialize form state when customForm changes
+		useEffect(() => {
+			if (customForm) {
+				// Initialize form with isOpen and showPicker properties
+				const updatedFields = customForm.fields.map((field) => ({
+					...field,
+					isOpen: false,
+					showPicker: false,
+				}));
+				setFormState({ ...customForm, fields: updatedFields });
+			}
+		}, [customForm]);
+
 		// Handle sheet visibility using our local ref
 		useEffect(() => {
 			if (visible && bottomSheetRef.current) {
@@ -130,80 +137,31 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 			}
 		}, [visible]);
 
+		const validateFormResponses = () => {
+			const errors: Record<string, string> = {};
+
+			if (customForm && customForm.fields) {
+				customForm.fields.forEach((field) => {
+					if (
+						field.required &&
+						(!formResponses[field.id] ||
+							formResponses[field.id] === "")
+					) {
+						errors[field.id] = `${field.label} is required`;
+					}
+				});
+			}
+
+			setFormErrors(errors);
+			return Object.keys(errors).length === 0;
+		};
+
 		// Handle form response changes
 		const handleFormResponseChange = (fieldId: string, value: any) => {
 			setFormResponses((prev) => ({
 				...prev,
 				[fieldId]: value,
 			}));
-		};
-
-		// Update this function to correctly check for file IDs
-		const handleFileDelete = (fieldId: string, file: FileUpload) => {
-			// Files from Firebase have either 'id' or are identified by their path/name
-			if (file.path || file.id) {
-				// Add the file identifier (path or id) to the deletion queue
-				const fileIdentifier = file.id || file.path;
-				const updatedDeletionQueue = [...deletionQueue, fileIdentifier];
-
-				// Also add the thumbnail path if it exists (for videos/images)
-				if (file.thumbnailPath) {
-					updatedDeletionQueue.push(file.thumbnailPath);
-					console.log(
-						`Added thumbnail to deletion queue: ${file.thumbnailPath}`,
-					);
-				}
-
-				setDeletionQueue(updatedDeletionQueue);
-				console.log(`Added file to deletion queue: ${fileIdentifier}`);
-			} else {
-				// For new files that haven't been uploaded yet (only have URI)
-				const updatedFiles = (formResponses[fieldId] || []).filter(
-					(f: FileUpload) => f.uri !== file.uri,
-				);
-				handleFormResponseChange(fieldId, updatedFiles);
-			}
-		};
-
-		// Also update the undelete handler
-		const handleFileUndelete = (fieldId: string, file: FileUpload) => {
-			const fileIdentifier = file.id || file.path;
-			if (fileIdentifier) {
-				// Remove both the file and its thumbnail (if exists) from deletion queue
-				let updatedQueue = deletionQueue.filter(
-					(id) => id !== fileIdentifier,
-				);
-
-				// Also remove thumbnail path if it exists
-				if (file.thumbnailPath) {
-					updatedQueue = updatedQueue.filter(
-						(id) => id !== file.thumbnailPath,
-					);
-				}
-
-				setDeletionQueue(updatedQueue);
-			}
-		};
-
-		// Toggle dropdown open state
-		const toggleDropdown = (
-			fieldId: string,
-			isOpenValue: React.SetStateAction<boolean>,
-		) => {
-			// Convert SetStateAction<boolean> to boolean
-			const isOpen =
-				typeof isOpenValue === "function"
-					? isOpenValue(openDropdowns[fieldId] || false)
-					: isOpenValue;
-
-			setOpenDropdowns((prev) => {
-				const newState = { ...prev };
-				// Close all other dropdowns
-				Object.keys(newState).forEach((key) => {
-					newState[key] = key === fieldId ? isOpen : false;
-				});
-				return newState;
-			});
 		};
 
 		// Handle save with all updated values
@@ -222,131 +180,24 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 				return;
 			}
 
+			// Validate form responses
+			const isFormValid = validateFormResponses();
+			if (!isFormValid) {
+				Alert.alert(
+					"Required Fields",
+					"Please fill out all required fields",
+				);
+				return;
+			}
+
 			try {
-				// Process any new file uploads in custom form fields
-				const newFormResponses = { ...formResponses };
-				let hasFilesToUpload = false;
-				const filesToUpload: {
-					fieldId: string;
-					files: FileUpload[];
-				}[] = [];
-
-				// Identify fields with new files to upload
-				if (customForm && customForm.fields) {
-					for (const field of customForm.fields) {
-						if (
-							(field.type === "document" ||
-								field.type === "media") &&
-							newFormResponses[field.id]
-						) {
-							// Filter out files in the deletion queue
-							let files = newFormResponses[field.id];
-							if (files && Array.isArray(files)) {
-								// Remove files that are in the deletion queue
-								files = files.filter((file) => {
-									const fileIdentifier = file.id || file.path;
-									return (
-										!fileIdentifier ||
-										!deletionQueue.includes(fileIdentifier)
-									);
-								});
-								newFormResponses[field.id] = files;
-
-								// Find files that need to be uploaded
-								const newFiles = files.filter(
-									(file) => !file.id && file.uri,
-								);
-								if (newFiles.length > 0) {
-									hasFilesToUpload = true;
-									filesToUpload.push({
-										fieldId: field.id,
-										files: newFiles,
-									});
-								}
-							}
-						}
-					}
-				}
-
-				// If there are files in the deletion queue, delete them
-
-				if (deletionQueue.length > 0) {
-					try {
-						await deleteTimeEntryAttachments(deletionQueue);
-					} catch (error) {
-						console.error("Error deleting attachments:", error);
-					}
-				}
-
-				// Process uploads (existing code)
-				if (hasFilesToUpload) {
-					try {
-						// Get all files that need to be uploaded
-						const allFilesToUpload = filesToUpload.flatMap(
-							(item) => item.files,
-						);
-
-						// Start tracking uploads
-						setUploadingFiles(
-							allFilesToUpload.map((file) => file.uri),
-						);
-
-						// Upload each file
-						for (const fileGroup of filesToUpload) {
-							const uploadedFiles = await Promise.all(
-								fileGroup.files.map(async (file) => {
-									try {
-										const uploadedFile = await uploadFile(
-											file,
-											timeEntry.id, // Using time entry ID as reference
-											user.loggedInCompany, // Assuming this is the company ID
-											(uri, progress) => {
-												setUploadProgress((prev) => ({
-													...prev,
-													[uri]: progress,
-												}));
-											},
-										);
-										return uploadedFile;
-									} catch (error) {
-										console.error(
-											"Error uploading file:",
-											error,
-										);
-										return file; // Return original file on error
-									}
-								}),
-							);
-
-							// Update form responses with uploaded files
-							const existingFiles = newFormResponses[
-								fileGroup.fieldId
-							].filter((file) => file.id || file.url);
-							newFormResponses[fileGroup.fieldId] = [
-								...existingFiles,
-								...uploadedFiles,
-							];
-						}
-					} catch (error) {
-						console.error("Error processing file uploads:", error);
-						Alert.alert(
-							"Error",
-							"Failed to upload some files. Please try again.",
-						);
-						return;
-					} finally {
-						setUploadingFiles([]);
-						setUploadProgress({});
-					}
-				}
-
 				// Update the time entry with the updated form responses
 				const updates = {
 					notes: editNotes,
 					clockInTime: clockInDate.toISOString(),
 					clockOutTime: clockOutDate.toISOString(),
 					duration: duration,
-					formResponses: newFormResponses,
+					formResponses: formResponses,
 					status: "edited",
 					editHistory: timeEntry.editHistory
 						? [
@@ -393,9 +244,6 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 				};
 
 				onSave(updates);
-
-				// Reset the deletion queue
-				setDeletionQueue([]);
 			} catch (error) {
 				console.error("Error saving changes:", error);
 				Alert.alert(
@@ -427,273 +275,6 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 					},
 				],
 			);
-		};
-
-		// Render form field based on type
-		const renderFormField = (field: any) => {
-			const value = formResponses[field.id];
-
-			switch (field.type) {
-				case "text":
-					return (
-						<TextInput
-							style={styles.formInput}
-							value={value?.toString() || ""}
-							onChangeText={(text) =>
-								handleFormResponseChange(field.id, text)
-							}
-							placeholder={
-								field.placeholder ||
-								`Enter ${field.label.toLowerCase()}`
-							}
-						/>
-					);
-
-				case "number":
-					return (
-						<TextInput
-							style={styles.formInput}
-							value={value?.toString() || ""}
-							onChangeText={(text) =>
-								handleFormResponseChange(field.id, text)
-							}
-							keyboardType="numeric"
-							placeholder={
-								field.placeholder ||
-								`Enter ${field.label.toLowerCase()}`
-							}
-						/>
-					);
-
-				case "checkbox":
-					return (
-						<Switch
-							value={value === true}
-							onValueChange={(val) =>
-								handleFormResponseChange(field.id, val)
-							}
-							trackColor={{ false: "#ddd", true: "#007AFF" }}
-						/>
-					);
-
-				case "select":
-					return (
-						<View style={styles.dropdownContainer}>
-							<DropDownPicker
-								open={openDropdowns[field.id] || false}
-								value={value || ""}
-								items={(field.options || []).map(
-									(option: string) => ({
-										label: option,
-										value: option,
-									}),
-								)}
-								setOpen={(isOpen) =>
-									toggleDropdown(field.id, isOpen)
-								}
-								setValue={(callback) => {
-									const newValue =
-										typeof callback === "function"
-											? callback(value)
-											: callback;
-									handleFormResponseChange(
-										field.id,
-										newValue,
-									);
-								}}
-								style={styles.dropdown}
-								dropDownContainerStyle={styles.dropdownList}
-								placeholder={
-									field.placeholder ||
-									`Select ${field.label.toLowerCase()}`
-								}
-								listMode="SCROLLVIEW"
-								scrollViewProps={{
-									nestedScrollEnabled: true,
-								}}
-							/>
-						</View>
-					);
-
-				case "multiSelect":
-					return (
-						<View style={styles.dropdownContainer}>
-							<DropDownPicker
-								multiple={true}
-								open={openDropdowns[field.id] || false}
-								value={Array.isArray(value) ? value : []}
-								items={(field.options || []).map(
-									(option: string) => ({
-										label: option,
-										value: option,
-									}),
-								)}
-								setOpen={(isOpen) =>
-									toggleDropdown(field.id, isOpen)
-								}
-								setValue={(callback) => {
-									const currentValues = Array.isArray(value)
-										? [...value]
-										: [];
-									const newValues =
-										typeof callback === "function"
-											? callback(currentValues)
-											: callback;
-									handleFormResponseChange(
-										field.id,
-										Array.isArray(newValues)
-											? newValues
-											: [],
-									);
-								}}
-								style={styles.dropdown}
-								dropDownContainerStyle={styles.dropdownList}
-								placeholder={
-									field.placeholder ||
-									`Select ${field.label.toLowerCase()}`
-								}
-								mode="BADGE"
-								badgeColors={["#3d7eea"]}
-								badgeTextStyle={{ color: "white" }}
-								listMode="SCROLLVIEW"
-								scrollViewProps={{
-									nestedScrollEnabled: true,
-								}}
-							/>
-						</View>
-					);
-
-				case "date":
-				case "time":
-					// For simplicity, I'm using the same picker for date/time fields
-					// In a real app, you might want to handle these differently
-					return (
-						<>
-							<TouchableOpacity
-								style={styles.datePickerButton}
-								onPress={() => {
-									setOpenDropdowns((prev) => ({
-										...prev,
-										[`${field.id}_picker`]: true,
-									}));
-								}}
-							>
-								<Text style={styles.datePickerText}>
-									{value
-										? format(
-												new Date(value),
-												field.type === "date"
-													? "MMM d, yyyy"
-													: "h:mm a",
-											)
-										: "Select..."}
-								</Text>
-								<Icon
-									name={
-										field.type === "date"
-											? "calendar-today"
-											: "access-time"
-									}
-									size={20}
-									color="#007AFF"
-								/>
-							</TouchableOpacity>
-							<DatePicker
-								modal
-								open={!!openDropdowns[`${field.id}_picker`]}
-								date={value ? new Date(value) : new Date()}
-								mode={field.type === "date" ? "date" : "time"}
-								onConfirm={(date) => {
-									setOpenDropdowns((prev) => ({
-										...prev,
-										[`${field.id}_picker`]: false,
-									}));
-									handleFormResponseChange(
-										field.id,
-										date.toISOString(),
-									);
-								}}
-								onCancel={() => {
-									setOpenDropdowns((prev) => ({
-										...prev,
-										[`${field.id}_picker`]: false,
-									}));
-								}}
-							/>
-						</>
-					);
-
-				case "document":
-					return (
-						<View style={styles.fieldAttachmentContainer}>
-							<AttachmentUploader
-								files={value || []}
-								onFilesAdded={(files) => {
-									// Only accept documents (not images or videos)
-									const docFiles = files.filter(
-										(file) =>
-											!file.type.startsWith("image/") &&
-											!file.type.startsWith("video/"),
-									);
-									if (docFiles.length) {
-										handleFormResponseChange(field.id, [
-											...(value || []),
-											...docFiles,
-										]);
-									}
-								}}
-								onFileDelete={(file) =>
-									handleFileDelete(field.id, file)
-								}
-								onFileUndelete={(file) =>
-									handleFileUndelete(field.id, file)
-								}
-								deletionQueue={deletionQueue}
-								uploadingFiles={uploadingFiles}
-								uploadProgress={uploadProgress}
-								docOnly={true}
-								deletionQueueType="path"
-							/>
-						</View>
-					);
-
-				case "media":
-					return (
-						<View style={styles.fieldAttachmentContainer}>
-							<AttachmentUploader
-								files={value || []}
-								onFilesAdded={(files) => {
-									// Only accept images and videos
-									const mediaFiles = files.filter(
-										(file) =>
-											file.type.startsWith("image/") ||
-											file.type.startsWith("video/"),
-									);
-									if (mediaFiles.length) {
-										handleFormResponseChange(field.id, [
-											...(value || []),
-											...mediaFiles,
-										]);
-									}
-								}}
-								onFileDelete={(file) =>
-									handleFileDelete(field.id, file)
-								}
-								onFileUndelete={(file) =>
-									handleFileUndelete(field.id, file)
-								}
-								deletionQueue={deletionQueue}
-								uploadingFiles={uploadingFiles}
-								uploadProgress={uploadProgress}
-								mediaOnly={true}
-								deletionQueueType="path"
-							/>
-						</View>
-					);
-
-				default:
-					return <Text>Unsupported field type: {field.type}</Text>;
-			}
 		};
 
 		// Add a function to handle focus on the summary field
@@ -843,35 +424,20 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 						</View>
 
 						{/* Form Responses Section */}
-						{customForm &&
-							customForm.fields &&
-							customForm.fields.length > 0 && (
-								<View style={styles.formSection}>
-									<Text style={styles.sectionTitle}>
-										Form Responses
-									</Text>
-									{customForm.fields.map((field: any) => (
-										<View
-											key={field.id}
-											style={styles.formField}
-										>
-											<Text style={styles.fieldLabel}>
-												{field.label}
-												{field.required && (
-													<Text
-														style={
-															styles.requiredMark
-														}
-													>
-														*
-													</Text>
-												)}
-											</Text>
-											{renderFormField(field)}
-										</View>
-									))}
-								</View>
-							)}
+						{customForm && (
+							<View style={styles.formSection}>
+								<Text style={styles.sectionTitle}>
+									Form Responses
+								</Text>
+								<CustomFormRender
+									customForm={formState}
+									formResponses={formResponses}
+									formErrors={formErrors}
+									onFieldChange={handleFormResponseChange}
+									setCustomForm={setFormState}
+								/>
+							</View>
+						)}
 
 						{/* Change Summary */}
 						<View style={styles.summarySection}>
@@ -896,7 +462,6 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 								value={editChangeSummary}
 								onChangeText={setEditChangeSummary}
 								onFocus={handleSummaryFocus}
-								blurOnSubmit={false}
 							/>
 						</View>
 					</View>
