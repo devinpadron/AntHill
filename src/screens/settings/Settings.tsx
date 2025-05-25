@@ -11,8 +11,6 @@ const Settings = ({ navigation }: any) => {
 	const { isAdmin, logout, companyId } = useUser();
 	const { preferences, isLoading } = useCompany();
 
-	//TODO: move useCompany to context
-
 	const handleLogout = () => {
 		Alert.alert("Logout", "Are you sure you want to logout?", [
 			{ text: "Cancel", style: "cancel" },
