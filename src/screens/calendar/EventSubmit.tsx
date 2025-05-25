@@ -18,7 +18,7 @@ import DropDownPicker from "react-native-dropdown-picker";
 import moment from "moment";
 import { subscribeAllUsersInCompany } from "../../services/companyService";
 import { getUser } from "../../services/userService";
-import { useEventForm, Location } from "../../hooks/useEventForm";
+import { useEventForm } from "../../hooks/useEventForm";
 import { EventFormHeader } from "../../components/eventSubmit/EventFormHeader";
 import { LocationInput } from "../../components/eventSubmit/LocationInput";
 import { AttachmentUploader } from "../../components/eventSubmit/AttachmentUploader";
