@@ -62,9 +62,7 @@ const CompanyCustomForm = ({ navigation }) => {
 				Alert.alert("Error", "Failed to load company preferences");
 			}
 		};
-		console.log("before", customForm);
 		loadPreferences();
-		console.log("after", customForm);
 	}, [companyId]);
 
 	// Save form configuration
