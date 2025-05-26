@@ -27,6 +27,8 @@ import { Button } from "../../components/ui/Button";
 import AttachmentsSelector from "../../components/ui/AttachmentsSelector";
 import { AttachmentItem } from "../../types";
 import { useUploadManager } from "../../contexts/UploadManagerContext";
+import { getEventAttachments } from "../../services/eventService";
+import { get, set } from "lodash";
 
 const EventSubmit = ({ navigation }) => {
 	const insets = useSafeAreaInsets();
@@ -88,7 +90,6 @@ const EventSubmit = ({ navigation }) => {
 	>([]);
 
 	// Add these at the top of your component
-	const [mountedRef] = useState({ current: true });
 	const isMounted = useRef(true);
 
 	// Add at the beginning of the component
@@ -126,6 +127,31 @@ const EventSubmit = ({ navigation }) => {
 	const formatTime = (time: Date, start: boolean = true) => {
 		if (start) return moment(time).format("h:mm A");
 		return moment(time).format("MMMM D, h:mm A");
+	};
+
+	// Load attachments if editing an event
+	useEffect(() => {
+		if (eventId) {
+			const fetchAttachments = async () => {
+				const attachments = await getEventAttachments(
+					currentCompany,
+					eventId,
+				);
+
+				setAttachments(attachments);
+			};
+
+			fetchAttachments();
+		}
+	}, [eventId, currentCompany]);
+
+	const canSubmit = () => {
+		if (hasFormChanged()) {
+			return true;
+		} else if (attachmentDeletionQueue.length > 0) {
+			return true;
+		}
+		return false;
 	};
 
 	const handleBackPress = () => {
@@ -520,32 +546,6 @@ const EventSubmit = ({ navigation }) => {
 								return;
 							}
 
-							// Check for invalid attachments
-							const invalidAttachments = attachments.filter(
-								(att) =>
-									!att.uri ||
-									(!att.uri.startsWith("file://") &&
-										!att.uri.startsWith("http")),
-							);
-
-							if (invalidAttachments.length > 0) {
-								Alert.alert(
-									"Warning",
-									"Some attachments may not upload properly. Continue anyway?",
-									[
-										{
-											text: "Cancel",
-											style: "cancel",
-										},
-										{
-											text: "Continue",
-											onPress: handleAttachmentSubmit,
-										},
-									],
-								);
-								return;
-							}
-
 							handleAttachmentSubmit();
 						}}
 						style={styles.submitButton}
@@ -554,7 +554,7 @@ const EventSubmit = ({ navigation }) => {
 						fullWidth
 						loading={isLoading || isUploading}
 						disabled={
-							(isEditing && !hasFormChanged()) ||
+							(isEditing && !canSubmit()) ||
 							isUploading ||
 							isLoading
 						}

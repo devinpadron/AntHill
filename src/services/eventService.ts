@@ -50,6 +50,7 @@ export async function getEventAttachments(
 		const attachmentData = attachment.data() as AttachmentItem;
 		attachments.push({
 			...attachmentData,
+			isExisting: true,
 		});
 	});
 

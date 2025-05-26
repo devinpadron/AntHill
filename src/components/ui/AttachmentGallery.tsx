@@ -783,7 +783,7 @@ const styles = StyleSheet.create<Styles>({
 	},
 	videoIndicator: {
 		position: "absolute",
-		top: "35%",
+		top: "50%",
 		left: "50%",
 		transform: [{ translateX: -14 }, { translateY: -14 }],
 		backgroundColor: "rgba(0, 0, 0, 0.3)",

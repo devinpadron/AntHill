@@ -24,6 +24,8 @@ import DatePicker from "react-native-date-picker";
 import { format, differenceInSeconds } from "date-fns";
 import { useUser } from "../../contexts/UserContext";
 import CustomFormRender from "./CustomFormRender";
+import { useUploadManager } from "../../contexts/UploadManagerContext";
+import { AttachmentItem } from "../../types";
 
 // Define interface for component props
 interface EditSheetProps {
@@ -71,6 +73,12 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 		const [showInPicker, setShowInPicker] = useState(false);
 		const [showOutPicker, setShowOutPicker] = useState(false);
 		const [formResponses, setFormResponses] = useState<any>({});
+		const { uploadFiles, deleteFiles, uploadProgress } = useUploadManager();
+
+		const [filesToUpload, setFilesToUpload] = useState<{
+			[fieldId: string]: AttachmentItem[];
+		}>({});
+		const [deletionQueue, setDeletionQueue] = useState<string[]>([]);
 
 		// State for form errors
 		const [formErrors, setFormErrors] = useState<Record<string, string>>(
@@ -79,11 +87,6 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 		const [formState, setFormState] = useState(customForm);
 
 		const { userId, user } = useUser();
-
-		// Dropdown states
-		const [openDropdowns, setOpenDropdowns] = useState<{
-			[key: string]: boolean;
-		}>({});
 
 		// Calculate duration based on clock in/out times
 		const calculateDuration = (): number => {
@@ -157,11 +160,32 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 		};
 
 		// Handle form response changes
-		const handleFormResponseChange = (fieldId: string, value: any) => {
+		const handleFormResponseChange = (
+			fieldId: string,
+			fieldType,
+			value: any,
+		) => {
 			setFormResponses((prev) => ({
 				...prev,
 				[fieldId]: value,
 			}));
+
+			// If this is a document or media field, track files that need uploading
+			if (fieldType === "document" || fieldType === "media") {
+				if (Array.isArray(value)) {
+					// Find files that don't have a downloadUrl (new uploads)
+					const newFiles = value.filter(
+						(file) => !file.downloadUrl && !file.url,
+					);
+
+					if (newFiles.length > 0) {
+						setFilesToUpload((prev) => ({
+							...prev,
+							[fieldId]: newFiles,
+						}));
+					}
+				}
+			}
 		};
 
 		// Handle save with all updated values
@@ -191,13 +215,121 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 			}
 
 			try {
+				// First process deletions if there are any files in the deletion queue
+				if (deletionQueue.length > 0) {
+					try {
+						await deleteFiles(
+							deletionQueue,
+							user.loggedInCompany,
+							timeEntry.id,
+							"TimeEntries",
+						);
+						console.log(`Deleted ${deletionQueue.length} files`);
+					} catch (deleteError) {
+						console.error("Error deleting files:", deleteError);
+						Alert.alert(
+							"Warning",
+							"Some files could not be deleted. Continuing with save.",
+						);
+					}
+				}
+
+				// Process uploads if there are any new files to upload
+				const pendingUploads = Object.values(filesToUpload).flat();
+				let updatedFormResponses = { ...formResponses };
+
+				if (pendingUploads.length > 0) {
+					try {
+						// Create temporary IDs for files if they don't have them
+						const filesWithIds = pendingUploads.map((file) => ({
+							...file,
+							id:
+								file.id ||
+								`file-${Date.now()}-${Math.random()
+									.toString(36)
+									.substring(2, 9)}`,
+						}));
+
+						// Upload the files
+						const uploadedFiles = await uploadFiles(
+							filesWithIds,
+							user.loggedInCompany,
+							timeEntry.id,
+							"TimeEntries",
+						);
+
+						// Update form responses with uploaded file references
+						Object.keys(filesToUpload).forEach((fieldId) => {
+							const fieldFiles = [
+								...(formResponses[fieldId] || []),
+							];
+
+							// Replace local files with uploaded versions
+							const updatedFiles = fieldFiles.map((file) => {
+								// Check if this is a file that was just uploaded
+								const uploadedFile = uploadedFiles.find(
+									(u) =>
+										file.uri === u.uri ||
+										(file.id && file.id === u.id),
+								);
+								return uploadedFile || file;
+							});
+
+							updatedFormResponses[fieldId] = updatedFiles;
+						});
+					} catch (uploadError) {
+						console.error("Error uploading files:", uploadError);
+						Alert.alert(
+							"Error",
+							"Failed to upload some files. Please try again.",
+						);
+						return;
+					}
+				}
+
+				// For fields with files, filter out any that were marked for deletion
+				if (customForm && customForm.fields) {
+					customForm.fields.forEach((field) => {
+						if (
+							(field.type === "document" ||
+								field.type === "media") &&
+							updatedFormResponses[field.id]
+						) {
+							const files = updatedFormResponses[field.id];
+							if (Array.isArray(files)) {
+								// Filter out files that are in the deletion queue
+								updatedFormResponses[field.id] = files.filter(
+									(file) => {
+										const fileId = file.id || file.path;
+										const fileInDeletionQueue =
+											fileId &&
+											deletionQueue.includes(fileId);
+
+										// Also check if thumbnail is in deletion queue
+										const thumbnailInDeletionQueue =
+											file.thumbnailPath &&
+											deletionQueue.includes(
+												file.thumbnailPath,
+											);
+
+										return (
+											!fileInDeletionQueue &&
+											!thumbnailInDeletionQueue
+										);
+									},
+								);
+							}
+						}
+					});
+				}
+
 				// Update the time entry with the updated form responses
 				const updates = {
 					notes: editNotes,
 					clockInTime: clockInDate.toISOString(),
 					clockOutTime: clockOutDate.toISOString(),
 					duration: duration,
-					formResponses: formResponses,
+					formResponses: updatedFormResponses,
 					status: "edited",
 					editHistory: timeEntry.editHistory
 						? [
@@ -243,6 +375,11 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 							],
 				};
 
+				// Reset tracking states
+				setFilesToUpload({});
+				setDeletionQueue([]);
+
+				// Save the updated entry
 				onSave(updates);
 			} catch (error) {
 				console.error("Error saving changes:", error);
@@ -435,6 +572,9 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 									formErrors={formErrors}
 									onFieldChange={handleFormResponseChange}
 									setCustomForm={setFormState}
+									uploadProgress={uploadProgress}
+									deletionQueue={deletionQueue}
+									setDeletionQueue={setDeletionQueue}
 								/>
 							</View>
 						)}

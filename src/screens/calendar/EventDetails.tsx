@@ -7,7 +7,7 @@ import {
 	Animated,
 	TouchableOpacity,
 } from "react-native";
-import { RouteProp, useRoute } from "@react-navigation/native";
+import { RouteProp, useFocusEffect, useRoute } from "@react-navigation/native";
 import LoadingScreen from "../LoadingScreen";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import moment from "moment";
@@ -54,7 +54,15 @@ const EventDetails = ({ navigation }) => {
 		isLoading,
 		saveNotes,
 		hasEditPermission,
+		setRefreshKey,
 	} = useEventDetails(eventId);
+
+	// Add this new effect to refresh data when screen comes into focus
+	useFocusEffect(
+		React.useCallback(() => {
+			setRefreshKey((prevKey) => prevKey + 1);
+		}, [eventId]),
+	);
 
 	const handleDoubleTap = () => {
 		const now = Date.now();

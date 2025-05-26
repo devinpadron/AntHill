@@ -1,7 +1,6 @@
 import db from "../constants/firestore";
-import { TimeEntry } from "../types";
+import { AttachmentItem, TimeEntry } from "../types";
 import * as FileSystem from "expo-file-system";
-import storage, { list } from "@react-native-firebase/storage";
 
 export const clockIn = async (userId: string, companyId: string) => {
 	const timeEntryRef = db
@@ -117,6 +116,29 @@ export const getTimeEntries = async (
 		...doc.data(),
 	}));
 };
+
+export async function getTimeEntryAttachments(
+	company: string,
+	timeEntryId: string,
+): Promise<AttachmentItem[]> {
+	const timeEntry = await db
+		.collection("Companies")
+		.doc(company)
+		.collection("TimeEntries")
+		.doc(timeEntryId)
+		.collection("Attachments")
+		.get();
+	const attachments: AttachmentItem[] = [];
+	timeEntry.forEach((attachment) => {
+		const attachmentData = attachment.data() as AttachmentItem;
+		attachments.push({
+			...attachmentData,
+			isExisting: true,
+		});
+	});
+
+	return attachments;
+}
 
 export const subscribeToActiveTimeEntry = (
 	userId: string,
@@ -529,37 +551,9 @@ export const deleteTimeEntry = async (
 			.collection("TimeEntries")
 			.doc(timeEntryId)
 			.delete();
-
-		storage()
-			.ref(`companies/${companyId}/events/${timeEntryId}`)
-			.listAll()
-			.then((listResult) => {
-				listResult.prefixes.forEach((folderRef) => {
-					//console.log(folderRef);
-					folderRef.listAll().then((subListResult) => {
-						subListResult.items.forEach((fileRef) => {
-							//console.log(fileRef);
-							fileRef.delete();
-						});
-					});
-				});
-			});
-
 		return { success: true };
 	} catch (error) {
 		console.error("Error deleting time entry:", error);
 		throw error;
-	}
-};
-
-export const deleteTimeEntryAttachments = async (attachments: string[]) => {
-	try {
-		for (const attachment of attachments) {
-			const fileRef = storage().ref(attachment).delete();
-		}
-		return true;
-	} catch (e) {
-		console.error("Error deleting attachments:", e);
-		throw e;
 	}
 };

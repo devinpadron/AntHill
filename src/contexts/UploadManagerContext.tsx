@@ -85,6 +85,7 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
 			// Process each attachment in sequence
 			for (let i = 0; i < attachmentsToUpload.length; i++) {
 				const attachment = attachmentsToUpload[i];
+				const hasThumbnail = !!attachment.thumbnailUri;
 
 				// Update status to uploading
 				setUploadProgress((prev) => ({
@@ -103,16 +104,22 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
 					// Upload file with progress tracking
 					const task = storageRef.putFile(attachment.uri);
 
-					// Set up progress tracking
+					// Set up progress tracking - main file is 80% of total progress if there's a thumbnail
 					task.on("state_changed", (snapshot) => {
-						const progress =
+						const mainFileProgress =
 							(snapshot.bytesTransferred / snapshot.totalBytes) *
 							100;
+
+						// If this file has a thumbnail, the main file is worth 80% of total progress
+						const adjustedProgress = hasThumbnail
+							? mainFileProgress * 0.8 // Main file is 80% of progress
+							: mainFileProgress; // No thumbnail = 100% of progress
+
 						setUploadProgress((prev) => ({
 							...prev,
 							[attachment.id]: {
 								...prev[attachment.id],
-								progress: progress,
+								progress: adjustedProgress,
 							},
 						}));
 					});
@@ -126,33 +133,38 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
 					// Handle thumbnail upload if it exists
 					let thumbnailUrl = null;
 					if (attachment.thumbnailUri) {
-						// Update progress to show we're working on thumbnail
-						setUploadProgress((prev) => ({
-							...prev,
-							[attachment.id]: {
-								...prev[attachment.id],
-								progress: 80, // Indicate we're working on thumbnail
-							},
-						}));
-
 						// Create separate storage reference for thumbnail
 						const thumbnailPath = `companies/${companyId}/${parentType}/${parentId}/${attachment.id}_thumbnail`;
 						const thumbnailRef = storage().ref(thumbnailPath);
 
-						// Upload thumbnail file
-						await thumbnailRef.putFile(attachment.thumbnailUri);
+						// Upload thumbnail file with progress tracking
+						const thumbnailTask = thumbnailRef.putFile(
+							attachment.thumbnailUri,
+						);
+
+						// Track thumbnail progress (represents final 20% of total progress)
+						thumbnailTask.on("state_changed", (snapshot) => {
+							const thumbnailProgress =
+								(snapshot.bytesTransferred /
+									snapshot.totalBytes) *
+								100;
+							// Main file was 80%, thumbnail is remaining 20%
+							const totalProgress = 80 + thumbnailProgress * 0.2;
+
+							setUploadProgress((prev) => ({
+								...prev,
+								[attachment.id]: {
+									...prev[attachment.id],
+									progress: totalProgress,
+								},
+							}));
+						});
+
+						// Wait for thumbnail upload to complete
+						await thumbnailTask;
 
 						// Get thumbnail download URL
 						thumbnailUrl = await thumbnailRef.getDownloadURL();
-
-						// Update progress after thumbnail upload
-						setUploadProgress((prev) => ({
-							...prev,
-							[attachment.id]: {
-								...prev[attachment.id],
-								progress: 90, // Indicate thumbnail is uploaded
-							},
-						}));
 					}
 
 					// Create Firestore entry
@@ -164,7 +176,7 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
 						storageRef: storagePath,
 						downloadUrl,
 						createdAt: new Date(),
-						thumbnailUrl: thumbnailUrl, // Use the uploaded thumbnail URL
+						thumbnailUrl: thumbnailUrl,
 						thumbnailStorageRef: thumbnailUrl
 							? `companies/${companyId}/${parentType}/${parentId}/${attachment.id}_thumbnail`
 							: null,
@@ -193,8 +205,8 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
 					const updatedAttachment: AttachmentItem = {
 						...attachment,
 						isExisting: true,
-						uri: downloadUrl, // Update the URI to the download URL
-						thumbnailUri: thumbnailUrl || attachment.thumbnailUri, // Update thumbnail URI if available
+						uri: downloadUrl,
+						thumbnailUri: thumbnailUrl || attachment.thumbnailUri,
 					};
 
 					uploadedAttachments.push(updatedAttachment);

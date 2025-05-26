@@ -195,8 +195,9 @@ const PayrollReview = ({ navigation }) => {
 
 	// Reset to current week
 	const goToCurrentWeek = () => {
-		setStartDate(startOfWeek(new Date(), { weekStartsOn: 0 }));
-		setEndDate(endOfWeek(new Date(), { weekStartsOn: 0 }));
+		const weekStartsOn = preferences?.workWeekStarts == "sunday" ? 0 : 1;
+		setStartDate(startOfWeek(new Date(), { weekStartsOn }));
+		setEndDate(endOfWeek(new Date(), { weekStartsOn }));
 	};
 
 	// Handle date picker confirmations

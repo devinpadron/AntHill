@@ -18,7 +18,7 @@ interface ThumbnailGalleryProps {
 	media: AttachmentItem[];
 	deletionQueue: string[];
 	uploadProgress?: UploadProgressMap;
-	onDelete: (id: string, isMediaItem: boolean, isExisting: boolean) => void;
+	onDelete: (id: string, isExisting: boolean) => void;
 	onRestore: (id: string) => void;
 }
 
@@ -125,16 +125,26 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 								isDeleting && styles.deletedItem,
 							]}
 						>
-							<Image
-								source={{
-									uri:
-										item.type.includes("video") &&
-										item.thumbnailUri
+							{item.type.includes("video") && (
+								<Image
+									source={{
+										uri: item.thumbnailUri
 											? item.thumbnailUri
-											: item.uri,
-								}}
-								style={styles.mediaThumbnail}
-							/>
+											: item.thumbnailUrl,
+									}}
+									style={styles.mediaThumbnail}
+								/>
+							)}
+							{item.type.includes("image") && (
+								<Image
+									source={{
+										uri: item.uri
+											? item.uri
+											: item.downloadUrl,
+									}}
+									style={styles.mediaThumbnail}
+								/>
+							)}
 
 							{item.type.includes("video") && (
 								<View style={styles.videoIndicator}>
@@ -158,11 +168,7 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 								onPress={() =>
 									isDeleting
 										? onRestore(item.id)
-										: onDelete(
-												item.id,
-												true,
-												item.isExisting,
-											)
+										: onDelete(item.id, item.isExisting)
 								}
 								disabled={!!uploadProgress[item.id]}
 							>
@@ -220,11 +226,7 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 								onPress={() =>
 									isDeleting
 										? onRestore(item.id)
-										: onDelete(
-												item.id,
-												false,
-												item.isExisting,
-											)
+										: onDelete(item.id, item.isExisting)
 								}
 								disabled={!!uploadProgress[item.id]}
 							>

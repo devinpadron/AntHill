@@ -8,11 +8,13 @@ import {
 	ActivityIndicator,
 	Platform,
 	Keyboard,
+	Alert,
 } from "react-native";
 import { format } from "date-fns";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { getEventsByDate } from "../../services/eventService";
 import { useUser } from "../../contexts/UserContext";
+import { useUploadManager } from "../../contexts/UploadManagerContext"; // Add this import
 import moment from "moment";
 import { getCompanyPreferences } from "../../services/companyService";
 import BottomSheet, {
@@ -21,6 +23,7 @@ import BottomSheet, {
 } from "@gorhom/bottom-sheet";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CustomFormRender from "./CustomFormRender";
+import { AttachmentItem } from "../../types";
 
 const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const [notes, setNotes] = useState("");
@@ -35,6 +38,13 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const [formResponses, setFormResponses] = useState({});
 	const [formErrors, setFormErrors] = useState({});
 	const insets = useSafeAreaInsets();
+
+	// Add these for file upload tracking
+	const [filesToUpload, setFilesToUpload] = useState<{
+		[fieldId: string]: AttachmentItem[];
+	}>({});
+	const { uploadFiles, isUploading, uploadProgress, resetUploadProgress } =
+		useUploadManager();
 
 	const bottomSheetRef = useRef(null);
 	const scrollViewRef = useRef(null);
@@ -188,11 +198,29 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 		return selectedEvents.some((event) => event.id === eventId);
 	};
 
-	const handleFieldChange = (fieldId, value) => {
+	// Updated to track files that need uploading
+	const handleFieldChange = (fieldId, fieldType, value) => {
 		setFormResponses((prev) => ({
 			...prev,
 			[fieldId]: value,
 		}));
+
+		// If this is a document or media field, track files that need uploading
+		if (fieldType === "document" || fieldType === "media") {
+			if (Array.isArray(value)) {
+				// Find files that don't have a downloadUrl (new uploads)
+				const newFiles = value.filter(
+					(file) => !file.downloadUrl && !file.url,
+				);
+
+				if (newFiles.length > 0) {
+					setFilesToUpload((prev) => ({
+						...prev,
+						[fieldId]: newFiles,
+					}));
+				}
+			}
+		}
 
 		if (formErrors[fieldId]) {
 			setFormErrors((prev) => ({
@@ -228,6 +256,7 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 		return isValid;
 	};
 
+	// Updated to handle file uploads before submission
 	const handleSubmit = async () => {
 		try {
 			setIsSubmitting(true);
@@ -238,28 +267,86 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 				return;
 			}
 
-			const enrichedTimeEntry = {
-				...timeEntry,
-				notes: notes,
-				submittedAt: new Date().toISOString(),
-				status: "pending_approval",
-				connectedEvents: selectedEvents.map((event) => ({
-					eventId: event.id,
-					eventTitle: event.title,
-				})),
-				formResponses: customForm ? formResponses : null,
-			};
+			// Check if we have files to upload
+			const pendingUploads = Object.values(filesToUpload).flat();
+			if (pendingUploads.length > 0) {
+				try {
+					// Create temporary IDs for files if they don't have them
+					const filesWithIds = pendingUploads.map((file) => ({
+						...file,
+						id:
+							file.id ||
+							`file-${Date.now()}-${Math.random()
+								.toString(36)
+								.substring(2, 9)}`,
+					}));
 
-			await onSubmit(timeEntry.id, enrichedTimeEntry);
+					// Upload the files
+					const uploadedFiles = await uploadFiles(
+						filesWithIds,
+						companyId,
+						timeEntry.id,
+						"TimeEntries",
+					);
 
-			setNotes("");
-			handleClosePress();
+					// Update form responses with uploaded file references
+					const updatedFormResponses = { ...formResponses };
+
+					Object.keys(filesToUpload).forEach((fieldId) => {
+						const fieldFiles = [...(formResponses[fieldId] || [])];
+
+						// Replace local files with uploaded versions
+						const updatedFiles = fieldFiles.map((file) => {
+							const uploadedFile = uploadedFiles.find(
+								(u) =>
+									file.uri === u.uri ||
+									(file.id && file.id === u.id),
+							);
+							return uploadedFile || file;
+						});
+
+						updatedFormResponses[fieldId] = updatedFiles;
+					});
+
+					// Now submit with the updated form responses
+					await submitTimeEntry(updatedFormResponses);
+				} catch (uploadError) {
+					console.error("Error uploading files:", uploadError);
+					setError("Failed to upload files. Please try again.");
+					setIsSubmitting(false);
+					return;
+				}
+			} else {
+				// No files to upload, submit directly
+				await submitTimeEntry(formResponses);
+			}
 		} catch (err) {
 			setError("Failed to submit time entry. Please try again.");
 			console.error("Error submitting time entry:", err);
 		} finally {
 			setIsSubmitting(false);
 		}
+	};
+
+	// Helper function for the actual submission
+	const submitTimeEntry = async (finalFormResponses) => {
+		const enrichedTimeEntry = {
+			...timeEntry,
+			notes: notes,
+			submittedAt: new Date().toISOString(),
+			status: "pending_approval",
+			connectedEvents: selectedEvents.map((event) => ({
+				eventId: event.id,
+				eventTitle: event.title,
+			})),
+			formResponses: customForm ? finalFormResponses : null,
+		};
+
+		await onSubmit(timeEntry.id, enrichedTimeEntry);
+
+		setNotes("");
+		resetUploadProgress();
+		handleClosePress();
 	};
 
 	const handleNotesFocus = () => {
@@ -444,7 +531,28 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 						formErrors={formErrors}
 						onFieldChange={handleFieldChange}
 						setCustomForm={setCustomForm}
+						uploadProgress={uploadProgress}
 					/>
+				)}
+
+				{/* Add a progress indicator when uploading */}
+				{isUploading && (
+					<View style={styles.uploadProgressContainer}>
+						<ActivityIndicator size="small" color="#007AFF" />
+						<Text style={styles.uploadProgressText}>
+							Uploading files...{" "}
+							{Object.values(uploadProgress).length > 0
+								? `${Math.round(
+										Object.values(uploadProgress).reduce(
+											(acc, cur) => acc + cur.progress,
+											0,
+										) /
+											Object.values(uploadProgress)
+												.length,
+									)}%`
+								: ""}
+						</Text>
+					</View>
 				)}
 
 				<Text style={styles.notesLabel}>Notes/Comments:</Text>
@@ -675,6 +783,19 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		color: "#666",
 		marginLeft: 4,
+	},
+	uploadProgressContainer: {
+		flexDirection: "row",
+		alignItems: "center",
+		backgroundColor: "#f0f7ff",
+		padding: 12,
+		borderRadius: 8,
+		marginBottom: 16,
+	},
+	uploadProgressText: {
+		marginLeft: 8,
+		color: "#007AFF",
+		fontSize: 14,
 	},
 });
 

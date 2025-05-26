@@ -14,6 +14,7 @@ export const useEventDetails = (eventId: string) => {
 	const [workerList, setWorkerList] = useState("");
 	const [localNotes, setLocalNotes] = useState("");
 	const [isLoading, setIsLoading] = useState(true);
+	const [refreshKey, setRefreshKey] = useState(0);
 
 	// Subscribe to current user
 	const { user, isAdmin } = useUser();
@@ -47,7 +48,7 @@ export const useEventDetails = (eventId: string) => {
 		getAttachments();
 
 		console.log(attachments);
-	}, [event]);
+	}, [event, refreshKey]);
 
 	// Process event data
 	useEffect(() => {
@@ -109,5 +110,6 @@ export const useEventDetails = (eventId: string) => {
 		isLoading,
 		saveNotes,
 		hasEditPermission,
+		setRefreshKey,
 	};
 };

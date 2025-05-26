@@ -17,8 +17,17 @@ interface CustomFormRenderProps {
 	customForm: any;
 	formResponses: any;
 	formErrors: any;
-	onFieldChange: (fieldId: string, value: any) => void;
+	onFieldChange: (fieldId: string, fieldType: string, value: any) => void;
 	setCustomForm: React.Dispatch<React.SetStateAction<any>>;
+	uploadProgress?: {
+		[fileId: string]: {
+			progress: number;
+			status: "pending" | "uploading" | "complete" | "error";
+			error?: string;
+		};
+	};
+	deletionQueue?: string[];
+	setDeletionQueue?: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
 /**
@@ -30,13 +39,13 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 	formErrors,
 	onFieldChange,
 	setCustomForm,
+	uploadProgress = {},
+	deletionQueue = [],
+	setDeletionQueue,
 }) => {
 	if (!customForm) return null;
 
 	const [multiSelect, setMultiSelect] = useState([]);
-	const [attachmentDeletionQueue, setAttachmentDeletionQueue] = useState<
-		string[]
-	>([]);
 
 	// Helper function to calculate multiplied value
 	const calculateMultiplied = (value, multiplier) => {
@@ -58,7 +67,9 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 						placeholder={field.placeholder || ""}
 						value={formResponses[field.id] || ""}
 						multiline
-						onChangeText={(text) => onFieldChange(field.id, text)}
+						onChangeText={(text) =>
+							onFieldChange(field.id, field.type, text)
+						}
 					/>
 				);
 
@@ -70,7 +81,7 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 							placeholder={field.placeholder || ""}
 							value={formResponses[field.id] || ""}
 							onChangeText={(text) =>
-								onFieldChange(field.id, text)
+								onFieldChange(field.id, field.type, text)
 							}
 							keyboardType="numeric"
 						/>
@@ -97,7 +108,11 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 					<TouchableOpacity
 						style={styles.checkboxContainer}
 						onPress={() =>
-							onFieldChange(field.id, !formResponses[field.id])
+							onFieldChange(
+								field.id,
+								field.type,
+								!formResponses[field.id],
+							)
 						}
 					>
 						<View style={styles.checkbox}>
@@ -152,7 +167,7 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 							}}
 							setValue={(callback) => {
 								const value = callback(formResponses[field.id]);
-								onFieldChange(field.id, value);
+								onFieldChange(field.id, field.type, value);
 							}}
 							style={styles.dropdown}
 							dropDownContainerStyle={styles.dropdownList}
@@ -205,7 +220,7 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 							onChangeValue={(value) => {
 								// Use direct value updates as backup for rapid changes
 								if (value !== formResponses[field.id]) {
-									onFieldChange(field.id, value);
+									onFieldChange(field.id, field.type, value);
 								}
 							}}
 							style={styles.dropdown}
@@ -293,7 +308,11 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 								}
 								mode="date"
 								onConfirm={(date) => {
-									onFieldChange(field.id, date.toISOString());
+									onFieldChange(
+										field.id,
+										field.type,
+										date.toISOString(),
+									);
 									setCustomForm({
 										...customForm,
 										fields: customForm.fields.map((f) =>
@@ -360,7 +379,11 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 								}
 								mode="time"
 								onConfirm={(time) => {
-									onFieldChange(field.id, time.toISOString());
+									onFieldChange(
+										field.id,
+										field.type,
+										time.toISOString(),
+									);
 									setCustomForm({
 										...customForm,
 										fields: customForm.fields.map((f) =>
@@ -384,7 +407,6 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 						)}
 					</TouchableOpacity>
 				);
-
 			case "document":
 				return (
 					<View style={styles.uploaderContainer}>
@@ -393,15 +415,16 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 							showMedia={false}
 							attachments={formResponses[field.id] || []}
 							setAttachments={(attachments) =>
-								onFieldChange(field.id, attachments)
+								onFieldChange(field.id, field.type, attachments)
 							}
-							deletionQueue={attachmentDeletionQueue}
-							setDeletionQueue={setAttachmentDeletionQueue}
+							deletionQueue={deletionQueue}
+							setDeletionQueue={setDeletionQueue}
 						/>
 					</View>
 				);
 
 			case "media":
+				console.log(formResponses[field.id]);
 				return (
 					<View style={styles.uploaderContainer}>
 						<AttachmentsSelector
@@ -409,10 +432,11 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 							showMedia
 							attachments={formResponses[field.id] || []}
 							setAttachments={(attachments) =>
-								onFieldChange(field.id, attachments)
+								onFieldChange(field.id, field.type, attachments)
 							}
-							deletionQueue={attachmentDeletionQueue}
-							setDeletionQueue={setAttachmentDeletionQueue}
+							deletionQueue={deletionQueue}
+							setDeletionQueue={setDeletionQueue}
+							uploadProgress={uploadProgress}
 						/>
 					</View>
 				);
