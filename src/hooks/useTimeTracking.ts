@@ -11,6 +11,7 @@ import {
 } from "../services/timeEntryService";
 import { startOfWeek, endOfWeek } from "date-fns";
 import { TimeEntry } from "../types";
+import { useCompany } from "../contexts/CompanyContext";
 
 export const useTimeTracking = () => {
 	const { userId, companyId } = useUser();
@@ -21,6 +22,8 @@ export const useTimeTracking = () => {
 	const [isLoading, setIsLoading] = useState(true);
 	const [isPaused, setIsPaused] = useState(false);
 	const [isPausingOrResuming, setIsPausingOrResuming] = useState(false);
+
+	const { preferences } = useCompany();
 
 	// Get all time entries for this user
 	const fetchTimeEntries = useCallback(async () => {
@@ -74,8 +77,17 @@ export const useTimeTracking = () => {
 			return { hours: 0, minutes: 0, seconds: 0, count: 0 };
 
 		const today = new Date();
-		const weekStart = startOfWeek(today, { weekStartsOn: 0 });
-		const weekEnd = endOfWeek(today, { weekStartsOn: 0 });
+
+		// Weekly summary data
+		const weekStart =
+			preferences.workWeekStarts === "sunday"
+				? startOfWeek(new Date(), { weekStartsOn: 0 })
+				: startOfWeek(new Date(), { weekStartsOn: 1 });
+
+		const weekEnd =
+			preferences.workWeekStarts === "sunday"
+				? endOfWeek(new Date(), { weekStartsOn: 0 })
+				: endOfWeek(new Date(), { weekStartsOn: 1 });
 
 		const thisWeekEntries = timeEntries.filter((entry) => {
 			const entryDate = new Date(entry.clockInTime);

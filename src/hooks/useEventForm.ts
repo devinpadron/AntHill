@@ -7,15 +7,8 @@ import {
 	subscribeEvent,
 	updateEvent,
 } from "../services/eventService";
-import {
-	addAttachments,
-	deleteEventAttachments,
-	getEventAttachments,
-} from "../services/attachmentService";
-import { FileUpload, Event, User } from "../types";
-import { uploadFile } from "../utils/fileUtils";
+import { Event } from "../types";
 import { useUser } from "../contexts/UserContext";
-import { has } from "lodash";
 
 export type Location = {
 	[address: string]: {
@@ -36,7 +29,6 @@ export const useEventForm = (navigation, eventId?: string) => {
 	const [locations, setLocations] = useState<Location | null>(null);
 	const [assignedWorkers, setAssignedWorkers] = useState<string[]>([]);
 	const [notes, setNotes] = useState("");
-	const [files, setFiles] = useState<FileUpload[]>([]);
 	const [originalValues, setOriginalValues] = useState({
 		title: "",
 		date: new Date(),
@@ -47,7 +39,6 @@ export const useEventForm = (navigation, eventId?: string) => {
 		locations: {},
 		assignedWorkers: [],
 		notes: "",
-		files: [],
 	});
 
 	// UI state
@@ -59,15 +50,8 @@ export const useEventForm = (navigation, eventId?: string) => {
 	const [isLoading, setIsLoading] = useState(false);
 	const [isEditing, setIsEditing] = useState(!!eventId);
 	const [editID, setEditID] = useState<string | null>(eventId || null);
-
-	// Files state
-	const [uploadQueue, setUploadQueue] = useState<FileUpload[]>([]);
-	const [deletionQueue, setDeletionQueue] = useState<string[]>([]);
 	const [editingLabelForAddress, setEditingLabelForAddress] = useState("");
 	const [labelText, setLabelText] = useState("");
-	const [uploadProgress, setUploadProgress] = useState<
-		Record<string, number>
-	>({});
 
 	// Load user data
 	const { user, companyId: currentCompany } = useUser();
@@ -102,8 +86,6 @@ export const useEventForm = (navigation, eventId?: string) => {
 				setAssignedWorkers(data.assignedWorkers || []);
 				setNotes(data.notes || "");
 
-				loadAttachments(editID);
-
 				setOriginalValues({
 					title: data.title,
 					date: moment(data.date).toDate(),
@@ -118,7 +100,6 @@ export const useEventForm = (navigation, eventId?: string) => {
 					locations: data.locations || {},
 					assignedWorkers: data.assignedWorkers || [],
 					notes: data.notes || "",
-					files: files,
 				});
 			}
 			setIsLoading(false);
@@ -126,19 +107,6 @@ export const useEventForm = (navigation, eventId?: string) => {
 
 		return () => subscriber();
 	}, [currentCompany, editID, isEditing]);
-
-	// Load event attachments
-	const loadAttachments = async (eventId: string) => {
-		try {
-			const attachments = await getEventAttachments(
-				currentCompany,
-				eventId,
-			);
-			setFiles(attachments);
-		} catch (error) {
-			console.error("Error getting attachments:", error);
-		}
-	};
 
 	// Calculate event duration
 	const calculateDuration = useCallback(() => {
@@ -291,77 +259,6 @@ export const useEventForm = (navigation, eventId?: string) => {
 		});
 	}, [date, startTime, allDay]);
 
-	// Add file to upload queue
-	const addToUploadQueue = useCallback((newFiles: FileUpload[]) => {
-		setUploadQueue((prev) => [...prev, ...newFiles]);
-		setFiles((prev) => [...prev, ...newFiles]);
-	}, []);
-
-	// Delete file
-	const deleteFile = useCallback(
-		(fileToDelete: FileUpload) => {
-			if (isEditing && fileToDelete.id) {
-				setDeletionQueue((prev) => [...prev, fileToDelete.id]);
-			} else {
-				setFiles((prev) =>
-					prev.filter((file) => file.name !== fileToDelete.name),
-				);
-				setUploadQueue((prev) =>
-					prev.filter((file) => file.name !== fileToDelete.name),
-				);
-			}
-		},
-		[isEditing],
-	);
-
-	// Undo file deletion
-	const undoDeleteFile = useCallback((fileToUndo: FileUpload) => {
-		if (!fileToUndo.id) return;
-
-		setDeletionQueue((prev) => prev.filter((id) => id !== fileToUndo.id));
-	}, []);
-
-	// Upload files
-	const uploadFiles = useCallback(
-		async (eventId: string) => {
-			try {
-				// Process files in parallel with progress tracking
-				const uploadPromises = uploadQueue.map(async (file) => {
-					const uploadedFile = await uploadFile(
-						file,
-						eventId,
-						currentCompany,
-						// Progress callback
-						(uri, progress) => {
-							setUploadProgress((prev) => ({
-								...prev,
-								[uri]: progress,
-							}));
-						},
-					);
-					return uploadedFile;
-				});
-
-				const uploadedFiles = await Promise.all(uploadPromises);
-
-				// Add this line to save the attachment information to the event
-				if (uploadedFiles.length > 0) {
-					await addAttachments(
-						currentCompany,
-						eventId,
-						uploadedFiles,
-					);
-				}
-
-				return uploadedFiles;
-			} catch (error) {
-				console.error("Error uploading files:", error);
-				// ... error handling
-			}
-		},
-		[uploadQueue, currentCompany],
-	);
-
 	// Handle event submission
 	const handleSubmit = useCallback(async () => {
 		if (!validateFields()) return;
@@ -402,23 +299,10 @@ export const useEventForm = (navigation, eventId?: string) => {
 
 			if (isEditing && editID) {
 				await updateEvent(currentCompany, editID, eventData);
-
-				if (deletionQueue.length > 0) {
-					await deleteEventAttachments(
-						currentCompany,
-						editID,
-						deletionQueue,
-					);
-				}
-
-				await uploadFiles(editID);
 				eventId = editID;
 			} else {
 				eventId = await addEvent(currentCompany, eventData);
-				await uploadFiles(eventId);
 			}
-
-			navigation.pop();
 			return eventId;
 		} catch (error) {
 			console.error("Error submitting event:", error);
@@ -448,10 +332,8 @@ export const useEventForm = (navigation, eventId?: string) => {
 		assignedWorkers,
 		isEditing,
 		editID,
-		deletionQueue,
 		calculateDuration,
 		validateFields,
-		uploadFiles,
 		currentCompany,
 		navigation,
 	]);
@@ -462,13 +344,6 @@ export const useEventForm = (navigation, eventId?: string) => {
 
 		try {
 			setIsLoading(true);
-
-			await deleteEventAttachments(
-				currentCompany,
-				editID,
-				files.map((file) => file.id),
-			);
-
 			await deleteEvent(editID, currentCompany);
 			navigation.pop(2);
 		} catch (error) {
@@ -477,7 +352,7 @@ export const useEventForm = (navigation, eventId?: string) => {
 		} finally {
 			setIsLoading(false);
 		}
-	}, [currentCompany, editID, isEditing, files, navigation]);
+	}, [currentCompany, editID, isEditing, navigation]);
 
 	const hasFormChanged = useCallback(() => {
 		// If we're not editing, any content is a change
@@ -546,11 +421,6 @@ export const useEventForm = (navigation, eventId?: string) => {
 			}
 		}
 
-		// Check for file changes
-		if (deletionQueue.length > 0 || uploadQueue.length > 0) {
-			return true;
-		}
-
 		return false;
 	}, [
 		isEditing,
@@ -563,8 +433,6 @@ export const useEventForm = (navigation, eventId?: string) => {
 		notes,
 		locations,
 		assignedWorkers,
-		deletionQueue,
-		uploadQueue,
 		originalValues,
 	]);
 
@@ -585,7 +453,6 @@ export const useEventForm = (navigation, eventId?: string) => {
 		setAssignedWorkers,
 		notes,
 		setNotes,
-		files,
 		originalValues,
 
 		// UI state
@@ -601,8 +468,6 @@ export const useEventForm = (navigation, eventId?: string) => {
 		setEditingLabelForAddress,
 		labelText,
 		setLabelText,
-		deletionQueue,
-		uploadProgress,
 
 		// Methods
 		updateLocation,
@@ -611,9 +476,6 @@ export const useEventForm = (navigation, eventId?: string) => {
 		toggleDatePicker,
 		toggleAllDay,
 		toggleEndTime,
-		addToUploadQueue,
-		deleteFile,
-		undoDeleteFile,
 		handleSubmit,
 		handleDelete,
 		hasFormChanged,

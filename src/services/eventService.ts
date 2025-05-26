@@ -1,8 +1,6 @@
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
-import { Event } from "../types";
+import { AttachmentItem, Event } from "../types";
 import db from "../constants/firestore";
-import { addAttachments, getEventAttachments } from "./attachmentService";
-import moment from "moment";
 /* An EventController that contains:
   - An event interface that provides the structure of event data
   - A function that uses an eventID to pull from Firestore and retrieve the event entry
@@ -29,21 +27,34 @@ export async function getEvent(company: string, eventID: string) {
 			.collection("Events")
 			.doc(eventID)
 			.get();
-		if (eventEntry.exists) {
-			const dbData = eventEntry.data();
-			if (dbData) {
-				const attachments = await getEventAttachments(company, eventID);
-				return {
-					...dbData,
-					attachments,
-				};
-			} else {
-				return null;
-			}
-		}
+
+		return eventEntry.data() as Event;
 	} catch (e) {
 		console.error("Error getting event", e);
 	}
+}
+
+export async function getEventAttachments(
+	company: string,
+	eventID: string,
+): Promise<AttachmentItem[]> {
+	const eventEntry = await db
+		.collection("Companies")
+		.doc(company)
+		.collection("Events")
+		.doc(eventID)
+		.collection("Attachments")
+		.get();
+	const attachments: AttachmentItem[] = [];
+	eventEntry.forEach((attachment) => {
+		const attachmentData = attachment.data() as AttachmentItem;
+		attachments.push({
+			...attachmentData,
+			isExisting: true,
+		});
+	});
+
+	return attachments;
 }
 
 export function subscribeEvent(
@@ -120,8 +131,6 @@ export function subscribeAllEvents(
 
 export async function addEvent(company: string, newEvent: Event) {
 	try {
-		const { attachments, ...eventData } = newEvent;
-
 		const entry = await db
 			.collection("Companies")
 			.doc(company)
@@ -132,10 +141,6 @@ export async function addEvent(company: string, newEvent: Event) {
 		entry.update({
 			id: entryid,
 		});
-
-		if (attachments && attachments.length > 0) {
-			await addAttachments(company, entry.id, attachments);
-		}
 
 		return entryid;
 	} catch (e) {

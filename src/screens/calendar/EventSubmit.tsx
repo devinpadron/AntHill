@@ -1,5 +1,5 @@
 import "react-native-get-random-values";
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import {
 	View,
 	Text,
@@ -8,6 +8,7 @@ import {
 	TouchableOpacity,
 	Alert,
 	Platform,
+	ActivityIndicator,
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,13 +19,16 @@ import DropDownPicker from "react-native-dropdown-picker";
 import moment from "moment";
 import { subscribeAllUsersInCompany } from "../../services/companyService";
 import { getUser } from "../../services/userService";
-import { useEventForm, Location } from "../../hooks/useEventForm";
+import { useEventForm } from "../../hooks/useEventForm";
 import { EventFormHeader } from "../../components/eventSubmit/EventFormHeader";
 import { LocationInput } from "../../components/eventSubmit/LocationInput";
-import { AttachmentUploader } from "../../components/eventSubmit/AttachmentUploader";
 import { useUser } from "../../contexts/UserContext";
 import { Button } from "../../components/ui/Button";
-import { set } from "lodash";
+import AttachmentsSelector from "../../components/ui/AttachmentsSelector";
+import { AttachmentItem } from "../../types";
+import { useUploadManager } from "../../contexts/UploadManagerContext";
+import { getEventAttachments } from "../../services/eventService";
+import { get, set } from "lodash";
 
 const EventSubmit = ({ navigation }) => {
 	const insets = useSafeAreaInsets();
@@ -50,9 +54,6 @@ const EventSubmit = ({ navigation }) => {
 		setAssignedWorkers,
 		notes,
 		setNotes,
-		files,
-		originalValues,
-		uploadProgress,
 
 		// UI state
 		openSelect,
@@ -67,7 +68,6 @@ const EventSubmit = ({ navigation }) => {
 		setEditingLabelForAddress,
 		labelText,
 		setLabelText,
-		deletionQueue,
 
 		// Methods
 		updateLocation,
@@ -76,15 +76,29 @@ const EventSubmit = ({ navigation }) => {
 		toggleDatePicker,
 		toggleAllDay,
 		toggleEndTime,
-		addToUploadQueue,
-		deleteFile,
-		undoDeleteFile,
 		handleSubmit,
 		handleDelete,
 		hasFormChanged,
 	} = useEventForm(navigation, eventId);
 
 	const { companyId: currentCompany } = useUser();
+	const { uploadFiles, deleteFiles, isUploading, uploadProgress } =
+		useUploadManager();
+	const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
+	const [attachmentDeletionQueue, setAttachmentDeletionQueue] = useState<
+		string[]
+	>([]);
+
+	// Add these at the top of your component
+	const isMounted = useRef(true);
+
+	// Add at the beginning of the component
+	useEffect(() => {
+		isMounted.current = true;
+		return () => {
+			isMounted.current = false;
+		};
+	}, []);
 
 	// Load available workers
 	useEffect(() => {
@@ -115,6 +129,31 @@ const EventSubmit = ({ navigation }) => {
 		return moment(time).format("MMMM D, h:mm A");
 	};
 
+	// Load attachments if editing an event
+	useEffect(() => {
+		if (eventId) {
+			const fetchAttachments = async () => {
+				const attachments = await getEventAttachments(
+					currentCompany,
+					eventId,
+				);
+
+				setAttachments(attachments);
+			};
+
+			fetchAttachments();
+		}
+	}, [eventId, currentCompany]);
+
+	const canSubmit = () => {
+		if (hasFormChanged()) {
+			return true;
+		} else if (attachmentDeletionQueue.length > 0) {
+			return true;
+		}
+		return false;
+	};
+
 	const handleBackPress = () => {
 		if (hasFormChanged()) {
 			Alert.alert(
@@ -134,6 +173,84 @@ const EventSubmit = ({ navigation }) => {
 			);
 		} else {
 			navigation.goBack();
+		}
+	};
+
+	const handleAttachmentSubmit = async () => {
+		try {
+			if (!isMounted.current) return;
+
+			// First, create or update the event and get the ID
+			const eventId = await handleSubmit();
+
+			if (!eventId || !currentCompany) {
+				Alert.alert(
+					"Error",
+					"Unable to save event information. Please try again.",
+				);
+				return;
+			}
+
+			// Validate attachments before proceeding
+			const validAttachments = attachments.filter((att) =>
+				att.uri
+					? att.uri.startsWith("file://") ||
+						att.uri.startsWith("http")
+					: false,
+			);
+
+			if (validAttachments.length !== attachments.length) {
+				console.warn(
+					`Found ${
+						attachments.length - validAttachments.length
+					} invalid attachments`,
+				);
+			}
+
+			// First delete any files in the deletion queue
+			if (attachmentDeletionQueue.length > 0) {
+				await deleteFiles(
+					attachmentDeletionQueue,
+					currentCompany,
+					eventId,
+					"Events",
+				);
+			}
+
+			// Then upload any new files
+			if (validAttachments.length > 0) {
+				const uploadedAttachments = await uploadFiles(
+					validAttachments,
+					currentCompany,
+					eventId,
+					"Events",
+				);
+
+				// Update state with uploaded attachments (uncomment and fix this)
+				if (uploadedAttachments && uploadedAttachments.length > 0) {
+					const existingAttachments = attachments.filter(
+						(att) => att.isExisting,
+					);
+					setAttachments([
+						...existingAttachments,
+						...uploadedAttachments,
+					]);
+				}
+			}
+
+			// Clear deletion queue
+			setAttachmentDeletionQueue([]);
+
+			// Only navigate after all operations are complete
+			if (isMounted.current) {
+				navigation.pop();
+			}
+		} catch (error) {
+			console.error("Error handling attachments:", error);
+			Alert.alert(
+				"Upload Error",
+				"There was an error uploading attachments. Please try again.",
+			);
 		}
 	};
 
@@ -402,14 +519,14 @@ const EventSubmit = ({ navigation }) => {
 						{/* Attachments Section */}
 						<View style={styles.attachmentsContainer}>
 							<Text style={styles.label}>Attachments</Text>
-							<AttachmentUploader
-								files={files}
-								onFilesAdded={addToUploadQueue}
-								onFileDelete={deleteFile}
-								onFileUndelete={undoDeleteFile}
-								deletionQueue={deletionQueue}
-								uploadingFiles={Object.keys(uploadProgress)} // Pass files that are uploading
-								uploadProgress={uploadProgress} // Pass the upload progress
+							<AttachmentsSelector
+								showDocuments={true}
+								showMedia={true}
+								attachments={attachments}
+								setAttachments={setAttachments}
+								deletionQueue={attachmentDeletionQueue}
+								setDeletionQueue={setAttachmentDeletionQueue}
+								uploadProgress={uploadProgress}
 							/>
 						</View>
 					</View>
@@ -419,13 +536,28 @@ const EventSubmit = ({ navigation }) => {
 				<View style={styles.actionButtonsContainer}>
 					<Button
 						title={isEditing ? "Update Event" : "Create Event"}
-						onPress={handleSubmit}
+						onPress={() => {
+							// Validate before submitting
+							if (!title.trim()) {
+								Alert.alert(
+									"Error",
+									"Please enter a title for the event",
+								);
+								return;
+							}
+
+							handleAttachmentSubmit();
+						}}
 						style={styles.submitButton}
 						textStyle={styles.submitButtonText}
 						variant="primary"
 						fullWidth
-						loading={isLoading}
-						disabled={isEditing && !hasFormChanged()}
+						loading={isLoading || isUploading}
+						disabled={
+							(isEditing && !canSubmit()) ||
+							isUploading ||
+							isLoading
+						}
 						icon={<Ionicons name="send" size={22} color="white" />}
 					/>
 

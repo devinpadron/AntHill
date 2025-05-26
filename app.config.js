@@ -22,11 +22,16 @@ export default {
 				"aps-environment": "production",
 			},
 			infoPlist: {
-				NSPhotoLibraryUsageDescription:
-					"This app needs access to your photo library to allow you to select images for sharing.",
-				NSPhotoLibraryAddUsageDescription:
-					"This app needs access to your photo library to allow you to save images.",
 				ITSAppUsesNonExemptEncryption: false,
+				NSPhotoLibraryAddUsageDescription:
+					"AntHill needs photo library permissions to save photos",
+				NSPhotoLibraryUsageDescription:
+					"AntHill needs photo library permissions to save photos",
+				// if you allow camera, you need to add this
+				NSCameraUsageDescription:
+					"AntHill needs to access your Camera so that you can take photos",
+				NSMicrophoneUsageDescription:
+					"AntHill needs to access your microphone so that you can record audio",
 			},
 		},
 		android: {

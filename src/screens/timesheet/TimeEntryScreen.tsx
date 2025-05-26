@@ -21,6 +21,7 @@ import { submitTimeEntryForApproval } from "../../services/timeEntryService";
 import { useUser } from "../../contexts/UserContext";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback } from "react";
+import { useCompany } from "../../contexts/CompanyContext";
 
 // Time Entry Screen Component
 const TimeEntryScreen = ({ navigation }) => {
@@ -72,10 +73,18 @@ const TimeEntryScreen = ({ navigation }) => {
 		}
 	};
 
+	const { preferences } = useCompany();
+
 	// Weekly summary data
-	const today = new Date();
-	const weekStart = startOfWeek(today, { weekStartsOn: 0 });
-	const weekEnd = endOfWeek(today, { weekStartsOn: 0 });
+	const weekStart =
+		preferences.workWeekStarts === "sunday"
+			? startOfWeek(new Date(), { weekStartsOn: 0 })
+			: startOfWeek(new Date(), { weekStartsOn: 1 });
+
+	const weekEnd =
+		preferences.workWeekStarts === "sunday"
+			? endOfWeek(new Date(), { weekStartsOn: 0 })
+			: endOfWeek(new Date(), { weekStartsOn: 1 });
 
 	// Handle clock out with confirmation
 	const handleClockOut = async () => {

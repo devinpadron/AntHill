@@ -8,7 +8,6 @@ export interface Event {
 	duration: string | null;
 	notes: string;
 	assignedWorkers: string[];
-	attachments?: FileUpload[];
 }
 
 type Location = {
@@ -17,16 +16,3 @@ type Location = {
 		longitude: number;
 	};
 };
-
-export interface FileUpload {
-	uri: string;
-	name: string;
-	type: string;
-	url?: string;
-	uploadTime?: number;
-	path?: string;
-	id?: string;
-	duration?: number; // Duration in seconds for videos
-	thumbnailUrl?: string; // URL for the thumbnail image
-	thumbnailPath?: string; // Path for the thumbnail image
-}

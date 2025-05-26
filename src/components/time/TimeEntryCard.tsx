@@ -86,7 +86,7 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 	// For completed entries, use the stored duration (in seconds)
 	// For active/paused entries, use the elapsed seconds
 	const duration =
-		timeEntry.status === "completed" || timeEntry.status === "edited"
+		timeEntry.status !== "active" || timeEntry.status !== "paused"
 			? getDurationValues(timeEntry.duration || 0)
 			: getDurationValues(Math.max(0, elapsedSeconds));
 

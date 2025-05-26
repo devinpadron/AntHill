@@ -1,16 +1,20 @@
 import { useState, useEffect } from "react";
 import { getUser } from "../services/userService";
-import { subscribeEvent, updateEvent } from "../services/eventService";
-import { subscribeEventAttachments } from "../services/attachmentService";
-import { FileUpload } from "../types";
+import {
+	getEventAttachments,
+	subscribeEvent,
+	updateEvent,
+} from "../services/eventService";
 import { useUser } from "../contexts/UserContext";
+import { get, set } from "lodash";
 
 export const useEventDetails = (eventId: string) => {
 	const [event, setEvent] = useState<any>(null);
+	const [attachments, setAttachments] = useState<any[]>([]);
 	const [workerList, setWorkerList] = useState("");
 	const [localNotes, setLocalNotes] = useState("");
 	const [isLoading, setIsLoading] = useState(true);
-	const [attachments, setAttachments] = useState<FileUpload[]>([]);
+	const [refreshKey, setRefreshKey] = useState(0);
 
 	// Subscribe to current user
 	const { user, isAdmin } = useUser();
@@ -30,23 +34,21 @@ export const useEventDetails = (eventId: string) => {
 		return () => subscriber();
 	}, [user, eventId]);
 
-	// Subscribe to event attachments
 	useEffect(() => {
-		if (!event || !user) return;
+		if (!event) return;
 
-		const subscriber = subscribeEventAttachments(
-			user.loggedInCompany,
-			eventId,
-			(attachments) => {
-				const files = attachments.docs.map(
-					(doc) => doc.data() as FileUpload,
-				);
-				setAttachments(files);
-			},
-		);
+		const getAttachments = async () => {
+			const attachments = await getEventAttachments(
+				user.loggedInCompany,
+				eventId,
+			);
+			setAttachments(attachments);
+		};
 
-		return () => subscriber();
-	}, [event, user, eventId]);
+		getAttachments();
+
+		console.log(attachments);
+	}, [event, refreshKey]);
 
 	// Process event data
 	useEffect(() => {
@@ -101,12 +103,13 @@ export const useEventDetails = (eventId: string) => {
 	return {
 		user,
 		event,
+		attachments,
 		workerList,
 		localNotes,
 		setLocalNotes,
 		isLoading,
-		attachments,
 		saveNotes,
 		hasEditPermission,
+		setRefreshKey,
 	};
 };

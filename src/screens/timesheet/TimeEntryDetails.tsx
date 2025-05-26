@@ -26,6 +26,7 @@ import {
 	approveTimeEntry,
 	exportTimeEntries,
 	deleteTimeEntry,
+	getTimeEntryAttachments,
 } from "../../services/timeEntryService";
 import { getUser } from "../../services/userService";
 import { getCompanyPreferences } from "../../services/companyService";
@@ -36,7 +37,8 @@ import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import EditSheet from "../../components/time/EditSheet";
 import { useCompany } from "../../contexts/CompanyContext";
-import MediaViewer from "../../components/media/MediaViewer";
+import AttachmentGallery from "../../components/ui/AttachmentGallery";
+import { AttachmentItem } from "../../types";
 
 // Add this helper function near the top of the component
 const calculateMultipliedValue = (value, multiplier) => {
@@ -93,8 +95,6 @@ const TimeEntryDetails = ({ route, navigation }) => {
 	const [editNotes, setEditNotes] = useState("");
 	const [editDuration, setEditDuration] = useState("");
 	const [editChangeSummary, setEditChangeSummary] = useState("");
-	const [mediaViewerVisible, setMediaViewerVisible] = useState(false);
-	const [selectedMedia, setSelectedMedia] = useState(null);
 
 	// Check if current user is a manager or admin
 
@@ -112,6 +112,11 @@ const TimeEntryDetails = ({ route, navigation }) => {
 	// Bottom sheet snap points
 	const editSnapPoints = useRef(["90%"]).current;
 	const exportSnapPoints = useRef(["40%"]).current;
+
+	// Add a new state variable for storing attachments
+	const [attachmentMap, setAttachmentsMap] = useState<
+		Record<string, AttachmentItem[]>
+	>({});
 
 	useEffect(() => {
 		loadTimeEntries();
@@ -147,6 +152,28 @@ const TimeEntryDetails = ({ route, navigation }) => {
 			// Filter out any null/undefined entries
 			const validEntries = entries.filter((entry) => entry);
 			setTimeEntries(validEntries);
+
+			// Fetch attachments for each entry
+			const attachments = {};
+			await Promise.all(
+				validEntries.map(async (entry) => {
+					try {
+						// Get attachments from the subcollection
+						const entryAttachments = await getTimeEntryAttachments(
+							companyId,
+							entry.id,
+						);
+						attachments[entry.id] = entryAttachments;
+					} catch (error) {
+						console.error(
+							`Error fetching attachments for entry ${entry.id}:`,
+							error,
+						);
+						attachments[entry.id] = [];
+					}
+				}),
+			);
+			setAttachmentsMap(attachments);
 
 			// Calculate total duration
 			const totalSeconds = validEntries.reduce(
@@ -800,17 +827,6 @@ ${companyData.name || "Management"}
 		return connectedEvents.find((event) => event.id === eventId) || null;
 	};
 
-	// Open media viewer
-	const handleOpenMedia = (file) => {
-		setSelectedMedia({
-			uri: file.url || file.uri,
-			type: file.type,
-			name: file.name,
-			thumbnailUrl: file.thumbnailUrl,
-		});
-		setMediaViewerVisible(true);
-	};
-
 	// If still loading, show loading indicator
 	if (isLoading) {
 		return (
@@ -1300,126 +1316,13 @@ ${companyData.name || "Management"}
 															response,
 														) &&
 														response.length > 0 ? (
-															<View
-																style={
-																	styles.fileResponseGrid
+															<AttachmentGallery
+																attachments={
+																	attachmentMap[
+																		entry.id
+																	] || []
 																}
-															>
-																{response.map(
-																	(
-																		file,
-																		idx,
-																	) => (
-																		<TouchableOpacity
-																			key={
-																				idx
-																			}
-																			style={
-																				styles.fileResponseItem
-																			}
-																			onPress={() => {
-																				// Open file viewer based on type
-																				if (
-																					file.url
-																				) {
-																					if (
-																						file.type.startsWith(
-																							"image/",
-																						) ||
-																						file.type.startsWith(
-																							"video/",
-																						)
-																					) {
-																						// Open media viewer
-																						handleOpenMedia(
-																							file,
-																						);
-																					} else {
-																						// Open document
-																						Linking.openURL(
-																							file.url,
-																						);
-																					}
-																				}
-																			}}
-																		>
-																			{file.type.startsWith(
-																				"image/",
-																			) ? (
-																				<Image
-																					source={{
-																						uri:
-																							file.url ||
-																							file.uri,
-																					}}
-																					style={
-																						styles.fileResponseImage
-																					}
-																				/>
-																			) : file.type.startsWith(
-																					"video/",
-																			  ) ? (
-																				<View
-																					style={
-																						styles.fileResponseVideo
-																					}
-																				>
-																					<Image
-																						source={{
-																							uri:
-																								file.thumbnailUrl ||
-																								file.url ||
-																								file.uri,
-																						}}
-																						style={
-																							styles.fileResponseImage
-																						}
-																					/>
-																					<View
-																						style={
-																							styles.videoOverlay
-																						}
-																					>
-																						<Icon
-																							name="play-circle"
-																							size={
-																								28
-																							}
-																							color="#fff"
-																						/>
-																					</View>
-																				</View>
-																			) : (
-																				<View
-																					style={
-																						styles.fileResponseDoc
-																					}
-																				>
-																					<Icon
-																						name="file-document-outline"
-																						size={
-																							28
-																						}
-																						color="#666"
-																					/>
-																					<Text
-																						style={
-																							styles.fileResponseName
-																						}
-																						numberOfLines={
-																							2
-																						}
-																					>
-																						{
-																							file.name
-																						}
-																					</Text>
-																				</View>
-																			)}
-																		</TouchableOpacity>
-																	),
-																)}
-															</View>
+															/>
 														) : (
 															<Text
 																style={
@@ -1490,10 +1393,10 @@ ${companyData.name || "Management"}
 
 							{/* Actions */}
 							<View style={styles.entryActions}>
-								{((isAdmin ||
+								{(isAdmin ||
 									preferences?.allowUserEventEditing) &&
-									entry.status !== "approved") ||
-									(entry.status !== "active" && (
+									(entry.status !== "approved" ||
+										entry.status !== "active") && (
 										<TouchableOpacity
 											style={styles.editButton}
 											onPress={() =>
@@ -1509,7 +1412,7 @@ ${companyData.name || "Management"}
 												Edit
 											</Text>
 										</TouchableOpacity>
-									))}
+									)}
 							</View>
 						</View>
 					</View>
@@ -1625,12 +1528,6 @@ ${companyData.name || "Management"}
 					</View>
 				</BottomSheetScrollView>
 			</BottomSheet>
-
-			<MediaViewer
-				visible={mediaViewerVisible}
-				media={selectedMedia}
-				onClose={() => setMediaViewerVisible(false)}
-			/>
 		</View>
 	);
 };

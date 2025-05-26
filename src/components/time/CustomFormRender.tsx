@@ -5,25 +5,29 @@ import {
 	TextInput,
 	TouchableOpacity,
 	StyleSheet,
-	Image,
 } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import DatePicker from "react-native-date-picker";
 import { format } from "date-fns";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import { set } from "lodash";
-import { AttachmentUploader } from "../eventSubmit/AttachmentUploader";
-import { FileUpload } from "../../types";
+import AttachmentsSelector from "../ui/AttachmentsSelector";
 
 // Update the props interface to include the missing properties
 interface CustomFormRenderProps {
 	customForm: any;
 	formResponses: any;
 	formErrors: any;
-	onFieldChange: (fieldId: string, value: any) => void;
+	onFieldChange: (fieldId: string, fieldType: string, value: any) => void;
 	setCustomForm: React.Dispatch<React.SetStateAction<any>>;
-	uploadingFiles?: string[]; // Add this prop
-	uploadProgress?: Record<string, number>; // Add this prop
+	uploadProgress?: {
+		[fileId: string]: {
+			progress: number;
+			status: "pending" | "uploading" | "complete" | "error";
+			error?: string;
+		};
+	};
+	deletionQueue?: string[];
+	setDeletionQueue?: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
 /**
@@ -35,8 +39,9 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 	formErrors,
 	onFieldChange,
 	setCustomForm,
-	uploadingFiles = [], // Provide default value
-	uploadProgress = {}, // Provide default value
+	uploadProgress = {},
+	deletionQueue = [],
+	setDeletionQueue,
 }) => {
 	if (!customForm) return null;
 
@@ -62,7 +67,9 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 						placeholder={field.placeholder || ""}
 						value={formResponses[field.id] || ""}
 						multiline
-						onChangeText={(text) => onFieldChange(field.id, text)}
+						onChangeText={(text) =>
+							onFieldChange(field.id, field.type, text)
+						}
 					/>
 				);
 
@@ -74,7 +81,7 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 							placeholder={field.placeholder || ""}
 							value={formResponses[field.id] || ""}
 							onChangeText={(text) =>
-								onFieldChange(field.id, text)
+								onFieldChange(field.id, field.type, text)
 							}
 							keyboardType="numeric"
 						/>
@@ -101,7 +108,11 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 					<TouchableOpacity
 						style={styles.checkboxContainer}
 						onPress={() =>
-							onFieldChange(field.id, !formResponses[field.id])
+							onFieldChange(
+								field.id,
+								field.type,
+								!formResponses[field.id],
+							)
 						}
 					>
 						<View style={styles.checkbox}>
@@ -156,7 +167,7 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 							}}
 							setValue={(callback) => {
 								const value = callback(formResponses[field.id]);
-								onFieldChange(field.id, value);
+								onFieldChange(field.id, field.type, value);
 							}}
 							style={styles.dropdown}
 							dropDownContainerStyle={styles.dropdownList}
@@ -209,7 +220,7 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 							onChangeValue={(value) => {
 								// Use direct value updates as backup for rapid changes
 								if (value !== formResponses[field.id]) {
-									onFieldChange(field.id, value);
+									onFieldChange(field.id, field.type, value);
 								}
 							}}
 							style={styles.dropdown}
@@ -297,7 +308,11 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 								}
 								mode="date"
 								onConfirm={(date) => {
-									onFieldChange(field.id, date.toISOString());
+									onFieldChange(
+										field.id,
+										field.type,
+										date.toISOString(),
+									);
 									setCustomForm({
 										...customForm,
 										fields: customForm.fields.map((f) =>
@@ -364,7 +379,11 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 								}
 								mode="time"
 								onConfirm={(time) => {
-									onFieldChange(field.id, time.toISOString());
+									onFieldChange(
+										field.id,
+										field.type,
+										time.toISOString(),
+									);
 									setCustomForm({
 										...customForm,
 										fields: customForm.fields.map((f) =>
@@ -388,71 +407,36 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 						)}
 					</TouchableOpacity>
 				);
-
 			case "document":
 				return (
 					<View style={styles.uploaderContainer}>
-						<AttachmentUploader
-							files={formResponses[field.id] || []}
-							onFilesAdded={(files) => {
-								// Only accept documents (not images or videos)
-								const docFiles = files.filter(
-									(file) =>
-										!file.type.startsWith("image/") &&
-										!file.type.startsWith("video/"),
-								);
-								if (docFiles.length) {
-									onFieldChange(field.id, [
-										...(formResponses[field.id] || []),
-										...docFiles,
-									]);
-								}
-							}}
-							onFileDelete={(file) => {
-								const updatedFiles = (
-									formResponses[field.id] || []
-								).filter((f) => f.uri !== file.uri);
-								onFieldChange(field.id, updatedFiles);
-							}}
-							onFileUndelete={() => {}} // Not needed for new uploads
-							deletionQueue={[]}
-							uploadingFiles={uploadingFiles} // Updated to use prop
-							uploadProgress={uploadProgress} // Updated to use prop
-							docOnly={true} // New prop to restrict to documents only
+						<AttachmentsSelector
+							showDocuments
+							showMedia={false}
+							attachments={formResponses[field.id] || []}
+							setAttachments={(attachments) =>
+								onFieldChange(field.id, field.type, attachments)
+							}
+							deletionQueue={deletionQueue}
+							setDeletionQueue={setDeletionQueue}
 						/>
 					</View>
 				);
 
 			case "media":
+				console.log(formResponses[field.id]);
 				return (
 					<View style={styles.uploaderContainer}>
-						<AttachmentUploader
-							files={formResponses[field.id] || []}
-							onFilesAdded={(files) => {
-								// Only accept images and videos
-								const mediaFiles = files.filter(
-									(file) =>
-										file.type.startsWith("image/") ||
-										file.type.startsWith("video/"),
-								);
-								if (mediaFiles.length) {
-									onFieldChange(field.id, [
-										...(formResponses[field.id] || []),
-										...mediaFiles,
-									]);
-								}
-							}}
-							onFileDelete={(file) => {
-								const updatedFiles = (
-									formResponses[field.id] || []
-								).filter((f) => f.uri !== file.uri);
-								onFieldChange(field.id, updatedFiles);
-							}}
-							onFileUndelete={() => {}} // Not needed for new uploads
-							deletionQueue={[]}
-							uploadingFiles={uploadingFiles} // Updated to use prop
-							uploadProgress={uploadProgress} // Updated to use prop
-							mediaOnly={true} // New prop to restrict to media only
+						<AttachmentsSelector
+							showDocuments={false}
+							showMedia
+							attachments={formResponses[field.id] || []}
+							setAttachments={(attachments) =>
+								onFieldChange(field.id, field.type, attachments)
+							}
+							deletionQueue={deletionQueue}
+							setDeletionQueue={setDeletionQueue}
+							uploadProgress={uploadProgress}
 						/>
 					</View>
 				);
