@@ -14,6 +14,8 @@ import {
 import { signOut } from "../services/authService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Role } from "../types";
+import messaging from "@react-native-firebase/messaging";
+import { clearNotificationToken } from "../services/notificationService";
 
 // Define the shape of our context
 type UserContextType = {
@@ -222,7 +224,15 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 	}, [user, userId, companyId]);
 
 	const logout = async () => {
+		console.log("Logging out user:", userId);
 		try {
+			await messaging()
+				.getToken()
+				.then((token) => {
+					clearNotificationToken(token, userId);
+				});
+			await messaging().deleteToken();
+
 			await clearAuthState();
 			await signOut();
 		} catch (error) {
@@ -242,6 +252,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 		logout,
 		initializing,
 	};
+
+	console.log("UserContext initialized with user:", userId);
 
 	return (
 		<UserContext.Provider value={value}>{children}</UserContext.Provider>

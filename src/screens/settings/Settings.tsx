@@ -18,7 +18,7 @@ const Settings = ({ navigation }: any) => {
 				text: "Logout",
 				onPress: async () => {
 					try {
-						logout();
+						await logout();
 					} catch (error) {
 						console.error("Signout Error", error);
 					}

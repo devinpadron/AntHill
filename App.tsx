@@ -5,6 +5,7 @@ import { CompanyProvider, useCompany } from "./src/contexts/CompanyContext";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { UploadManagerProvider } from "./src/contexts/UploadManagerContext";
+import { NotificationProvider } from "./src/contexts/NotificationContext";
 
 // Component to initialize the company context after user auth
 const CompanyInitializer = () => {
@@ -27,8 +28,10 @@ const App: React.FC = () => {
 				<UploadManagerProvider>
 					<UserProvider>
 						<CompanyProvider>
-							<CompanyInitializer />
-							<AppNavigator />
+							<NotificationProvider>
+								<CompanyInitializer />
+								<AppNavigator />
+							</NotificationProvider>
 						</CompanyProvider>
 					</UserProvider>
 				</UploadManagerProvider>

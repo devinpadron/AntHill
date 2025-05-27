@@ -52,6 +52,7 @@ export const useAuth = () => {
 					email: user.email,
 				});
 			}
+
 			console.log("User account signed in!");
 			return true;
 		} catch (error) {

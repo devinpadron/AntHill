@@ -1,11 +1,18 @@
 import { Alert, PermissionsAndroid, Platform } from "react-native";
 import messaging from "@react-native-firebase/messaging";
+import db from "../constants/firestore";
+import firestore from "@react-native-firebase/firestore";
 
 export const requestNotificationPermissions = async () => {
 	if (Platform.OS === "android") {
-		await PermissionsAndroid.request(
+		const authStatus = await PermissionsAndroid.request(
 			PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
 		);
+		const enabled = authStatus === PermissionsAndroid.RESULTS.GRANTED;
+		if (enabled) {
+			console.log("Authorization status:", authStatus);
+		}
+		return enabled;
 	} else if (Platform.OS === "ios") {
 		const authStatus = await messaging().requestPermission();
 		const enabled =
@@ -21,7 +28,6 @@ export const requestNotificationPermissions = async () => {
 
 export const getFCMToken = async () => {
 	const token = await messaging().getToken();
-	console.log("FCM Token:", token);
 	return token;
 };
 
@@ -35,4 +41,38 @@ export const setupNotificationListeners = () => {
 	});
 
 	return unsubscribe;
+};
+
+export const saveTokenToUserProfile = async (token: string, userId: string) => {
+	try {
+		await db
+			.collection("Users")
+			.doc(userId)
+			.update({
+				fcmToken: firestore.FieldValue.arrayUnion(token),
+			});
+		console.log("FCM token saved to user profile:", userId);
+	} catch (error) {
+		console.error("Error saving FCM token to user profile:", error);
+		Alert.alert(
+			"Error",
+			"Failed to save notification token. Please try again later.",
+		);
+	}
+	return true;
+};
+
+export const clearNotificationToken = async (token: string, userId: string) => {
+	try {
+		// Use arrayRemove to remove only the specific token
+		await db
+			.collection("Users")
+			.doc(userId)
+			.update({
+				fcmToken: firestore.FieldValue.arrayRemove(token),
+			});
+		console.log("FCM token removed for user:", userId, "Token:", token);
+	} catch (error) {
+		console.error("Error removing FCM token:", error);
+	}
 };

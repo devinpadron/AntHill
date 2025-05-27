@@ -3,11 +3,11 @@ import { View, Text, StyleSheet, Alert } from "react-native";
 import { Dropdown } from "react-native-element-dropdown";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import LoadingScreen from "../LoadingScreen";
-import { signOut } from "../../services/authService";
 import { useProfile } from "../../hooks/useProfile";
 import { ProfileHeader } from "../../components/profile/ProfileHeader";
 import { showPrompt, showConfirmation } from "../../utils/alertUtils";
 import { Button } from "../../components/ui/Button";
+import { useUser } from "../../contexts/UserContext";
 
 const ProfilePage = ({ navigation }) => {
 	const insets = useSafeAreaInsets();
@@ -22,6 +22,8 @@ const ProfilePage = ({ navigation }) => {
 		resetPassword,
 		deleteAccount,
 	} = useProfile();
+
+	const { logout } = useUser();
 
 	// Handle name change flow
 	const handleNameChange = () => {
@@ -115,7 +117,7 @@ const ProfilePage = ({ navigation }) => {
 											[
 												{
 													text: "Logout",
-													onPress: signOut,
+													onPress: logout,
 												},
 											],
 										);

@@ -25,10 +25,6 @@ export const usePullEvents = (
 		(events: any[]) => {
 			if (!events || events.length === 0) return [];
 
-			console.log(
-				`Filtering ${events.length} events by type: ${filterType}`,
-			);
-
 			switch (filterType) {
 				case FilterType.ALL:
 					// Return all events
@@ -161,9 +157,6 @@ export const usePullEvents = (
 			setAgendaItems(items);
 			setMarkedDates(marks);
 			setIsLoading(false);
-			console.log(
-				`Processed ${allEvents.length} events, filtered to ${filteredEvents.length} items`,
-			);
 		};
 
 		const unsubscribe = subscribeAllEvents(companyId, handleCalendarFill);
