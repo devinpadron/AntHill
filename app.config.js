@@ -34,6 +34,7 @@ export default {
 					"AntHill needs to access your microphone so that you can record audio",
 				NSUserNotificationsUsageDescription:
 					"AntHill needs to send you notifications to keep you updated on your tasks and activities.",
+				UIBackgroundModes: ["fetch", "remote-notification"],
 			},
 		},
 		android: {
