@@ -15,7 +15,11 @@ import { signOut } from "../services/authService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Role } from "../types";
 import messaging from "@react-native-firebase/messaging";
-import { clearNotificationToken } from "../services/notificationService";
+import {
+	clearNotificationToken,
+	unsubscribeFromAllTopics,
+} from "../services/notificationService";
+import { useNotification } from "./NotificationContext";
 
 // Define the shape of our context
 type UserContextType = {
@@ -226,15 +230,31 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 	const logout = async () => {
 		console.log("Logging out user:", userId);
 		try {
-			await messaging()
-				.getToken()
-				.then((token) => {
-					clearNotificationToken(token, userId);
-				});
-			await messaging().deleteToken();
+			// Get FCM token
+			const token = await messaging().getToken();
 
-			await clearAuthState();
-			await signOut();
+			// Clear FCM token and unsubscribe from topics
+			if (token && userId) {
+				console.log("Clearing FCM token:", token);
+				await clearNotificationToken(userId, token);
+
+				// Get notification context to access topics
+				const notificationContext = useNotification();
+				if (
+					notificationContext &&
+					notificationContext.subscribedTopics.length > 0
+				) {
+					await unsubscribeFromAllTopics(
+						notificationContext.subscribedTopics,
+					);
+				}
+
+				await messaging().deleteToken();
+			}
+
+			// Continue with logout process
+			await auth().signOut();
+			// Reset any other state as needed
 		} catch (error) {
 			console.error("Error during logout:", error);
 		}
