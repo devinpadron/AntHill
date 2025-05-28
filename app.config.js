@@ -32,6 +32,8 @@ export default {
 					"AntHill needs to access your Camera so that you can take photos",
 				NSMicrophoneUsageDescription:
 					"AntHill needs to access your microphone so that you can record audio",
+				NSUserNotificationsUsageDescription:
+					"AntHill needs to send you notifications to keep you updated on your tasks and activities.",
 			},
 		},
 		android: {
