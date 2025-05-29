@@ -90,7 +90,6 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
 					}
 				}
 
-				console.log(`Formatted ${formattedWorkers.length} workers`); // Debug output
 				setAvailableWorkers(formattedWorkers);
 			} catch (error) {
 				console.error("Error fetching workers:", error);
