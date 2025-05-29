@@ -12,9 +12,5 @@ export const AppNavigator = () => {
 		return <SplashScreen />;
 	}
 
-	return (
-		<NavigationContainer>
-			{loggedIn ? <HomeTabs /> : <AuthStack />}
-		</NavigationContainer>
-	);
+	return <>{loggedIn ? <HomeTabs /> : <AuthStack />}</>;
 };

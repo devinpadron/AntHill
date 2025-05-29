@@ -31,7 +31,7 @@ const App: React.FC = () => {
 				<UploadManagerProvider>
 					<UserProvider>
 						<CompanyProvider>
-							<NavigationContainer ref={navigationRef}>
+							<NavigationContainer>
 								<NotificationProvider>
 									<NotifierWrapper>
 										<CompanyInitializer />
