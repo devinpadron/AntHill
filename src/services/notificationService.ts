@@ -35,7 +35,9 @@ export const getFCMToken = async () => {
 };
 
 // Set up notification listeners for the app
-export const setupNotificationListeners = () => {
+export const setupNotificationListeners = (
+	onNotificationTap?: (remoteMessage: any) => void,
+) => {
 	// Handle foreground messages
 	const unsubscribe = messaging().onMessage(async (remoteMessage) => {
 		Notifier.showNotification({
@@ -46,6 +48,12 @@ export const setupNotificationListeners = () => {
 			duration: 0,
 			showAnimationDuration: 800,
 			showEasing: Easing.bounce,
+			onPress: () => {
+				// When notification is tapped, trigger the callback
+				if (onNotificationTap) {
+					onNotificationTap(remoteMessage);
+				}
+			},
 		});
 	});
 

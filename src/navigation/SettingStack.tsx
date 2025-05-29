@@ -2,7 +2,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import Settings from "../screens/settings/Settings";
 import ProfilePage from "../screens/settings/ProfilePage";
 import EmployeeList from "../screens/settings/admin/EmployeeList";
-import PayrollReviewStack from "../routes/PayrollReviewStack";
+import PayrollReviewStack from "../navigation/PayrollReviewStack";
 import CompanyCustomForm from "../screens/settings/admin/CompanyCustomForm";
 import CompanyPreferences from "../screens/settings/admin/CompanyPreferences";
 

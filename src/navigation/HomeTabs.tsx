@@ -4,13 +4,12 @@ import { Ionicons } from "@expo/vector-icons";
 import CalendarStack from "./CalendarStack";
 import SettingStack from "./SettingStack";
 import ClockStack from "./ClockStack";
-import { useUser } from "../contexts/UserContext";
 import { useCompany } from "../contexts/CompanyContext";
+import messaging from "@react-native-firebase/messaging";
 
 const Tab = createBottomTabNavigator();
 
 const HomeTabs = () => {
-	const { companyId } = useUser();
 	const { preferences } = useCompany();
 
 	useEffect(() => {}, [preferences]);
