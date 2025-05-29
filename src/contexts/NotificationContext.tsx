@@ -14,8 +14,8 @@ import {
 	saveTokenToUserProfile,
 	setupNotificationListeners,
 } from "../services/notificationService";
-import { NavigationProp, useNavigation } from "@react-navigation/native";
 import { swapUserCompany } from "../services/userService";
+import { pendingNavigation } from "../navigation/navigationRef";
 
 type NotificationContextType = {
 	lastNotification: any | null;
@@ -28,63 +28,58 @@ const NotificationContext = createContext<NotificationContextType>({
 	handleNotificationNavigation: () => {},
 });
 
-// Create a reference to store the navigation object outside of components
-let navigationRef: NavigationProp<any> | null = null;
-
 export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 	const { userId, loggedIn, user, companyId } = useUser();
 	const [lastNotification, setLastNotification] = useState<any | null>(null);
-	const navigation = useNavigation();
 	const initialNotificationProcessed = useRef(false);
 
-	// Store navigation reference for use outside of components
-	useEffect(() => {
-		if (navigation) {
-			navigationRef = navigation;
-		}
-	}, [navigation]);
-
-	// Navigation handler function
+	// Updated navigation handler function
 	const handleNotificationNavigation = async (data: any) => {
 		console.log("Handling notification navigation:", data);
 
-		if (!data || !navigationRef) {
-			console.log("Cannot navigate: missing data or navigation ref");
+		if (!data) {
+			console.log("Cannot navigate: missing data");
 			return;
 		}
 
 		// Store the last notification data
 		setLastNotification(data);
 
-		// Navigate based on notification type
-		switch (data.type) {
-			case "new_user_joined":
-				if (data.screenName && data.companyId) {
-					await swapUserCompany(userId, data.companyId);
-					navigationRef.navigate(data.screenName);
-				}
-				break;
+		try {
+			// Navigate based on notification type
+			switch (data.type) {
+				case "user_left":
+				case "new_user_joined":
+					if (data.screenName && data.companyId) {
+						await swapUserCompany(userId, data.companyId);
+						// Use pendingNavigation.setAction instead of direct navigation
+						pendingNavigation.setAction(data.screenName);
+					}
+					break;
 
-			case "update":
-			case "assignment":
-				if (data.screenName && data.eventId && data.companyId) {
-					await swapUserCompany(userId, data.companyId);
-					navigationRef.navigate(data.screenName, {
-						eventId: data.eventId,
-					});
-				}
-				break;
+				case "update":
+				case "assignment":
+					if (data.screenName && data.eventId && data.companyId) {
+						await swapUserCompany(userId, data.companyId);
+						pendingNavigation.setAction(data.screenName, {
+							eventId: data.eventId,
+						});
+					}
+					break;
 
-			case "timesheet_approval":
-			case "timesheet_rejection":
-				if (data.screenName && data.timesheetId && data.companyId) {
-					await swapUserCompany(userId, data.companyId);
-					navigationRef.navigate(data.screenName, {
-						timesheetId: data.timesheetId,
-						userId: data.userId,
-					});
-				}
-				break;
+				case "timesheet_approval":
+				case "timesheet_rejection":
+					if (data.screenName && data.timesheetId && data.companyId) {
+						await swapUserCompany(userId, data.companyId);
+						pendingNavigation.setAction(data.screenName, {
+							timesheetId: data.timesheetId,
+							userId: data.userId,
+						});
+					}
+					break;
+			}
+		} catch (error) {
+			console.error("Navigation error:", error);
 		}
 	};
 
@@ -158,12 +153,10 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 							remoteMessage,
 						);
 
-						// Need a slight delay to ensure navigation is ready
-						setTimeout(() => {
-							const notificationData: any =
-								remoteMessage.data || {};
-							handleNotificationNavigation(notificationData);
-						}, 1000);
+						// Remove the setTimeout and directly handle navigation
+						// The pendingNavigation system will take care of timing
+						const notificationData: any = remoteMessage.data || {};
+						handleNotificationNavigation(notificationData);
 					}
 				});
 		}
@@ -186,3 +179,5 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 		</NotificationContext.Provider>
 	);
 };
+
+export const useNotification = () => useContext(NotificationContext);

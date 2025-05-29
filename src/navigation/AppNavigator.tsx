@@ -1,5 +1,4 @@
 import React from "react";
-import { NavigationContainer } from "@react-navigation/native";
 import HomeTabs from "../navigation/HomeTabs";
 import AuthStack from "../navigation/AuthStack";
 import SplashScreen from "../screens/SplashScreen";
@@ -12,5 +11,5 @@ export const AppNavigator = () => {
 		return <SplashScreen />;
 	}
 
-	return <>{loggedIn ? <HomeTabs /> : <AuthStack />}</>;
+	return loggedIn ? <HomeTabs /> : <AuthStack />;
 };

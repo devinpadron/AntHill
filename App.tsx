@@ -8,7 +8,10 @@ import { UploadManagerProvider } from "./src/contexts/UploadManagerContext";
 import { NotificationProvider } from "./src/contexts/NotificationContext";
 import { NotifierWrapper } from "react-native-notifier";
 import { NavigationContainer } from "@react-navigation/native";
-import { navigationRef } from "./src/navigation/navigationRef";
+import {
+	navigationRef,
+	pendingNavigation,
+} from "./src/navigation/navigationRef";
 
 // Component to initialize the company context after user auth
 const CompanyInitializer = () => {
@@ -31,7 +34,12 @@ const App: React.FC = () => {
 				<UploadManagerProvider>
 					<UserProvider>
 						<CompanyProvider>
-							<NavigationContainer>
+							<NavigationContainer
+								ref={navigationRef}
+								onReady={() => {
+									pendingNavigation.executeIfReady();
+								}}
+							>
 								<NotificationProvider>
 									<NotifierWrapper>
 										<CompanyInitializer />
