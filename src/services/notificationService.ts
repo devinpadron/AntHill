@@ -2,6 +2,7 @@ import messaging from "@react-native-firebase/messaging";
 import firestore from "@react-native-firebase/firestore";
 import { Alert, PermissionsAndroid, Platform } from "react-native";
 import db from "../constants/firestore";
+import { Notifier, Easing } from "react-native-notifier";
 
 // Request notification permissions from the user
 export const requestNotificationPermissions = async () => {
@@ -37,10 +38,15 @@ export const getFCMToken = async () => {
 export const setupNotificationListeners = () => {
 	// Handle foreground messages
 	const unsubscribe = messaging().onMessage(async (remoteMessage) => {
-		Alert.alert(
-			"New Notification",
-			remoteMessage.notification?.body || JSON.stringify(remoteMessage),
-		);
+		Notifier.showNotification({
+			title: remoteMessage.notification?.title || "New Notification",
+			description:
+				remoteMessage.notification?.body ||
+				JSON.stringify(remoteMessage),
+			duration: 0,
+			showAnimationDuration: 800,
+			showEasing: Easing.bounce,
+		});
 	});
 
 	return unsubscribe;

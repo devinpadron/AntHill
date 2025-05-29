@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { UploadManagerProvider } from "./src/contexts/UploadManagerContext";
 import { NotificationProvider } from "./src/contexts/NotificationContext";
+import { NotifierWrapper } from "react-native-notifier";
 
 // Component to initialize the company context after user auth
 const CompanyInitializer = () => {
@@ -20,7 +21,6 @@ const CompanyInitializer = () => {
 
 	return null;
 };
-
 const App: React.FC = () => {
 	return (
 		<GestureHandlerRootView style={{ flex: 1 }}>
@@ -29,8 +29,10 @@ const App: React.FC = () => {
 					<UserProvider>
 						<CompanyProvider>
 							<NotificationProvider>
-								<CompanyInitializer />
-								<AppNavigator />
+								<NotifierWrapper>
+									<CompanyInitializer />
+									<AppNavigator />
+								</NotifierWrapper>
 							</NotificationProvider>
 						</CompanyProvider>
 					</UserProvider>
