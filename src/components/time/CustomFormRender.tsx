@@ -424,7 +424,6 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 				);
 
 			case "media":
-				console.log(formResponses[field.id]);
 				return (
 					<View style={styles.uploaderContainer}>
 						<AttachmentsSelector
