@@ -4,6 +4,7 @@ import React, {
 	useEffect,
 	useState,
 	ReactNode,
+	useRef,
 } from "react";
 import messaging from "@react-native-firebase/messaging";
 import { useUser } from "./UserContext";
@@ -27,9 +28,22 @@ const NotificationContext = createContext<NotificationContextType>({
 	handleNotificationNavigation: () => {},
 });
 
+const parseIdsToArray = (idString: string): string[] => {
+	// If the string contains commas, split it into an array
+	if (idString && idString.includes(",")) {
+		return idString.split(",").map((id) => id.trim());
+	}
+	// Otherwise return it as a single-item array
+	return [idString];
+};
+
 export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 	const { userId, loggedIn, user, companyId } = useUser();
 	const [lastNotification, setLastNotification] = useState<any | null>(null);
+
+	// Add a ref to store initial notification data
+	const initialNotificationRef = useRef<any>(null);
+	const initialNotificationChecked = useRef(false);
 
 	// Updated navigation handler function
 	const handleNotificationNavigation = async (data: any) => {
@@ -75,11 +89,63 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 						});
 					}
 					break;
+
+				case "timesheet_approval_batch":
+				case "timesheet_rejection_batch":
+					if (data.screenName && data.timesheetId && data.companyId) {
+						await swapUserCompany(userId, data.companyId);
+						pendingNavigation.setAction(data.screenName, {
+							entryId: parseIdsToArray(data.timesheetId),
+							userId: data.userId,
+						});
+					}
+					break;
 			}
 		} catch (error) {
 			console.error("Navigation error:", error);
 		}
 	};
+
+	// First effect - check for initial notification immediately on mount
+	// This runs before auth is ready but captures the notification
+	useEffect(() => {
+		// Only check once
+		if (initialNotificationChecked.current) return;
+
+		initialNotificationChecked.current = true;
+
+		// Check if app was opened from a notification (app was closed)
+		messaging()
+			.getInitialNotification()
+			.then((remoteMessage) => {
+				if (remoteMessage) {
+					console.log(
+						"Captured initial notification from quit state:",
+						remoteMessage,
+					);
+
+					// Store notification data in ref for later processing
+					initialNotificationRef.current = remoteMessage.data || {};
+				}
+			});
+	}, []); // Empty dependency array - run only once on mount
+
+	// Second effect - process initial notification when auth is ready
+	useEffect(() => {
+		// Wait until user is authenticated
+		if (!userId || !loggedIn) return;
+
+		// Process stored initial notification if we have one
+		if (initialNotificationRef.current) {
+			console.log(
+				"Processing stored initial notification now that auth is ready:",
+				initialNotificationRef.current,
+			);
+
+			handleNotificationNavigation(initialNotificationRef.current);
+			initialNotificationRef.current = null; // Clear after processing
+		}
+	}, [userId, loggedIn]); // Run when auth state changes
 
 	// Setup FCM token and listeners
 	useEffect(() => {
@@ -115,9 +181,9 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 		setupNotifications();
 	}, [userId, loggedIn]);
 
-	// Handle notification clicks
+	// Handle notification clicks for background/foreground states
 	useEffect(() => {
-		// Handle notifications that cause the app to open from background state
+		// Background notification handler
 		const unsubscribeFromBackgroundNotifications =
 			messaging().onNotificationOpenedApp((remoteMessage) => {
 				console.log(
@@ -130,7 +196,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 				handleNotificationNavigation(notificationData);
 			});
 
-		// Setup foreground notification listener
+		// Foreground notification handler
 		const unsubscribeFromForegroundNotifications =
 			setupNotificationListeners((remoteMessage) => {
 				// This callback will be triggered when a user taps on the in-app notification
@@ -138,29 +204,12 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 				handleNotificationNavigation(notificationData);
 			});
 
-		// Check if app was opened from a notification (app was closed)
-		messaging()
-			.getInitialNotification()
-			.then((remoteMessage) => {
-				if (remoteMessage) {
-					console.log(
-						"Notification caused app to open from quit state:",
-						remoteMessage,
-					);
-
-					// Remove the setTimeout and directly handle navigation
-					// The pendingNavigation system will take care of timing
-					const notificationData: any = remoteMessage.data || {};
-					handleNotificationNavigation(notificationData);
-				}
-			});
-
 		// Clean up listeners on unmount
 		return () => {
 			unsubscribeFromBackgroundNotifications();
 			unsubscribeFromForegroundNotifications();
 		};
-	}, [loggedIn, userId]); // Re-run when user auth state changes
+	}, [loggedIn, userId]);
 
 	const value = {
 		lastNotification,
