@@ -11,7 +11,6 @@ import {
 	TextInput,
 	TouchableOpacity,
 	StyleSheet,
-	Switch,
 	Alert,
 } from "react-native";
 import BottomSheet, {

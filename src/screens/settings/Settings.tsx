@@ -44,6 +44,10 @@ const Settings = ({ navigation }: any) => {
 					title="Profile"
 					onPress={() => navigation.push("Profile")}
 				/>
+				<SettingsItem
+					title="User Preferences"
+					onPress={() => navigation.push("UserPreferences")}
+				/>
 			</View>
 
 			{isAdmin ? (

@@ -21,6 +21,7 @@ import { getRegionForMarkers, openMap, MapMarker } from "../../utils/mapUtils";
 import { EventHeader } from "../../components/eventDetails/EventHeader";
 import { ScrollView } from "react-native-gesture-handler";
 import AttachmentGallery from "../../components/ui/AttachmentGallery";
+import { useUser } from "../../contexts/UserContext";
 
 // Types
 type RootStackParamList = {
@@ -40,7 +41,8 @@ const EventDetails = ({ navigation }) => {
 	const scrollViewRef = useRef(null);
 	const [isEditingNotes, setIsEditingNotes] = useState(false);
 	const [lastTapTime, setLastTapTime] = useState(0);
-
+	const { settings } = useUser();
+	const prefMap = settings?.preferredMapApp || "";
 	const animatedOpacity = useRef(new Animated.Value(0)).current;
 
 	// Use custom hook for event data
@@ -227,7 +229,13 @@ const EventDetails = ({ navigation }) => {
 												? marker.label
 												: marker.title
 										}
-										onCalloutPress={() => openMap(marker)}
+										onCalloutPress={() =>
+											openMap(
+												marker,
+												prefMap,
+												marker.title,
+											)
+										}
 									/>
 								))}
 							</MapView>

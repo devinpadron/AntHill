@@ -47,14 +47,31 @@ export const getRegionForMarkers = (markers: MapMarker[]) => {
 	};
 };
 
-export const openMap = ({ latitude, longitude, label }: MapMarker) => {
+export const openMap = (
+	{ latitude, longitude, label }: MapMarker,
+	prefMap: string = "",
+	location: string = "",
+) => {
+	console.log("location", location);
 	if (!label) {
 		label = "Event";
 	}
-	const scheme = Platform.select({
-		ios: `maps://?q=${label}&ll=${latitude},${longitude}`,
-		android: `geo:${latitude},${longitude}?q=${latitude},${longitude}(${label})`,
-	});
+	let scheme = "";
+	if (prefMap === "apple") {
+		`maps://?q=${label}&ll=${latitude},${longitude}`;
+	}
+	if (prefMap === "google") {
+		scheme = `https://www.google.com/maps/search/?api=1&query=${location}`;
+	}
+	if (prefMap === "waze") {
+		scheme = "https://waze.com/ul?q=" + location;
+	}
+	if (prefMap === "") {
+		scheme = Platform.select({
+			ios: `maps://?q=${label}&ll=${latitude},${longitude}`,
+			android: `geo:${latitude},${longitude}?q=${latitude},${longitude}(${label})`,
+		});
+	}
 
 	if (scheme) {
 		Linking.openURL(scheme).catch((err) =>

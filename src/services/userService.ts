@@ -225,3 +225,37 @@ export const batchGetUserPrivileges = async (
 		return {};
 	}
 };
+
+export const getUserPreferences = async (userID: string) => {
+	const preferencesDoc = await db
+		.collection("Users")
+		.doc(userID)
+		.collection("Preferences")
+		.doc("settings")
+		.get();
+
+	return preferencesDoc.exists ? preferencesDoc.data() : null;
+};
+
+export const setUserPreferences = async (userID: string, preferences) => {
+	await db
+		.collection("Users")
+		.doc(userID)
+		.collection("Preferences")
+		.doc("settings")
+		.set(preferences, { merge: true });
+};
+
+export const subscribeUserPreferences = (
+	userID: string,
+	onSnap: (
+		snapshot: FirebaseFirestoreTypes.DocumentSnapshot<FirebaseFirestoreTypes.DocumentData>,
+	) => void,
+) => {
+	return db
+		.collection("Users")
+		.doc(userID)
+		.collection("Preferences")
+		.doc("settings")
+		.onSnapshot(onSnap);
+};

@@ -5,6 +5,7 @@ import EmployeeList from "../screens/settings/admin/EmployeeList";
 import PayrollReviewStack from "../navigation/PayrollReviewStack";
 import CompanyCustomForm from "../screens/settings/admin/CompanyCustomForm";
 import CompanyPreferences from "../screens/settings/admin/CompanyPreferences";
+import UserPreferences from "../screens/settings/UserPreferences";
 
 const Stack = createNativeStackNavigator();
 
@@ -39,6 +40,11 @@ const SettingStack = () => {
 			<Stack.Screen
 				name="CompanyPreferences"
 				component={CompanyPreferences}
+				options={{ headerShown: false, gestureEnabled: true }}
+			/>
+			<Stack.Screen
+				name="UserPreferences"
+				component={UserPreferences} // Assuming this is the user preferences screen
 				options={{ headerShown: false, gestureEnabled: true }}
 			/>
 		</Stack.Navigator>
