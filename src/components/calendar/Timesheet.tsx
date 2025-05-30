@@ -168,7 +168,7 @@ export default function Timesheet(
 	const renderEntry = (entry) => {
 		const pushDetails = () => {
 			props.navigation.navigate("Details", {
-				uid: entry.id,
+				eventId: entry.id,
 			});
 		};
 

@@ -4,7 +4,6 @@ import React, {
 	useEffect,
 	useState,
 	ReactNode,
-	useRef,
 } from "react";
 import messaging from "@react-native-firebase/messaging";
 import { useUser } from "./UserContext";
@@ -31,7 +30,6 @@ const NotificationContext = createContext<NotificationContextType>({
 export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 	const { userId, loggedIn, user, companyId } = useUser();
 	const [lastNotification, setLastNotification] = useState<any | null>(null);
-	const initialNotificationProcessed = useRef(false);
 
 	// Updated navigation handler function
 	const handleNotificationNavigation = async (data: any) => {
@@ -72,7 +70,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 					if (data.screenName && data.timesheetId && data.companyId) {
 						await swapUserCompany(userId, data.companyId);
 						pendingNavigation.setAction(data.screenName, {
-							timesheetId: data.timesheetId,
+							entryId: data.timesheetId,
 							userId: data.userId,
 						});
 					}
@@ -141,25 +139,21 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 			});
 
 		// Check if app was opened from a notification (app was closed)
-		if (!initialNotificationProcessed.current) {
-			messaging()
-				.getInitialNotification()
-				.then((remoteMessage) => {
-					initialNotificationProcessed.current = true;
+		messaging()
+			.getInitialNotification()
+			.then((remoteMessage) => {
+				if (remoteMessage) {
+					console.log(
+						"Notification caused app to open from quit state:",
+						remoteMessage,
+					);
 
-					if (remoteMessage) {
-						console.log(
-							"Notification caused app to open from quit state:",
-							remoteMessage,
-						);
-
-						// Remove the setTimeout and directly handle navigation
-						// The pendingNavigation system will take care of timing
-						const notificationData: any = remoteMessage.data || {};
-						handleNotificationNavigation(notificationData);
-					}
-				});
-		}
+					// Remove the setTimeout and directly handle navigation
+					// The pendingNavigation system will take care of timing
+					const notificationData: any = remoteMessage.data || {};
+					handleNotificationNavigation(notificationData);
+				}
+			});
 
 		// Clean up listeners on unmount
 		return () => {

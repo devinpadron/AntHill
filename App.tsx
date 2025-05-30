@@ -28,6 +28,22 @@ const CompanyInitializer = () => {
 };
 
 const App: React.FC = () => {
+	// Add this effect to check pending navigation periodically
+	useEffect(() => {
+		// Check for pending navigation every 500ms for the first few seconds
+		// This handles cases where navigation isn't immediately ready
+		const checkInterval = setInterval(() => {
+			pendingNavigation.executeIfReady();
+		}, 500);
+
+		// Clear interval after 5 seconds
+		setTimeout(() => {
+			clearInterval(checkInterval);
+		}, 5000);
+
+		return () => clearInterval(checkInterval);
+	}, []);
+
 	return (
 		<GestureHandlerRootView style={{ flex: 1 }}>
 			<SafeAreaProvider>

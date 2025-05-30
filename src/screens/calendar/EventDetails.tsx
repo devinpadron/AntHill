@@ -24,7 +24,7 @@ import AttachmentGallery from "../../components/ui/AttachmentGallery";
 
 // Types
 type RootStackParamList = {
-	EventDetails: { uid: string };
+	EventDetails: { eventId: string };
 };
 
 type EventDetailsRouteProp = RouteProp<RootStackParamList, "EventDetails">;
@@ -34,7 +34,7 @@ const EventDetails = ({ navigation }) => {
 	const route = useRoute<EventDetailsRouteProp>();
 	if (!route.params) return null;
 
-	const eventId = route.params.uid;
+	const eventId = route.params.eventId;
 	const [markers, setMarkers] = useState<MapMarker[]>([]);
 	const [initialRegion, setInitialRegion] = useState(null);
 	const scrollViewRef = useRef(null);

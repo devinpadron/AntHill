@@ -4,7 +4,7 @@ export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 export type RootStackParamList = {
 	Details: { eventId: string };
-	TimeEntryDetails: { timesheetId: string[] | string; userId: string };
+	TimeEntryDetails: { entryId: string[] | string; userId: string };
 	EmployeeList: {};
 	// Add other screens as needed
 };
@@ -29,14 +29,30 @@ export const pendingNavigation = {
 		if (this.action && navigationRef.isReady()) {
 			const { routeName, params } = this.action;
 
-			// Type-safe navigation
-			navigationRef.navigate({
-				name: routeName,
+			console.log(
+				`Attempting navigation to: ${routeName} with params:`,
 				params,
-			} as never);
+			);
 
-			this.action = null;
-			return true;
+			try {
+				navigationRef.navigate({
+					name: routeName,
+					params,
+				} as never);
+
+				console.log(`Navigation successful to: ${routeName}`);
+				this.action = null;
+				return true;
+			} catch (error) {
+				console.error(`Navigation failed to ${routeName}:`, error);
+				return false;
+			}
+		}
+
+		if (this.action) {
+			console.log(
+				`Navigation not ready yet. Pending route: ${this.action.routeName}`,
+			);
 		}
 		return false;
 	},

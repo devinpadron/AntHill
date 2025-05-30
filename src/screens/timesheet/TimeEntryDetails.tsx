@@ -9,12 +9,8 @@ import {
 	Alert,
 	Platform,
 	Share,
-	TextInput,
-	Switch,
 	Dimensions,
 	Keyboard,
-	Image,
-	Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
@@ -33,7 +29,6 @@ import { getCompanyPreferences } from "../../services/companyService";
 import { getEventsByIds } from "../../services/eventService";
 import * as MailComposer from "expo-mail-composer";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
-import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import EditSheet from "../../components/time/EditSheet";
 import { useCompany } from "../../contexts/CompanyContext";
