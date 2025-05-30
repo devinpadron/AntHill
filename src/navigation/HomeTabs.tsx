@@ -5,7 +5,6 @@ import CalendarStack from "./CalendarStack";
 import SettingStack from "./SettingStack";
 import ClockStack from "./ClockStack";
 import { useCompany } from "../contexts/CompanyContext";
-import messaging from "@react-native-firebase/messaging";
 
 const Tab = createBottomTabNavigator();
 

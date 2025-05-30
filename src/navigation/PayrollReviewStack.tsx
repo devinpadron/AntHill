@@ -4,7 +4,7 @@ import PayrollReview from "../screens/settings/admin/PayrollReview";
 
 const Stack = createNativeStackNavigator();
 
-const SettingStack = () => {
+const PayrollReviewStack = () => {
 	return (
 		<Stack.Navigator>
 			<Stack.Screen
@@ -21,4 +21,4 @@ const SettingStack = () => {
 	);
 };
 
-export default SettingStack;
+export default PayrollReviewStack;

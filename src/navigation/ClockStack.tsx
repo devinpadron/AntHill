@@ -4,7 +4,7 @@ import TimeEntryDetails from "../screens/timesheet/TimeEntryDetails";
 
 const Stack = createNativeStackNavigator();
 
-const SettingStack = () => {
+const ClockStack = () => {
 	return (
 		<Stack.Navigator>
 			<Stack.Screen
@@ -21,4 +21,4 @@ const SettingStack = () => {
 	);
 };
 
-export default SettingStack;
+export default ClockStack;

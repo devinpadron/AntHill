@@ -5,7 +5,7 @@ import EventSubmit from "../screens/calendar/EventSubmit";
 
 const Stack = createNativeStackNavigator();
 
-const SettingStack = () => {
+const CalendarStack = () => {
 	return (
 		<Stack.Navigator>
 			<Stack.Screen
@@ -27,4 +27,4 @@ const SettingStack = () => {
 	);
 };
 
-export default SettingStack;
+export default CalendarStack;
