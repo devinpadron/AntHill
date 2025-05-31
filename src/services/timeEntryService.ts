@@ -114,7 +114,7 @@ export const getTimeEntries = async (
 	return snapshot.docs.map((doc) => ({
 		id: doc.id,
 		...doc.data(),
-	}));
+	})) as any;
 };
 
 export async function getTimeEntryAttachments(

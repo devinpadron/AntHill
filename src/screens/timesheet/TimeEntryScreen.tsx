@@ -1,5 +1,5 @@
 // Time Entry Screen Component
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
 	View,
 	Text,
@@ -13,20 +13,49 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import { format, startOfWeek, endOfWeek, differenceInMinutes } from "date-fns";
+import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from "date-fns";
+import { useFocusEffect } from "@react-navigation/native";
 import TimeEntryCard from "../../components/time/TimeEntryCard";
 import TimeEntrySubmitModal from "../../components/time/TimeEntrySubmitModal";
 import { useTimeTracking } from "../../hooks/useTimeTracking";
 import { submitTimeEntryForApproval } from "../../services/timeEntryService";
 import { useUser } from "../../contexts/UserContext";
-import { useFocusEffect } from "@react-navigation/native";
-import { useCallback } from "react";
 import { useCompany } from "../../contexts/CompanyContext";
 
 // Time Entry Screen Component
 const TimeEntryScreen = ({ navigation }) => {
 	const insets = useSafeAreaInsets();
 	const { userId, companyId } = useUser();
+	const { preferences } = useCompany();
+
+	// Date-related states and functions
+	const [currentStartDate, setCurrentStartDate] = useState(() => {
+		const weekStartsOn = preferences?.workWeekStarts === "sunday" ? 0 : 1;
+		return startOfWeek(new Date(), { weekStartsOn });
+	});
+
+	const [currentEndDate, setCurrentEndDate] = useState(() => {
+		const weekStartsOn = preferences?.workWeekStarts === "sunday" ? 0 : 1;
+		return endOfWeek(new Date(), { weekStartsOn });
+	});
+
+	const goToPrevWeek = () => {
+		setCurrentStartDate((prev) => subWeeks(prev, 1));
+		setCurrentEndDate((prev) => subWeeks(prev, 1));
+	};
+
+	const goToNextWeek = () => {
+		setCurrentStartDate((prev) => addWeeks(prev, 1));
+		setCurrentEndDate((prev) => addWeeks(prev, 1));
+	};
+
+	const goToCurrentWeek = () => {
+		const weekStartsOn = preferences?.workWeekStarts === "sunday" ? 0 : 1;
+		setCurrentStartDate(startOfWeek(new Date(), { weekStartsOn }));
+		setCurrentEndDate(endOfWeek(new Date(), { weekStartsOn }));
+	};
+
+	// Time tracking hook
 	const {
 		timeEntries,
 		activeTimeEntry,
@@ -40,28 +69,27 @@ const TimeEntryScreen = ({ navigation }) => {
 		resumeTimer,
 		weeklyStats,
 		fetchTimeEntries,
-	} = useTimeTracking();
+	} = useTimeTracking({
+		startDate: currentStartDate,
+		endDate: currentEndDate,
+	});
 
-	// Add state for pull-to-refresh
+	// Modal and UI state
 	const [refreshing, setRefreshing] = useState(false);
-
-	// Add state for time entry submission modal
 	const [submitModalVisible, setSubmitModalVisible] = useState(false);
 	const [selectedTimeEntry, setSelectedTimeEntry] = useState(null);
 
-	// Add this useFocusEffect to refresh data when screen comes into focus
+	// Data fetching
 	useFocusEffect(
 		useCallback(() => {
-			// This will execute when the screen comes into focus
 			fetchTimeEntries();
-			setSubmitModalVisible(false); // Close the modal if it was open
+			setSubmitModalVisible(false);
 			return () => {
-				// Optional cleanup function
+				// Optional cleanup
 			};
-		}, [fetchTimeEntries]),
+		}, [currentStartDate, currentEndDate, fetchTimeEntries]),
 	);
 
-	// Handle pull-to-refresh
 	const onRefresh = async () => {
 		setRefreshing(true);
 		try {
@@ -73,20 +101,7 @@ const TimeEntryScreen = ({ navigation }) => {
 		}
 	};
 
-	const { preferences } = useCompany();
-
-	// Weekly summary data
-	const weekStart =
-		preferences.workWeekStarts === "sunday"
-			? startOfWeek(new Date(), { weekStartsOn: 0 })
-			: startOfWeek(new Date(), { weekStartsOn: 1 });
-
-	const weekEnd =
-		preferences.workWeekStarts === "sunday"
-			? endOfWeek(new Date(), { weekStartsOn: 0 })
-			: endOfWeek(new Date(), { weekStartsOn: 1 });
-
-	// Handle clock out with confirmation
+	// Time entry actions
 	const handleClockOut = async () => {
 		Alert.alert("Clock Out", "Are you sure you want to clock out?", [
 			{
@@ -101,7 +116,6 @@ const TimeEntryScreen = ({ navigation }) => {
 						const completedEntry = await clockOut();
 						fetchTimeEntries();
 
-						// Show submit for approval option after clock out
 						setTimeout(() => {
 							setSelectedTimeEntry(completedEntry);
 							setSubmitModalVisible(true);
@@ -115,30 +129,24 @@ const TimeEntryScreen = ({ navigation }) => {
 		]);
 	};
 
-	// Handle time entry submission
 	const handleSubmitTimeEntry = async (timeEntryId, entry) => {
 		if (!timeEntryId || !companyId) {
 			throw new Error("Missing required data for submission");
 		}
 
 		await submitTimeEntryForApproval(timeEntryId, companyId, entry);
-		fetchTimeEntries(); // Refresh the list to update status
+		fetchTimeEntries();
 	};
 
-	// Open submit modal for a specific time entry
 	const openSubmitModal = (timeEntry) => {
 		setSelectedTimeEntry(timeEntry);
 		setSubmitModalVisible(true);
 	};
 
-	// View time entry details
 	const viewTimeEntryDetails = (entryId) => {
-		// Future implementation
-		console.log("View time entry details:", entryId);
 		navigation.navigate("TimeEntryDetails", { entryId, userId });
 	};
 
-	// Update the renderTimeEntry function
 	const renderTimeEntry = ({ item }) => {
 		return (
 			<TimeEntryCard
@@ -153,9 +161,40 @@ const TimeEntryScreen = ({ navigation }) => {
 
 	return (
 		<SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
-			{/* Weekly Summary */}
+			{/* 1. Week Navigation Controls */}
+			<View style={styles.weekNavigator}>
+				<View style={styles.dateControls}>
+					<TouchableOpacity
+						onPress={goToPrevWeek}
+						style={styles.dateNavButton}
+					>
+						<Icon name="chevron-left" size={24} color="#007AFF" />
+					</TouchableOpacity>
+
+					<TouchableOpacity
+						onPress={goToCurrentWeek}
+						style={styles.currentWeekButton}
+					>
+						<Text style={styles.currentWeekText}>Current Week</Text>
+					</TouchableOpacity>
+
+					<TouchableOpacity
+						onPress={goToNextWeek}
+						style={styles.dateNavButton}
+					>
+						<Icon name="chevron-right" size={24} color="#007AFF" />
+					</TouchableOpacity>
+				</View>
+
+				<Text style={styles.weekRangeText}>
+					{format(currentStartDate, "MMM d")} -{" "}
+					{format(currentEndDate, "MMM d, yyyy")}
+				</Text>
+			</View>
+
+			{/* 2. Weekly Summary */}
 			<View style={styles.summaryCard}>
-				<Text style={styles.summaryTitle}>This Week</Text>
+				<Text style={styles.summaryTitle}>Weekly Summary</Text>
 				<View style={styles.summaryStats}>
 					<View style={styles.statItem}>
 						<Text style={styles.statValue}>
@@ -163,7 +202,9 @@ const TimeEntryScreen = ({ navigation }) => {
 							{weeklyStats.seconds > 0 &&
 								` ${weeklyStats.seconds}s`}
 						</Text>
-						<Text style={styles.statLabel}>Total Hours</Text>
+						<Text style={styles.statLabel}>
+							Total Hours Completed
+						</Text>
 					</View>
 					<View style={styles.divider} />
 					<View style={styles.statItem}>
@@ -173,13 +214,9 @@ const TimeEntryScreen = ({ navigation }) => {
 						<Text style={styles.statLabel}>Shifts</Text>
 					</View>
 				</View>
-				<Text style={styles.weekRange}>
-					{format(weekStart, "MMM d")} -{" "}
-					{format(weekEnd, "MMM d, yyyy")}
-				</Text>
 			</View>
 
-			{/* Clock In/Out Section */}
+			{/* 3. Clock In/Out Section */}
 			<View style={styles.clockSection}>
 				{activeTimeEntry ? (
 					<>
@@ -206,10 +243,8 @@ const TimeEntryScreen = ({ navigation }) => {
 							</Text>
 						</View>
 
-						{/* Action buttons */}
 						<View style={styles.buttonRow}>
 							{isPausingOrResuming ? (
-								// Show loading button
 								<TouchableOpacity
 									style={[
 										styles.clockButton,
@@ -229,7 +264,6 @@ const TimeEntryScreen = ({ navigation }) => {
 									</Text>
 								</TouchableOpacity>
 							) : isPaused ? (
-								// Resume button
 								<TouchableOpacity
 									style={[
 										styles.clockButton,
@@ -248,7 +282,6 @@ const TimeEntryScreen = ({ navigation }) => {
 									</Text>
 								</TouchableOpacity>
 							) : (
-								// Pause button
 								<TouchableOpacity
 									style={[
 										styles.clockButton,
@@ -317,17 +350,23 @@ const TimeEntryScreen = ({ navigation }) => {
 				)}
 			</View>
 
-			{/* Recent Time Entries */}
+			{/* 4. Time Entries List */}
 			<View style={styles.entriesSection}>
-				<Text style={styles.sectionTitle}>Recent Time Entries</Text>
+				<Text style={styles.sectionTitle}>Time Entries</Text>
 				<FlatList
-					data={timeEntries}
+					data={[...timeEntries].sort((a, b) => {
+						// Sort by clockInTime in descending order (newest first)
+						return (
+							new Date(b.clockInTime).getTime() -
+							new Date(a.clockInTime).getTime()
+						);
+					})}
 					keyExtractor={(item) => item.id}
 					renderItem={renderTimeEntry}
 					ListEmptyComponent={
 						<View style={styles.emptyContainer}>
 							<Text style={styles.emptyText}>
-								No time entries found
+								No time entries found for this week
 							</Text>
 						</View>
 					}
@@ -344,7 +383,7 @@ const TimeEntryScreen = ({ navigation }) => {
 				/>
 			</View>
 
-			{/* Time Entry Submission Modal */}
+			{/* 5. Time Entry Submission Modal */}
 			<TimeEntrySubmitModal
 				visible={submitModalVisible}
 				timeEntry={selectedTimeEntry}
@@ -567,6 +606,39 @@ const styles = StyleSheet.create({
 		color: "#FFA500",
 		fontWeight: "500",
 		fontSize: 14,
+	},
+	weekNavigator: {
+		marginTop: 8,
+		marginBottom: 16,
+		backgroundColor: "#f7f7f7",
+		borderRadius: 8,
+		padding: 8,
+	},
+	dateControls: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		paddingVertical: 4,
+	},
+	dateNavButton: {
+		padding: 8,
+	},
+	currentWeekButton: {
+		paddingVertical: 6,
+		paddingHorizontal: 12,
+		backgroundColor: "#f0f7ff",
+		borderRadius: 16,
+	},
+	currentWeekText: {
+		color: "#007AFF",
+		fontWeight: "500",
+		fontSize: 14,
+	},
+	weekRangeText: {
+		textAlign: "center",
+		fontSize: 14,
+		color: "#666",
+		marginTop: 4,
 	},
 });
 

@@ -7,13 +7,21 @@ import {
 	resumeTimeEntry,
 	getTimeEntries,
 	subscribeToActiveTimeEntry,
-	getAllTimeEntries,
 } from "../services/timeEntryService";
 import { startOfWeek, endOfWeek } from "date-fns";
 import { TimeEntry } from "../types";
 import { useCompany } from "../contexts/CompanyContext";
 
-export const useTimeTracking = () => {
+// Define interface for parameters
+interface TimeTrackingParams {
+	startDate?: Date;
+	endDate?: Date;
+}
+
+export const useTimeTracking = ({
+	startDate,
+	endDate,
+}: TimeTrackingParams = {}) => {
 	const { userId, companyId } = useUser();
 	const [activeTimeEntry, setActiveTimeEntry] = useState<TimeEntry | null>(
 		null,
@@ -29,17 +37,23 @@ export const useTimeTracking = () => {
 	const fetchTimeEntries = useCallback(async () => {
 		if (!userId || !companyId) return;
 
-		setIsLoading(true);
 		try {
-			// Use the broader getAllTimeEntries function instead of date-range limited one
-			const entries = await getAllTimeEntries(userId, companyId);
+			setIsLoading(true);
+			// Use the provided date range if available, otherwise use defaults
+
+			const entries = await getTimeEntries(
+				userId,
+				companyId,
+				startDate,
+				endDate,
+			);
 			setTimeEntries(entries);
 		} catch (error) {
 			console.error("Error fetching time entries:", error);
 		} finally {
 			setIsLoading(false);
 		}
-	}, [userId, companyId]);
+	}, [userId, companyId, startDate, endDate]);
 
 	// Check for existing active time entry on load and set up listeners
 	useEffect(() => {
