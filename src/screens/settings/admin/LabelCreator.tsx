@@ -278,7 +278,7 @@ const LabelCreator = ({ navigation }) => {
 						<View style={styles.colorContainer}>
 							<ColorPicker
 								thumbSize={40}
-								sliderSize={20}
+								sliderSize={25}
 								onColorChange={setSelectedColor}
 								color={selectedColor}
 								noSnap={true}
@@ -286,8 +286,8 @@ const LabelCreator = ({ navigation }) => {
 								swatchesLast={false}
 								swatches={true}
 								discrete={false}
-								useNativeDriver={false}
-								useNativeLayout={false}
+								useNativeDriver={true}
+								useNativeLayout={true}
 							/>
 						</View>
 
