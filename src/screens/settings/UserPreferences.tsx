@@ -14,7 +14,10 @@ import {
 	getUserPreferences,
 	setUserPreferences,
 } from "../../services/userService";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+	SafeAreaView,
+	useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialIcons";
 
 // Map app options
@@ -125,8 +128,10 @@ const UserPreferences = ({ navigation }) => {
 		);
 	}
 
+	const insets = useSafeAreaInsets();
+
 	return (
-		<SafeAreaView style={styles.container}>
+		<View style={[styles.container, { paddingTop: insets.top }]}>
 			<View style={styles.header}>
 				<View style={styles.headerRow}>
 					<TouchableOpacity
@@ -201,7 +206,7 @@ const UserPreferences = ({ navigation }) => {
 					)}
 				</TouchableOpacity>
 			</View>
-		</SafeAreaView>
+		</View>
 	);
 };
 

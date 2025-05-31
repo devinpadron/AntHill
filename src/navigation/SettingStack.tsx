@@ -6,6 +6,8 @@ import PayrollReviewStack from "../navigation/PayrollReviewStack";
 import CompanyCustomForm from "../screens/settings/admin/CompanyCustomForm";
 import CompanyPreferences from "../screens/settings/admin/CompanyPreferences";
 import UserPreferences from "../screens/settings/UserPreferences";
+import ChecklistCreator from "../screens/settings/admin/ChecklistCreator";
+import PackageCreator from "../screens/settings/admin/PackageCreator";
 
 const Stack = createNativeStackNavigator();
 
@@ -44,7 +46,17 @@ const SettingStack = () => {
 			/>
 			<Stack.Screen
 				name="UserPreferences"
-				component={UserPreferences} // Assuming this is the user preferences screen
+				component={UserPreferences}
+				options={{ headerShown: false, gestureEnabled: true }}
+			/>
+			<Stack.Screen
+				name="ChecklistCreator"
+				component={ChecklistCreator}
+				options={{ headerShown: false, gestureEnabled: true }}
+			/>
+			<Stack.Screen
+				name="PackageCreator"
+				component={PackageCreator}
 				options={{ headerShown: false, gestureEnabled: true }}
 			/>
 		</Stack.Navigator>

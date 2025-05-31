@@ -27,8 +27,8 @@ import { Button } from "../../components/ui/Button";
 import AttachmentsSelector from "../../components/ui/AttachmentsSelector";
 import { AttachmentItem } from "../../types";
 import { useUploadManager } from "../../contexts/UploadManagerContext";
-import { getEventAttachments } from "../../services/eventService";
-import { get, set } from "lodash";
+import { getEventAttachments, updateEvent } from "../../services/eventService";
+import { getEventPackages, getPackages } from "../../services/packageService";
 
 const EventSubmit = ({ navigation }) => {
 	const insets = useSafeAreaInsets();
@@ -76,7 +76,7 @@ const EventSubmit = ({ navigation }) => {
 		toggleDatePicker,
 		toggleAllDay,
 		toggleEndTime,
-		handleSubmit,
+		handleSubmitData,
 		handleDelete,
 		hasFormChanged,
 	} = useEventForm(navigation, eventId);
@@ -88,6 +88,10 @@ const EventSubmit = ({ navigation }) => {
 	const [attachmentDeletionQueue, setAttachmentDeletionQueue] = useState<
 		string[]
 	>([]);
+	const [availablePackages, setAvailablePackages] = useState([]);
+	const [selectedPackages, setSelectedPackages] = useState([]);
+	const [ogSelectedPackages, setOgSelectedPackages] = useState([]);
+	const [loadingPackages, setLoadingPackages] = useState(false);
 
 	// Add these at the top of your component
 	const isMounted = useRef(true);
@@ -123,6 +127,37 @@ const EventSubmit = ({ navigation }) => {
 		return () => subscriber();
 	}, [currentCompany]);
 
+	// Load packages
+	useEffect(() => {
+		if (!currentCompany) return;
+
+		const fetchPackagesData = async () => {
+			setLoadingPackages(true);
+			try {
+				const packages = await getPackages(currentCompany);
+				setAvailablePackages(packages);
+
+				// If editing an event, load attached packages
+				if (eventId) {
+					const eventPackages = await getEventPackages(
+						currentCompany,
+						eventId,
+					);
+					if (eventPackages && eventPackages.length > 0) {
+						setSelectedPackages(eventPackages);
+						setOgSelectedPackages(eventPackages);
+					}
+				}
+			} catch (error) {
+				console.error("Error loading packages:", error);
+			} finally {
+				setLoadingPackages(false);
+			}
+		};
+
+		fetchPackagesData();
+	}, [currentCompany, eventId]);
+
 	const formatDate = (date: Date) => moment(date).format("MMM D, YYYY");
 	const formatTime = (time: Date, start: boolean = true) => {
 		if (start) return moment(time).format("h:mm A");
@@ -150,6 +185,11 @@ const EventSubmit = ({ navigation }) => {
 			return true;
 		} else if (attachmentDeletionQueue.length > 0) {
 			return true;
+		} else if (
+			selectedPackages.length > ogSelectedPackages.length ||
+			selectedPackages.length < ogSelectedPackages.length
+		) {
+			return true;
 		}
 		return false;
 	};
@@ -176,12 +216,9 @@ const EventSubmit = ({ navigation }) => {
 		}
 	};
 
-	const handleAttachmentSubmit = async () => {
+	const handleAttachmentSubmit = async (eventId) => {
 		try {
 			if (!isMounted.current) return;
-
-			// First, create or update the event and get the ID
-			const eventId = await handleSubmit();
 
 			if (!eventId || !currentCompany) {
 				Alert.alert(
@@ -254,6 +291,29 @@ const EventSubmit = ({ navigation }) => {
 		}
 	};
 
+	const handleSubmit = async () => {
+		const eventId = await handleSubmitData();
+		handleAttachmentSubmit(eventId);
+
+		await updateEvent(currentCompany, eventId, {
+			packages: selectedPackages,
+		});
+	};
+
+	// Toggle package selection
+	const togglePackageSelection = (packageId) => {
+		if (selectedPackages.includes(packageId)) {
+			setSelectedPackages(
+				selectedPackages.filter((id) => id !== packageId),
+			);
+		} else {
+			setSelectedPackages([...selectedPackages, packageId]);
+		}
+	};
+
+	// Add this state for dropdown control
+	const [openPackagesDropdown, setOpenPackagesDropdown] = useState(false);
+	console.log(availablePackages);
 	return (
 		<View style={[{ flex: 1, paddingTop: insets.top }, styles.container]}>
 			<KeyboardAwareScrollView
@@ -498,6 +558,174 @@ const EventSubmit = ({ navigation }) => {
 						</View>
 					</View>
 
+					{/* Packages Section */}
+					<View style={[styles.sectionContainer, { zIndex: 2 }]}>
+						<Text style={styles.sectionTitle}>Packages</Text>
+						<View style={styles.inputContainer}>
+							<Text style={styles.label}>Attach Packages</Text>
+							<Text style={styles.helperText}>
+								Select packages to attach to this event
+							</Text>
+
+							{loadingPackages ? (
+								<ActivityIndicator
+									style={{ marginVertical: 20 }}
+								/>
+							) : availablePackages.length === 0 ? (
+								<View style={styles.emptyPackagesContainer}>
+									<Text style={styles.emptyPackagesText}>
+										No packages available
+									</Text>
+								</View>
+							) : (
+								<>
+									{/* Package Dropdown Selector */}
+									<DropDownPicker
+										open={openPackagesDropdown}
+										setOpen={setOpenPackagesDropdown}
+										items={availablePackages.map((pkg) => ({
+											label: pkg.title, // Just use the package title as the label
+											value: pkg.id,
+										}))}
+										value={[]} // Use null for single selection mode
+										setValue={(callback) => {
+											// Keep this empty as we handle selection manually
+										}}
+										multiple={false}
+										searchable={true}
+										searchPlaceholder="Search packages..."
+										placeholder="Select a package"
+										style={styles.dropdown}
+										dropDownContainerStyle={
+											styles.dropdownList
+										}
+										listItemContainerStyle={
+											styles.dropdownItem
+										}
+										listMode="SCROLLVIEW" // Add this to ensure scrolling works
+										maxHeight={300} // Set a reasonable max height
+										onSelectItem={(item) => {
+											if (
+												item &&
+												!selectedPackages.includes(
+													item.value,
+												)
+											) {
+												togglePackageSelection(
+													item.value,
+												);
+											}
+											setOpenPackagesDropdown(false);
+										}}
+										zIndex={2000}
+									/>
+
+									{/* Display Selected Packages */}
+									{selectedPackages.length > 0 && (
+										<View
+											style={
+												styles.selectedPackagesContainer
+											}
+										>
+											<Text
+												style={
+													styles.selectedPackagesTitle
+												}
+											>
+												Selected Packages (
+												{selectedPackages.length})
+											</Text>
+											{availablePackages
+												.filter((pkg) =>
+													selectedPackages.includes(
+														pkg.id,
+													),
+												)
+												.map((pkg) => (
+													<View
+														key={pkg.id}
+														style={
+															styles.packageItem
+														}
+													>
+														<View
+															style={
+																styles.packageItemContent
+															}
+														>
+															<View
+																style={
+																	styles.packageItemHeader
+																}
+															>
+																<Text
+																	style={
+																		styles.packageItemTitle
+																	}
+																>
+																	{pkg.title}
+																</Text>
+																<TouchableOpacity
+																	onPress={() =>
+																		togglePackageSelection(
+																			pkg.id,
+																		)
+																	}
+																	style={
+																		styles.removePackageButton
+																	}
+																>
+																	<Ionicons
+																		name="close-circle"
+																		size={
+																			24
+																		}
+																		color="#e74c3c"
+																	/>
+																</TouchableOpacity>
+															</View>
+
+															{pkg.description ? (
+																<Text
+																	style={
+																		styles.packageItemDescription
+																	}
+																	numberOfLines={
+																		2
+																	}
+																>
+																	{
+																		pkg.description
+																	}
+																</Text>
+															) : null}
+
+															<Text
+																style={
+																	styles.packageItemStats
+																}
+															>
+																{
+																	pkg
+																		.checklists
+																		.length
+																}{" "}
+																{pkg.checklists
+																	.length ===
+																1
+																	? "checklist"
+																	: "checklists"}
+															</Text>
+														</View>
+													</View>
+												))}
+										</View>
+									)}
+								</>
+							)}
+						</View>
+					</View>
+
 					{/* Notes Section */}
 					<View style={[styles.sectionContainer, { zIndex: 1 }]}>
 						<Text style={styles.sectionTitle}>
@@ -546,7 +774,7 @@ const EventSubmit = ({ navigation }) => {
 								return;
 							}
 
-							handleAttachmentSubmit();
+							handleSubmit();
 						}}
 						style={styles.submitButton}
 						textStyle={styles.submitButtonText}
@@ -740,6 +968,79 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		flexDirection: "row",
 		justifyContent: "center",
+	},
+	helperText: {
+		fontSize: 14,
+		color: "#666",
+		marginBottom: 12,
+	},
+	emptyPackagesContainer: {
+		padding: 20,
+		backgroundColor: "#f9f9f9",
+		borderRadius: 8,
+		alignItems: "center",
+		justifyContent: "center",
+		borderWidth: 1,
+		borderColor: "#eee",
+		borderStyle: "dashed",
+	},
+	emptyPackagesText: {
+		color: "#999",
+		fontSize: 16,
+	},
+	packagesContainer: {
+		marginTop: 8,
+	},
+	packageItem: {
+		backgroundColor: "#f9f9f9",
+		borderRadius: 8,
+		marginBottom: 12,
+		borderWidth: 1,
+		borderColor: "#eee",
+		overflow: "hidden",
+	},
+	packageItemSelected: {
+		backgroundColor: "#eaf4ff",
+		borderColor: "#3d7eea",
+	},
+	packageItemContent: {
+		padding: 12,
+	},
+	packageItemHeader: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		marginBottom: 8,
+	},
+	packageItemTitle: {
+		fontSize: 16,
+		fontWeight: "600",
+		color: "#333",
+		flex: 1,
+	},
+	packageItemDescription: {
+		fontSize: 14,
+		color: "#666",
+		marginBottom: 8,
+	},
+	packageItemStats: {
+		fontSize: 14,
+		color: "#888",
+	},
+	selectedPackagesContainer: {
+		marginTop: 16,
+		borderTopWidth: 1,
+		borderTopColor: "#eee",
+		paddingTop: 16,
+	},
+	selectedPackagesTitle: {
+		fontSize: 16,
+		fontWeight: "600",
+		color: "#333",
+		marginBottom: 12,
+	},
+	removePackageButton: {
+		padding: 4,
 	},
 });
 

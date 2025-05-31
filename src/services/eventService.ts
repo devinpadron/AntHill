@@ -169,7 +169,7 @@ export async function deleteEvent(eventID: string, company: string) {
 export async function updateEvent(
 	company: string,
 	eventID: string,
-	eventData: Event,
+	eventData: any,
 ) {
 	try {
 		await db
