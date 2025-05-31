@@ -3,6 +3,7 @@ import { getAgendaItems, getMarkedDates } from "../services/agendaItemService";
 import { subscribeAllEvents } from "../services/eventService";
 import { FilterType } from "../types/enums/FilterType";
 import { useEffect, useState, useCallback } from "react";
+import db from "../constants/firestore";
 
 export const usePullEvents = (
 	companyId: string,
@@ -114,6 +115,36 @@ export const usePullEvents = (
 		[date, includePastEvents],
 	);
 
+	// Add state for storing labels
+	const [labelMap, setLabelMap] = useState({});
+
+	// Fetch labels from database
+	useEffect(() => {
+		if (!companyId) return;
+
+		const fetchLabels = async () => {
+			try {
+				const labelsRef = db
+					.collection("Companies")
+					.doc(companyId)
+					.collection("EventLabels");
+
+				const snapshot = await labelsRef.get();
+				const labels = {};
+
+				snapshot.docs.forEach((doc) => {
+					labels[doc.id] = doc.data().color;
+				});
+
+				setLabelMap(labels);
+			} catch (error) {
+				console.error("Error fetching label colors:", error);
+			}
+		};
+
+		fetchLabels();
+	}, [companyId]);
+
 	useEffect(() => {
 		const handleCalendarFill = (snapshot: { docs: any }) => {
 			if (!snapshot || !snapshot.docs) {
@@ -152,6 +183,7 @@ export const usePullEvents = (
 				markedEvents.map((event) => ({
 					data: () => event,
 				})),
+				labelMap,
 			);
 
 			setAgendaItems(items);
@@ -185,5 +217,6 @@ export const usePullEvents = (
 		togglePastEvents: () => setIncludePastEvents((prev) => !prev),
 		loadPastEvents: () => setIncludePastEvents(true),
 		isLoading,
+		labelMap,
 	};
 };

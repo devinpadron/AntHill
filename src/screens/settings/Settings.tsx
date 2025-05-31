@@ -86,6 +86,11 @@ const Settings = ({ navigation }: any) => {
 							onPress={() => navigation.push("PackageCreator")}
 							style={styles.nestedItem}
 						/>
+						<SettingsItem
+							title="Labels"
+							onPress={() => navigation.push("LabelCreator")}
+							style={styles.nestedItem}
+						/>
 					</ExpandableSettingsSection>
 				</View>
 			) : null}

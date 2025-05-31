@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState, useEffect } from "react";
 import {
 	View,
 	Text,
@@ -17,6 +17,7 @@ import { CalendarList } from "react-native-calendars";
 import { Dimensions } from "react-native";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import LoadingScreen from "../../screens/LoadingScreen";
+import db from "../../constants/firestore"; // Add this import
 
 export default function Timesheet(
 	props: {
@@ -51,6 +52,7 @@ export default function Timesheet(
 		loadPastEvents,
 		togglePastEvents,
 		isLoading,
+		labelMap,
 	} = usePullEvents(
 		companyId,
 		userId,
@@ -103,12 +105,19 @@ export default function Timesheet(
 					description = startTime.format("h:mm A");
 				}
 
+				console.log(event);
+				// Map label ID to color
+				const labelColor = event.labelId
+					? labelMap[event.labelId]
+					: null;
+
 				return {
 					id: event.uid,
 					title: event.title,
 					hours: parseFloat(hours.toFixed(1)),
 					description: description,
 					date: dateString,
+					label: labelColor, // Use the color directly
 				};
 			});
 
@@ -129,7 +138,7 @@ export default function Timesheet(
 		});
 
 		return formattedEntries;
-	}, [agendaItems]);
+	}, [agendaItems, labelMap]); // Add labelMap as a dependency
 
 	const renderSectionHeader = ({ date }) => {
 		const dateObj =
@@ -184,23 +193,37 @@ export default function Timesheet(
 						},
 					]}
 				>
-					<Text
-						style={styles.projectName}
-						numberOfLines={2}
-						ellipsizeMode="tail"
-					>
-						{entry.title}
-					</Text>
-
-					{entry.description ? (
-						<Text style={styles.entryDescription}>
-							{entry.description}
-						</Text>
-					) : null}
-
-					{entry.hours > 0 && (
-						<Text style={styles.hoursValue}>{entry.hours} hrs</Text>
+					{/* Add label indicator if we have a color */}
+					{entry.label && (
+						<View
+							style={[
+								styles.labelIndicator,
+								{ backgroundColor: entry.label },
+							]}
+						/>
 					)}
+
+					<View style={styles.entryContent}>
+						<Text
+							style={styles.projectName}
+							numberOfLines={2}
+							ellipsizeMode="tail"
+						>
+							{entry.title}
+						</Text>
+
+						{entry.description ? (
+							<Text style={styles.entryDescription}>
+								{entry.description}
+							</Text>
+						) : null}
+
+						{entry.hours > 0 && (
+							<Text style={styles.hoursValue}>
+								{entry.hours} hrs
+							</Text>
+						)}
+					</View>
 				</View>
 			</TouchableOpacity>
 		);
@@ -453,13 +476,14 @@ const styles = StyleSheet.create({
 	entryCard: {
 		backgroundColor: "white",
 		borderRadius: 10,
-		padding: 12,
 		marginBottom: 8,
 		shadowColor: "#000",
 		shadowOffset: { width: 0, height: 1 },
 		shadowOpacity: 0.1,
 		shadowRadius: 2,
 		elevation: 2,
+		flexDirection: "row", // Change to row layout to position label indicator
+		overflow: "hidden", // This ensures the indicator doesn't overflow
 	},
 	dateNumberContainer: {
 		width: 50,
@@ -588,5 +612,13 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		color: "#987B30",
 		fontWeight: "500",
+	},
+	labelIndicator: {
+		width: 5,
+		height: "100%", // Full height of card
+	},
+	entryContent: {
+		flex: 1,
+		padding: 12,
 	},
 });

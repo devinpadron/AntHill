@@ -9,6 +9,7 @@ export interface Event {
 	notes: string;
 	assignedWorkers: string[];
 	packages: string[];
+	label?: string;
 }
 
 type Location = {

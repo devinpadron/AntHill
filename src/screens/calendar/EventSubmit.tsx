@@ -29,6 +29,7 @@ import { AttachmentItem } from "../../types";
 import { useUploadManager } from "../../contexts/UploadManagerContext";
 import { getEventAttachments, updateEvent } from "../../services/eventService";
 import { getEventPackages, getPackages } from "../../services/packageService";
+import db from "../../constants/firestore";
 
 const EventSubmit = ({ navigation }) => {
 	const insets = useSafeAreaInsets();
@@ -92,6 +93,12 @@ const EventSubmit = ({ navigation }) => {
 	const [selectedPackages, setSelectedPackages] = useState([]);
 	const [ogSelectedPackages, setOgSelectedPackages] = useState([]);
 	const [loadingPackages, setLoadingPackages] = useState(false);
+
+	// Add these after your other state declarations
+	const [availableLabels, setAvailableLabels] = useState([]);
+	const [selectedLabelId, setSelectedLabelId] = useState(null);
+	const [loadingLabels, setLoadingLabels] = useState(false);
+	const [openLabelsDropdown, setOpenLabelsDropdown] = useState(false);
 
 	// Add these at the top of your component
 	const isMounted = useRef(true);
@@ -158,6 +165,49 @@ const EventSubmit = ({ navigation }) => {
 		fetchPackagesData();
 	}, [currentCompany, eventId]);
 
+	// Add this useEffect after your other useEffects
+	useEffect(() => {
+		if (!currentCompany) return;
+
+		const fetchLabels = async () => {
+			setLoadingLabels(true);
+			try {
+				const labelsRef = db
+					.collection("Companies")
+					.doc(currentCompany)
+					.collection("EventLabels");
+
+				const snapshot = await labelsRef.get();
+				const labelData = snapshot.docs.map((doc) => ({
+					id: doc.id,
+					...doc.data(),
+				}));
+
+				setAvailableLabels(labelData);
+
+				// If editing and event has a label, set it
+				if (eventId) {
+					const eventDoc = await db
+						.collection("Companies")
+						.doc(currentCompany)
+						.collection("Events")
+						.doc(eventId)
+						.get();
+
+					if (eventDoc.exists && eventDoc.data().labelId) {
+						setSelectedLabelId(eventDoc.data().labelId);
+					}
+				}
+			} catch (error) {
+				console.error("Error fetching labels:", error);
+			} finally {
+				setLoadingLabels(false);
+			}
+		};
+
+		fetchLabels();
+	}, [currentCompany, eventId]);
+
 	const formatDate = (date: Date) => moment(date).format("MMM D, YYYY");
 	const formatTime = (time: Date, start: boolean = true) => {
 		if (start) return moment(time).format("h:mm A");
@@ -181,17 +231,18 @@ const EventSubmit = ({ navigation }) => {
 	}, [eventId, currentCompany]);
 
 	const canSubmit = () => {
-		if (hasFormChanged()) {
-			return true;
-		} else if (attachmentDeletionQueue.length > 0) {
-			return true;
-		} else if (
-			selectedPackages.length > ogSelectedPackages.length ||
-			selectedPackages.length < ogSelectedPackages.length
-		) {
-			return true;
-		}
-		return false;
+		// if (hasFormChanged()) {
+		// 	return true;
+		// } else if (attachmentDeletionQueue.length > 0) {
+		// 	return true;
+		// } else if (
+		// 	selectedPackages.length > ogSelectedPackages.length ||
+		// 	selectedPackages.length < ogSelectedPackages.length
+		// ) {
+		// 	return true;
+		// }
+
+		return true;
 	};
 
 	const handleBackPress = () => {
@@ -293,10 +344,12 @@ const EventSubmit = ({ navigation }) => {
 
 	const handleSubmit = async () => {
 		const eventId = await handleSubmitData();
+
 		handleAttachmentSubmit(eventId);
 
 		await updateEvent(currentCompany, eventId, {
 			packages: selectedPackages,
+			labelId: selectedLabelId,
 		});
 	};
 
@@ -725,6 +778,122 @@ const EventSubmit = ({ navigation }) => {
 						</View>
 					</View>
 
+					{/* Label Section */}
+					<View style={[styles.sectionContainer, { zIndex: 1 }]}>
+						<Text style={styles.sectionTitle}>Label</Text>
+						<View style={styles.inputContainer}>
+							<Text style={styles.label}>Event Label</Text>
+							<Text style={styles.helperText}>
+								Categorize this event with a label
+							</Text>
+
+							{loadingLabels ? (
+								<ActivityIndicator
+									style={{ marginVertical: 10 }}
+								/>
+							) : availableLabels.length === 0 ? (
+								<View style={styles.emptyLabelsContainer}>
+									<Text style={styles.emptyLabelsText}>
+										No labels available
+									</Text>
+								</View>
+							) : (
+								<View style={styles.labelSelectorContainer}>
+									<View style={styles.labelsGrid}>
+										{/* Option for no label */}
+										<TouchableOpacity
+											style={[
+												styles.labelOption,
+												!selectedLabelId &&
+													styles.labelOptionSelected,
+											]}
+											onPress={() =>
+												setSelectedLabelId(null)
+											}
+										>
+											<View style={styles.labelColorNone}>
+												<Ionicons
+													name="close"
+													size={16}
+													color="#999"
+												/>
+											</View>
+											<Text
+												style={styles.labelOptionText}
+											>
+												None
+											</Text>
+										</TouchableOpacity>
+
+										{/* Available labels */}
+										{availableLabels.map((label) => (
+											<TouchableOpacity
+												key={label.id}
+												style={[
+													styles.labelOption,
+													selectedLabelId ===
+														label.id &&
+														styles.labelOptionSelected,
+												]}
+												onPress={() =>
+													setSelectedLabelId(label.id)
+												}
+											>
+												<View
+													style={[
+														styles.labelColor,
+														{
+															backgroundColor:
+																label.color,
+														},
+													]}
+												/>
+												<Text
+													style={
+														styles.labelOptionText
+													}
+												>
+													{label.name}
+												</Text>
+											</TouchableOpacity>
+										))}
+									</View>
+								</View>
+							)}
+
+							{/* Selected Label Preview */}
+							{selectedLabelId && (
+								<View style={styles.selectedLabelContainer}>
+									{availableLabels.map((label) => {
+										if (label.id === selectedLabelId) {
+											return (
+												<View
+													key={label.id}
+													style={[
+														styles.selectedLabel,
+														{
+															backgroundColor:
+																label.color,
+														},
+													]}
+												>
+													<Text
+														style={
+															styles.selectedLabelText
+														}
+													>
+														{label.name}
+													</Text>
+												</View>
+											);
+										}
+										return null;
+									})}
+								</View>
+							)}
+						</View>
+					</View>
+
 					{/* Notes Section */}
 					<View style={[styles.sectionContainer, { zIndex: 1 }]}>
 						<Text style={styles.sectionTitle}>
@@ -1040,6 +1209,84 @@ const styles = StyleSheet.create({
 	},
 	removePackageButton: {
 		padding: 4,
+	},
+	emptyLabelsContainer: {
+		padding: 15,
+		backgroundColor: "#f9f9f9",
+		borderRadius: 8,
+		alignItems: "center",
+		justifyContent: "center",
+		borderWidth: 1,
+		borderColor: "#eee",
+		borderStyle: "dashed",
+		marginVertical: 8,
+	},
+	emptyLabelsText: {
+		color: "#999",
+		fontSize: 16,
+	},
+	labelSelectorContainer: {
+		marginTop: 8,
+		marginBottom: 8,
+	},
+	labelsGrid: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+	},
+	labelOption: {
+		flexDirection: "row",
+		alignItems: "center",
+		paddingHorizontal: 12,
+		paddingVertical: 8,
+		borderRadius: 16,
+		marginRight: 8,
+		marginBottom: 8,
+		backgroundColor: "#f5f5f5",
+		borderWidth: 1,
+		borderColor: "#e0e0e0",
+		minHeight: 36,
+	},
+	labelOptionSelected: {
+		backgroundColor: "#eaf4ff",
+		borderColor: "#3d7eea",
+	},
+	labelColor: {
+		width: 18,
+		height: 18,
+		borderRadius: 9,
+		marginRight: 8,
+	},
+	labelColorNone: {
+		width: 18,
+		height: 18,
+		borderRadius: 9,
+		marginRight: 8,
+		backgroundColor: "#f0f0f0",
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	labelOptionText: {
+		fontSize: 14,
+		color: "#333",
+	},
+	selectedLabelContainer: {
+		marginTop: 16,
+		paddingTop: 8,
+	},
+	selectedLabel: {
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 16,
+		alignSelf: "flex-start",
+		marginTop: 4,
+	},
+	selectedLabelText: {
+		color: "white",
+		fontSize: 14,
+		fontWeight: "500",
+		textShadowColor: "rgba(0, 0, 0, 0.3)",
+		textShadowOffset: { width: 0, height: 1 },
+		textShadowRadius: 2,
 	},
 });
 

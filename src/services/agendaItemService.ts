@@ -1,5 +1,6 @@
 import { MarkedDates } from "react-native-calendars/src/types";
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
+import db from "../constants/firestore";
 
 /* An AgendaItem controller that conatains:
   - An AgendaItemData interface that provides the structure of AgendaItem data
@@ -23,6 +24,7 @@ export interface AgendaItemData {
 		type: string;
 		path: string;
 	}[];
+	labelId?: string;
 }
 
 export interface AgendaItem {
@@ -42,6 +44,7 @@ function createAgendaItem(
 		assigned: docRef.assignedWorkers || [],
 		uid: docRef.id,
 		attachments: docRef.attachments || [],
+		labelId: docRef.labelId || "",
 	};
 }
 
@@ -65,13 +68,14 @@ function isEmpty(obj: any): boolean {
 	return Object.keys(obj).length === 0;
 }
 
-export function getMarkedDates(events: any[]): MarkedDates {
+export function getMarkedDates(events: any[], labelMap: any): MarkedDates {
 	const marked: MarkedDates = {};
 	events.forEach((event) => {
 		const data = event.data();
 		const day = data.date; // Assuming event has a date field in YYYY-MM-DD format
+		const label = labelMap[data.labelId] || "grey"; // Default to blue if no label found
 		if (day) {
-			marked[day] = { marked: true };
+			marked[day] = { marked: true, dotColor: label };
 		}
 	});
 	return marked;

@@ -25,6 +25,8 @@ import { EventHeader } from "../../components/eventDetails/EventHeader";
 import { ScrollView } from "react-native-gesture-handler";
 import AttachmentGallery from "../../components/ui/AttachmentGallery";
 import { useUser } from "../../contexts/UserContext";
+import db from "../../constants/firestore";
+import { useCompany } from "../../contexts/CompanyContext";
 
 // Types
 type RootStackParamList = {
@@ -47,6 +49,7 @@ const EventDetails = ({ navigation }) => {
 	const { settings } = useUser();
 	const prefMap = settings?.preferredMapApp || "";
 	const animatedOpacity = useRef(new Animated.Value(0)).current;
+	const { preferences } = useCompany();
 
 	// Use custom hook for event data
 	const {
@@ -137,7 +140,7 @@ const EventDetails = ({ navigation }) => {
 	// Add state for packages
 	const [packages, setPackages] = useState([]);
 	const [loadingPackages, setLoadingPackages] = useState(false);
-	const { companyId } = useUser();
+	const { companyId, isAdmin } = useUser();
 
 	// Add effect to load packages
 	useEffect(() => {
@@ -160,6 +163,37 @@ const EventDetails = ({ navigation }) => {
 
 		fetchPackages();
 	}, [event?.packages, companyId]);
+
+	// First, add a state for the label
+	const [eventLabel, setEventLabel] = useState(null);
+
+	// Add this effect to fetch the label data
+	useEffect(() => {
+		if (!event?.labelId || !companyId) return;
+
+		const fetchLabel = async () => {
+			try {
+				const labelRef = db
+					.collection("Companies")
+					.doc(companyId)
+					.collection("EventLabels")
+					.doc(event.labelId);
+
+				const labelDoc = await labelRef.get();
+
+				if (labelDoc.exists) {
+					setEventLabel({
+						id: labelDoc.id,
+						...labelDoc.data(),
+					});
+				}
+			} catch (error) {
+				console.error("Error fetching label:", error);
+			}
+		};
+
+		fetchLabel();
+	}, [event?.labelId, companyId]);
 
 	if (isLoading || !event) {
 		return <LoadingScreen />;
@@ -187,6 +221,22 @@ const EventDetails = ({ navigation }) => {
 					onEdit={handleEdit}
 					canEdit={hasEditPermission}
 				/>
+
+				{/* Event Label */}
+				{(preferences.canViewEventLabels || isAdmin) && eventLabel && (
+					<View style={styles.labelContainer}>
+						<View
+							style={[
+								styles.labelBadge,
+								{ backgroundColor: eventLabel.color },
+							]}
+						>
+							<Text style={styles.labelText}>
+								{eventLabel.name}
+							</Text>
+						</View>
+					</View>
+				)}
 
 				{/* Date & Time Card */}
 				<View style={styles.card}>
@@ -772,6 +822,31 @@ const styles = StyleSheet.create({
 	},
 	bottomSpace: {
 		height: 40,
+	},
+	labelContainer: {
+		marginBottom: 12,
+		paddingTop: 8,
+		paddingHorizontal: 4,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	labelBadge: {
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 16,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.1,
+		shadowRadius: 2,
+		elevation: 1,
+	},
+	labelText: {
+		color: "white",
+		fontSize: 14,
+		fontWeight: "500",
+		textShadowColor: "rgba(0, 0, 0, 0.3)",
+		textShadowOffset: { width: 0, height: 1 },
+		textShadowRadius: 2,
 	},
 });
 

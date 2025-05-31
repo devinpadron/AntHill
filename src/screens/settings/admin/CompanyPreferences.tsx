@@ -172,6 +172,24 @@ const CompanyPreferences = ({ navigation }) => {
 							}
 						/>
 					</View>
+
+					<View style={styles.settingItem}>
+						<Text style={styles.settingLabel}>
+							Allow Users to View Event Labels
+						</Text>
+						<Switch
+							value={preferences.canViewEventLabels}
+							onValueChange={(value) =>
+								handleToggleChange("canViewEventLabels", value)
+							}
+							trackColor={{ false: "#d3d3d3", true: "#b3e0ff" }}
+							thumbColor={
+								preferences.canViewEventLabels
+									? "#007AFF"
+									: "#f4f3f4"
+							}
+						/>
+					</View>
 				</View>
 			</ScrollView>
 		</SafeAreaView>

@@ -8,6 +8,7 @@ import CompanyPreferences from "../screens/settings/admin/CompanyPreferences";
 import UserPreferences from "../screens/settings/UserPreferences";
 import ChecklistCreator from "../screens/settings/admin/ChecklistCreator";
 import PackageCreator from "../screens/settings/admin/PackageCreator";
+import LabelCreator from "../screens/settings/admin/LabelCreator";
 
 const Stack = createNativeStackNavigator();
 
@@ -57,6 +58,11 @@ const SettingStack = () => {
 			<Stack.Screen
 				name="PackageCreator"
 				component={PackageCreator}
+				options={{ headerShown: false, gestureEnabled: true }}
+			/>
+			<Stack.Screen
+				name="LabelCreator"
+				component={LabelCreator}
 				options={{ headerShown: false, gestureEnabled: true }}
 			/>
 		</Stack.Navigator>
