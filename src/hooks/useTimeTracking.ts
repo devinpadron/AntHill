@@ -112,6 +112,7 @@ export const useTimeTracking = () => {
 	const handleClockIn = async () => {
 		try {
 			const timeEntry = await clockIn(userId, companyId);
+			fetchTimeEntries();
 			return timeEntry;
 		} catch (error) {
 			console.error("Error clocking in:", error);
