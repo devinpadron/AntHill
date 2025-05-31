@@ -502,7 +502,6 @@ export const exportTimeEntries = async (
 							.replace(/"/g, '""') +
 						'"';
 				}
-				console.log(customForm[entry.id]);
 
 				// Format edit history (unchanged)
 				let editHistoryStr = "";

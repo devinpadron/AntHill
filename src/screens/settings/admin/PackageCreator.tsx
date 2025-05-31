@@ -318,8 +318,6 @@ const PackageCreator = ({ navigation }) => {
 		}
 	};
 
-	console.log(availableChecklists);
-
 	// Render an existing package in the list
 	const renderPackage = ({ item }: { item: Package }) => (
 		<View style={styles.packageCard}>

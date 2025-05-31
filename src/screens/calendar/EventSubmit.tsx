@@ -313,7 +313,6 @@ const EventSubmit = ({ navigation }) => {
 
 	// Add this state for dropdown control
 	const [openPackagesDropdown, setOpenPackagesDropdown] = useState(false);
-	console.log(availablePackages);
 	return (
 		<View style={[{ flex: 1, paddingTop: insets.top }, styles.container]}>
 			<KeyboardAwareScrollView
