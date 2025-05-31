@@ -44,7 +44,7 @@ export const ExpandableSettingsSection: React.FC<
 				<Ionicons
 					name={expanded ? "chevron-up" : "chevron-down"}
 					size={20}
-					color="#555"
+					color="#888"
 				/>
 			</TouchableOpacity>
 
