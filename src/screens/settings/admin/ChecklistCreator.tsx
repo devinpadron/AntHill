@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react"; // Add useRef import
 import {
 	View,
 	Text,
@@ -43,6 +43,9 @@ const ChecklistCreator = ({ navigation }) => {
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [isEditing, setIsEditing] = useState(false);
+
+	// Add ref for the TextInput
+	const itemInputRef = useRef(null);
 
 	// Fetch checklists on component mount
 	useEffect(() => {
@@ -173,6 +176,14 @@ const ChecklistCreator = ({ navigation }) => {
 		});
 
 		setNewItemText("");
+
+		// Focus back on the input after adding the item
+		// Use setTimeout to ensure the clear happens first
+		setTimeout(() => {
+			if (itemInputRef.current) {
+				itemInputRef.current.focus();
+			}
+		}, 0);
 	};
 
 	// Remove item from current checklist
@@ -387,12 +398,14 @@ const ChecklistCreator = ({ navigation }) => {
 							<Text style={styles.label}>Checklist Items</Text>
 							<View style={styles.itemInputContainer}>
 								<TextInput
+									ref={itemInputRef}
 									style={styles.itemInput}
 									value={newItemText}
 									onChangeText={setNewItemText}
 									placeholder="Add new item"
 									onSubmitEditing={addChecklistItem}
 									returnKeyType="done"
+									blurOnSubmit={false} // Add this line to prevent blur on submit
 								/>
 								<TouchableOpacity
 									style={styles.addButton}
