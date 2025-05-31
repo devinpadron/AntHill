@@ -10,6 +10,7 @@ type PromptButtons = Array<{
 type PromptOptions = {
 	defaultValue?: string;
 	isSecure?: boolean;
+	keyboardType?: string;
 };
 
 export const showPrompt = (
@@ -18,7 +19,11 @@ export const showPrompt = (
 	buttons: PromptButtons,
 	options: PromptOptions = {},
 ) => {
-	const { defaultValue = "", isSecure = false } = options;
+	const {
+		defaultValue = "",
+		isSecure = false,
+		keyboardType = "default",
+	} = options;
 
 	if (Platform.OS === "android") {
 		prompt(title, message, buttons, {
@@ -32,6 +37,7 @@ export const showPrompt = (
 			buttons,
 			isSecure ? "secure-text" : "plain-text",
 			defaultValue,
+			keyboardType,
 		);
 	}
 };

@@ -57,6 +57,7 @@ export const useEmployeeData = () => {
 								lastName: userData.lastName,
 								email: userData.email,
 								role: userRole,
+								phone: userData.phone || "", // Ensure phone is always a string
 							};
 						}
 					});

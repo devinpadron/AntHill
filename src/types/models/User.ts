@@ -4,5 +4,6 @@ export interface User {
 	email: string;
 	loggedInCompany: string;
 	companies: string[];
+	phone?: string;
 	id: string;
 }

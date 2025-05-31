@@ -97,7 +97,7 @@ export async function addUser(newUser: User, userID: string) {
 	}
 }
 
-export async function updateUser(userID: string, userData: User) {
+export async function updateUser(userID: string, userData: any) {
 	try {
 		await db.collection("Users").doc(userID).update(userData);
 		console.log("User successfully updated");
