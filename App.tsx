@@ -27,8 +27,6 @@ const CompanyInitializer = () => {
 	return null;
 };
 
-//TODO: Add labels to events
-
 const App: React.FC = () => {
 	// Add this effect to check pending navigation periodically
 	useEffect(() => {
