@@ -1,23 +1,34 @@
 import { Ionicons } from "@expo/vector-icons";
 import { TouchableOpacity, Text, StyleSheet } from "react-native";
 
-export const SettingsItem: React.FC<{
+type SettingsItemProps = {
 	title: string;
-	isAction?: boolean;
 	onPress: () => void;
-}> = ({ title, isAction = false, onPress }) => (
-	<TouchableOpacity style={styles.settingsItem} onPress={onPress}>
-		<Text style={[styles.settingsItemText, isAction && styles.actionText]}>
-			{title}
-		</Text>
-		{!isAction && (
+	isAction?: boolean;
+	style?: any; // Add this line to accept custom styles
+};
+
+export const SettingsItem: React.FC<SettingsItemProps> = ({
+	title,
+	onPress,
+	isAction = false,
+	style, // Accept style prop
+}) => {
+	return (
+		<TouchableOpacity
+			style={[styles.container, isAction && styles.actionItem, style]} // Merge styles
+			onPress={onPress}
+		>
+			<Text style={[styles.title, isAction && styles.actionTitle]}>
+				{title}
+			</Text>
 			<Ionicons name="chevron-forward-outline" size={20} color="#888" />
-		)}
-	</TouchableOpacity>
-);
+		</TouchableOpacity>
+	);
+};
 
 const styles = StyleSheet.create({
-	settingsItem: {
+	container: {
 		flexDirection: "row",
 		justifyContent: "space-between",
 		alignItems: "center",
@@ -26,10 +37,13 @@ const styles = StyleSheet.create({
 		borderBottomWidth: 1,
 		borderBottomColor: "#e0e0e0",
 	},
-	settingsItemText: {
+	title: {
 		fontSize: 16,
 	},
-	actionText: {
+	actionItem: {
+		// Define styles for action item if needed
+	},
+	actionTitle: {
 		color: "red",
 	},
 });

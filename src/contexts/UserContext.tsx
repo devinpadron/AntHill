@@ -10,6 +10,7 @@ import { Alert } from "react-native";
 import {
 	subscribeCurrentUser,
 	subscribeUserPrivilege,
+	subscribeUserPreferences,
 } from "../services/userService";
 import { signOut } from "../services/authService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -26,6 +27,7 @@ type UserContextType = {
 	isLoading: boolean;
 	loggedIn: boolean;
 	companyId: string | undefined;
+	settings: any;
 	logout: () => Promise<void>;
 	initializing: boolean;
 };
@@ -39,6 +41,7 @@ const UserContext = createContext<UserContextType>({
 	isLoading: true,
 	loggedIn: false,
 	companyId: undefined,
+	settings: null,
 	logout: async () => {},
 	initializing: true,
 });
@@ -54,6 +57,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 	const [initializing, setInitializing] = useState(true);
 	const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 	const [companyId, setCompanyId] = useState<string | undefined>(undefined);
+	const [settings, setSettings] = useState<any>(null);
 
 	// When auth state changes (user logged in)
 	const storeAuthState = async () => {
@@ -206,6 +210,25 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 		return userSubscriber;
 	}, [loggedIn]);
 
+	// Subscribe to user preferences changes
+	useEffect(() => {
+		const subscriber = subscribeUserPreferences(
+			userId,
+			(userPreferencesSnapshot) => {
+				if (userPreferencesSnapshot.exists) {
+					const preferences = userPreferencesSnapshot.data();
+					setSettings(preferences);
+					console.log("User preferences updated:", preferences);
+				} else {
+					console.log("No user preferences found");
+				}
+			},
+		);
+		return () => {
+			subscriber();
+		};
+	}, [userId, loggedIn]);
+
 	useEffect(() => {
 		const privSubscriber = subscribeUserPrivilege(
 			userId,
@@ -254,6 +277,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 		isLoading,
 		loggedIn,
 		companyId,
+		settings,
 		logout,
 		initializing,
 	};

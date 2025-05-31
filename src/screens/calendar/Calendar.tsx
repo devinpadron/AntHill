@@ -9,12 +9,14 @@ import { FloatingActionButtons } from "../../components/calendar/FloatingActionB
 import LoadingScreen from "../LoadingScreen";
 import { FilterType } from "../../types";
 import Timesheet from "../../components/calendar/Timesheet";
+import { set } from "lodash";
+import { Filter } from "react-native-feather";
 
 const today = moment().format("YYYY-MM-DD");
 
 const CalendarScreen = ({ navigation }: { navigation: any }) => {
 	// User State
-	const { user, isAdmin, isLoading } = useUser();
+	const { user, isAdmin, isLoading, settings } = useUser();
 
 	// Date Selection
 	const [selectedDate, setSelectedDate] = useState<string>(null);
@@ -29,7 +31,15 @@ const CalendarScreen = ({ navigation }: { navigation: any }) => {
 	const [filterType, setFilterType] = useState<FilterType>(FilterType.MY);
 
 	useEffect(() => {
-		setFilterType(isAdmin ? FilterType.ALL : FilterType.MY);
+		if (isAdmin) {
+			setFilterType(
+				settings?.defaultCalendarFilter
+					? settings.defaultCalendarFilter
+					: FilterType.ALL,
+			);
+		} else {
+			setFilterType(FilterType.MY);
+		}
 	}, [isLoading, isAdmin]);
 
 	const handleFilterChange = (type: FilterType) => {

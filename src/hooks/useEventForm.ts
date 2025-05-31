@@ -260,7 +260,7 @@ export const useEventForm = (navigation, eventId?: string) => {
 	}, [date, startTime, allDay]);
 
 	// Handle event submission
-	const handleSubmit = useCallback(async () => {
+	const handleSubmitData = useCallback(async () => {
 		if (!validateFields()) return;
 
 		try {
@@ -293,6 +293,7 @@ export const useEventForm = (navigation, eventId?: string) => {
 				duration: calculateDuration(),
 				notes,
 				assignedWorkers,
+				packages: [],
 			};
 
 			let eventId;
@@ -476,7 +477,7 @@ export const useEventForm = (navigation, eventId?: string) => {
 		toggleDatePicker,
 		toggleAllDay,
 		toggleEndTime,
-		handleSubmit,
+		handleSubmitData,
 		handleDelete,
 		hasFormChanged,
 	};

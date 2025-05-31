@@ -11,6 +11,7 @@ type Employee = {
 	email: string;
 	id: string;
 	role?: string;
+	phone?: string; // Phone can be optional, but should default to an empty string if not provided
 };
 
 type EmployeeMap = Record<string, Employee>;
@@ -57,6 +58,7 @@ export const useEmployeeData = () => {
 								lastName: userData.lastName,
 								email: userData.email,
 								role: userRole,
+								phone: userData.phone || "", // Ensure phone is always a string
 							};
 						}
 					});

@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import CalendarScreen from "../screens/calendar/Calendar";
 import EventDetails from "../screens/calendar/EventDetails";
 import EventSubmit from "../screens/calendar/EventSubmit";
+import EventChecklists from "../screens/calendar/EventChecklists";
 
 const Stack = createNativeStackNavigator();
 
@@ -21,6 +22,11 @@ const CalendarStack = () => {
 			<Stack.Screen
 				name="EditEvent"
 				component={EventSubmit}
+				options={{ headerShown: false, gestureEnabled: true }}
+			/>
+			<Stack.Screen
+				name="EventChecklists"
+				component={EventChecklists}
 				options={{ headerShown: false, gestureEnabled: true }}
 			/>
 		</Stack.Navigator>

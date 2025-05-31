@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, StatusBar, Alert } from "react-native";
 import { SettingsItem } from "../../components/settings/SettingsItem";
+import { ExpandableSettingsSection } from "../../components/settings/ExpandableSettingsSection";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUser } from "../../contexts/UserContext";
 import { useCompany } from "../../contexts/CompanyContext";
@@ -44,6 +45,10 @@ const Settings = ({ navigation }: any) => {
 					title="Profile"
 					onPress={() => navigation.push("Profile")}
 				/>
+				<SettingsItem
+					title="User Preferences"
+					onPress={() => navigation.push("UserPreferences")}
+				/>
 			</View>
 
 			{isAdmin ? (
@@ -63,10 +68,30 @@ const Settings = ({ navigation }: any) => {
 							onPress={() => navigation.push("PayrollReview")}
 						/>
 					)}
-					<SettingsItem
-						title="Custom Submission Form"
-						onPress={() => navigation.push("CompanyCustomForm")}
-					/>
+
+					{/* Add the expandable Create section */}
+					<ExpandableSettingsSection title="Create">
+						<SettingsItem
+							title="Submission Form"
+							onPress={() => navigation.push("CompanyCustomForm")}
+							style={styles.nestedItem}
+						/>
+						<SettingsItem
+							title="Checklists"
+							onPress={() => navigation.push("ChecklistCreator")}
+							style={styles.nestedItem}
+						/>
+						<SettingsItem
+							title="Packages"
+							onPress={() => navigation.push("PackageCreator")}
+							style={styles.nestedItem}
+						/>
+						<SettingsItem
+							title="Labels"
+							onPress={() => navigation.push("LabelCreator")}
+							style={styles.nestedItem}
+						/>
+					</ExpandableSettingsSection>
 				</View>
 			) : null}
 
@@ -105,6 +130,9 @@ const styles = StyleSheet.create({
 		color: "#888",
 		marginLeft: 16,
 		marginBottom: 8,
+	},
+	nestedItem: {
+		paddingLeft: 16, // Indentation for nested items
 	},
 });
 

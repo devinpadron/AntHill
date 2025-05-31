@@ -97,7 +97,7 @@ export async function addUser(newUser: User, userID: string) {
 	}
 }
 
-export async function updateUser(userID: string, userData: User) {
+export async function updateUser(userID: string, userData: any) {
 	try {
 		await db.collection("Users").doc(userID).update(userData);
 		console.log("User successfully updated");
@@ -224,4 +224,38 @@ export const batchGetUserPrivileges = async (
 		console.error("Error batch fetching user privileges:", error);
 		return {};
 	}
+};
+
+export const getUserPreferences = async (userID: string) => {
+	const preferencesDoc = await db
+		.collection("Users")
+		.doc(userID)
+		.collection("Preferences")
+		.doc("settings")
+		.get();
+
+	return preferencesDoc.exists ? preferencesDoc.data() : null;
+};
+
+export const setUserPreferences = async (userID: string, preferences) => {
+	await db
+		.collection("Users")
+		.doc(userID)
+		.collection("Preferences")
+		.doc("settings")
+		.set(preferences, { merge: true });
+};
+
+export const subscribeUserPreferences = (
+	userID: string,
+	onSnap: (
+		snapshot: FirebaseFirestoreTypes.DocumentSnapshot<FirebaseFirestoreTypes.DocumentData>,
+	) => void,
+) => {
+	return db
+		.collection("Users")
+		.doc(userID)
+		.collection("Preferences")
+		.doc("settings")
+		.onSnapshot(onSnap);
 };

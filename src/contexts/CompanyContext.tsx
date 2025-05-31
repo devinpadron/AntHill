@@ -17,6 +17,7 @@ export interface CompanyPreferences {
 	allowUserEventEditing: boolean;
 	enableTimeSheet: boolean;
 	timeEntryForm: any;
+	canViewEventLabels: boolean;
 }
 
 export interface CompanyData {
@@ -50,6 +51,7 @@ const defaultPreferences: CompanyPreferences = {
 		fields: [],
 		isEnabled: true,
 	},
+	canViewEventLabels: true,
 };
 
 // Create context with default values

@@ -62,7 +62,10 @@ const promoteEmployee = async (employee, companyId, onRefresh) => {
 const demoteEmployee = async (employee, companyId, onRefresh) => {
 	try {
 		await changeUserRole(employee.id, companyId, Role.USER);
-		console.log("Demoted", `${employee.firstName} ${employee.lastName}`);
+		await console.log(
+			"Demoted",
+			`${employee.firstName} ${employee.lastName}`,
+		);
 		onRefresh();
 	} catch (error) {
 		console.error("Error demoting employee:", error);
