@@ -24,6 +24,12 @@ import BottomSheet, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CustomFormRender from "./CustomFormRender";
 
+//TODO: What I did before was attach the formResponses directly to each connected event
+// Next we need to:
+// 1. Update the timeEntryDetails to handle the new structure and display the form responses correctly
+// 2. Add a new form that will get attached to the submission, not to the event (like its handled rn)
+// 3. Update the submission logic to handle the new structure
+
 const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const [notes, setNotes] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
