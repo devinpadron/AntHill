@@ -139,7 +139,7 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 	return (
 		<TouchableOpacity
 			style={styles.card}
-			onPress={onPress}
+			onPress={canSubmit && onSubmit ? handleSubmit : onPress}
 			activeOpacity={onPress ? 0.7 : 1}
 		>
 			{/* Date */}
@@ -232,10 +232,7 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 
 			{/* Status badges and submit button */}
 			{canSubmit && onSubmit ? (
-				<TouchableOpacity
-					style={styles.submitButton}
-					onPress={handleSubmit}
-				>
+				<View style={styles.submitButton}>
 					<Icon
 						name="check-circle-outline"
 						size={16}
@@ -243,7 +240,7 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 						style={styles.icon}
 					/>
 					<Text style={styles.submitText}>Submit for Approval</Text>
-				</TouchableOpacity>
+				</View>
 			) : null}
 		</TouchableOpacity>
 	);

@@ -90,22 +90,9 @@ export const useTimeTracking = ({
 		if (!timeEntries.length)
 			return { hours: 0, minutes: 0, seconds: 0, count: 0 };
 
-		const today = new Date();
-
-		// Weekly summary data
-		const weekStart =
-			preferences.workWeekStarts === "sunday"
-				? startOfWeek(new Date(), { weekStartsOn: 0 })
-				: startOfWeek(new Date(), { weekStartsOn: 1 });
-
-		const weekEnd =
-			preferences.workWeekStarts === "sunday"
-				? endOfWeek(new Date(), { weekStartsOn: 0 })
-				: endOfWeek(new Date(), { weekStartsOn: 1 });
-
 		const thisWeekEntries = timeEntries.filter((entry) => {
 			const entryDate = new Date(entry.clockInTime);
-			return entryDate >= weekStart && entryDate <= weekEnd;
+			return entryDate >= startDate && entryDate <= endDate;
 		});
 
 		// Total seconds across all entries

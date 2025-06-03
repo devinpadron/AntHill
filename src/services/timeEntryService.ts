@@ -100,13 +100,16 @@ export const getTimeEntries = async (
 	startDate: Date,
 	endDate: Date,
 ) => {
-	const timeEntriesRef = db
+	let timeEntriesRef = db
 		.collection("Companies")
 		.doc(companyId)
 		.collection("TimeEntries")
 		.where("userId", "==", userId)
 		.where("clockInTime", ">=", startDate.toISOString())
 		.where("clockInTime", "<=", endDate.toISOString());
+
+	// Always sort by clockInTime in descending order and limit results
+	timeEntriesRef = timeEntriesRef.orderBy("clockInTime", "desc");
 
 	const snapshot = await timeEntriesRef.get();
 	if (snapshot.empty) return [];

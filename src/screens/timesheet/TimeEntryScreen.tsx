@@ -10,11 +10,14 @@ import {
 	Alert,
 	ActivityIndicator,
 	RefreshControl,
+	Modal,
+	Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from "date-fns";
 import { useFocusEffect } from "@react-navigation/native";
+import DatePicker from "react-native-date-picker";
 import TimeEntryCard from "../../components/time/TimeEntryCard";
 import TimeEntrySubmitModal from "../../components/time/TimeEntrySubmitModal";
 import { useTimeTracking } from "../../hooks/useTimeTracking";
@@ -28,7 +31,7 @@ const TimeEntryScreen = ({ navigation }) => {
 	const { userId, companyId } = useUser();
 	const { preferences } = useCompany();
 
-	// Date-related states and functions
+	// Date-related states
 	const [currentStartDate, setCurrentStartDate] = useState(() => {
 		const weekStartsOn = preferences?.workWeekStarts === "sunday" ? 0 : 1;
 		return startOfWeek(new Date(), { weekStartsOn });
@@ -39,6 +42,11 @@ const TimeEntryScreen = ({ navigation }) => {
 		return endOfWeek(new Date(), { weekStartsOn });
 	});
 
+	// Date picker visibility states
+	const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+	const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+
+	// Week navigation functions
 	const goToPrevWeek = () => {
 		setCurrentStartDate((prev) => subWeeks(prev, 1));
 		setCurrentEndDate((prev) => subWeeks(prev, 1));
@@ -53,6 +61,31 @@ const TimeEntryScreen = ({ navigation }) => {
 		const weekStartsOn = preferences?.workWeekStarts === "sunday" ? 0 : 1;
 		setCurrentStartDate(startOfWeek(new Date(), { weekStartsOn }));
 		setCurrentEndDate(endOfWeek(new Date(), { weekStartsOn }));
+	};
+
+	// Date picker handlers
+	const handleStartDateChange = (date) => {
+		setShowStartDatePicker(false);
+		if (date > currentEndDate) {
+			Alert.alert(
+				"Invalid Date Range",
+				"Start date cannot be after end date",
+			);
+			return;
+		}
+		setCurrentStartDate(date);
+	};
+
+	const handleEndDateChange = (date) => {
+		setShowEndDatePicker(false);
+		if (date < currentStartDate) {
+			Alert.alert(
+				"Invalid Date Range",
+				"End date cannot be before start date",
+			);
+			return;
+		}
+		setCurrentEndDate(date);
 	};
 
 	// Time tracking hook
@@ -161,8 +194,8 @@ const TimeEntryScreen = ({ navigation }) => {
 
 	return (
 		<SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
-			{/* 1. Week Navigation Controls */}
-			<View style={styles.weekNavigator}>
+			{/* 1. Date Range Selection */}
+			<View>
 				<View style={styles.dateControls}>
 					<TouchableOpacity
 						onPress={goToPrevWeek}
@@ -186,15 +219,44 @@ const TimeEntryScreen = ({ navigation }) => {
 					</TouchableOpacity>
 				</View>
 
-				<Text style={styles.weekRangeText}>
-					{format(currentStartDate, "MMM d")} -{" "}
-					{format(currentEndDate, "MMM d, yyyy")}
-				</Text>
+				<View style={styles.dateRange}>
+					<TouchableOpacity
+						onPress={() => setShowStartDatePicker(true)}
+						style={styles.dateButton}
+					>
+						<Icon
+							name="calendar"
+							size={18}
+							color="#666"
+							style={styles.calendarIcon}
+						/>
+						<Text style={styles.dateText}>
+							{format(currentStartDate, "MMM d, yyyy")}
+						</Text>
+					</TouchableOpacity>
+
+					<Text style={styles.dateRangeSeparator}>to</Text>
+
+					<TouchableOpacity
+						onPress={() => setShowEndDatePicker(true)}
+						style={styles.dateButton}
+					>
+						<Icon
+							name="calendar"
+							size={18}
+							color="#666"
+							style={styles.calendarIcon}
+						/>
+						<Text style={styles.dateText}>
+							{format(currentEndDate, "MMM d, yyyy")}
+						</Text>
+					</TouchableOpacity>
+				</View>
 			</View>
 
-			{/* 2. Weekly Summary */}
+			{/* 2. Date Range Summary */}
 			<View style={styles.summaryCard}>
-				<Text style={styles.summaryTitle}>Weekly Summary</Text>
+				<Text style={styles.summaryTitle}>Summary</Text>
 				<View style={styles.summaryStats}>
 					<View style={styles.statItem}>
 						<Text style={styles.statValue}>
@@ -202,9 +264,7 @@ const TimeEntryScreen = ({ navigation }) => {
 							{weeklyStats.seconds > 0 &&
 								` ${weeklyStats.seconds}s`}
 						</Text>
-						<Text style={styles.statLabel}>
-							Total Hours Completed
-						</Text>
+						<Text style={styles.statLabel}>Total Hours</Text>
 					</View>
 					<View style={styles.divider} />
 					<View style={styles.statItem}>
@@ -354,13 +414,7 @@ const TimeEntryScreen = ({ navigation }) => {
 			<View style={styles.entriesSection}>
 				<Text style={styles.sectionTitle}>Time Entries</Text>
 				<FlatList
-					data={[...timeEntries].sort((a, b) => {
-						// Sort by clockInTime in descending order (newest first)
-						return (
-							new Date(b.clockInTime).getTime() -
-							new Date(a.clockInTime).getTime()
-						);
-					})}
+					data={timeEntries}
 					keyExtractor={(item) => item.id}
 					renderItem={renderTimeEntry}
 					ListEmptyComponent={
@@ -389,6 +443,25 @@ const TimeEntryScreen = ({ navigation }) => {
 				timeEntry={selectedTimeEntry}
 				onClose={() => setSubmitModalVisible(false)}
 				onSubmit={handleSubmitTimeEntry}
+			/>
+
+			{/* Date Pickers */}
+			<DatePicker
+				modal
+				mode="date"
+				open={showStartDatePicker}
+				date={currentStartDate}
+				onConfirm={handleStartDateChange}
+				onCancel={() => setShowStartDatePicker(false)}
+			/>
+
+			<DatePicker
+				modal
+				mode="date"
+				open={showEndDatePicker}
+				date={currentEndDate}
+				onConfirm={handleEndDateChange}
+				onCancel={() => setShowEndDatePicker(false)}
 			/>
 		</SafeAreaView>
 	);
@@ -608,25 +681,26 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 	},
 	weekNavigator: {
-		marginTop: 8,
-		marginBottom: 16,
-		backgroundColor: "#f7f7f7",
-		borderRadius: 8,
-		padding: 8,
+		backgroundColor: "white",
+		paddingHorizontal: 16,
+		paddingVertical: 12,
+		borderBottomWidth: 1,
+		borderBottomColor: "#eaeaea",
+		marginBottom: 8,
 	},
 	dateControls: {
 		flexDirection: "row",
 		justifyContent: "space-between",
 		alignItems: "center",
-		paddingVertical: 4,
+		paddingVertical: 8,
 	},
 	dateNavButton: {
-		padding: 8,
+		paddingHorizontal: 32,
 	},
 	currentWeekButton: {
 		paddingVertical: 6,
 		paddingHorizontal: 12,
-		backgroundColor: "#f0f7ff",
+		backgroundColor: "#f0f0ff",
 		borderRadius: 16,
 	},
 	currentWeekText: {
@@ -634,11 +708,29 @@ const styles = StyleSheet.create({
 		fontWeight: "500",
 		fontSize: 14,
 	},
-	weekRangeText: {
-		textAlign: "center",
+	dateRange: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		marginTop: 8,
+	},
+	dateButton: {
+		flexDirection: "row",
+		alignItems: "center",
+		padding: 8,
+		backgroundColor: "#f2f2f2",
+		borderRadius: 8,
+	},
+	calendarIcon: {
+		marginRight: 6,
+	},
+	dateText: {
 		fontSize: 14,
+		color: "#333",
+	},
+	dateRangeSeparator: {
+		marginHorizontal: 8,
 		color: "#666",
-		marginTop: 4,
 	},
 });
 

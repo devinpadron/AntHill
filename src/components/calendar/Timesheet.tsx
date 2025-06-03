@@ -17,7 +17,6 @@ import { CalendarList } from "react-native-calendars";
 import { Dimensions } from "react-native";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import LoadingScreen from "../../screens/LoadingScreen";
-import db from "../../constants/firestore"; // Add this import
 
 export default function Timesheet(
 	props: {
@@ -75,7 +74,7 @@ export default function Timesheet(
 
 	const timesheetData = useMemo(() => {
 		const formattedEntries = [];
-		const today = moment().startOf("day");
+		let currentYear = null;
 
 		// Get all dates from agendaItems and sort them
 		const sortedDates = Object.keys(agendaItems).sort((a, b) =>
@@ -86,6 +85,20 @@ export default function Timesheet(
 		sortedDates.forEach((dateString) => {
 			const events = agendaItems[dateString] || [];
 			if (events.length === 0) return;
+
+			// Check for year transition
+			const momentDate = moment(dateString);
+			const year = momentDate.year();
+
+			// If this is the first date or a new year, add a year header
+			if (currentYear === null || year !== currentYear) {
+				formattedEntries.push({
+					isYearHeader: true,
+					year: year,
+					date: `${year}`,
+				});
+				currentYear = year;
+			}
 
 			const entries = events.map((event) => {
 				// Calculate hours from duration or time difference
@@ -105,7 +118,6 @@ export default function Timesheet(
 					description = startTime.format("h:mm A");
 				}
 
-				console.log(event);
 				// Map label ID to color
 				const labelColor = event.labelId
 					? labelMap[event.labelId]
@@ -123,13 +135,8 @@ export default function Timesheet(
 
 			// Format the date display
 			let displayDate;
-			const momentDate = moment(dateString);
 
-			if (momentDate.isSame(today, "day")) {
-				displayDate = "Today";
-			} else {
-				displayDate = momentDate.format("MMMM D, YYYY");
-			}
+			displayDate = momentDate.format("MMMM D, YYYY");
 
 			formattedEntries.push({
 				date: displayDate,
@@ -293,6 +300,8 @@ export default function Timesheet(
 		return <LoadingScreen />;
 	}
 
+	console.log("Timesheet data:", timesheetData);
+
 	return (
 		<View style={styles.container}>
 			<StatusBar barStyle="dark-content" />
@@ -347,25 +356,49 @@ export default function Timesheet(
 						/>
 					) : null
 				}
-				keyExtractor={(item) => item.date}
-				renderItem={({ item }) => (
-					<View style={styles.section}>
-						<View style={styles.dateRow}>
-							{renderSectionHeader(item)}
-
-							<View style={styles.entriesContainer}>
-								{item.entries.map((entry) => (
-									<View key={entry.id}>
-										{renderEntry(entry)}
-									</View>
-								))}
+				keyExtractor={(item, index) => item.date + index}
+				renderItem={({ item, index }) => {
+					// Render year header
+					if (item.isYearHeader) {
+						return (
+							<View style={styles.yearHeader}>
+								<View style={styles.yearLine} />
+								<Text style={styles.yearText}>{item.year}</Text>
+								<View style={styles.yearLine} />
 							</View>
-						</View>
+						);
+					}
 
-						{/* Divider line still appears after all entries */}
-						<View style={styles.sectionDivider} />
-					</View>
-				)}
+					// Check if the next item is a year header
+					const nextItem =
+						index < timesheetData.length - 1
+							? timesheetData[index + 1]
+							: null;
+					const isNextItemYearHeader =
+						nextItem && nextItem.isYearHeader;
+
+					// Render regular date section
+					return (
+						<View style={styles.section}>
+							<View style={styles.dateRow}>
+								{renderSectionHeader(item)}
+
+								<View style={styles.entriesContainer}>
+									{item.entries.map((entry) => (
+										<View key={entry.id}>
+											{renderEntry(entry)}
+										</View>
+									))}
+								</View>
+							</View>
+
+							{/* Only render divider if next item isn't a year header */}
+							{!isNextItemYearHeader && (
+								<View style={styles.sectionDivider} />
+							)}
+						</View>
+					);
+				}}
 				contentContainerStyle={styles.listContent}
 			/>
 
@@ -620,5 +653,22 @@ const styles = StyleSheet.create({
 	entryContent: {
 		flex: 1,
 		padding: 12,
+	},
+	yearHeader: {
+		flexDirection: "row",
+		alignItems: "center",
+		paddingHorizontal: 20,
+		marginVertical: 16,
+	},
+	yearLine: {
+		flex: 1,
+		height: 1,
+		backgroundColor: "#C7C7CC",
+	},
+	yearText: {
+		fontSize: 18,
+		fontWeight: "600",
+		color: "#3C3C43",
+		marginHorizontal: 12,
 	},
 });

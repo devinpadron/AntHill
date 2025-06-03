@@ -23,7 +23,6 @@ import BottomSheet, {
 } from "@gorhom/bottom-sheet";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CustomFormRender from "./CustomFormRender";
-import { AttachmentItem } from "../../types";
 
 const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const [notes, setNotes] = useState("");
@@ -35,14 +34,12 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const [showOtherEvents, setShowOtherEvents] = useState(false);
 	const { userId, companyId } = useUser();
 	const [customForm, setCustomForm] = useState(null);
-	const [formResponses, setFormResponses] = useState({});
-	const [formErrors, setFormErrors] = useState({});
-	const insets = useSafeAreaInsets();
-
-	// Add these for file upload tracking
-	const [filesToUpload, setFilesToUpload] = useState<{
-		[fieldId: string]: AttachmentItem[];
-	}>({});
+	// Replace single formResponses with a map keyed by event ID
+	const [formResponsesByEvent, setFormResponsesByEvent] = useState({});
+	// Replace single formErrors with a map keyed by event ID
+	const [formErrorsByEvent, setFormErrorsByEvent] = useState({});
+	// Update filesToUpload to be organized by event
+	const [filesToUpload, setFilesToUpload] = useState({});
 	const { uploadFiles, isUploading, uploadProgress, resetUploadProgress } =
 		useUploadManager();
 
@@ -50,6 +47,7 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const scrollViewRef = useRef(null);
 	const notesInputRef = useRef(null);
 	const snapPoints = useRef(["85%"]).current;
+	const insets = useSafeAreaInsets();
 
 	useEffect(() => {
 		if (visible && bottomSheetRef.current) {
@@ -82,17 +80,13 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 				if (preferences?.timeEntryForm?.isEnabled) {
 					setCustomForm(preferences.timeEntryForm);
 
-					const initialResponses = {};
-					preferences.timeEntryForm.fields.forEach((field) => {
-						if (field.type === "checkbox") {
-							initialResponses[field.id] = false;
-						} else if (field.type === "multiSelect") {
-							initialResponses[field.id] = [];
-						} else {
-							initialResponses[field.id] = "";
-						}
-					});
-					setFormResponses(initialResponses);
+					// Initialize empty responses for existing events
+					if (selectedEvents.length > 0) {
+						initializeFormResponsesForEvents(
+							selectedEvents,
+							preferences.timeEntryForm,
+						);
+					}
 				}
 			} catch (error) {
 				console.error("Failed to load custom form:", error);
@@ -102,7 +96,41 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 		if (visible) {
 			loadCustomForm();
 		}
-	}, [visible, companyId]);
+	}, [visible, companyId, selectedEvents.length]);
+
+	// Add this helper function
+	const initializeFormResponsesForEvents = (events, formTemplate) => {
+		const newResponsesByEvent = { ...formResponsesByEvent };
+
+		events.forEach((event) => {
+			// Skip if we already have responses for this event
+			if (newResponsesByEvent[event.id]) return;
+
+			const initialResponses = {};
+			formTemplate.fields.forEach((field) => {
+				if (field.type === "checkbox") {
+					initialResponses[field.id] = false;
+				} else if (field.type === "multiSelect") {
+					initialResponses[field.id] = [];
+				} else {
+					initialResponses[field.id] = "";
+				}
+			});
+
+			newResponsesByEvent[event.id] = initialResponses;
+		});
+
+		setFormResponsesByEvent(newResponsesByEvent);
+
+		// Initialize empty errors object
+		const newErrorsByEvent = { ...formErrorsByEvent };
+		events.forEach((event) => {
+			if (!newErrorsByEvent[event.id]) {
+				newErrorsByEvent[event.id] = {};
+			}
+		});
+		setFormErrorsByEvent(newErrorsByEvent);
+	};
 
 	const fetchRelatedEvents = async () => {
 		if (!timeEntry || !companyId || !userId) return;
@@ -178,6 +206,11 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 		setOtherAvailableEvents((prev) =>
 			prev.filter((e) => e.id !== event.id),
 		);
+
+		// Initialize form responses for the new event
+		if (customForm) {
+			initializeFormResponsesForEvents([event], customForm);
+		}
 	};
 
 	const removeEvent = (eventId) => {
@@ -191,6 +224,26 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 
 		if (eventToRemove) {
 			setOtherAvailableEvents((prev) => [...prev, eventToRemove]);
+
+			// Remove form responses for this event
+			setFormResponsesByEvent((prev) => {
+				const updated = { ...prev };
+				delete updated[eventId];
+				return updated;
+			});
+
+			setFormErrorsByEvent((prev) => {
+				const updated = { ...prev };
+				delete updated[eventId];
+				return updated;
+			});
+
+			// Remove any files to upload for this event
+			setFilesToUpload((prev) => {
+				const updated = { ...prev };
+				delete updated[eventId];
+				return updated;
+			});
 		}
 	};
 
@@ -199,10 +252,13 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	};
 
 	// Updated to track files that need uploading
-	const handleFieldChange = (fieldId, fieldType, value) => {
-		setFormResponses((prev) => ({
+	const handleFieldChange = (eventId, fieldId, fieldType, value) => {
+		setFormResponsesByEvent((prev) => ({
 			...prev,
-			[fieldId]: value,
+			[eventId]: {
+				...prev[eventId],
+				[fieldId]: value,
+			},
 		}));
 
 		// If this is a document or media field, track files that need uploading
@@ -216,43 +272,54 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 				if (newFiles.length > 0) {
 					setFilesToUpload((prev) => ({
 						...prev,
-						[fieldId]: newFiles,
+						[`${eventId}-${fieldId}`]: newFiles,
 					}));
 				}
 			}
 		}
 
-		if (formErrors[fieldId]) {
-			setFormErrors((prev) => ({
+		if (formErrorsByEvent[eventId]?.[fieldId]) {
+			setFormErrorsByEvent((prev) => ({
 				...prev,
-				[fieldId]: null,
+				[eventId]: {
+					...prev[eventId],
+					[fieldId]: null,
+				},
 			}));
 		}
 	};
 
-	const validateForm = () => {
+	const validateForms = () => {
 		if (!customForm) return true;
 
-		const errors = {};
+		const newErrorsByEvent = { ...formErrorsByEvent };
 		let isValid = true;
 
-		customForm.fields.forEach((field) => {
-			if (field.required) {
-				const value = formResponses[field.id];
+		selectedEvents.forEach((event) => {
+			const eventErrors = {};
+			let eventIsValid = true;
 
-				if (
-					value === undefined ||
-					value === null ||
-					value === "" ||
-					(Array.isArray(value) && value.length === 0)
-				) {
-					errors[field.id] = `${field.label} is required`;
-					isValid = false;
+			customForm.fields.forEach((field) => {
+				if (field.required) {
+					const value = formResponsesByEvent[event.id]?.[field.id];
+
+					if (
+						value === undefined ||
+						value === null ||
+						value === "" ||
+						(Array.isArray(value) && value.length === 0)
+					) {
+						eventErrors[field.id] = `${field.label} is required`;
+						eventIsValid = false;
+						isValid = false;
+					}
 				}
-			}
+			});
+
+			newErrorsByEvent[event.id] = eventErrors;
 		});
 
-		setFormErrors(errors);
+		setFormErrorsByEvent(newErrorsByEvent);
 		return isValid;
 	};
 
@@ -262,8 +329,9 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 			setIsSubmitting(true);
 			setError(null);
 
-			if (customForm && !validateForm()) {
-				setError("Please complete all required fields");
+			if (customForm && !validateForms()) {
+				setError("Please complete all required fields for each event");
+				setIsSubmitting(false);
 				return;
 			}
 
@@ -272,14 +340,25 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 			if (pendingUploads.length > 0) {
 				try {
 					// Create temporary IDs for files if they don't have them
-					const filesWithIds = pendingUploads.map((file) => ({
-						...file,
-						id:
-							file.id ||
-							`file-${Date.now()}-${Math.random()
+					const filesWithIds = pendingUploads.map((file: any) => {
+						// Ensure file is an object before spreading
+						if (file && typeof file === "object") {
+							return {
+								...file,
+								id:
+									file.id ||
+									`file-${Date.now()}-${Math.random()
+										.toString(36)
+										.substring(2, 9)}`,
+							};
+						}
+						// Handle non-object files
+						return {
+							id: `file-${Date.now()}-${Math.random()
 								.toString(36)
 								.substring(2, 9)}`,
-					}));
+						};
+					});
 
 					// Upload the files
 					const uploadedFiles = await uploadFiles(
@@ -290,26 +369,38 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 					);
 
 					// Update form responses with uploaded file references
-					const updatedFormResponses = { ...formResponses };
+					const updatedFormResponsesByEvent = {
+						...formResponsesByEvent,
+					};
 
-					Object.keys(filesToUpload).forEach((fieldId) => {
-						const fieldFiles = [...(formResponses[fieldId] || [])];
+					Object.keys(filesToUpload).forEach((key) => {
+						// key format is "eventId-fieldId"
+						const [eventId, fieldId] = key.split("-");
 
-						// Replace local files with uploaded versions
-						const updatedFiles = fieldFiles.map((file) => {
-							const uploadedFile = uploadedFiles.find(
-								(u) =>
-									file.uri === u.uri ||
-									(file.id && file.id === u.id),
-							);
-							return uploadedFile || file;
-						});
+						if (updatedFormResponsesByEvent[eventId]) {
+							const fieldFiles = [
+								...(updatedFormResponsesByEvent[eventId][
+									fieldId
+								] || []),
+							];
 
-						updatedFormResponses[fieldId] = updatedFiles;
+							// Replace local files with uploaded versions
+							const updatedFiles = fieldFiles.map((file) => {
+								const uploadedFile = uploadedFiles.find(
+									(u) =>
+										file.uri === u.uri ||
+										(file.id && file.id === u.id),
+								);
+								return uploadedFile || file;
+							});
+
+							updatedFormResponsesByEvent[eventId][fieldId] =
+								updatedFiles;
+						}
 					});
 
 					// Now submit with the updated form responses
-					await submitTimeEntry(updatedFormResponses);
+					await submitTimeEntry(updatedFormResponsesByEvent);
 				} catch (uploadError) {
 					console.error("Error uploading files:", uploadError);
 					setError("Failed to upload files. Please try again.");
@@ -318,18 +409,17 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 				}
 			} else {
 				// No files to upload, submit directly
-				await submitTimeEntry(formResponses);
+				await submitTimeEntry(formResponsesByEvent);
 			}
 		} catch (err) {
 			setError("Failed to submit time entry. Please try again.");
 			console.error("Error submitting time entry:", err);
-		} finally {
 			setIsSubmitting(false);
 		}
 	};
 
 	// Helper function for the actual submission
-	const submitTimeEntry = async (finalFormResponses) => {
+	const submitTimeEntry = async (finalFormResponsesByEvent) => {
 		const enrichedTimeEntry = {
 			...timeEntry,
 			notes: notes,
@@ -338,8 +428,10 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 			connectedEvents: selectedEvents.map((event) => ({
 				eventId: event.id,
 				eventTitle: event.title,
+				formResponses: finalFormResponsesByEvent[event.id] || null,
 			})),
-			formResponses: customForm ? finalFormResponses : null,
+			// We no longer need this field since responses are tied to events
+			// formResponses: customForm ? finalFormResponses : null,
 		};
 
 		await onSubmit(timeEntry.id, enrichedTimeEntry);
@@ -355,6 +447,26 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 				scrollViewRef.current.scrollToEnd({ animated: true });
 			}
 		}, 300);
+	};
+
+	const [showAddEventInput, setShowAddEventInput] = useState(false);
+	const [newEventTitle, setNewEventTitle] = useState("");
+
+	const addCustomEvent = () => {
+		if (!newEventTitle.trim()) {
+			Alert.alert("Error", "Please enter an event title");
+			return;
+		}
+
+		const newEvent = {
+			id: `custom-${Date.now()}`,
+			title: newEventTitle.trim(),
+			isCustom: true,
+		};
+
+		setSelectedEvents((prev) => [...prev, newEvent]);
+		setNewEventTitle("");
+		setShowAddEventInput(false);
 	};
 
 	if (!timeEntry || !visible) return null;
@@ -440,7 +552,10 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 												color="#007AFF"
 											/>
 											<Text style={styles.eventItem}>
-												{event.title}
+												{event.title}{" "}
+												{event.isCustom
+													? "(Custom)"
+													: ""}
 											</Text>
 										</View>
 										<TouchableOpacity
@@ -462,6 +577,53 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 							<Text style={styles.noEventsText}>
 								No events connected to this time entry
 							</Text>
+						)}
+
+						{showAddEventInput ? (
+							<View style={styles.addEventInputContainer}>
+								<TextInput
+									style={styles.addEventInput}
+									placeholder="Enter event title"
+									value={newEventTitle}
+									onChangeText={setNewEventTitle}
+									autoFocus
+								/>
+								<View style={styles.addEventButtonsRow}>
+									<TouchableOpacity
+										style={styles.addEventCancelButton}
+										onPress={() => {
+											setShowAddEventInput(false);
+											setNewEventTitle("");
+										}}
+									>
+										<Text style={styles.addEventCancelText}>
+											Cancel
+										</Text>
+									</TouchableOpacity>
+									<TouchableOpacity
+										style={styles.addEventSaveButton}
+										onPress={addCustomEvent}
+									>
+										<Text style={styles.addEventSaveText}>
+											Add
+										</Text>
+									</TouchableOpacity>
+								</View>
+							</View>
+						) : (
+							<TouchableOpacity
+								style={styles.addEventButton}
+								onPress={() => setShowAddEventInput(true)}
+							>
+								<Icon
+									name="plus-circle"
+									size={18}
+									color="#007AFF"
+								/>
+								<Text style={styles.addEventButtonText}>
+									Add Custom Event
+								</Text>
+							</TouchableOpacity>
 						)}
 
 						{otherAvailableEvents.length > 0 && (
@@ -524,15 +686,48 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 					</View>
 				)}
 
-				{customForm && (
-					<CustomFormRender
-						customForm={customForm}
-						formResponses={formResponses}
-						formErrors={formErrors}
-						onFieldChange={handleFieldChange}
-						setCustomForm={setCustomForm}
-						uploadProgress={uploadProgress}
-					/>
+				{customForm && selectedEvents.length > 0 && (
+					<View style={styles.eventFormsContainer}>
+						<Text style={styles.eventFormsTitle}>
+							Event Information:
+						</Text>
+						{selectedEvents.map((event) => (
+							<View
+								key={event.id}
+								style={styles.eventFormContainer}
+							>
+								<View style={styles.eventFormHeader}>
+									<Text style={styles.eventFormTitle}>
+										{event.title}{" "}
+										{event.isCustom ? "(Custom)" : ""}
+									</Text>
+								</View>
+								<CustomFormRender
+									customForm={customForm}
+									formResponses={
+										formResponsesByEvent[event.id] || {}
+									}
+									formErrors={
+										formErrorsByEvent[event.id] || {}
+									}
+									onFieldChange={(
+										fieldId,
+										fieldType,
+										value,
+									) =>
+										handleFieldChange(
+											event.id,
+											fieldId,
+											fieldType,
+											value,
+										)
+									}
+									setCustomForm={setCustomForm}
+									uploadProgress={uploadProgress}
+								/>
+							</View>
+						))}
+					</View>
 				)}
 
 				{/* Add a progress indicator when uploading */}
@@ -796,6 +991,83 @@ const styles = StyleSheet.create({
 		marginLeft: 8,
 		color: "#007AFF",
 		fontSize: 14,
+	},
+	addEventButton: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		paddingVertical: 8,
+		marginTop: 6,
+		borderTopWidth: 1,
+		borderTopColor: "rgba(0, 122, 255, 0.2)",
+	},
+	addEventButtonText: {
+		color: "#007AFF",
+		fontSize: 14,
+		marginLeft: 4,
+	},
+	addEventInputContainer: {
+		marginTop: 8,
+		borderTopWidth: 1,
+		borderTopColor: "rgba(0, 122, 255, 0.2)",
+		paddingTop: 8,
+	},
+	addEventInput: {
+		borderWidth: 1,
+		borderColor: "#ddd",
+		borderRadius: 8,
+		padding: 8,
+		fontSize: 14,
+	},
+	addEventButtonsRow: {
+		flexDirection: "row",
+		justifyContent: "flex-end",
+		marginTop: 8,
+	},
+	addEventCancelButton: {
+		paddingVertical: 6,
+		paddingHorizontal: 12,
+		marginRight: 8,
+	},
+	addEventCancelText: {
+		color: "#666",
+	},
+	addEventSaveButton: {
+		backgroundColor: "#007AFF",
+		paddingVertical: 6,
+		paddingHorizontal: 12,
+		borderRadius: 6,
+	},
+	addEventSaveText: {
+		color: "white",
+		fontWeight: "500",
+	},
+	eventFormsContainer: {
+		marginBottom: 16,
+	},
+	eventFormsTitle: {
+		fontSize: 15,
+		fontWeight: "600",
+		marginBottom: 8,
+	},
+	eventFormContainer: {
+		backgroundColor: "#f7f9fc",
+		borderRadius: 8,
+		padding: 12,
+		marginBottom: 12,
+		borderLeftWidth: 3,
+		borderLeftColor: "#007AFF",
+	},
+	eventFormHeader: {
+		marginBottom: 12,
+		borderBottomWidth: 1,
+		borderBottomColor: "#e0e0e0",
+		paddingBottom: 8,
+	},
+	eventFormTitle: {
+		fontSize: 14,
+		fontWeight: "600",
+		color: "#333",
 	},
 });
 
