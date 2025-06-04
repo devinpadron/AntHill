@@ -253,6 +253,16 @@ export default function Timesheet(
 		}
 	};
 
+	// Calculate total events (add this in the component before the return statement)
+	const totalEvents = useMemo(() => {
+		return timesheetData.reduce((count, item) => {
+			// Skip year headers
+			if (item.isYearHeader) return count;
+			// Add the number of entries in this section
+			return count + item.entries.length;
+		}, 0);
+	}, [timesheetData]);
+
 	const CalendarModal = () => {
 		return (
 			<BottomSheet
@@ -308,11 +318,21 @@ export default function Timesheet(
 
 			{/* Header */}
 			<View style={styles.header}>
-				<Text style={styles.headerTitle}>
-					{user.firstName.substr(user.firstName.length - 1) == "s"
-						? user.firstName + "' Schedule"
-						: user.firstName + "'s Schedule"}
-				</Text>
+				<View>
+					<Text style={styles.headerTitle}>
+						{user.firstName.substr(user.firstName.length - 1) == "s"
+							? user.firstName + "' Schedule"
+							: user.firstName + "'s Schedule"}
+					</Text>
+					{totalEvents > 0 && (
+						<View style={styles.eventCountContainer}>
+							<Text style={styles.eventCountText}>
+								{totalEvents}{" "}
+								{totalEvents === 1 ? "event" : "events"}
+							</Text>
+						</View>
+					)}
+				</View>
 				<TouchableOpacity
 					style={styles.headerButton}
 					onPress={() => toggleCalendar()}
@@ -670,5 +690,18 @@ const styles = StyleSheet.create({
 		fontWeight: "600",
 		color: "#3C3C43",
 		marginHorizontal: 12,
+	},
+	eventCountContainer: {
+		backgroundColor: "#E9F0FF",
+		paddingHorizontal: 8,
+		paddingVertical: 4,
+		borderRadius: 12,
+		alignSelf: "flex-start",
+		marginTop: 4,
+	},
+	eventCountText: {
+		fontSize: 12,
+		color: "#007AFF",
+		fontWeight: "500",
 	},
 });
