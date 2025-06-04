@@ -17,6 +17,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useUser } from "../../contexts/UserContext";
 import db from "../../constants/firestore";
+import {
+	updateEventChecklist,
+	subscribeEventChecklist,
+} from "../../services/eventService";
 
 // Enable LayoutAnimation for Android
 if (Platform.OS === "android") {
@@ -35,17 +39,19 @@ const EventChecklists = () => {
 	const route = useRoute<any>();
 	const navigation = useNavigation();
 	const insets = useSafeAreaInsets();
-	const { checklistIds } = route.params || {}; // Change from eventId to checklistIds
+	console.log("Route params:", route.params);
+	const { checklistIds, eventId } = route.params || {}; // Add eventId from route params
 	const { companyId } = useUser();
 
 	const [loading, setLoading] = useState(true);
 	const [checklists, setChecklists] = useState([]);
 	const [itemStates, setItemStates] = useState({});
-
-	const screenWidth = Dimensions.get("window").width;
+	const [savedState, setSavedState] = useState({});
 
 	// Load checklists from the provided IDs
 	useEffect(() => {
+		let unsubscribeFunction = null;
+
 		const fetchChecklists = async () => {
 			if (
 				!checklistIds ||
@@ -93,7 +99,82 @@ const EventChecklists = () => {
 		};
 
 		fetchChecklists();
-	}, [checklistIds, companyId]);
+		return () => {
+			if (unsubscribeFunction) {
+				unsubscribeFunction();
+			}
+		};
+	}, [checklistIds, companyId, eventId]);
+
+	useEffect(() => {
+		// Add function to load saved checklist states
+
+		let unsubscribeFunction = null;
+
+		const loadSavedChecklistStates = async () => {
+			if (!eventId || !companyId) return;
+
+			try {
+				// Subscribe to changes in the event's checklist collection
+				unsubscribeFunction = await subscribeEventChecklist(
+					companyId,
+					eventId,
+					(snapshot) => {
+						const savedStates = {};
+
+						snapshot.forEach((doc) => {
+							savedStates[doc.id] = doc.data();
+						});
+
+						setSavedState(savedStates);
+
+						// Update itemStates with saved values
+						setItemStates((prevStates) => {
+							const newStates = { ...prevStates };
+
+							// For each checklist that has saved state
+							Object.keys(savedStates).forEach((checklistId) => {
+								if (newStates[checklistId]) {
+									// Merge the saved state with current state
+									newStates[checklistId] = {
+										...newStates[checklistId],
+										...savedStates[checklistId],
+									};
+								}
+							});
+
+							return newStates;
+						});
+					},
+				);
+			} catch (error) {
+				console.error("Error loading saved checklist states:", error);
+			}
+		};
+		loadSavedChecklistStates();
+		return () => {
+			if (unsubscribeFunction) {
+				unsubscribeFunction();
+			}
+		};
+	}, [checklists]);
+
+	// Add function to save checklist state to Firestore
+	const saveChecklistState = async (checklistId, newState) => {
+		if (!eventId || !companyId) return;
+
+		try {
+			await updateEventChecklist(
+				companyId,
+				eventId,
+				checklistId,
+				newState,
+			);
+		} catch (error) {
+			console.error("Error saving checklist state:", error);
+			Alert.alert("Error", "Failed to save checklist state");
+		}
+	};
 
 	// Toggle item state with animation
 	const toggleItemState = (checklistId, itemId) => {
@@ -117,12 +198,17 @@ const EventChecklists = () => {
 			const currentState = prevStates[checklistId][itemId];
 			const newState = (currentState + 1) % 3; // Cycle through states 0, 1, 2
 
+			const updatedChecklistState = {
+				...prevStates[checklistId],
+				[itemId]: newState,
+			};
+
+			// Save the updated state to Firestore
+			saveChecklistState(checklistId, updatedChecklistState);
+
 			return {
 				...prevStates,
-				[checklistId]: {
-					...prevStates[checklistId],
-					[itemId]: newState,
-				},
+				[checklistId]: updatedChecklistState,
 			};
 		});
 	};

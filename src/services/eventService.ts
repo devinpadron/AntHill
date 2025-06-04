@@ -216,3 +216,50 @@ export const getEventsByIds = async (companyId: string, eventIds: string[]) => {
 		throw error;
 	}
 };
+
+export const updateEventChecklist = async (
+	companyId: string,
+	eventId: string,
+	checklistId: string,
+	checklistItem: { [key: string]: boolean },
+) => {
+	try {
+		const eventRef = db
+			.collection("Companies")
+			.doc(companyId)
+			.collection("Events")
+			.doc(eventId);
+
+		if (checklistItem) {
+			await eventRef
+				.collection("Checklists")
+				.doc(checklistId)
+				.set(checklistItem);
+		}
+	} catch (error) {
+		console.error("Error updating event checklist:", error);
+		throw error;
+	}
+};
+
+export const subscribeEventChecklist = async (
+	companyId: string,
+	eventId: string,
+	onSnap: (
+		snapshot: FirebaseFirestoreTypes.QuerySnapshot<FirebaseFirestoreTypes.DocumentData>,
+	) => void,
+) => {
+	try {
+		const eventRef = db
+			.collection("Companies")
+			.doc(companyId)
+			.collection("Events")
+			.doc(eventId)
+			.collection("Checklists")
+			.onSnapshot(onSnap);
+		return eventRef;
+	} catch (error) {
+		console.error("Error updating event checklist:", error);
+		throw error;
+	}
+};

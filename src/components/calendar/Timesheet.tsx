@@ -310,8 +310,6 @@ export default function Timesheet(
 		return <LoadingScreen />;
 	}
 
-	console.log("Timesheet data:", timesheetData);
-
 	return (
 		<View style={styles.container}>
 			<StatusBar barStyle="dark-content" />

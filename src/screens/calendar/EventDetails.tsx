@@ -387,6 +387,7 @@ const EventDetails = ({ navigation }) => {
 														"EventChecklists",
 														{
 															checklistIds,
+															eventId,
 														},
 													);
 												}}
@@ -610,6 +611,7 @@ const EventDetails = ({ navigation }) => {
 						);
 						navigation.navigate("EventChecklists", {
 							checklistIds,
+							eventId,
 						});
 					}}
 				>
