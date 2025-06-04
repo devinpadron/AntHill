@@ -263,3 +263,60 @@ export const subscribeEventChecklist = async (
 		throw error;
 	}
 };
+
+export const getEventPackages = async (
+	companyId: string,
+	eventId: string,
+): Promise<FirebaseFirestoreTypes.DocumentData[]> => {
+	try {
+		// Get the event document
+		const event = await db
+			.collection("Companies")
+			.doc(companyId)
+			.collection("Events")
+			.doc(eventId)
+			.get();
+
+		if (!event.exists) {
+			console.log(`Event ${eventId} not found`);
+			return [];
+		}
+
+		const eventData = event.data();
+		if (!eventData) return [];
+
+		const packageEntries = eventData.packages || [];
+
+		// If no packages, return empty array
+		if (packageEntries.length === 0) return [];
+
+		// Use map instead of forEach to create an array of promises
+		const packageDocs = await Promise.all(
+			packageEntries.map((pkg) => {
+				return db
+					.collection("Companies")
+					.doc(companyId)
+					.collection("Packages")
+					.doc(pkg)
+					.get();
+			}),
+		);
+
+		// Filter out any non-existent documents and map to their data
+		return packageDocs
+			.filter((doc) => doc.exists)
+			.map((doc) => {
+				const data = doc.data();
+				return {
+					id: doc.id,
+					...data,
+					quantity:
+						packageEntries.find((p) => p.id === doc.id)?.quantity ||
+						1,
+				};
+			});
+	} catch (error) {
+		console.error("Error fetching event packages:", error);
+		return []; // Return empty array on error rather than throwing
+	}
+};

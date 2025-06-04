@@ -344,6 +344,21 @@ const CompanyCustomForm = ({ navigation }) => {
 													</Text>
 												</View>
 											)}
+											{item.quickEditPayroll && (
+												<View
+													style={
+														styles.quickEditBadge
+													}
+												>
+													<Text
+														style={
+															styles.quickEditText
+														}
+													>
+														PAYROLL EDIT
+													</Text>
+												</View>
+											)}
 										</View>
 
 										<View style={styles.fieldActions}>
@@ -653,6 +668,42 @@ const CompanyCustomForm = ({ navigation }) => {
 								)}
 							</>
 						)}
+
+						{/* New Quick Edit Toggle */}
+						<View style={styles.switchRow}>
+							<View style={styles.labelWithHelp}>
+								<Text style={styles.label}>
+									Quick Edit in Payroll
+								</Text>
+								<TouchableOpacity
+									onPress={() =>
+										Alert.alert(
+											"Quick Edit in Payroll",
+											"When enabled, this field can be quickly edited when processing payroll entries without needing to open the full edit form.",
+										)
+									}
+								>
+									<Ionicons
+										name="information-circle-outline"
+										size={20}
+										color="#777"
+									/>
+								</TouchableOpacity>
+							</View>
+							<Switch
+								value={editingField.quickEditPayroll || false}
+								onValueChange={(value) =>
+									setEditingField({
+										...editingField,
+										quickEditPayroll: value,
+									})
+								}
+								trackColor={{
+									false: "#767577",
+									true: "#007AFF",
+								}}
+							/>
+						</View>
 
 						<TouchableOpacity
 							style={styles.saveFieldButton}
@@ -1283,6 +1334,20 @@ const styles = StyleSheet.create({
 		marginTop: 8,
 		color: "#666",
 		fontSize: 14,
+	},
+	quickEditBadge: {
+		backgroundColor: "#34c759",
+		marginLeft: 8,
+		paddingHorizontal: 6,
+		paddingVertical: 2,
+		borderRadius: 4,
+		marginTop: 2,
+		flexShrink: 0,
+	},
+	quickEditText: {
+		fontSize: 10,
+		color: "white",
+		fontWeight: "600",
 	},
 });
 

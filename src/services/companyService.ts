@@ -26,6 +26,25 @@ export async function compareAccessCode(accessCode: string) {
 	return data;
 }
 
+export async function getCompanyById(company: string) {
+	let data = null;
+	try {
+		const companyEntry = await db
+			.collection("Companies")
+			.doc(company)
+			.get();
+		if (companyEntry.exists) {
+			data = companyEntry.data();
+		} else {
+			throw new Error("Company not found");
+		}
+	} catch (e) {
+		console.error("Error getting company", e);
+		return null;
+	}
+	return data;
+}
+
 export async function getAllUsersInCompany(company: string) {
 	const employees: {} = {};
 	try {

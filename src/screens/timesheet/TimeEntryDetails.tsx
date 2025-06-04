@@ -7,99 +7,62 @@ import {
 	TouchableOpacity,
 	ActivityIndicator,
 	Alert,
-	Platform,
-	Share,
-	Dimensions,
-	Keyboard,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import { format } from "date-fns";
 import { useUser } from "../../contexts/UserContext";
+import { useCompany } from "../../contexts/CompanyContext";
 import {
 	getTimeEntry,
 	updateTimeEntry,
-	approveTimeEntry,
-	exportTimeEntries,
-	deleteTimeEntry,
 	getTimeEntryAttachments,
+	deleteTimeEntry,
 } from "../../services/timeEntryService";
 import { getUser } from "../../services/userService";
 import { getCompanyPreferences } from "../../services/companyService";
 import { getEventsByIds } from "../../services/eventService";
-import * as MailComposer from "expo-mail-composer";
-import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
-import * as Sharing from "expo-sharing";
+import { getStatusBadgeColor, getStatusBadgeText } from "../../utils/timeUtils";
+import TimeEntrySummary from "../../components/time/TimeEntrySummary";
+import TimeDetailCard from "../../components/time/TimeDetailCard";
+import ManagerActions from "../../components/time/ManagerActions";
 import EditSheet from "../../components/time/EditSheet";
-import { useCompany } from "../../contexts/CompanyContext";
-import AttachmentGallery from "../../components/ui/AttachmentGallery";
-import { AttachmentItem } from "../../types";
-
-// Add this helper function near the top of the component
-const calculateMultipliedValue = (value, multiplier) => {
-	if (!value || !multiplier) return null;
-
-	const numValue = parseFloat(value);
-	if (isNaN(numValue)) return null;
-
-	const result = numValue * multiplier;
-	return result % 1 !== 0 ? result.toFixed(2) : result.toString();
-};
-
-// Define the structure of individual total items
-interface TotalItem {
-	value: number;
-	label: string;
-	unit?: string;
-	multiplier?: number | null;
-}
-
-interface Totals {
-	[key: string]: TotalItem;
-}
+import ExportSheet from "../../components/time/ExportSheet";
+import FieldTotalsCard from "../../components/time/FieldTotalsCard";
 
 const TimeEntryDetails = ({ route, navigation }) => {
 	// Extract params - handle both single ID and array of IDs
 	const { entryId, userId: passedUserId } = route.params;
-
 	const entryIdArray = Array.isArray(entryId) ? entryId : [entryId];
 
 	const insets = useSafeAreaInsets();
-	const {
-		userId: currentUserId,
-		companyId,
-		userPrivilege: role,
-		isAdmin,
-	} = useUser();
+	const { userId: currentUserId, companyId, isAdmin } = useUser();
+	const { preferences } = useCompany();
 
-	const { preferences, companyData } = useCompany();
-
-	// State variables
+	// Core state
 	const [isLoading, setIsLoading] = useState(true);
 	const [timeEntries, setTimeEntries] = useState([]);
 	const [employeeUser, setEmployeeUser] = useState(null);
 	const [customForm, setCustomForm] = useState(null);
 	const [eventForm, setEventForm] = useState(null);
-	const [connectedEvents, setConnectedEvents] = useState([]);
+	const [connectedEvents, setConnectedEvents] = useState({});
+	const [attachmentMap, setAttachmentsMap] = useState({});
+
+	// Calculations
 	const [totalDurationSeconds, setTotalDurationSeconds] = useState(0);
 	const [totalDurationDecimal, setTotalDurationDecimal] = useState(0);
-	const [isApproving, setIsApproving] = useState(false);
-	const [isExporting, setIsExporting] = useState(false);
+	const [fieldTotals, setFieldTotals] = useState({});
+
+	// UI state
 	const [selectedEntries, setSelectedEntries] = useState({});
+	const [selectAll, setSelectAll] = useState(false);
+	const [isApproving, setIsApproving] = useState(false);
+
+	// Modal state
 	const [editModalVisible, setEditModalVisible] = useState(false);
+	const [exportModalVisible, setExportModalVisible] = useState(false);
 	const [currentEditEntry, setCurrentEditEntry] = useState(null);
 	const [editNotes, setEditNotes] = useState("");
-	const [editDuration, setEditDuration] = useState("");
 	const [editChangeSummary, setEditChangeSummary] = useState("");
-
-	// Check if current user is a manager or admin
-
-	// For bulk selection logic
-	const [selectAll, setSelectAll] = useState(false);
-
-	// Export options
-	const [exportFormat, setExportFormat] = useState("txt");
-	const [exportModalVisible, setExportModalVisible] = useState(false);
 
 	// Bottom sheet refs
 	const editBottomSheetRef = useRef(null);
@@ -107,18 +70,14 @@ const TimeEntryDetails = ({ route, navigation }) => {
 
 	// Bottom sheet snap points
 	const editSnapPoints = useRef(["90%"]).current;
-	const exportSnapPoints = useRef(["40%"]).current;
+	const exportSnapPoints = useRef(["70%"]).current;
 
-	// Add a new state variable for storing attachments
-	const [attachmentMap, setAttachmentsMap] = useState<
-		Record<string, AttachmentItem[]>
-	>({});
-
+	// Load data on mount
 	useEffect(() => {
 		loadTimeEntries();
 	}, []);
 
-	// Control bottom sheet visibility
+	// Handle bottom sheet visibility
 	useEffect(() => {
 		if (editModalVisible && editBottomSheetRef.current) {
 			editBottomSheetRef.current.expand();
@@ -135,26 +94,21 @@ const TimeEntryDetails = ({ route, navigation }) => {
 		}
 	}, [exportModalVisible]);
 
-	// Load all relevant data
+	// Core data loading function
 	const loadTimeEntries = async () => {
 		try {
-			setIsLoading(true);
-
-			// Fetch all time entries
+			// Fetch entries and filter out nulls
 			const entries = await Promise.all(
 				entryIdArray.map((id) => getTimeEntry(companyId, id)),
 			);
-
-			// Filter out any null/undefined entries
 			const validEntries = entries.filter((entry) => entry);
 			setTimeEntries(validEntries);
 
-			// Fetch attachments for each entry
+			// Fetch attachments
 			const attachments = {};
 			await Promise.all(
 				validEntries.map(async (entry) => {
 					try {
-						// Get attachments from the subcollection
 						const entryAttachments = await getTimeEntryAttachments(
 							companyId,
 							entry.id,
@@ -171,57 +125,65 @@ const TimeEntryDetails = ({ route, navigation }) => {
 			);
 			setAttachmentsMap(attachments);
 
-			// Calculate total duration
+			// Calculate totals
 			const totalSeconds = validEntries.reduce(
 				(sum, entry) => sum + (entry.duration || 0),
 				0,
 			);
 			setTotalDurationSeconds(totalSeconds);
+			setTotalDurationDecimal(+(totalSeconds / 3600).toFixed(2));
 
-			// Convert to decimal hours (2 decimal places)
-			const decimalHours = +(totalSeconds / 3600).toFixed(2);
-			setTotalDurationDecimal(decimalHours);
-
-			// Initialize selection state for each entry
+			// Initialize selection state
 			const initialSelection = {};
 			validEntries.forEach((entry) => {
 				initialSelection[entry.id] = false;
 			});
 			setSelectedEntries(initialSelection);
 
-			// Get employee user info
+			// Get employee info
 			const userId = validEntries[0]?.userId || passedUserId;
 			if (userId) {
 				const user = await getUser(userId);
 				setEmployeeUser(user);
 			}
 
-			// Get custom form if applicable
-			if (validEntries.length > 0 && validEntries[0].formResponses) {
-				const preferences = await getCompanyPreferences(companyId);
-				if (preferences?.eventForm) {
-					setEventForm(preferences.eventForm);
-				}
-				if (preferences?.timeEntryForm) {
-					setCustomForm(preferences.timeEntryForm);
+			// Get forms
+			if (validEntries.length > 0) {
+				const prefs = await getCompanyPreferences(companyId);
+				if (prefs?.eventForm) setEventForm(prefs.eventForm);
+				if (prefs?.timeEntryForm) {
+					setCustomForm(prefs.timeEntryForm);
+					// Calculate field totals after setting both forms
+					const totals = calculateFieldTotals(
+						validEntries,
+						prefs.timeEntryForm,
+						prefs.eventForm,
+					);
+					setFieldTotals(totals);
 				}
 			}
 
-			// Get all connected events
-			const allEventIds = validEntries.reduce((acc, entry) => {
+			// Get connected events
+			const entryConnectionMap = {};
+
+			// Just organize the connections by entry, don't try to fetch actual events
+			validEntries.forEach((entry) => {
 				if (entry.connectedEvents && entry.connectedEvents.length > 0) {
-					return [
-						...acc,
-						...entry.connectedEvents.map((e) => e.eventId),
-					];
+					// Initialize the array for this entry with the connection data we already have
+					entryConnectionMap[entry.id] = entry.connectedEvents.map(
+						(connection: any) => ({
+							...connection,
+							// Include minimal default properties to avoid UI errors
+							title: connection.eventTitle || "Connected Event",
+							formResponses: connection.formResponses || {},
+						}),
+					);
+				} else {
+					entryConnectionMap[entry.id] = [];
 				}
-				return acc;
-			}, []);
+			});
 
-			if (allEventIds.length > 0) {
-				const events = await getEventsByIds(companyId, allEventIds);
-				setConnectedEvents(events);
-			}
+			setConnectedEvents(entryConnectionMap);
 		} catch (error) {
 			console.error("Error loading time entry details:", error);
 			Alert.alert("Error", "Failed to load time entry details");
@@ -230,148 +192,16 @@ const TimeEntryDetails = ({ route, navigation }) => {
 		}
 	};
 
-	// Make sure the function is properly typed to return Totals
-	const calculateNumberFieldTotals = (): Totals => {
-		const totals: Totals = {}; // Initialize with proper type
-
-		// Skip if no entries or no custom forms
-		if (!timeEntries?.length || (!customForm?.fields && !eventForm?.fields))
-			return totals;
-
-		// Find all number fields that should show totals in main form
-		const mainTotalableFields =
-			customForm?.fields?.filter(
-				(field) => field.type === "number" && field.showTotal === true,
-			) || [];
-
-		// Find all number fields that should show totals in event form
-		const eventTotalableFields =
-			eventForm?.fields?.filter(
-				(field) => field.type === "number" && field.showTotal === true,
-			) || [];
-
-		// Process each time entry
-		timeEntries.forEach((entry) => {
-			// Process main form responses
-			if (entry.formResponses && mainTotalableFields.length > 0) {
-				mainTotalableFields.forEach((field) => {
-					const value = entry.formResponses[field.id];
-					if (value && !isNaN(parseFloat(value))) {
-						const numValue = parseFloat(value);
-
-						// Initialize if not exists
-						if (!totals[field.id]) {
-							totals[field.id] = {
-								value: 0,
-								label: field.label,
-								unit: field.unit || "",
-								multiplier: field.useMultiplier
-									? field.multiplier
-									: null,
-							};
-						}
-						totals[field.id].value += numValue;
-					}
-				});
-			}
-
-			// Process event form responses
-			if (entry.connectedEvents && eventTotalableFields.length > 0) {
-				entry.connectedEvents.forEach((connEvent) => {
-					if (connEvent.formResponses) {
-						eventTotalableFields.forEach((field) => {
-							const value = connEvent.formResponses[field.id];
-							if (value && !isNaN(parseFloat(value))) {
-								const numValue = parseFloat(value);
-
-								// Use a unique ID for event fields to avoid conflicts with main form
-								const fieldId = `event_${field.id}`;
-
-								// Initialize if not exists
-								if (!totals[fieldId]) {
-									totals[fieldId] = {
-										value: 0,
-										label: `${field.label} (Events)`, // Add indicator this is from events
-										unit: field.unit || "",
-										multiplier: field.useMultiplier
-											? field.multiplier
-											: null,
-									};
-								}
-								totals[fieldId].value += numValue;
-							}
-						});
-					}
-				});
-			}
-		});
-
-		return totals;
-	};
-
-	// Get status badge color
-	const getStatusBadgeColor = (status) => {
-		switch (status) {
-			case "approved":
-				return "#d4edda"; // Green
-			case "pending_approval":
-				return "#fff3cd"; // Orange
-			case "edited":
-				return "#cce5ff"; // Yellow
-			case "active":
-				return "#d1ecf1"; // Blue
-			case "paused":
-				return "#fff3cd"; // Orange
-			case "rejected":
-				return "#f8d7da"; // Red
-			default:
-				return "#f8d7da"; // Grey
-		}
-	};
-
-	// Get status badge text
-	const getStatusBadgeText = (status) => {
-		switch (status) {
-			case "approved":
-				return "Approved";
-			case "pending_approval":
-				return "Pending Approval";
-			case "edited":
-				return "Edited";
-			case "active":
-				return "Active";
-			case "paused":
-				return "Paused";
-			case "rejected":
-				return "Rejected";
-			default:
-				return "Not Submitted";
-		}
-	};
-
-	// Format time duration for display
-	const formatDuration = (seconds) => {
-		if (!seconds) return "0h 0m";
-
-		const hours = Math.floor(seconds / 3600);
-		const minutes = Math.floor((seconds % 3600) / 60);
-
-		if (hours > 0) {
-			return `${hours}h ${minutes}m`;
-		}
-		return `${minutes}m`;
-	};
-
 	// Toggle selection for a specific entry
-	const toggleEntrySelection = (entryId) => {
+	const toggleEntrySelection = useCallback((entryId) => {
 		setSelectedEntries((prev) => ({
 			...prev,
 			[entryId]: !prev[entryId],
 		}));
-	};
+	}, []);
 
 	// Toggle select all entries
-	const toggleSelectAll = () => {
+	const toggleSelectAll = useCallback(() => {
 		const newValue = !selectAll;
 		setSelectAll(newValue);
 
@@ -380,487 +210,174 @@ const TimeEntryDetails = ({ route, navigation }) => {
 			updatedSelection[entry.id] = newValue;
 		});
 		setSelectedEntries(updatedSelection);
-	};
+	}, [selectAll, timeEntries]);
 
 	// Get IDs of selected entries
-	const getSelectedEntryIds = () => {
+	const getSelectedEntryIds = useCallback(() => {
 		return Object.keys(selectedEntries).filter((id) => selectedEntries[id]);
-	};
+	}, [selectedEntries]);
 
-	// Approve selected entries
-	const handleApproveEntries = async () => {
-		const selectedIds = getSelectedEntryIds();
-		if (selectedIds.length === 0) {
-			Alert.alert(
-				"Selection Required",
-				"Please select at least one entry to approve.",
-			);
-			return;
-		}
-
-		try {
-			setIsApproving(true);
-
-			await Promise.all(
-				selectedIds.map((id) =>
-					approveTimeEntry(id, companyId, {
-						status: "approved",
-						approvedBy: currentUserId,
-						approvedAt: new Date().toISOString(),
-					}),
-				),
-			);
-
-			Alert.alert(
-				"Success",
-				`${selectedIds.length} time ${
-					selectedIds.length > 1 ? "entries" : "entry"
-				} approved.`,
-				[
-					{
-						text: "OK",
-						onPress: () => {
-							// Send approval email automatically
-							handleEmailEmployee(selectedIds, "approved");
-							loadTimeEntries();
-							setSelectAll(false);
-						},
-					},
-				],
-			);
-		} catch (error) {
-			console.error("Error approving time entries:", error);
-			Alert.alert("Error", "Failed to approve selected time entries");
-		} finally {
-			setIsApproving(false);
-		}
-	};
-
-	// Add this new function after handleApproveEntries
-	const handleRejectEntries = async () => {
-		const selectedIds = getSelectedEntryIds();
-		if (selectedIds.length === 0) {
-			Alert.alert(
-				"Selection Required",
-				"Please select at least one entry to reject.",
-			);
-			return;
-		}
-
-		// Ask for rejection reason
-		Alert.prompt(
-			"Rejection Reason",
-			"Please provide a reason for rejecting these entries:",
-			[
-				{
-					text: "Cancel",
-					style: "cancel",
-				},
-				{
-					text: "Reject",
-					onPress: async (rejectionReason) => {
-						try {
-							setIsApproving(true); // Reuse the loading indicator
-
-							await Promise.all(
-								selectedIds.map((id) =>
-									updateTimeEntry(id, companyId, {
-										status: "rejected",
-										rejectedBy: currentUserId,
-										rejectedAt: new Date().toISOString(),
-										rejectionReason:
-											rejectionReason ||
-											"No reason provided",
-									}),
-								),
-							);
-
-							Alert.alert(
-								"Success",
-								`${selectedIds.length} time ${
-									selectedIds.length > 1 ? "entries" : "entry"
-								} rejected.`,
-								[
-									{
-										text: "OK",
-										onPress: () => {
-											// Send rejection email automatically
-											handleEmailEmployee(
-												selectedIds,
-												"rejected",
-												rejectionReason,
-											);
-											loadTimeEntries();
-											setSelectAll(false);
-										},
-									},
-								],
-							);
-						} catch (error) {
-							console.error(
-								"Error rejecting time entries:",
-								error,
-							);
-							Alert.alert(
-								"Error",
-								"Failed to reject selected time entries",
-							);
-						} finally {
-							setIsApproving(false);
-						}
-					},
-				},
-			],
-			"plain-text",
-		);
-	};
-
-	// Handle exporting time entries
-	const handleExport = () => {
-		setExportModalVisible(true);
-	};
-
-	// Export the selected time entries
-	const exportSelectedEntries = async () => {
-		const selectedIds = getSelectedEntryIds();
-		if (selectedIds.length === 0) {
-			Alert.alert(
-				"Selection Required",
-				"Please select at least one entry to export.",
-			);
-			return;
-		}
-
-		// Get the actual entry objects that match the selected IDs
-		const selectedEntries = timeEntries.filter((entry) =>
-			selectedIds.includes(entry.id),
-		);
-
-		// Now pass the entry objects to createFormFieldMap
-		const formresponses = createFormFieldMap(selectedEntries);
-
-		try {
-			setIsExporting(true);
-
-			const fileUri = await exportTimeEntries(
-				companyId,
-				selectedIds,
-				exportFormat,
-				employeeUser?.firstName + " " + employeeUser?.lastName ||
-					"Employee",
-				formresponses,
-			);
-
-			if (fileUri) {
-				if (Platform.OS === "ios") {
-					await Sharing.shareAsync(fileUri);
-				} else {
-					const shareResult = await Share.share({
-						url: "file://" + fileUri,
-						title: `Time Entries - ${
-							employeeUser?.firstName +
-								" " +
-								employeeUser?.lastName || "Employee"
-						}`,
-					});
-				}
-			}
-		} catch (error) {
-			console.error("Error exporting time entries:", error);
-			Alert.alert("Error", "Failed to export time entries");
-		} finally {
-			setIsExporting(false);
-			setExportModalVisible(false);
-		}
-	};
-
-	// Update email function to handle both approve and reject cases
-	const handleEmailEmployee = async (
-		entryIds = null,
-		status = "approved",
-		rejectionReason = null,
-	) => {
-		const idsToEmail = entryIds || getSelectedEntryIds();
-		if (idsToEmail.length === 0) {
-			Alert.alert(
-				"Selection Required",
-				"Please select at least one entry.",
-			);
-			return;
-		}
-
-		if (!employeeUser || !employeeUser.email) {
-			Alert.alert("Error", "Employee email not found");
-			return;
-		}
-
-		try {
-			const entries = idsToEmail
-				.map((id) => timeEntries.find((entry) => entry.id === id))
-				.filter((entry) => entry);
-
-			const totalHours = +(
-				entries.reduce((sum, entry) => sum + (entry.duration || 0), 0) /
-				3600
-			).toFixed(2);
-
-			const dateRanges = entries
-				.map((entry) =>
-					format(new Date(entry.clockInTime), "MMM d, yyyy"),
-				)
-				.filter((date, index, self) => self.indexOf(date) === index);
-
-			// Build entry list for email including connected events
-			let entryList = "";
-			entries.forEach((entry) => {
-				entryList += `- ${format(
-					new Date(entry.clockInTime),
-					"EEE, MMM d, yyyy",
-				)} (${format(new Date(entry.clockInTime), "h:mm a")} - ${
-					entry.clockOutTime
-						? format(new Date(entry.clockOutTime), "h:mm a")
-						: "N/A"
-				})\n`;
-				entryList += `  Duration: ${formatDuration(entry.duration)} (${(
-					entry.duration / 3600
-				).toFixed(2)} hrs)\n`;
-
-				// Add entry notes if available
-				if (entry.notes) {
-					entryList += `  Notes: ${entry.notes}\n`;
-				}
-
-				// Add connected events if available
-				if (entry.connectedEvents && entry.connectedEvents.length > 0) {
-					entryList += `  Events:\n`;
-					entry.connectedEvents.forEach((connEvent) => {
-						// Get event details
-						const fullEvent = getEventById(connEvent.eventId);
-						const eventTitle =
-							connEvent.eventTitle ||
-							fullEvent?.title ||
-							"Unknown Event";
-
-						entryList += `    • ${eventTitle}\n`;
-
-						// Add time if available
-						if (fullEvent?.startTime) {
-							entryList += `      ${format(
-								new Date(fullEvent.startTime),
-								"h:mm a",
-							)}`;
-							if (fullEvent.endTime) {
-								entryList += ` - ${format(
-									new Date(fullEvent.endTime),
-									"h:mm a",
-								)}`;
-							}
-							entryList += `\n`;
-						}
-
-						// Add location if available
-						if (fullEvent?.location) {
-							entryList += `      Location: ${fullEvent.location}\n`;
-						}
-					});
-				}
-
-				entryList += "\n";
-			});
-
-			// Build summary of number field totals
-			let fieldTotals = "";
-			const totals = calculateNumberFieldTotals();
-			Object.values(totals).forEach((total) => {
-				const hasMultiplier =
-					total.multiplier && !isNaN(total.multiplier);
-				const multipliedValue = hasMultiplier
-					? total.value * total.multiplier
-					: null;
-
-				fieldTotals += `- ${total.label}: ${total.value.toFixed(2)}`;
-				if (hasMultiplier) {
-					fieldTotals += ` (${multipliedValue.toFixed(2)}${
-						total.unit ? ` ${total.unit}` : ""
-					})`;
-				} else if (total.unit) {
-					fieldTotals += ` ${total.unit}`;
-				}
-				fieldTotals += "\n";
-			});
-
-			// Set subject and message based on status
-			const subject =
-				status === "approved"
-					? `Time Entries Approved - ${dateRanges.join(", ")}`
-					: `Time Entries Rejected - ${dateRanges.join(", ")}`;
-
-			let message = `
-Dear ${employeeUser.firstName + " " + employeeUser.lastName},
-
-Your time entries for ${dateRanges.join(", ")} have been ${status}.
-`;
-
-			// Add rejection reason if applicable
-			if (status === "rejected" && rejectionReason) {
-				message += `
-Reason for rejection: ${rejectionReason}
-`;
-			}
-
-			message += `
---- SUMMARY ---
-Total hours: ${totalHours}
-Total duration: ${formatDuration(totalDurationSeconds)}
-
-${fieldTotals ? `--- FIELD TOTALS ---\n${fieldTotals}` : ""}
-
---- ${status.toUpperCase()} ENTRIES ---
-${entryList}
-
-${
-	status === "approved"
-		? "Thank you for your work!"
-		: "Please review and resubmit these entries."
-}
-
-Best regards,
-${companyData.name || "Management"}
-    `;
-
-			// Check if email is available
-			const isAvailable = await MailComposer.isAvailableAsync();
-			if (!isAvailable) {
-				Alert.alert(
-					"Info",
-					`Email is not available. Email would contain:\n\nSubject: ${subject}`,
-				);
-				console.log(message);
-				return;
-			}
-
-			await MailComposer.composeAsync({
-				recipients: [employeeUser.email],
-				subject: subject,
-				body: message,
-			});
-		} catch (error) {
-			console.error("Error sending email:", error);
-			Alert.alert("Error", "Failed to send email");
-		}
-	};
-
-	// Open edit modal for a specific entry
-	const handleEditEntry = (entry) => {
+	// Edit entry handler
+	const handleEditEntry = useCallback((entry) => {
 		setCurrentEditEntry(entry);
 		setEditNotes(entry.notes || "");
-		setEditDuration(entry.duration ? String(entry.duration) : "");
 		setEditChangeSummary("");
 		setEditModalVisible(true);
-	};
-
-	// Save edited entry
-	const saveEditedEntry = async (updates) => {
-		if (!currentEditEntry) return;
-
-		try {
-			await updateTimeEntry(currentEditEntry.id, companyId, updates);
-
-			Alert.alert("Success", "Time entry updated successfully", [
-				{ text: "OK", onPress: () => loadTimeEntries() },
-			]);
-
-			setEditModalVisible(false);
-		} catch (error) {
-			console.error("Error updating time entry:", error);
-			Alert.alert("Error", "Failed to update time entry");
-		}
-	};
-
-	const handleDeleteTimeEntry = async (timeEntryId) => {
-		try {
-			// Call your API or Firestore function to delete the time entry
-			await deleteTimeEntry(timeEntryId, companyId);
-
-			// Update the local state to remove the deleted entry
-			setTimeEntries((prevEntries) =>
-				prevEntries.filter((entry) => entry.id !== timeEntryId),
-			);
-
-			navigation.goBack();
-
-			// Show success message
-			Alert.alert("Success", "Time entry deleted successfully");
-		} catch (error) {
-			console.error("Error deleting time entry:", error);
-			Alert.alert("Error", "Failed to delete time entry");
-		}
-	};
-
-	const createFormFieldMap = (entries) => {
-		// If no entries or no custom form, return empty object
-		if (!entries.length || !customForm) return {};
-
-		// Create a map where entry IDs are keys and values are objects of form responses
-		const formFieldMap = {};
-
-		entries.forEach((entry) => {
-			if (!entry.formResponses) return;
-
-			// Initialize object for this entry if not exists
-			if (!formFieldMap[entry.id]) {
-				formFieldMap[entry.id] = {};
-			}
-
-			// Process each field in the custom form
-			customForm.fields.forEach((field) => {
-				const response = entry.formResponses[field.id];
-
-				// Skip if there's no response for this field
-				if (response === undefined || response === null) return;
-
-				// Format the response based on field type
-				let formattedResponse = response;
-
-				if (field.type === "checkbox") {
-					formattedResponse = response ? "Yes" : "No";
-				} else if (
-					field.type === "multiSelect" &&
-					Array.isArray(response)
-				) {
-					formattedResponse =
-						response.length > 0 ? response.join(", ") : "N/A";
-				} else if (field.type === "date" && response) {
-					formattedResponse = format(
-						new Date(response),
-						"MMM d, yyyy",
-					);
-				} else if (field.type === "time" && response) {
-					formattedResponse = format(new Date(response), "h:mm a");
-				}
-
-				// Store in map with field label as key under the entry's object
-				formFieldMap[entry.id][field.label] = formattedResponse;
-			});
-		});
-
-		return formFieldMap;
-	};
+	}, []);
 
 	// Handlers for bottom sheets
 	const handleEditSheetClose = useCallback(() => {
 		setEditModalVisible(false);
-		Keyboard?.dismiss();
 	}, []);
 
 	const handleExportSheetClose = useCallback(() => {
 		setExportModalVisible(false);
 	}, []);
 
-	// Get event details by ID
-	const getEventById = (eventId) => {
-		return connectedEvents.find((event) => event.id === eventId) || null;
+	// Update the calculateFieldTotals function
+	const calculateFieldTotals = (entries, form, evForm) => {
+		// Initialize an empty totals object
+		const totals = {};
+
+		if (!entries || entries.length === 0) {
+			return totals;
+		}
+
+		// Process time entry form fields
+		if (form && form.fields) {
+			// Find fields that have showTotal enabled
+			const fieldsToTotal = form.fields.filter(
+				(field) =>
+					field.showTotal === true &&
+					(field.type === "number" ||
+						field.type === "currency" ||
+						field.type === "quantity"),
+			);
+
+			if (fieldsToTotal.length > 0) {
+				// Initialize totals object with field info
+				fieldsToTotal.forEach((field) => {
+					totals[`te_${field.id}`] = {
+						label: field.label,
+						total: 0,
+						unit: field.unit || "",
+						useMultiplier: field.useMultiplier || false,
+						multiplier: field.multiplier || 1,
+						type: field.type,
+						source: "timeEntry",
+					};
+				});
+
+				// Calculate totals from all time entries
+				entries.forEach((entry) => {
+					if (!entry.formResponses) return;
+
+					fieldsToTotal.forEach((field) => {
+						const value = entry.formResponses[field.id];
+						if (value !== undefined && value !== null) {
+							const numValue = parseFloat(value);
+							if (!isNaN(numValue)) {
+								totals[`te_${field.id}`].total += numValue;
+
+								// Store the raw total before multiplier is applied
+								totals[`te_${field.id}`].rawTotal =
+									totals[`te_${field.id}`].total;
+
+								// If this field uses a multiplier, calculate multiplied value
+								if (field.useMultiplier && field.multiplier) {
+									totals[`te_${field.id}`].multipliedTotal =
+										totals[`te_${field.id}`].total *
+										field.multiplier;
+								}
+							}
+						}
+					});
+				});
+			}
+		}
+
+		// Process event form fields
+		if (evForm && evForm.fields) {
+			// Find event fields that have showTotal enabled
+			const eventFieldsToTotal = evForm.fields.filter(
+				(field) =>
+					field.showTotal === true &&
+					(field.type === "number" ||
+						field.type === "currency" ||
+						field.type === "quantity"),
+			);
+
+			if (eventFieldsToTotal.length > 0) {
+				// Initialize totals object with event field info
+				eventFieldsToTotal.forEach((field) => {
+					totals[`ev_${field.id}`] = {
+						label: `${field.label} (Events)`,
+						total: 0,
+						unit: field.unit || "",
+						useMultiplier: field.useMultiplier || false,
+						multiplier: field.multiplier || 1,
+						type: field.type,
+						source: "event",
+					};
+				});
+
+				// Calculate totals from all connected events
+				entries.forEach((entry) => {
+					// Skip if no connected events
+					if (
+						!entry.connectedEvents ||
+						entry.connectedEvents.length === 0
+					)
+						return;
+
+					// Process each connected event
+					entry.connectedEvents.forEach((connection) => {
+						if (!connection.formResponses) return;
+
+						eventFieldsToTotal.forEach((field) => {
+							const value = connection.formResponses[field.id];
+							if (value !== undefined && value !== null) {
+								const numValue = parseFloat(value);
+								if (!isNaN(numValue)) {
+									totals[`ev_${field.id}`].total += numValue;
+
+									// Store the raw total before multiplier is applied
+									totals[`ev_${field.id}`].rawTotal =
+										totals[`ev_${field.id}`].total;
+
+									// If this field uses a multiplier, calculate multiplied value
+									if (
+										field.useMultiplier &&
+										field.multiplier
+									) {
+										totals[
+											`ev_${field.id}`
+										].multipliedTotal =
+											totals[`ev_${field.id}`].total *
+											field.multiplier;
+									}
+								}
+							}
+						});
+					});
+				});
+			}
+		}
+
+		return totals;
 	};
+
+	// Add this useEffect
+	useEffect(() => {
+		if (timeEntries.length > 0 && (customForm || eventForm)) {
+			const totals = calculateFieldTotals(
+				timeEntries,
+				customForm,
+				eventForm,
+			);
+			setFieldTotals(totals);
+		}
+	}, [timeEntries, customForm, eventForm]);
 
 	// If still loading, show loading indicator
 	if (isLoading) {
@@ -873,6 +390,301 @@ ${companyData.name || "Management"}
 			</View>
 		);
 	}
+
+	const handleApproveEntries = async (entryIds: string[]) => {
+		if (entryIds.length === 0) {
+			Alert.alert(
+				"No entries selected",
+				"Please select entries to approve.",
+			);
+			return;
+		}
+
+		try {
+			setIsApproving(true);
+
+			// Process each entry sequentially
+			for (const entryId of entryIds) {
+				await updateTimeEntry(entryId, companyId, {
+					status: "approved",
+					rejectedAt: new Date().toISOString(),
+					rejectedBy: currentUserId,
+				});
+			}
+
+			// Reload the time entries to reflect the changes
+			await loadTimeEntries();
+
+			// Clear selection after successful approval
+			setSelectAll(false);
+			const resetSelection = {};
+			timeEntries.forEach((entry) => {
+				resetSelection[entry.id] = false;
+			});
+			setSelectedEntries(resetSelection);
+
+			// Show success message
+			Alert.alert(
+				"Success",
+				`${entryIds.length} time ${
+					entryIds.length === 1 ? "entry" : "entries"
+				} approved successfully.`,
+			);
+		} catch (error) {
+			console.error("Error approving time entries:", error);
+			Alert.alert(
+				"Error",
+				"Failed to approve time entries. Please try again.",
+			);
+		} finally {
+			setIsApproving(false);
+		}
+	};
+
+	const handleRejectEntries = async (entryIds: string[]) => {
+		if (entryIds.length === 0) {
+			Alert.alert(
+				"No entries selected",
+				"Please select entries to reject.",
+			);
+			return;
+		}
+
+		// Show rejection confirmation dialog
+		Alert.alert(
+			"Confirm Rejection",
+			"Are you sure you want to reject the selected time entries?",
+			[
+				{
+					text: "Cancel",
+					style: "cancel",
+				},
+				{
+					text: "Reject",
+					style: "destructive",
+					onPress: async () => {
+						try {
+							setIsApproving(true); // Reuse loading state for rejection
+
+							// Process each entry sequentially
+							for (const entryId of entryIds) {
+								// Update the time entry status to "rejected"
+								await updateTimeEntry(entryId, companyId, {
+									status: "rejected",
+									rejectedAt: new Date().toISOString(),
+									rejectedBy: currentUserId,
+								});
+							}
+
+							// Reload the time entries to reflect the changes
+							await loadTimeEntries();
+
+							// Clear selection after successful rejection
+							setSelectAll(false);
+							const resetSelection = {};
+							timeEntries.forEach((entry) => {
+								resetSelection[entry.id] = false;
+							});
+							setSelectedEntries(resetSelection);
+
+							// Show success message
+							Alert.alert(
+								"Success",
+								`${entryIds.length} time ${
+									entryIds.length === 1 ? "entry" : "entries"
+								} rejected successfully.`,
+							);
+						} catch (error) {
+							console.error(
+								"Error rejecting time entries:",
+								error,
+							);
+							Alert.alert(
+								"Error",
+								"Failed to reject time entries. Please try again.",
+							);
+						} finally {
+							setIsApproving(false);
+						}
+					},
+				},
+			],
+		);
+	};
+
+	// Function to save edited time entry
+	const saveEditedEntry = async (updates: any) => {
+		if (!currentEditEntry) return;
+
+		try {
+			// Prepare updated data
+			const updatedData = {
+				...updates,
+				editHistory: [
+					...(currentEditEntry.editHistory || []),
+					{
+						timestamp: new Date().toISOString(),
+						userId: currentUserId,
+						changeSummary:
+							editChangeSummary || "Updated time entry",
+					},
+				],
+			};
+
+			// Update the time entry
+			await updateTimeEntry(currentEditEntry.id, companyId, updatedData);
+
+			// Close the edit modal
+			setEditModalVisible(false);
+
+			// Reload time entries to reflect changes
+			await loadTimeEntries();
+
+			// Show success message
+			Alert.alert("Success", "Time entry updated successfully");
+		} catch (error) {
+			console.error("Error updating time entry:", error);
+			Alert.alert(
+				"Error",
+				"Failed to update time entry. Please try again.",
+			);
+		}
+	};
+
+	// Function to handle time entry deletion
+	const handleDeleteTimeEntry = () => {
+		if (!currentEditEntry) return;
+
+		// Show confirmation dialog
+		Alert.alert(
+			"Confirm Deletion",
+			"Are you sure you want to delete this time entry? This action cannot be undone.",
+			[
+				{
+					text: "Cancel",
+					style: "cancel",
+				},
+				{
+					text: "Delete",
+					style: "destructive",
+					onPress: async () => {
+						try {
+							// Delete the time entry
+							await deleteTimeEntry(
+								companyId,
+								currentEditEntry.id,
+							);
+
+							// Close the edit modal
+							setEditModalVisible(false);
+
+							// If we're viewing a single entry, navigate back
+							if (timeEntries.length === 1) {
+								navigation.goBack();
+								return;
+							}
+
+							// Otherwise reload the remaining entries
+							await loadTimeEntries();
+
+							// Show success message
+							Alert.alert(
+								"Success",
+								"Time entry deleted successfully",
+							);
+						} catch (error) {
+							console.error("Error deleting time entry:", error);
+							Alert.alert(
+								"Error",
+								"Failed to delete time entry. Please try again.",
+							);
+						}
+					},
+				},
+			],
+		);
+	};
+
+	// Add this function to handle individual field updates
+	const handleFieldUpdate = async (entryId, fieldId, value) => {
+		try {
+			// For entry fields
+			if (!fieldId.includes("_")) {
+				// Update a single field in the form responses
+				const entry = timeEntries.find((e) => e.id === entryId);
+				if (!entry) throw new Error("Entry not found");
+
+				const updatedFormResponses = {
+					...entry.formResponses,
+					[fieldId]: value,
+				};
+
+				// Update the time entry with just the form responses
+				await updateTimeEntry(entryId, companyId, {
+					formResponses: updatedFormResponses,
+					editHistory: [
+						...(entry.editHistory || []),
+						{
+							timestamp: new Date().toISOString(),
+							userId: currentUserId,
+							changeSummary: `Updated field: ${
+								customForm?.fields.find((f) => f.id === fieldId)
+									?.label || fieldId
+							}`,
+						},
+					],
+				});
+			}
+			// For connected event fields
+			else {
+				const [eventId, eventFieldId] = fieldId.split("_");
+
+				// Find the right entry and connected event
+				const entry = timeEntries.find((e) => e.id === entryId);
+				if (!entry || !entry.connectedEvents)
+					throw new Error("Entry or connected events not found");
+
+				// Update the connected event's form responses
+				const updatedConnectedEvents = entry.connectedEvents.map(
+					(event) => {
+						if (event.eventId === eventId) {
+							return {
+								...event,
+								formResponses: {
+									...(event.formResponses || {}),
+									[eventFieldId]: value,
+								},
+							};
+						}
+						return event;
+					},
+				);
+
+				// Update the time entry with just the connected events
+				await updateTimeEntry(entryId, companyId, {
+					connectedEvents: updatedConnectedEvents,
+					editHistory: [
+						...(entry.editHistory || []),
+						{
+							timestamp: new Date().toISOString(),
+							userId: currentUserId,
+							changeSummary: `Updated event field: ${
+								eventForm?.fields.find(
+									(f) => f.id === eventFieldId,
+								)?.label || eventFieldId
+							}`,
+						},
+					],
+				});
+			}
+
+			// Refresh the data
+			await loadTimeEntries();
+		} catch (error) {
+			console.error("Error updating field:", error);
+			throw error;
+		}
+	};
 
 	return (
 		<View style={[styles.container, { paddingTop: insets.top }]}>
@@ -889,8 +701,7 @@ ${companyData.name || "Management"}
 				</Text>
 				{isAdmin && (
 					<TouchableOpacity
-						onPress={handleExport}
-						disabled={isExporting}
+						onPress={() => setExportModalVisible(true)}
 					>
 						<Icon name="export-variant" size={24} color="#007AFF" />
 					</TouchableOpacity>
@@ -899,874 +710,90 @@ ${companyData.name || "Management"}
 
 			<ScrollView style={styles.scrollContainer}>
 				{/* Summary Card */}
-				<View style={styles.summaryCard}>
-					<View style={styles.summaryRow}>
-						<Text style={styles.summaryLabel}>Employee:</Text>
-						<Text style={styles.summaryValue}>
-							{employeeUser?.firstName +
-								" " +
-								employeeUser?.lastName || "Unknown"}
-						</Text>
-					</View>
+				<TimeEntrySummary
+					status={timeEntries[0]?.status || "draft"}
+					employeeUser={employeeUser}
+					totalDurationSeconds={totalDurationSeconds}
+					totalDurationDecimal={totalDurationDecimal}
+					timeEntries={timeEntries}
+					getStatusBadgeColor={getStatusBadgeColor}
+					getStatusBadgeText={getStatusBadgeText}
+				/>
 
-					<View style={styles.summaryRow}>
-						<Text style={styles.summaryLabel}>Total Duration:</Text>
-						<Text style={styles.summaryValue}>
-							{formatDuration(totalDurationSeconds)} (
-							{totalDurationDecimal} hrs)
-						</Text>
-					</View>
-
-					<View style={styles.summaryRow}>
-						<Text style={styles.summaryLabel}>Status:</Text>
-						<View style={styles.statusContainer}>
-							{timeEntries.length === 1 ? (
-								<View
-									style={[
-										styles.statusBadge,
-										{
-											backgroundColor:
-												getStatusBadgeColor(
-													timeEntries[0].status,
-												),
-										},
-									]}
-								>
-									<Text style={styles.statusText}>
-										{getStatusBadgeText(
-											timeEntries[0].status,
-										)}
-									</Text>
-								</View>
-							) : (
-								<Text style={styles.statusText}>Multiple</Text>
-							)}
-						</View>
-					</View>
-
-					<View style={styles.summaryRow}>
-						<Text style={styles.summaryLabel}>Date Range:</Text>
-						<Text style={styles.summaryValue}>
-							{timeEntries.length > 0
-								? `${format(
-										new Date(timeEntries[0].clockInTime),
-										"MMM d, yyyy",
-									)}
-                  ${
-						timeEntries.length > 1
-							? " - " +
-								format(
-									new Date(
-										timeEntries[
-											timeEntries.length - 1
-										].clockInTime,
-									),
-									"MMM d, yyyy",
-								)
-							: ""
-					}`
-								: "N/A"}
-						</Text>
-					</View>
-
-					{/* Add Number Field Totals - only show when there are multiple entries */}
-					{timeEntries.length > 1 && (
-						<>
-							{Object.values(calculateNumberFieldTotals()).map(
-								(total: TotalItem) => {
-									// Calculate multiplied value if applicable
-									const hasMultiplier =
-										total.multiplier &&
-										!isNaN(total.multiplier);
-									const multipliedValue = hasMultiplier
-										? total.value * total.multiplier
-										: null;
-
-									return (
-										<View
-											key={total.label}
-											style={[
-												styles.summaryRow,
-												styles.totalSummaryRow,
-											]}
-										>
-											<Text style={styles.summaryLabel}>
-												{total.label} Total:
-											</Text>
-											<Text
-												style={[
-													styles.summaryValue,
-													styles.totalValue,
-												]}
-											>
-												{total.value.toFixed(2)}
-												{hasMultiplier
-													? ` (${multipliedValue.toFixed(
-															2,
-														)}${
-															total.unit
-																? ` ${total.unit}`
-																: ""
-														})`
-													: total.unit
-														? ` ${total.unit}`
-														: ""}
-											</Text>
-										</View>
-									);
-								},
-							)}
-						</>
-					)}
-				</View>
+				{/* Field Totals Card - Add this new component */}
+				{Object.keys(fieldTotals).length > 0 && (
+					<FieldTotalsCard fieldTotals={fieldTotals} />
+				)}
 
 				{/* Manager Actions */}
 				{isAdmin && timeEntries.length > 0 && (
-					<View style={styles.managerActionsCard}>
-						<View style={styles.selectAllRow}>
-							<TouchableOpacity
-								onPress={toggleSelectAll}
-								style={styles.selectAllButton}
-							>
-								<Icon
-									name={
-										selectAll
-											? "checkbox-marked"
-											: "checkbox-blank-outline"
-									}
-									size={24}
-									color="#007AFF"
-								/>
-								<Text style={styles.selectAllText}>
-									Select All
-								</Text>
-							</TouchableOpacity>
-							<Text style={styles.selectedCountText}>
-								{getSelectedEntryIds().length} of{" "}
-								{timeEntries.length} selected
-							</Text>
-						</View>
-
-						<View style={styles.managerButtonRow}>
-							<TouchableOpacity
-								style={[
-									styles.managerActionButton,
-									styles.approveButton,
-									isApproving && styles.disabledButton,
-								]}
-								onPress={handleApproveEntries}
-								disabled={
-									isApproving ||
-									getSelectedEntryIds().length === 0
-								}
-							>
-								{isApproving ? (
-									<ActivityIndicator
-										size="small"
-										color="#fff"
-									/>
-								) : (
-									<>
-										<Icon
-											name="check-circle"
-											size={18}
-											color="#fff"
-										/>
-										<Text style={styles.buttonText}>
-											Approve
-										</Text>
-									</>
-								)}
-							</TouchableOpacity>
-
-							<TouchableOpacity
-								style={[
-									styles.managerActionButton,
-									styles.rejectButton,
-									isApproving && styles.disabledButton,
-								]}
-								onPress={handleRejectEntries}
-								disabled={
-									isApproving ||
-									getSelectedEntryIds().length === 0
-								}
-							>
-								<Icon
-									name="close-circle"
-									size={18}
-									color="#fff"
-								/>
-								<Text style={styles.buttonText}>Reject</Text>
-							</TouchableOpacity>
-						</View>
-					</View>
+					<ManagerActions
+						selectAll={selectAll}
+						toggleSelectAll={toggleSelectAll}
+						selectedCount={getSelectedEntryIds().length}
+						totalCount={timeEntries.length}
+						isApproving={isApproving}
+						onApprove={() =>
+							handleApproveEntries(getSelectedEntryIds())
+						}
+						onReject={() =>
+							handleRejectEntries(getSelectedEntryIds())
+						}
+					/>
 				)}
 
 				{/* Time Entries List */}
 				{timeEntries.map((entry) => (
-					<View key={entry.id} style={styles.timeEntryCard}>
-						<View style={styles.timeEntryHeader}>
-							<View style={styles.headerLeftSection}>
-								{isAdmin && (
-									<TouchableOpacity
-										style={styles.selectionCheckbox}
-										onPress={() =>
-											toggleEntrySelection(entry.id)
-										}
-									>
-										<Icon
-											name={
-												selectedEntries[entry.id]
-													? "checkbox-marked"
-													: "checkbox-blank-outline"
-											}
-											size={24}
-											color="#007AFF"
-										/>
-									</TouchableOpacity>
-								)}
-								<Text style={styles.dateTimeText}>
-									{format(
-										new Date(entry.clockInTime),
-										"EEE, MMM d, yyyy",
-									)}
-								</Text>
-							</View>
-							<View
-								style={[
-									styles.statusBadge,
-									{
-										backgroundColor: getStatusBadgeColor(
-											entry.status,
-										),
-									},
-								]}
-							>
-								<Text style={styles.statusText}>
-									{getStatusBadgeText(entry.status)}
-								</Text>
-							</View>
-						</View>
-
-						<View style={styles.timeEntryDetails}>
-							<View style={styles.detailRow}>
-								<Text style={styles.detailLabel}>
-									Clock In:
-								</Text>
-								<Text style={styles.detailValue}>
-									{format(
-										new Date(entry.clockInTime),
-										"h:mm a",
-									)}
-								</Text>
-							</View>
-
-							<View style={styles.detailRow}>
-								<Text style={styles.detailLabel}>
-									Clock Out:
-								</Text>
-								<Text style={styles.detailValue}>
-									{entry.clockOutTime
-										? format(
-												new Date(entry.clockOutTime),
-												"h:mm a",
-											)
-										: "N/A"}
-								</Text>
-							</View>
-
-							<View style={styles.detailRow}>
-								<Text style={styles.detailLabel}>
-									Duration:
-								</Text>
-								<Text style={styles.detailValue}>
-									{entry.duration
-										? formatDuration(entry.duration) +
-											"(" +
-											(entry.duration / 3600).toFixed(2) +
-											" hrs)"
-										: "N/A"}
-								</Text>
-							</View>
-
-							{/* Connected Events */}
-							{entry.connectedEvents &&
-								entry.connectedEvents.length > 0 && (
-									<View style={styles.connectedEventsSection}>
-										<Text style={styles.sectionTitle}>
-											Connected Events
-										</Text>
-										{entry.connectedEvents.map(
-											(connEvent, index) => {
-												const fullEvent = getEventById(
-													connEvent.eventId,
-												);
-												return (
-													<View
-														key={index}
-														style={
-															styles.connectedEventContainer
-														}
-													>
-														<View
-															style={
-																styles.connectedEventItem
-															}
-														>
-															<Icon
-																name="calendar"
-																size={16}
-																color="#007AFF"
-															/>
-															<Text
-																style={
-																	styles.eventTitle
-																}
-															>
-																{connEvent.eventTitle ||
-																	fullEvent?.title ||
-																	"Unknown Event"}
-															</Text>
-														</View>
-
-														{/* Event Form Responses */}
-														{connEvent.formResponses &&
-															eventForm && (
-																<View
-																	style={
-																		styles.eventFormResponsesSection
-																	}
-																>
-																	<Text
-																		style={
-																			styles.eventFormTitle
-																		}
-																	>
-																		Event
-																		Form
-																		Responses:
-																	</Text>
-																	{eventForm.fields.map(
-																		(
-																			field,
-																		) => {
-																			const response =
-																				connEvent
-																					.formResponses[
-																					field
-																						.id
-																				];
-
-																			if (
-																				response ===
-																					undefined ||
-																				response ===
-																					null
-																			)
-																				return null;
-
-																			return (
-																				<View
-																					key={
-																						field.id
-																					}
-																					style={
-																						styles.formResponseItem
-																					}
-																				>
-																					<Text
-																						style={
-																							styles.formFieldLabel
-																						}
-																					>
-																						{
-																							field.label
-																						}
-																					</Text>
-																					{field.type ===
-																						"number" &&
-																					field.useMultiplier &&
-																					field.multiplier ? (
-																						<View>
-																							<Text
-																								style={
-																									styles.formFieldValue
-																								}
-																							>
-																								{
-																									response
-																								}{" "}
-																							</Text>
-																							<Text
-																								style={
-																									styles.multiplierValue
-																								}
-																							>
-																								(
-																								{calculateMultipliedValue(
-																									response,
-																									field.multiplier,
-																								)}{" "}
-																								{field.unit ||
-																									""}
-
-																								)
-																							</Text>
-																						</View>
-																					) : field.type ===
-																					  "checkbox" ? (
-																						<Text
-																							style={
-																								styles.formFieldValue
-																							}
-																						>
-																							{response
-																								? "Yes"
-																								: "No"}
-																						</Text>
-																					) : field.type ===
-																					  "multiSelect" ? (
-																						<Text
-																							style={
-																								styles.formFieldValue
-																							}
-																						>
-																							{Array.isArray(
-																								response,
-																							) &&
-																							response.length >
-																								0
-																								? response.join(
-																										", ",
-																									)
-																								: "N/A"}
-																						</Text>
-																					) : field.type ===
-																					  "date" ? (
-																						<Text
-																							style={
-																								styles.formFieldValue
-																							}
-																						>
-																							{response
-																								? format(
-																										new Date(
-																											response,
-																										),
-																										"MMM d, yyyy",
-																									)
-																								: "N/A"}
-																						</Text>
-																					) : field.type ===
-																					  "time" ? (
-																						<Text
-																							style={
-																								styles.formFieldValue
-																							}
-																						>
-																							{response
-																								? format(
-																										new Date(
-																											response,
-																										),
-																										"h:mm a",
-																									)
-																								: "N/A"}
-																						</Text>
-																					) : field.type ===
-																							"document" ||
-																					  field.type ===
-																							"media" ? (
-																						<View>
-																							{response &&
-																							Array.isArray(
-																								response,
-																							) &&
-																							response.length >
-																								0 ? (
-																								<AttachmentGallery
-																									attachments={
-																										attachmentMap[
-																											entry
-																												.id
-																										] ||
-																										[]
-																									}
-																								/>
-																							) : (
-																								<Text
-																									style={
-																										styles.formFieldValue
-																									}
-																								>
-																									No
-																									files
-																									uploaded
-																								</Text>
-																							)}
-																						</View>
-																					) : (
-																						<Text
-																							style={
-																								styles.formFieldValue
-																							}
-																						>
-																							{response
-																								? response
-																								: "N/A"}
-																						</Text>
-																					)}
-																				</View>
-																			);
-																		},
-																	)}
-																</View>
-															)}
-													</View>
-												);
-											},
-										)}
-									</View>
-								)}
-
-							{/* Notes Section */}
-							{entry.notes && (
-								<View style={styles.notesSection}>
-									<Text style={styles.sectionTitle}>
-										Notes
-									</Text>
-									<Text style={styles.notesText}>
-										{entry.notes}
-									</Text>
-								</View>
-							)}
-
-							{/* Form Responses */}
-							{entry.formResponses && customForm && (
-								<View style={styles.formResponsesSection}>
-									<Text style={styles.sectionTitle}>
-										Time Entry Form Responses
-									</Text>
-									{customForm.fields.map((field) => {
-										const response =
-											entry.formResponses[field.id];
-
-										if (
-											response === undefined ||
-											response === null
-										)
-											return null;
-
-										return (
-											<View
-												key={field.id}
-												style={styles.formResponseItem}
-											>
-												<Text
-													style={
-														styles.formFieldLabel
-													}
-												>
-													{field.label}
-												</Text>
-												{field.type === "number" &&
-												field.useMultiplier &&
-												field.multiplier ? (
-													<View>
-														<Text
-															style={
-																styles.formFieldValue
-															}
-														>
-															{response}{" "}
-														</Text>
-														<Text
-															style={
-																styles.multiplierValue
-															}
-														>
-															(
-															{calculateMultipliedValue(
-																response,
-																field.multiplier,
-															)}{" "}
-															{field.unit || ""})
-														</Text>
-													</View>
-												) : field.type ===
-												  "checkbox" ? (
-													<Text
-														style={
-															styles.formFieldValue
-														}
-													>
-														{response
-															? "Yes"
-															: "No"}
-													</Text>
-												) : field.type ===
-												  "multiSelect" ? (
-													<Text
-														style={
-															styles.formFieldValue
-														}
-													>
-														{response.length > 0
-															? response.join(
-																	", ",
-																)
-															: "N/A"}
-													</Text>
-												) : field.type === "date" ? (
-													<Text
-														style={
-															styles.formFieldValue
-														}
-													>
-														{response
-															? format(
-																	response,
-																	"MMM d, yyyy",
-																)
-															: "N/A"}
-													</Text>
-												) : field.type === "time" ? (
-													<Text
-														style={
-															styles.formFieldValue
-														}
-													>
-														{response
-															? format(
-																	response,
-																	"h:mm a",
-																)
-															: "N/A"}
-													</Text>
-												) : field.type === "document" ||
-												  field.type === "media" ? (
-													<View>
-														{response &&
-														Array.isArray(
-															response,
-														) &&
-														response.length > 0 ? (
-															<AttachmentGallery
-																attachments={
-																	attachmentMap[
-																		entry.id
-																	] || []
-																}
-															/>
-														) : (
-															<Text
-																style={
-																	styles.formFieldValue
-																}
-															>
-																No files
-																uploaded
-															</Text>
-														)}
-													</View>
-												) : (
-													<Text
-														style={
-															styles.formFieldValue
-														}
-													>
-														{response
-															? response
-															: "N/A"}
-													</Text>
-												)}
-											</View>
-										);
-									})}
-								</View>
-							)}
-
-							{/* Edit History */}
-							{entry.editHistory &&
-								entry.editHistory.length > 0 && (
-									<View style={styles.editHistorySection}>
-										<Text style={styles.sectionTitle}>
-											Edit History
-										</Text>
-										{entry.editHistory.map(
-											(edit, index) => (
-												<View
-													key={index}
-													style={
-														styles.editHistoryItem
-													}
-												>
-													<Text
-														style={
-															styles.editTimestamp
-														}
-													>
-														{format(
-															new Date(
-																edit.timestamp,
-															),
-															"MMM d, yyyy h:mm a",
-														)}
-													</Text>
-													<Text
-														style={
-															styles.editSummary
-														}
-													>
-														{edit.summary}
-													</Text>
-												</View>
-											),
-										)}
-									</View>
-								)}
-
-							{/* Actions */}
-							<View style={styles.entryActions}>
-								{(isAdmin ||
-									preferences?.allowUserEventEditing) &&
-									(entry.status !== "approved" ||
-										entry.status !== "active") && (
-										<TouchableOpacity
-											style={styles.editButton}
-											onPress={() =>
-												handleEditEntry(entry)
-											}
-										>
-											<Icon
-												name="pencil"
-												size={16}
-												color="#007AFF"
-											/>
-											<Text style={styles.editButtonText}>
-												Edit
-											</Text>
-										</TouchableOpacity>
-									)}
-							</View>
-						</View>
-					</View>
+					<TimeDetailCard
+						key={entry.id}
+						entry={entry}
+						isSelected={selectedEntries[entry.id]}
+						isAdmin={isAdmin}
+						customForm={customForm}
+						eventForm={eventForm}
+						onToggleSelection={toggleEntrySelection}
+						onEditEntry={handleEditEntry}
+						attachmentMap={attachmentMap}
+						connectedEvents={connectedEvents[entry.id] || []}
+						onFieldUpdate={handleFieldUpdate}
+					/>
 				))}
 			</ScrollView>
 
+			{/* Edit Modal */}
 			<EditSheet
 				ref={editBottomSheetRef}
 				visible={editModalVisible}
 				snapPoints={editSnapPoints}
 				timeEntry={currentEditEntry}
 				customForm={customForm}
+				eventForm={eventForm}
 				editNotes={editNotes}
 				editChangeSummary={editChangeSummary}
 				setEditNotes={setEditNotes}
 				setEditChangeSummary={setEditChangeSummary}
 				onClose={handleEditSheetClose}
 				onSave={saveEditedEntry}
-				onDelete={handleDeleteTimeEntry} // Add this prop
+				onDelete={handleDeleteTimeEntry}
 			/>
 
-			{/* Export Bottom Sheet */}
-			<BottomSheet
+			{/* Export Modal */}
+			<ExportSheet
 				ref={exportBottomSheetRef}
+				visible={exportModalVisible}
 				snapPoints={exportSnapPoints}
-				enablePanDownToClose={true}
 				onClose={handleExportSheetClose}
-				backgroundStyle={styles.sheetBackground}
-				handleIndicatorStyle={styles.sheetIndicator}
-				index={-1}
-			>
-				<View style={styles.sheetHeader}>
-					<Text style={styles.modalTitle}>Export Time Entries</Text>
-					<TouchableOpacity
-						onPress={() => setExportModalVisible(false)}
-					>
-						<Icon name="close" size={24} color="#999" />
-					</TouchableOpacity>
-				</View>
-
-				<BottomSheetScrollView
-					contentContainerStyle={styles.sheetContent}
-				>
-					<View style={styles.exportOptionRow}>
-						<Text style={styles.modalLabel}>Export Format:</Text>
-						<View style={styles.exportOptions}>
-							<TouchableOpacity
-								style={[
-									styles.exportOption,
-									exportFormat === "txt" &&
-										styles.selectedExportOption,
-								]}
-								onPress={() => setExportFormat("txt")}
-							>
-								<Text
-									style={[
-										styles.exportOptionText,
-										exportFormat === "txt" &&
-											styles.selectedExportOptionText,
-									]}
-								>
-									TXT
-								</Text>
-							</TouchableOpacity>
-
-							<TouchableOpacity
-								style={[
-									styles.exportOption,
-									exportFormat === "csv" &&
-										styles.selectedExportOption,
-								]}
-								onPress={() => setExportFormat("csv")}
-							>
-								<Text
-									style={[
-										styles.exportOptionText,
-										exportFormat === "csv" &&
-											styles.selectedExportOptionText,
-									]}
-								>
-									CSV
-								</Text>
-							</TouchableOpacity>
-						</View>
-					</View>
-
-					<View style={styles.modalButtons}>
-						<TouchableOpacity
-							style={[
-								styles.modalButton,
-								styles.modalCancelButton,
-							]}
-							onPress={() => setExportModalVisible(false)}
-						>
-							<Text style={styles.modalCancelButtonText}>
-								Cancel
-							</Text>
-						</TouchableOpacity>
-
-						<TouchableOpacity
-							style={[styles.modalButton, styles.modalSaveButton]}
-							onPress={exportSelectedEntries}
-							disabled={isExporting}
-						>
-							{isExporting ? (
-								<ActivityIndicator size="small" color="#fff" />
-							) : (
-								<Text style={styles.modalSaveButtonText}>
-									Export
-								</Text>
-							)}
-						</TouchableOpacity>
-					</View>
-				</BottomSheetScrollView>
-			</BottomSheet>
+				selectedEntries={getSelectedEntryIds()}
+				timeEntries={timeEntries}
+				employeeUser={employeeUser}
+				companyId={companyId}
+				customForm={customForm}
+			/>
 		</View>
 	);
 };
 
+// Keep just the styles needed for the main component
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
@@ -2103,7 +1130,6 @@ const styles = StyleSheet.create({
 		borderTopLeftRadius: 12,
 		borderTopRightRadius: 12,
 		padding: 20,
-		maxHeight: Dimensions.get("window").height * 0.8,
 	},
 	modalTitle: {
 		fontSize: 18,

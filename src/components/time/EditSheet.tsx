@@ -17,7 +17,7 @@ import BottomSheet, {
 	BottomSheetScrollView,
 	BottomSheetTextInput,
 } from "@gorhom/bottom-sheet";
-import Icon from "react-native-vector-icons/MaterialIcons";
+import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { BottomSheetMethods } from "@gorhom/bottom-sheet/lib/typescript/types";
 import DatePicker from "react-native-date-picker";
 import { format, differenceInSeconds } from "date-fns";
@@ -26,12 +26,13 @@ import CustomFormRender from "./CustomFormRender";
 import { useUploadManager } from "../../contexts/UploadManagerContext";
 import { AttachmentItem } from "../../types";
 
-// Define interface for component props
+// Update the interface for component props
 interface EditSheetProps {
 	visible: boolean;
 	snapPoints?: string[];
 	timeEntry?: any;
 	customForm?: any;
+	eventForm?: any; // Add this for connected events form
 	editNotes: string;
 	editChangeSummary: string;
 	setEditNotes: (value: string) => void;
@@ -49,6 +50,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 			snapPoints = ["85%"],
 			timeEntry,
 			customForm,
+			eventForm,
 			editNotes,
 			editChangeSummary,
 			setEditNotes,
@@ -85,6 +87,15 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 		);
 		const [formState, setFormState] = useState(customForm);
 
+		// Add these state variables near other state declarations
+		const [connectedEventResponses, setConnectedEventResponses] = useState<{
+			[eventId: string]: any;
+		}>({});
+		const [eventFormState, setEventFormState] = useState(eventForm);
+		const [eventFormErrors, setEventFormErrors] = useState<
+			Record<string, Record<string, string>>
+		>({});
+
 		const { userId, user } = useUser();
 
 		// Calculate duration based on clock in/out times
@@ -114,6 +125,22 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 				if (timeEntry.formResponses) {
 					setFormResponses({ ...timeEntry.formResponses });
 				}
+
+				// Initialize connected event responses
+				if (
+					timeEntry.connectedEvents &&
+					timeEntry.connectedEvents.length > 0
+				) {
+					const eventResponses = {};
+					timeEntry.connectedEvents.forEach((event) => {
+						if (event.formResponses) {
+							eventResponses[event.eventId] = {
+								...event.formResponses,
+							};
+						}
+					});
+					setConnectedEventResponses(eventResponses);
+				}
 			}
 		}, [timeEntry]);
 
@@ -129,6 +156,19 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 				setFormState({ ...customForm, fields: updatedFields });
 			}
 		}, [customForm]);
+
+		// Add a useEffect for eventForm initialization
+		useEffect(() => {
+			if (eventForm) {
+				// Initialize event form with isOpen and showPicker properties
+				const updatedFields = eventForm.fields.map((field) => ({
+					...field,
+					isOpen: false,
+					showPicker: false,
+				}));
+				setEventFormState({ ...eventForm, fields: updatedFields });
+			}
+		}, [eventForm]);
 
 		// Handle sheet visibility using our local ref
 		useEffect(() => {
@@ -156,6 +196,39 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 
 			setFormErrors(errors);
 			return Object.keys(errors).length === 0;
+		};
+
+		// New validation function for event form responses
+		const validateEventFormResponses = () => {
+			const errors: Record<string, Record<string, string>> = {};
+			let isValid = true;
+
+			if (timeEntry?.connectedEvents && eventForm && eventForm.fields) {
+				timeEntry.connectedEvents.forEach((event) => {
+					const eventId = event.eventId;
+					const eventErrors: Record<string, string> = {};
+
+					eventForm.fields.forEach((field) => {
+						if (
+							field.required &&
+							(!connectedEventResponses[eventId]?.[field.id] ||
+								connectedEventResponses[eventId]?.[field.id] ===
+									"")
+						) {
+							eventErrors[field.id] =
+								`${field.label} is required`;
+							isValid = false;
+						}
+					});
+
+					if (Object.keys(eventErrors).length > 0) {
+						errors[eventId] = eventErrors;
+					}
+				});
+			}
+
+			setEventFormErrors(errors);
+			return isValid;
 		};
 
 		// Handle form response changes
@@ -187,6 +260,39 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 			}
 		};
 
+		// Handle event form response changes
+		const handleEventFormResponseChange = (
+			eventId: string,
+			fieldId: string,
+			fieldType: string,
+			value: any,
+		) => {
+			setConnectedEventResponses((prev) => ({
+				...prev,
+				[eventId]: {
+					...(prev[eventId] || {}),
+					[fieldId]: value,
+				},
+			}));
+
+			// If this is a document or media field, track files that need uploading
+			if (fieldType === "document" || fieldType === "media") {
+				if (Array.isArray(value)) {
+					// Find files that don't have a downloadUrl (new uploads)
+					const newFiles = value.filter(
+						(file) => !file.downloadUrl && !file.url,
+					);
+
+					if (newFiles.length > 0) {
+						setFilesToUpload((prev) => ({
+							...prev,
+							[`event_${eventId}_${fieldId}`]: newFiles,
+						}));
+					}
+				}
+			}
+		};
+
 		// Handle save with all updated values
 		const handleSaveChanges = async () => {
 			if (!editChangeSummary.trim()) {
@@ -205,7 +311,8 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 
 			// Validate form responses
 			const isFormValid = validateFormResponses();
-			if (!isFormValid) {
+			const isEventFormValid = validateEventFormResponses();
+			if (!isFormValid || !isEventFormValid) {
 				Alert.alert(
 					"Required Fields",
 					"Please fill out all required fields",
@@ -323,12 +430,22 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 				}
 
 				// Update the time entry with the updated form responses
+				const updatedConnectedEvents = timeEntry.connectedEvents
+					? timeEntry.connectedEvents.map((event) => ({
+							...event,
+							formResponses:
+								connectedEventResponses[event.eventId] ||
+								event.formResponses,
+						}))
+					: [];
+
 				const updates = {
 					notes: editNotes,
 					clockInTime: clockInDate.toISOString(),
 					clockOutTime: clockOutDate.toISOString(),
 					duration: duration,
 					formResponses: updatedFormResponses,
+					connectedEvents: updatedConnectedEvents,
 					status: "edited",
 					editHistory: timeEntry.editHistory
 						? [
@@ -471,7 +588,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 										)}
 									</Text>
 									<Icon
-										name="access-time"
+										name="clock-outline"
 										size={20}
 										color="#007AFF"
 									/>
@@ -514,7 +631,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 										)}
 									</Text>
 									<Icon
-										name="access-time"
+										name="clock-outline"
 										size={20}
 										color="#007AFF"
 									/>
@@ -558,6 +675,85 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 								onChangeText={setEditNotes}
 							/>
 						</View>
+
+						{/* Connected Events Section */}
+						{timeEntry?.connectedEvents &&
+							timeEntry.connectedEvents.length > 0 &&
+							eventForm && (
+								<View style={styles.connectedEventsSection}>
+									<Text style={styles.sectionTitle}>
+										Connected Events
+									</Text>
+
+									{timeEntry.connectedEvents.map(
+										(event, index) => (
+											<View
+												key={event.eventId || index}
+												style={styles.formSection}
+											>
+												<View
+													style={
+														styles.connectedEventHeader
+													}
+												>
+													<Icon
+														name="calendar-check"
+														size={18}
+														color="#007AFF"
+													/>
+													<Text
+														style={
+															styles.connectedEventTitle
+														}
+													>
+														{event.eventTitle ||
+															"Connected Event"}
+													</Text>
+												</View>
+
+												{/* Event Form Responses */}
+												<CustomFormRender
+													customForm={eventFormState}
+													formResponses={
+														connectedEventResponses[
+															event.eventId
+														] || {}
+													}
+													formErrors={
+														eventFormErrors[
+															event.eventId
+														] || {}
+													}
+													onFieldChange={(
+														fieldId,
+														fieldType,
+														value,
+													) =>
+														handleEventFormResponseChange(
+															event.eventId,
+															fieldId,
+															fieldType,
+															value,
+														)
+													}
+													setCustomForm={
+														setEventFormState
+													}
+													uploadProgress={
+														uploadProgress
+													}
+													deletionQueue={
+														deletionQueue
+													}
+													setDeletionQueue={
+														setDeletionQueue
+													}
+												/>
+											</View>
+										),
+									)}
+								</View>
+							)}
 
 						{/* Form Responses Section */}
 						{customForm && (
@@ -705,6 +901,31 @@ const styles = StyleSheet.create({
 		backgroundColor: "#f9f9f9",
 		padding: 16,
 		borderRadius: 12,
+	},
+	connectedEventsSection: {
+		marginBottom: 24,
+	},
+	connectedEventCard: {
+		marginBottom: 16,
+		backgroundColor: "#f9f9f9",
+		padding: 16,
+		borderRadius: 12,
+		borderLeftWidth: 3,
+		borderLeftColor: "#007AFF",
+	},
+	connectedEventHeader: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginBottom: 12,
+		paddingBottom: 8,
+		borderBottomWidth: 1,
+		borderBottomColor: "#eee",
+	},
+	connectedEventTitle: {
+		fontSize: 16,
+		fontWeight: "600",
+		color: "#333",
+		marginLeft: 8,
 	},
 	summarySection: {
 		marginBottom: 16,
