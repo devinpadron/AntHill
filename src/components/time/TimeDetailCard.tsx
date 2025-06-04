@@ -18,6 +18,7 @@ import {
 import FormFieldValue from "./FormFieldValue";
 import { getEventPackages } from "../../services/eventService";
 import { useUser } from "../../contexts/UserContext";
+import { useCompany } from "../../contexts/CompanyContext";
 
 const TimeDetailCard = ({
 	entry,
@@ -36,6 +37,7 @@ const TimeDetailCard = ({
 	const [fieldValues, setFieldValues] = useState({});
 	const [savingFields, setSavingFields] = useState({});
 	const { companyId } = useUser();
+	const { preferences } = useCompany();
 
 	// Add state for event packages
 	const [eventPackages, setEventPackages] = useState({});
@@ -543,15 +545,19 @@ const TimeDetailCard = ({
 				)}
 
 				{/* Actions */}
-				<View style={styles.entryActions}>
-					<TouchableOpacity
-						style={styles.editButton}
-						onPress={() => onEditEntry(entry)}
-					>
-						<Icon name="pencil" size={16} color="#007AFF" />
-						<Text style={styles.editButtonText}>Edit</Text>
-					</TouchableOpacity>
-				</View>
+				{/*FIX THIS TO ONLY SHOW IF THE THING ISNT ACTIVE OR PAUSED AND IF THE USER IS AN ADMIN OR ALLOWED TO EDIT*/}
+				{!(entry.status === "active" || entry.status === "paused") &&
+				(isAdmin || preferences?.allowUserEventEditing) ? (
+					<View style={styles.entryActions}>
+						<TouchableOpacity
+							style={styles.editButton}
+							onPress={() => onEditEntry(entry)}
+						>
+							<Icon name="pencil" size={16} color="#007AFF" />
+							<Text style={styles.editButtonText}>Edit</Text>
+						</TouchableOpacity>
+					</View>
+				) : null}
 			</View>
 		</View>
 	);
