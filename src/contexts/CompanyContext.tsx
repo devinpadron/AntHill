@@ -17,6 +17,7 @@ export interface CompanyPreferences {
 	allowUserEventEditing: boolean;
 	enableTimeSheet: boolean;
 	timeEntryForm: any;
+	eventForm: any;
 	canViewEventLabels: boolean;
 }
 
@@ -48,6 +49,12 @@ const defaultPreferences: CompanyPreferences = {
 		title: "Time Entry Form",
 		description:
 			"Please complete this form when submitting your time entry",
+		fields: [],
+		isEnabled: true,
+	},
+	eventForm: {
+		title: "Event Form",
+		description: "Please complete this form when submitting your event",
 		fields: [],
 		isEnabled: true,
 	},

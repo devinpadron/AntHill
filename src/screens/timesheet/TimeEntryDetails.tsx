@@ -79,6 +79,7 @@ const TimeEntryDetails = ({ route, navigation }) => {
 	const [timeEntries, setTimeEntries] = useState([]);
 	const [employeeUser, setEmployeeUser] = useState(null);
 	const [customForm, setCustomForm] = useState(null);
+	const [eventForm, setEventForm] = useState(null);
 	const [connectedEvents, setConnectedEvents] = useState([]);
 	const [totalDurationSeconds, setTotalDurationSeconds] = useState(0);
 	const [totalDurationDecimal, setTotalDurationDecimal] = useState(0);
@@ -198,6 +199,9 @@ const TimeEntryDetails = ({ route, navigation }) => {
 			// Get custom form if applicable
 			if (validEntries.length > 0 && validEntries[0].formResponses) {
 				const preferences = await getCompanyPreferences(companyId);
+				if (preferences?.eventForm) {
+					setEventForm(preferences.eventForm);
+				}
 				if (preferences?.timeEntryForm) {
 					setCustomForm(preferences.timeEntryForm);
 				}
@@ -230,21 +234,27 @@ const TimeEntryDetails = ({ route, navigation }) => {
 	const calculateNumberFieldTotals = (): Totals => {
 		const totals: Totals = {}; // Initialize with proper type
 
-		// Skip if no entries or no custom form
-		if (!timeEntries?.length || !customForm?.fields) return totals;
+		// Skip if no entries or no custom forms
+		if (!timeEntries?.length || (!customForm?.fields && !eventForm?.fields))
+			return totals;
 
-		// Find all number fields that should show totals
-		const totalableFields = customForm.fields.filter(
-			(field) => field.type === "number" && field.showTotal === true,
-		);
+		// Find all number fields that should show totals in main form
+		const mainTotalableFields =
+			customForm?.fields?.filter(
+				(field) => field.type === "number" && field.showTotal === true,
+			) || [];
 
-		// Skip if no totalable fields
-		if (!totalableFields.length) return totals;
+		// Find all number fields that should show totals in event form
+		const eventTotalableFields =
+			eventForm?.fields?.filter(
+				(field) => field.type === "number" && field.showTotal === true,
+			) || [];
 
-		// Sum up values across all entries
+		// Process each time entry
 		timeEntries.forEach((entry) => {
-			if (entry.formResponses) {
-				totalableFields.forEach((field) => {
+			// Process main form responses
+			if (entry.formResponses && mainTotalableFields.length > 0) {
+				mainTotalableFields.forEach((field) => {
 					const value = entry.formResponses[field.id];
 					if (value && !isNaN(parseFloat(value))) {
 						const numValue = parseFloat(value);
@@ -261,6 +271,36 @@ const TimeEntryDetails = ({ route, navigation }) => {
 							};
 						}
 						totals[field.id].value += numValue;
+					}
+				});
+			}
+
+			// Process event form responses
+			if (entry.connectedEvents && eventTotalableFields.length > 0) {
+				entry.connectedEvents.forEach((connEvent) => {
+					if (connEvent.formResponses) {
+						eventTotalableFields.forEach((field) => {
+							const value = connEvent.formResponses[field.id];
+							if (value && !isNaN(parseFloat(value))) {
+								const numValue = parseFloat(value);
+
+								// Use a unique ID for event fields to avoid conflicts with main form
+								const fieldId = `event_${field.id}`;
+
+								// Initialize if not exists
+								if (!totals[fieldId]) {
+									totals[fieldId] = {
+										value: 0,
+										label: `${field.label} (Events)`, // Add indicator this is from events
+										unit: field.unit || "",
+										multiplier: field.useMultiplier
+											? field.multiplier
+											: null,
+									};
+								}
+								totals[fieldId].value += numValue;
+							}
+						});
 					}
 				});
 			}
@@ -1165,23 +1205,223 @@ ${companyData.name || "Management"}
 													<View
 														key={index}
 														style={
-															styles.connectedEventItem
+															styles.connectedEventContainer
 														}
 													>
-														<Icon
-															name="calendar"
-															size={16}
-															color="#007AFF"
-														/>
-														<Text
+														<View
 															style={
-																styles.eventTitle
+																styles.connectedEventItem
 															}
 														>
-															{connEvent.eventTitle ||
-																fullEvent?.title ||
-																"Unknown Event"}
-														</Text>
+															<Icon
+																name="calendar"
+																size={16}
+																color="#007AFF"
+															/>
+															<Text
+																style={
+																	styles.eventTitle
+																}
+															>
+																{connEvent.eventTitle ||
+																	fullEvent?.title ||
+																	"Unknown Event"}
+															</Text>
+														</View>
+
+														{/* Event Form Responses */}
+														{connEvent.formResponses &&
+															eventForm && (
+																<View
+																	style={
+																		styles.eventFormResponsesSection
+																	}
+																>
+																	<Text
+																		style={
+																			styles.eventFormTitle
+																		}
+																	>
+																		Event
+																		Form
+																		Responses:
+																	</Text>
+																	{eventForm.fields.map(
+																		(
+																			field,
+																		) => {
+																			const response =
+																				connEvent
+																					.formResponses[
+																					field
+																						.id
+																				];
+
+																			if (
+																				response ===
+																					undefined ||
+																				response ===
+																					null
+																			)
+																				return null;
+
+																			return (
+																				<View
+																					key={
+																						field.id
+																					}
+																					style={
+																						styles.formResponseItem
+																					}
+																				>
+																					<Text
+																						style={
+																							styles.formFieldLabel
+																						}
+																					>
+																						{
+																							field.label
+																						}
+																					</Text>
+																					{field.type ===
+																						"number" &&
+																					field.useMultiplier &&
+																					field.multiplier ? (
+																						<View>
+																							<Text
+																								style={
+																									styles.formFieldValue
+																								}
+																							>
+																								{
+																									response
+																								}{" "}
+																							</Text>
+																							<Text
+																								style={
+																									styles.multiplierValue
+																								}
+																							>
+																								(
+																								{calculateMultipliedValue(
+																									response,
+																									field.multiplier,
+																								)}{" "}
+																								{field.unit ||
+																									""}
+
+																								)
+																							</Text>
+																						</View>
+																					) : field.type ===
+																					  "checkbox" ? (
+																						<Text
+																							style={
+																								styles.formFieldValue
+																							}
+																						>
+																							{response
+																								? "Yes"
+																								: "No"}
+																						</Text>
+																					) : field.type ===
+																					  "multiSelect" ? (
+																						<Text
+																							style={
+																								styles.formFieldValue
+																							}
+																						>
+																							{Array.isArray(
+																								response,
+																							) &&
+																							response.length >
+																								0
+																								? response.join(
+																										", ",
+																									)
+																								: "N/A"}
+																						</Text>
+																					) : field.type ===
+																					  "date" ? (
+																						<Text
+																							style={
+																								styles.formFieldValue
+																							}
+																						>
+																							{response
+																								? format(
+																										new Date(
+																											response,
+																										),
+																										"MMM d, yyyy",
+																									)
+																								: "N/A"}
+																						</Text>
+																					) : field.type ===
+																					  "time" ? (
+																						<Text
+																							style={
+																								styles.formFieldValue
+																							}
+																						>
+																							{response
+																								? format(
+																										new Date(
+																											response,
+																										),
+																										"h:mm a",
+																									)
+																								: "N/A"}
+																						</Text>
+																					) : field.type ===
+																							"document" ||
+																					  field.type ===
+																							"media" ? (
+																						<View>
+																							{response &&
+																							Array.isArray(
+																								response,
+																							) &&
+																							response.length >
+																								0 ? (
+																								<AttachmentGallery
+																									attachments={
+																										attachmentMap[
+																											entry
+																												.id
+																										] ||
+																										[]
+																									}
+																								/>
+																							) : (
+																								<Text
+																									style={
+																										styles.formFieldValue
+																									}
+																								>
+																									No
+																									files
+																									uploaded
+																								</Text>
+																							)}
+																						</View>
+																					) : (
+																						<Text
+																							style={
+																								styles.formFieldValue
+																							}
+																						>
+																							{response
+																								? response
+																								: "N/A"}
+																						</Text>
+																					)}
+																				</View>
+																			);
+																		},
+																	)}
+																</View>
+															)}
 													</View>
 												);
 											},
@@ -1205,7 +1445,7 @@ ${companyData.name || "Management"}
 							{entry.formResponses && customForm && (
 								<View style={styles.formResponsesSection}>
 									<Text style={styles.sectionTitle}>
-										Form Responses
+										Time Entry Form Responses
 									</Text>
 									{customForm.fields.map((field) => {
 										const response =
@@ -1758,19 +1998,30 @@ const styles = StyleSheet.create({
 		color: "#333",
 		marginBottom: 8,
 	},
+	connectedEventContainer: {
+		marginBottom: 16,
+		borderWidth: 1,
+		borderColor: "#f0f0f0",
+		borderRadius: 8,
+		overflow: "hidden",
+	},
 	connectedEventItem: {
 		flexDirection: "row",
 		alignItems: "center",
-		paddingVertical: 6,
-		backgroundColor: "#f7f9fc",
+		paddingVertical: 10,
 		paddingHorizontal: 12,
-		borderRadius: 4,
-		marginBottom: 8,
+		backgroundColor: "#f7f9fc",
+		borderBottomColor: "#f0f0f0",
 	},
-	eventTitle: {
+	eventFormResponsesSection: {
+		padding: 12,
+		backgroundColor: "#ffffff",
+	},
+	eventFormTitle: {
 		fontSize: 14,
-		color: "#333",
-		marginLeft: 8,
+		fontWeight: "500",
+		color: "#666",
+		marginBottom: 8,
 	},
 	notesSection: {
 		marginTop: 16,
@@ -1991,6 +2242,12 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 		paddingHorizontal: 4,
 		marginTop: 4,
+	},
+	eventTitle: {
+		fontSize: 15,
+		fontWeight: "500",
+		color: "#333",
+		marginLeft: 8,
 	},
 });
 

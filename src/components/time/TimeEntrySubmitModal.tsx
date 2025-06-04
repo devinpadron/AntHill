@@ -16,19 +16,17 @@ import { getEventsByDate } from "../../services/eventService";
 import { useUser } from "../../contexts/UserContext";
 import { useUploadManager } from "../../contexts/UploadManagerContext"; // Add this import
 import moment from "moment";
-import { getCompanyPreferences } from "../../services/companyService";
 import BottomSheet, {
 	BottomSheetScrollView,
 	BottomSheetTextInput,
 } from "@gorhom/bottom-sheet";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CustomFormRender from "./CustomFormRender";
+import { useCompany } from "../../contexts/CompanyContext";
 
 //TODO: What I did before was attach the formResponses directly to each connected event
 // Next we need to:
 // 1. Update the timeEntryDetails to handle the new structure and display the form responses correctly
-// 2. Add a new form that will get attached to the submission, not to the event (like its handled rn)
-// 3. Update the submission logic to handle the new structure
 
 const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const [notes, setNotes] = useState("");
@@ -40,10 +38,13 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const [showOtherEvents, setShowOtherEvents] = useState(false);
 	const { userId, companyId } = useUser();
 	const [customForm, setCustomForm] = useState(null);
+	const [customFullForm, setCustomFullForm] = useState(null);
+	const [fullFormResponses, setFullFormResponses] = useState({});
 	// Replace single formResponses with a map keyed by event ID
 	const [formResponsesByEvent, setFormResponsesByEvent] = useState({});
 	// Replace single formErrors with a map keyed by event ID
 	const [formErrorsByEvent, setFormErrorsByEvent] = useState({});
+	const [fullFormErrors, setFullFormErrors] = useState({});
 	// Update filesToUpload to be organized by event
 	const [filesToUpload, setFilesToUpload] = useState({});
 	const { uploadFiles, isUploading, uploadProgress, resetUploadProgress } =
@@ -54,6 +55,7 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const notesInputRef = useRef(null);
 	const snapPoints = useRef(["85%"]).current;
 	const insets = useSafeAreaInsets();
+	const { preferences } = useCompany();
 
 	useEffect(() => {
 		if (visible && bottomSheetRef.current) {
@@ -77,32 +79,53 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 		}
 	}, [visible, timeEntry]);
 
+	// First useEffect - only for initializing the form templates
 	useEffect(() => {
-		const loadCustomForm = async () => {
+		const loadCustomForms = async () => {
 			if (!companyId) return;
 
 			try {
-				const preferences = await getCompanyPreferences(companyId);
-				if (preferences?.timeEntryForm?.isEnabled) {
-					setCustomForm(preferences.timeEntryForm);
+				if (preferences?.eventForm?.isEnabled) {
+					setCustomForm(preferences.eventForm);
+				}
 
-					// Initialize empty responses for existing events
-					if (selectedEvents.length > 0) {
-						initializeFormResponsesForEvents(
-							selectedEvents,
-							preferences.timeEntryForm,
-						);
+				if (preferences?.timeEntryForm?.isEnabled) {
+					setCustomFullForm(preferences.timeEntryForm);
+
+					// Only initialize the full form responses if they're empty
+					if (Object.keys(fullFormResponses).length === 0) {
+						const initialResponses = {};
+						preferences.timeEntryForm.fields.forEach((field) => {
+							if (field.type === "checkbox") {
+								initialResponses[field.id] = false;
+							} else if (field.type === "multiSelect") {
+								initialResponses[field.id] = [];
+							} else {
+								initialResponses[field.id] = "";
+							}
+						});
+						setFullFormResponses(initialResponses);
 					}
 				}
 			} catch (error) {
-				console.error("Failed to load custom form:", error);
+				console.error("Failed to load custom forms:", error);
 			}
 		};
 
 		if (visible) {
-			loadCustomForm();
+			loadCustomForms();
 		}
-	}, [visible, companyId, selectedEvents.length]);
+	}, [visible, companyId]); // Remove selectedEvents.length
+
+	// Second useEffect - only for initializing event form responses
+	useEffect(() => {
+		if (!customForm || !visible) return;
+
+		// Initialize empty responses for existing events
+		if (selectedEvents.length > 0) {
+			initializeFormResponsesForEvents(selectedEvents, customForm);
+		}
+	}, [customForm, selectedEvents, visible]);
 
 	// Add this helper function
 	const initializeFormResponsesForEvents = (events, formTemplate) => {
@@ -247,7 +270,12 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 			// Remove any files to upload for this event
 			setFilesToUpload((prev) => {
 				const updated = { ...prev };
-				delete updated[eventId];
+				// Only remove keys that are for this event (formatted as "eventId-fieldId")
+				Object.keys(updated).forEach((key) => {
+					if (key.startsWith(`${eventId}-`)) {
+						delete updated[key];
+					}
+				});
 				return updated;
 			});
 		}
@@ -259,13 +287,22 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 
 	// Updated to track files that need uploading
 	const handleFieldChange = (eventId, fieldId, fieldType, value) => {
-		setFormResponsesByEvent((prev) => ({
-			...prev,
-			[eventId]: {
-				...prev[eventId],
+		if (eventId === "fullForm") {
+			// Handle changes for the full form
+			setFullFormResponses((prev) => ({
+				...prev,
 				[fieldId]: value,
-			},
-		}));
+			}));
+			return;
+		} else {
+			setFormResponsesByEvent((prev) => ({
+				...prev,
+				[eventId]: {
+					...prev[eventId],
+					[fieldId]: value,
+				},
+			}));
+		}
 
 		// If this is a document or media field, track files that need uploading
 		if (fieldType === "document" || fieldType === "media") {
@@ -276,38 +313,86 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 				);
 
 				if (newFiles.length > 0) {
-					setFilesToUpload((prev) => ({
-						...prev,
-						[`${eventId}-${fieldId}`]: newFiles,
-					}));
+					if (eventId === "fullForm") {
+						// For full form, we don't track files by event
+						setFilesToUpload((prev) => ({
+							...prev,
+							[fieldId]: newFiles,
+						}));
+					} else {
+						setFilesToUpload((prev) => ({
+							...prev,
+							[`${eventId}-${fieldId}`]: newFiles,
+						}));
+					}
 				}
 			}
 		}
 
 		if (formErrorsByEvent[eventId]?.[fieldId]) {
-			setFormErrorsByEvent((prev) => ({
-				...prev,
-				[eventId]: {
-					...prev[eventId],
+			if (eventId === "fullForm") {
+				// Clear error for full form field
+				setFullFormErrors((prev) => ({
+					...prev,
 					[fieldId]: null,
-				},
-			}));
+				}));
+			} else {
+				setFormErrorsByEvent((prev) => ({
+					...prev,
+					[eventId]: {
+						...prev[eventId],
+						[fieldId]: null,
+					},
+				}));
+			}
 		}
 	};
 
 	const validateForms = () => {
-		if (!customForm) return true;
+		if (!customForm && !customFullForm) return true;
 
 		const newErrorsByEvent = { ...formErrorsByEvent };
 		let isValid = true;
 
-		selectedEvents.forEach((event) => {
-			const eventErrors = {};
-			let eventIsValid = true;
+		// Validate event-specific forms
+		if (customForm) {
+			selectedEvents.forEach((event) => {
+				const eventErrors = {};
+				let eventIsValid = true;
 
-			customForm.fields.forEach((field) => {
+				customForm.fields.forEach((field) => {
+					if (field.required) {
+						const value =
+							formResponsesByEvent[event.id]?.[field.id];
+
+						if (
+							value === undefined ||
+							value === null ||
+							value === "" ||
+							(Array.isArray(value) && value.length === 0)
+						) {
+							eventErrors[field.id] =
+								`${field.label} is required`;
+							eventIsValid = false;
+							isValid = false;
+						}
+					}
+				});
+
+				newErrorsByEvent[event.id] = eventErrors;
+			});
+
+			setFormErrorsByEvent(newErrorsByEvent);
+		}
+
+		// Validate the full form
+		if (customFullForm) {
+			const fullFormErrorsObj = {};
+			let fullFormIsValid = true;
+
+			customFullForm.fields.forEach((field) => {
 				if (field.required) {
-					const value = formResponsesByEvent[event.id]?.[field.id];
+					const value = fullFormResponses[field.id];
 
 					if (
 						value === undefined ||
@@ -315,28 +400,63 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 						value === "" ||
 						(Array.isArray(value) && value.length === 0)
 					) {
-						eventErrors[field.id] = `${field.label} is required`;
-						eventIsValid = false;
+						fullFormErrorsObj[field.id] =
+							`${field.label} is required`;
+						fullFormIsValid = false;
 						isValid = false;
 					}
 				}
 			});
 
-			newErrorsByEvent[event.id] = eventErrors;
-		});
+			setFullFormErrors(fullFormErrorsObj);
 
-		setFormErrorsByEvent(newErrorsByEvent);
+			// If the full form is invalid, update the isValid flag
+			if (!fullFormIsValid) {
+				isValid = false;
+			}
+		}
+
 		return isValid;
 	};
 
 	// Updated to handle file uploads before submission
 	const handleSubmit = async () => {
+		if (selectedEvents.length === 0) {
+			setError("Please attach at least one event to this time entry.");
+			return;
+		}
+
 		try {
 			setIsSubmitting(true);
 			setError(null);
 
-			if (customForm && !validateForms()) {
-				setError("Please complete all required fields for each event");
+			if ((customForm || customFullForm) && !validateForms()) {
+				let errorMessage = "Please complete all required fields";
+
+				// Check if there are full form errors
+				const hasFullFormErrors = Object.keys(fullFormErrors).some(
+					(key) =>
+						fullFormErrors[key] !== null &&
+						fullFormErrors[key] !== undefined,
+				);
+
+				// Check if there are event form errors
+				const hasEventFormErrors = Object.values(
+					formErrorsByEvent,
+				).some((errors) => Object.keys(errors).length > 0);
+
+				if (hasFullFormErrors && hasEventFormErrors) {
+					errorMessage =
+						"Please complete all required fields in the time entry and event forms";
+				} else if (hasFullFormErrors) {
+					errorMessage =
+						"Please complete all required fields in the time entry form";
+				} else if (hasEventFormErrors) {
+					errorMessage =
+						"Please complete all required fields in the event forms";
+				}
+
+				setError(errorMessage);
 				setIsSubmitting(false);
 				return;
 			}
@@ -379,15 +499,41 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 						...formResponsesByEvent,
 					};
 
-					Object.keys(filesToUpload).forEach((key) => {
-						// key format is "eventId-fieldId"
-						const [eventId, fieldId] = key.split("-");
+					// Create a copy of the full form responses to update
+					const updatedFullFormResponses = { ...fullFormResponses };
 
-						if (updatedFormResponsesByEvent[eventId]) {
+					Object.keys(filesToUpload).forEach((key) => {
+						if (key.includes("-")) {
+							// This is for event-specific forms
+							// key format is "eventId-fieldId"
+							const [eventId, fieldId] = key.split("-");
+
+							if (updatedFormResponsesByEvent[eventId]) {
+								const fieldFiles = [
+									...(updatedFormResponsesByEvent[eventId][
+										fieldId
+									] || []),
+								];
+
+								// Replace local files with uploaded versions
+								const updatedFiles = fieldFiles.map((file) => {
+									const uploadedFile = uploadedFiles.find(
+										(u) =>
+											file.uri === u.uri ||
+											(file.id && file.id === u.id),
+									);
+									return uploadedFile || file;
+								});
+
+								updatedFormResponsesByEvent[eventId][fieldId] =
+									updatedFiles;
+							}
+						} else {
+							// This is for the full form
+							// key is just the fieldId
+							const fieldId = key;
 							const fieldFiles = [
-								...(updatedFormResponsesByEvent[eventId][
-									fieldId
-								] || []),
+								...(updatedFullFormResponses[fieldId] || []),
 							];
 
 							// Replace local files with uploaded versions
@@ -400,13 +546,15 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 								return uploadedFile || file;
 							});
 
-							updatedFormResponsesByEvent[eventId][fieldId] =
-								updatedFiles;
+							updatedFullFormResponses[fieldId] = updatedFiles;
 						}
 					});
 
 					// Now submit with the updated form responses
-					await submitTimeEntry(updatedFormResponsesByEvent);
+					await submitTimeEntry(
+						updatedFormResponsesByEvent,
+						updatedFullFormResponses,
+					);
 				} catch (uploadError) {
 					console.error("Error uploading files:", uploadError);
 					setError("Failed to upload files. Please try again.");
@@ -415,7 +563,7 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 				}
 			} else {
 				// No files to upload, submit directly
-				await submitTimeEntry(formResponsesByEvent);
+				await submitTimeEntry(formResponsesByEvent, fullFormResponses);
 			}
 		} catch (err) {
 			setError("Failed to submit time entry. Please try again.");
@@ -425,7 +573,10 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	};
 
 	// Helper function for the actual submission
-	const submitTimeEntry = async (finalFormResponsesByEvent) => {
+	const submitTimeEntry = async (
+		finalFormResponsesByEvent,
+		finalFullFormResponses,
+	) => {
 		const enrichedTimeEntry = {
 			...timeEntry,
 			notes: notes,
@@ -436,14 +587,13 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 				eventTitle: event.title,
 				formResponses: finalFormResponsesByEvent[event.id] || null,
 			})),
-			// We no longer need this field since responses are tied to events
-			// formResponses: customForm ? finalFormResponses : null,
+			// Add the full form responses to the time entry
+			formResponses: customFullForm ? finalFullFormResponses : null,
 		};
 
 		await onSubmit(timeEntry.id, enrichedTimeEntry);
 
-		setNotes("");
-		resetUploadProgress();
+		resetModalState();
 		handleClosePress();
 	};
 
@@ -473,6 +623,30 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 		setSelectedEvents((prev) => [...prev, newEvent]);
 		setNewEventTitle("");
 		setShowAddEventInput(false);
+	};
+
+	const resetModalState = () => {
+		// Reset form data
+		setFormResponsesByEvent({});
+		setFullFormResponses({});
+		setFormErrorsByEvent({});
+		setFullFormErrors({});
+		setFilesToUpload({});
+
+		// Reset events
+		setSelectedEvents([]);
+		setOtherAvailableEvents([]);
+		setShowOtherEvents(false);
+
+		// Reset UI state
+		setNotes("");
+		setError(null);
+		setIsSubmitting(false);
+		setShowAddEventInput(false);
+		setNewEventTitle("");
+
+		// Reset upload state
+		resetUploadProgress();
 	};
 
 	if (!timeEntry || !visible) return null;
@@ -627,7 +801,7 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 									color="#007AFF"
 								/>
 								<Text style={styles.addEventButtonText}>
-									Add Custom Event
+									Attach An Event
 								</Text>
 							</TouchableOpacity>
 						)}
@@ -734,6 +908,24 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 							</View>
 						))}
 					</View>
+				)}
+
+				{customFullForm && (
+					<CustomFormRender
+						customForm={customFullForm}
+						formResponses={fullFormResponses}
+						formErrors={fullFormErrors}
+						onFieldChange={(fieldId, fieldType, value) =>
+							handleFieldChange(
+								"fullForm",
+								fieldId,
+								fieldType,
+								value,
+							)
+						}
+						setCustomForm={setCustomFullForm}
+						uploadProgress={uploadProgress}
+					/>
 				)}
 
 				{/* Add a progress indicator when uploading */}

@@ -18,6 +18,7 @@ import DropDownPicker from "react-native-dropdown-picker";
 import DraggableFlatList from "react-native-draggable-flatlist";
 import { useCompany } from "../../../contexts/CompanyContext";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import { RouteProp, useRoute } from "@react-navigation/native";
 
 // Form field types
 const FIELD_TYPES = [
@@ -32,14 +33,27 @@ const FIELD_TYPES = [
 	{ label: "Media Upload", value: "media" },
 ];
 
+type RootStackParamList = {
+	CompanyCustomForm: { isEventForm: boolean };
+};
+
+type CompanyCustomFormRouteProp = RouteProp<
+	RootStackParamList,
+	"CompanyCustomForm"
+>;
+
 const CompanyCustomForm = ({ navigation }) => {
+	const route = useRoute<CompanyCustomFormRouteProp>();
+	const isEventForm = route.params?.isEventForm || false;
 	const insets = useSafeAreaInsets();
 	const { companyId } = useUser();
 	const { preferences, updatePreferences, isLoading } = useCompany();
 
 	// Form state
 	const [isSaving, setIsSaving] = useState(false);
-	const [customForm, setCustomForm] = useState(preferences.timeEntryForm);
+	const [customForm, setCustomForm] = useState(
+		isEventForm ? preferences.eventForm : preferences.timeEntryForm,
+	);
 
 	// UI state
 	const [editingField, setEditingField] = useState(null);
@@ -54,8 +68,14 @@ const CompanyCustomForm = ({ navigation }) => {
 			if (!companyId) return;
 
 			try {
-				if (preferences?.timeEntryForm) {
-					setCustomForm(preferences.timeEntryForm);
+				if (isEventForm) {
+					if (preferences?.eventForm) {
+						setCustomForm(preferences.eventForm);
+					}
+				} else {
+					if (preferences?.timeEntryForm) {
+						setCustomForm(preferences.timeEntryForm);
+					}
 				}
 			} catch (error) {
 				console.error("Failed to load company preferences:", error);
@@ -71,10 +91,17 @@ const CompanyCustomForm = ({ navigation }) => {
 
 		try {
 			setIsSaving(true);
-			updatePreferences({
-				...preferences,
-				timeEntryForm: customForm,
-			});
+			if (isEventForm) {
+				updatePreferences({
+					...preferences,
+					eventForm: customForm,
+				});
+			} else {
+				updatePreferences({
+					...preferences,
+					timeEntryForm: customForm,
+				});
+			}
 			Alert.alert(
 				"Success",
 				"Time entry form settings saved successfully",

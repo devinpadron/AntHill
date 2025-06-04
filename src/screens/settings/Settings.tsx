@@ -73,7 +73,20 @@ const Settings = ({ navigation }: any) => {
 					<ExpandableSettingsSection title="Create">
 						<SettingsItem
 							title="Submission Form"
-							onPress={() => navigation.push("CompanyCustomForm")}
+							onPress={() =>
+								navigation.push("CompanyCustomForm", {
+									isEventForm: false,
+								})
+							}
+							style={styles.nestedItem}
+						/>
+						<SettingsItem
+							title="Event Forms"
+							onPress={() =>
+								navigation.push("CompanyCustomForm", {
+									isEventForm: true,
+								})
+							}
 							style={styles.nestedItem}
 						/>
 						<SettingsItem
