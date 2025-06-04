@@ -545,7 +545,6 @@ const TimeDetailCard = ({
 				)}
 
 				{/* Actions */}
-				{/*FIX THIS TO ONLY SHOW IF THE THING ISNT ACTIVE OR PAUSED AND IF THE USER IS AN ADMIN OR ALLOWED TO EDIT*/}
 				{!(entry.status === "active" || entry.status === "paused") &&
 				(isAdmin || preferences?.allowUserEventEditing) ? (
 					<View style={styles.entryActions}>
