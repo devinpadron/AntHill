@@ -104,6 +104,9 @@ export default function Timesheet(
 				// Calculate hours from duration or time difference
 				let hours = 0;
 				let description = "";
+				let startTimeValue = null;
+				let isAllDay = !event.startTime;
+
 				if (event.duration) {
 					hours = parseFloat(event.duration);
 				} else {
@@ -116,6 +119,7 @@ export default function Timesheet(
 						"YYYY-MM-DD HH:mm",
 					);
 					description = startTime.format("h:mm A");
+					startTimeValue = startTime.valueOf(); // Get timestamp for sorting
 				}
 
 				// Map label ID to color
@@ -129,13 +133,29 @@ export default function Timesheet(
 					hours: parseFloat(hours.toFixed(1)),
 					description: description,
 					date: dateString,
-					label: labelColor, // Use the color directly
+					label: labelColor,
+					isAllDay: isAllDay,
+					startTimeValue: startTimeValue,
 				};
+			});
+
+			// Sort entries: all-day events first, then by start time
+			entries.sort((a, b) => {
+				// All-day events come first
+				if (a.isAllDay && !b.isAllDay) return -1;
+				if (!a.isAllDay && b.isAllDay) return 1;
+
+				// Both are all-day or both have times, sort by time
+				if (a.startTimeValue && b.startTimeValue) {
+					return a.startTimeValue - b.startTimeValue;
+				}
+
+				// Default sorting (by title if neither has time)
+				return a.title.localeCompare(b.title);
 			});
 
 			// Format the date display
 			let displayDate;
-
 			displayDate = momentDate.format("MMMM D, YYYY");
 
 			formattedEntries.push({

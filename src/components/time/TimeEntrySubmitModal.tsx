@@ -485,12 +485,14 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 					});
 
 					// Upload the files
+					console.log("Files with IDS: ", filesWithIds);
 					const uploadedFiles = await uploadFiles(
 						filesWithIds,
 						companyId,
 						timeEntry.id,
 						"TimeEntries",
 					);
+					console.log("Uploaded Files: ", uploadedFiles);
 
 					// Update form responses with uploaded file references
 					const updatedFormResponsesByEvent = {

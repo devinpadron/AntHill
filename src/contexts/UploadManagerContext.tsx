@@ -1,7 +1,14 @@
-import React, { createContext, useContext, useState } from "react";
+import React, {
+	createContext,
+	useContext,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import storage from "@react-native-firebase/storage";
 import db from "../constants/firestore";
 import { AttachmentItem } from "../types";
+import NetInfo from "@react-native-community/netinfo";
 
 type ParentType = "TimeEntries" | "Events";
 
@@ -44,6 +51,19 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
 	const [isUploading, setIsUploading] = useState(false);
 	const [uploadProgress, setUploadProgress] = useState<UploadProgressMap>({});
 
+	const activeTasksRef = useRef<{ [key: string]: any }>({});
+
+	useEffect(() => {
+		return () => {
+			// Cancel any active uploads when provider unmounts
+			Object.values(activeTasksRef.current).forEach((task) => {
+				if (task && typeof task.cancel === "function") {
+					task.cancel();
+				}
+			});
+		};
+	}, []);
+
 	// Helper to reset progress tracking
 	const resetUploadProgress = () => {
 		setUploadProgress({});
@@ -58,6 +78,12 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
 		parentId: string,
 		parentType: ParentType,
 	): Promise<AttachmentItem[]> => {
+		//Make sure we are connected to the internet before proceeding
+		const netInfo = await NetInfo.fetch();
+		if (!netInfo.isConnected) {
+			throw new Error("No internet connection available");
+		}
+
 		// Filter to only upload attachments that haven't been uploaded yet
 		const attachmentsToUpload = attachments.filter(
 			(attachment) => !attachment.isExisting,
@@ -104,6 +130,8 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
 					// Upload file with progress tracking
 					const task = storageRef.putFile(attachment.uri);
 
+					activeTasksRef.current[attachment.id] = task;
+
 					// Set up progress tracking - main file is 80% of total progress if there's a thumbnail
 					task.on("state_changed", (snapshot) => {
 						const mainFileProgress =
@@ -127,12 +155,14 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
 					// Wait for upload to complete
 					await task;
 
+					delete activeTasksRef.current[attachment.id];
+
 					// Get download URL
 					const downloadUrl = await storageRef.getDownloadURL();
 
 					// Handle thumbnail upload if it exists
 					let thumbnailUrl = null;
-					if (attachment.thumbnailUri) {
+					if (hasThumbnail) {
 						// Create separate storage reference for thumbnail
 						const thumbnailPath = `companies/${companyId}/${parentType}/${parentId}/${attachment.id}_thumbnail`;
 						const thumbnailRef = storage().ref(thumbnailPath);
@@ -141,6 +171,9 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
 						const thumbnailTask = thumbnailRef.putFile(
 							attachment.thumbnailUri,
 						);
+
+						activeTasksRef.current[`${attachment.id}_thumbnail`] =
+							thumbnailTask;
 
 						// Track thumbnail progress (represents final 20% of total progress)
 						thumbnailTask.on("state_changed", (snapshot) => {
@@ -162,6 +195,10 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
 
 						// Wait for thumbnail upload to complete
 						await thumbnailTask;
+
+						delete activeTasksRef.current[
+							`${attachment.id}_thumbnail`
+						];
 
 						// Get thumbnail download URL
 						thumbnailUrl = await thumbnailRef.getDownloadURL();
@@ -202,12 +239,22 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
 					}));
 
 					// Mark as existing and update with download URL
-					const updatedAttachment: AttachmentItem = {
-						...attachment,
-						isExisting: true,
-						uri: downloadUrl,
-						thumbnailUri: thumbnailUrl || attachment.thumbnailUri,
-					};
+					let updatedAttachment: AttachmentItem;
+					if (hasThumbnail) {
+						updatedAttachment = {
+							...attachment,
+							isExisting: true,
+							uri: downloadUrl,
+							thumbnailUri:
+								thumbnailUrl || attachment.thumbnailUri,
+						};
+					} else {
+						updatedAttachment = {
+							...attachment,
+							isExisting: true,
+							uri: downloadUrl,
+						};
+					}
 
 					uploadedAttachments.push(updatedAttachment);
 				} catch (error) {
@@ -215,6 +262,9 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
 						`Error uploading file ${attachment.id}:`,
 						error,
 					);
+
+					delete activeTasksRef.current[attachment.id];
+					delete activeTasksRef.current[`${attachment.id}_thumbnail`];
 
 					// Mark as error
 					setUploadProgress((prev) => ({
@@ -233,6 +283,9 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
 			console.error("Error uploading files:", error);
 			throw new Error(`Failed to upload files: ${error.message}`);
 		} finally {
+			Object.keys(activeTasksRef.current).forEach((key) => {
+				delete activeTasksRef.current[key];
+			});
 			setIsUploading(false);
 		}
 	};
