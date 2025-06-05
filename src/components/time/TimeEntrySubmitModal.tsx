@@ -293,7 +293,6 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 				...prev,
 				[fieldId]: value,
 			}));
-			return;
 		} else {
 			setFormResponsesByEvent((prev) => ({
 				...prev,
@@ -455,7 +454,6 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 					errorMessage =
 						"Please complete all required fields in the event forms";
 				}
-
 				setError(errorMessage);
 				setIsSubmitting(false);
 				return;
