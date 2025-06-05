@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
 	View,
 	Text,
@@ -106,6 +106,21 @@ const EventChecklists = () => {
 		};
 	}, [checklistIds, companyId, eventId]);
 
+	// Keep track of both initial load and when data has stabilized
+	const hasInitializedRef = useRef(false);
+	const [animationsEnabled, setAnimationsEnabled] = useState(false);
+
+	// After initial data loading is complete, enable animations
+	useEffect(() => {
+		if (!loading && !hasInitializedRef.current) {
+			hasInitializedRef.current = true;
+			// Delay enabling animations until after initial render cycle
+			setTimeout(() => {
+				setAnimationsEnabled(true);
+			}, 500); // Small delay to ensure UI is stable
+		}
+	}, [loading]);
+
 	useEffect(() => {
 		// Add function to load saved checklist states
 
@@ -127,6 +142,26 @@ const EventChecklists = () => {
 						});
 
 						setSavedState(savedStates);
+
+						// Only apply animations after initial data has loaded and stabilized
+						if (animationsEnabled) {
+							LayoutAnimation.configureNext({
+								duration: 300,
+								update: {
+									type: LayoutAnimation.Types.easeInEaseOut,
+								},
+								create: {
+									type: LayoutAnimation.Types.easeInEaseOut,
+									property:
+										LayoutAnimation.Properties.opacity,
+								},
+								delete: {
+									type: LayoutAnimation.Types.easeInEaseOut,
+									property:
+										LayoutAnimation.Properties.opacity,
+								},
+							});
+						}
 
 						// Update itemStates with saved values
 						setItemStates((prevStates) => {
@@ -157,7 +192,7 @@ const EventChecklists = () => {
 				unsubscribeFunction();
 			}
 		};
-	}, [checklists]);
+	}, [checklists, companyId, eventId, animationsEnabled]); // Add animationsEnabled dependency
 
 	// Add function to save checklist state to Firestore
 	const saveChecklistState = async (checklistId, newState) => {

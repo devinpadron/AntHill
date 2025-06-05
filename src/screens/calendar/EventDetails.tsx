@@ -195,7 +195,7 @@ const EventDetails = ({ navigation }) => {
 		fetchLabel();
 	}, [event?.labelId, companyId]);
 
-	if (isLoading || !event) {
+	if (isLoading || !event || loadingPackages) {
 		return <LoadingScreen />;
 	}
 
