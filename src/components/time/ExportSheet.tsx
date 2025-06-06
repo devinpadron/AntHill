@@ -29,7 +29,6 @@ interface ExportSheetProps {
 	timeEntries: any[];
 	employeeUser: any;
 	companyId: string;
-	customForm: any;
 }
 
 const ExportSheet = forwardRef<BottomSheet, ExportSheetProps>((props, ref) => {
