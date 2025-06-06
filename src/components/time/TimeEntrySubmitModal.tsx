@@ -587,6 +587,8 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 				eventTitle: event.title,
 				formResponses: finalFormResponsesByEvent[event.id] || null,
 			})),
+			eventForm: customForm,
+			generalForm: customFullForm,
 			// Add the full form responses to the time entry
 			formResponses: customFullForm ? finalFullFormResponses : null,
 		};

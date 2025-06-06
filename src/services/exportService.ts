@@ -10,13 +10,11 @@ import { formatDuration } from "../utils/timeUtils";
  */
 export const exportTimeEntriesToCSV = async (
 	timeEntries: any[],
-	customForm: any,
-	employeeUser: any,
 	fileName: string,
 	isExcel = false,
 ): Promise<string> => {
 	try {
-		// Create headers
+		// Create headers for main time entry
 		let headers = [
 			"Date",
 			"Clock In",
@@ -27,12 +25,47 @@ export const exportTimeEntriesToCSV = async (
 			"Notes",
 		];
 
-		// Add form field headers if available
-		if (customForm && customForm.fields) {
-			customForm.fields.forEach((field) => {
-				headers.push(field.label);
-			});
-		}
+		// Find all possible form fields from all entries (main and connected events)
+		const mainFormFields = new Map();
+		const eventFormFields = new Map();
+
+		// Process all entries to collect unique form fields
+		timeEntries.forEach((entry) => {
+			// Process main entry form fields
+			if (entry.generalForm && entry.generalForm.fields) {
+				entry.generalForm.fields.forEach((field) => {
+					mainFormFields.set(field.id, field);
+				});
+			}
+
+			// Process connected events form fields
+			if (entry.connectedEvents && entry.connectedEvents.length > 0) {
+				entry.connectedEvents.forEach((connEvent) => {
+					if (entry.eventForm && entry.eventForm.fields) {
+						entry.eventForm.fields.forEach((field) => {
+							eventFormFields.set(
+								`${connEvent.eventId}_${field.id}`,
+								{
+									...field,
+									eventId: connEvent.eventId,
+									eventTitle: connEvent.eventTitle || "Event",
+								},
+							);
+						});
+					}
+				});
+			}
+		});
+
+		// Add main form field headers
+		Array.from(mainFormFields.values()).forEach((field) => {
+			headers.push(`Form: ${field.label}`);
+		});
+
+		// Add connected event headers
+		Array.from(eventFormFields.values()).forEach((field) => {
+			headers.push(`Event[${field.eventTitle}]: ${field.label}`);
+		});
 
 		// Create CSV content with headers
 		let csvContent = headers.join(",") + "\n";
@@ -67,43 +100,45 @@ export const exportTimeEntriesToCSV = async (
 				notes,
 			];
 
-			// Add form responses if available
-			if (customForm && customForm.fields) {
-				customForm.fields.forEach((field) => {
-					let value = "N/A";
+			// Add main form responses
+			Array.from(mainFormFields.values()).forEach((field) => {
+				let value = "N/A";
+
+				if (
+					entry.formResponses &&
+					entry.formResponses[field.id] !== undefined
+				) {
+					const response = entry.formResponses[field.id];
+					value = formatFieldValue(response, field.type);
+				}
+
+				row.push(value);
+			});
+
+			// Add connected event form responses
+			Array.from(eventFormFields.values()).forEach((field) => {
+				let value = "N/A";
+
+				// Find the matching connected event
+				if (entry.connectedEvents && entry.connectedEvents.length > 0) {
+					const connEvent = entry.connectedEvents.find(
+						(e) => e.eventId === field.eventId,
+					);
 
 					if (
-						entry.formResponses &&
-						entry.formResponses[field.id] !== undefined
+						connEvent &&
+						connEvent.formResponses &&
+						connEvent.formResponses[field.id.split("_")[1]] !==
+							undefined
 					) {
-						const response = entry.formResponses[field.id];
-
-						if (field.type === "checkbox") {
-							value = response ? "Yes" : "No";
-						} else if (
-							field.type === "multiSelect" &&
-							Array.isArray(response)
-						) {
-							value = response.join("; ");
-						} else if (field.type === "date" && response) {
-							value = format(new Date(response), "yyyy-MM-dd");
-						} else if (field.type === "time" && response) {
-							value = format(new Date(response), "HH:mm:ss");
-						} else if (typeof response === "object") {
-							value = JSON.stringify(response).replace(/,/g, ";");
-						} else if (
-							response !== null &&
-							response !== undefined
-						) {
-							value = String(response)
-								.replace(/,/g, ";")
-								.replace(/\n/g, " ");
-						}
+						const response =
+							connEvent.formResponses[field.id.split("_")[1]];
+						value = formatFieldValue(response, field.type);
 					}
+				}
 
-					row.push(value);
-				});
-			}
+				row.push(value);
+			});
 
 			// Add row to CSV content
 			csvContent += row.join(",") + "\n";
@@ -125,12 +160,36 @@ export const exportTimeEntriesToCSV = async (
 	}
 };
 
+// Helper function to format field values based on their type
+const formatFieldValue = (response, fieldType) => {
+	let value = "N/A";
+
+	if (response === null || response === undefined) {
+		return value;
+	}
+
+	if (fieldType === "checkbox") {
+		value = response ? "Yes" : "No";
+	} else if (fieldType === "multiSelect" && Array.isArray(response)) {
+		value = response.join("; ");
+	} else if (fieldType === "date" && response) {
+		value = format(new Date(response), "yyyy-MM-dd");
+	} else if (fieldType === "time" && response) {
+		value = format(new Date(response), "HH:mm:ss");
+	} else if (typeof response === "object") {
+		value = JSON.stringify(response).replace(/,/g, ";");
+	} else {
+		value = String(response).replace(/,/g, ";").replace(/\n/g, " ");
+	}
+
+	return value;
+};
+
 /**
  * Export time entries to PDF format
  */
 export const exportTimeEntriesToPDF = async (
 	timeEntries: any[],
-	customForm: any,
 	employeeUser: any,
 	companyId: string,
 	fileName: string,
@@ -139,7 +198,7 @@ export const exportTimeEntriesToPDF = async (
 		// Get company information for header
 		const company = await getCompanyById(companyId);
 
-		// Start building HTML content
+		// Start building HTML content with styles (keep existing styles)
 		let htmlContent = `
       <html>
         <head>
@@ -235,11 +294,31 @@ export const exportTimeEntriesToPDF = async (
               font-weight: bold;
               background-color: #f0f7ff;
             }
+            
+            /* Additional styles for connected events */
+            .connected-events {
+              margin-top: 15px;
+              padding-top: 10px;
+              border-top: 1px dashed #ccc;
+            }
+            .event-title {
+              font-weight: bold;
+              color: #0066cc;
+              margin-bottom: 8px;
+            }
+            .event-details {
+              margin-left: 15px;
+              padding-left: 10px;
+              border-left: 3px solid #eee;
+              margin-bottom: 10px;
+            }
           </style>
         </head>
         <body>
           <div class="header">
-            <div class="company-name">${company?.name || "AntHill Company"}</div>
+            <div class="company-name">${
+				company?.name || "AntHill Company"
+			}</div>
             <div class="report-title">Time Entry Report</div>
             <div>${format(new Date(), "MMMM d, yyyy")}</div>
           </div>
@@ -247,7 +326,9 @@ export const exportTimeEntriesToPDF = async (
           <div class="summary">
             <div class="summary-row">
               <span class="summary-label">Employee:</span>
-              <span>${employeeUser?.firstName || ""} ${employeeUser?.lastName || "Unknown"}</span>
+              <span>${employeeUser?.firstName || ""} ${
+					employeeUser?.lastName || "Unknown"
+				}</span>
             </div>
             <div class="summary-row">
               <span class="summary-label">Total Entries:</span>
@@ -255,7 +336,12 @@ export const exportTimeEntriesToPDF = async (
             </div>
             <div class="summary-row">
               <span class="summary-label">Total Hours:</span>
-              <span>${(timeEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0) / 3600).toFixed(2)}</span>
+              <span>${(
+					timeEntries.reduce(
+						(sum, entry) => sum + (entry.duration || 0),
+						0,
+					) / 3600
+				).toFixed(2)}</span>
             </div>
             <div class="summary-row">
               <span class="summary-label">Date Range:</span>
@@ -338,40 +424,17 @@ export const exportTimeEntriesToPDF = async (
 			}
 
 			// Add form responses if available
-			if (customForm && customForm.fields && entry.formResponses) {
-				htmlContent += `<div class="responses-section"><h4>Form Responses</h4>`;
+			if (
+				entry.generalForm &&
+				entry.generalForm.fields &&
+				entry.formResponses
+			) {
+				htmlContent += `<div class="responses-section"><h4>Time Entry Form Responses</h4>`;
 
-				customForm.fields.forEach((field) => {
+				entry.generalForm.fields.forEach((field) => {
 					if (entry.formResponses[field.id] !== undefined) {
 						const response = entry.formResponses[field.id];
-						let displayValue = "N/A";
-
-						if (field.type === "checkbox") {
-							displayValue = response ? "Yes" : "No";
-						} else if (
-							field.type === "multiSelect" &&
-							Array.isArray(response)
-						) {
-							displayValue = response.join(", ");
-						} else if (field.type === "date" && response) {
-							displayValue = format(
-								new Date(response),
-								"MMM d, yyyy",
-							);
-						} else if (field.type === "time" && response) {
-							displayValue = format(new Date(response), "h:mm a");
-						} else if (
-							field.type === "number" &&
-							field.useMultiplier &&
-							field.multiplier
-						) {
-							displayValue = `${response} (${(response * field.multiplier).toFixed(2)} ${field.unit || ""})`;
-						} else if (
-							response !== null &&
-							response !== undefined
-						) {
-							displayValue = String(response);
-						}
+						let displayValue = formatPDFFieldValue(response, field);
 
 						htmlContent += `
               <div class="response-item">
@@ -380,6 +443,51 @@ export const exportTimeEntriesToPDF = async (
               </div>
             `;
 					}
+				});
+
+				htmlContent += `</div>`;
+			}
+
+			// Add connected events if available
+			if (entry.connectedEvents && entry.connectedEvents.length > 0) {
+				htmlContent += `<div class="connected-events"><h4>Connected Events</h4>`;
+
+				entry.connectedEvents.forEach((connEvent) => {
+					htmlContent += `
+            <div class="event-title">${connEvent.eventTitle || "Event"}</div>
+            <div class="event-details">
+          `;
+
+					// Add event form responses if available
+					if (
+						entry.eventForm &&
+						entry.eventForm.fields &&
+						connEvent.formResponses
+					) {
+						entry.eventForm.fields.forEach((field) => {
+							if (
+								connEvent.formResponses[field.id] !== undefined
+							) {
+								const response =
+									connEvent.formResponses[field.id];
+								let displayValue = formatPDFFieldValue(
+									response,
+									field,
+								);
+
+								htmlContent += `
+                <div class="response-item">
+                  <div class="response-label">${field.label}</div>
+                  <div>${displayValue}</div>
+                </div>
+              `;
+							}
+						});
+					} else {
+						htmlContent += `<div>No form data available</div>`;
+					}
+
+					htmlContent += `</div>`;
 				});
 
 				htmlContent += `</div>`;
@@ -407,6 +515,35 @@ export const exportTimeEntriesToPDF = async (
 	} catch (error) {
 		console.error("Error exporting to PDF:", error);
 		throw error;
+	}
+};
+
+// Helper function to format field values for PDF
+const formatPDFFieldValue = (response, field) => {
+	if (response === null || response === undefined) {
+		return "N/A";
+	}
+
+	if (field.type === "checkbox") {
+		return response ? "Yes" : "No";
+	} else if (field.type === "multiSelect" && Array.isArray(response)) {
+		return response.join(", ");
+	} else if (field.type === "date" && response) {
+		return format(new Date(response), "MMM d, yyyy");
+	} else if (field.type === "time" && response) {
+		return format(new Date(response), "h:mm a");
+	} else if (
+		field.type === "number" &&
+		field.useMultiplier &&
+		field.multiplier
+	) {
+		return `${response} (${(response * field.multiplier).toFixed(2)} ${
+			field.unit || ""
+		})`;
+	} else if (typeof response === "string" && response.includes("\n")) {
+		return response.replace(/\n/g, "<br>");
+	} else {
+		return String(response);
 	}
 };
 

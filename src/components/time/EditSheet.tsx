@@ -31,8 +31,6 @@ interface EditSheetProps {
 	visible: boolean;
 	snapPoints?: string[];
 	timeEntry?: any;
-	customForm?: any;
-	eventForm?: any; // Add this for connected events form
 	editNotes: string;
 	editChangeSummary: string;
 	setEditNotes: (value: string) => void;
@@ -49,8 +47,6 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 			visible,
 			snapPoints = ["85%"],
 			timeEntry,
-			customForm,
-			eventForm,
 			editNotes,
 			editChangeSummary,
 			setEditNotes,
@@ -75,6 +71,8 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 		const [showOutPicker, setShowOutPicker] = useState(false);
 		const [formResponses, setFormResponses] = useState<any>({});
 		const { uploadFiles, deleteFiles, uploadProgress } = useUploadManager();
+		const customForm = timeEntry?.generalForm || null;
+		const eventForm = timeEntry?.eventForm || null;
 
 		const [filesToUpload, setFilesToUpload] = useState<{
 			[fieldId: string]: AttachmentItem[];

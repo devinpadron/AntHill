@@ -41,7 +41,6 @@ const ExportSheet = forwardRef<BottomSheet, ExportSheetProps>((props, ref) => {
 		timeEntries,
 		employeeUser,
 		companyId,
-		customForm,
 	} = props;
 
 	const [exportFormat, setExportFormat] = useState(EXPORT_FORMAT_PDF);
@@ -88,14 +87,11 @@ const ExportSheet = forwardRef<BottomSheet, ExportSheetProps>((props, ref) => {
 			if (exportFormat === EXPORT_FORMAT_CSV) {
 				filePath = await exportTimeEntriesToCSV(
 					selectedTimeEntries,
-					customForm,
-					employeeUser,
 					fileName,
 				);
 			} else if (exportFormat === EXPORT_FORMAT_PDF) {
 				filePath = await exportTimeEntriesToPDF(
 					selectedTimeEntries,
-					customForm,
 					employeeUser,
 					companyId,
 					fileName,
@@ -104,8 +100,6 @@ const ExportSheet = forwardRef<BottomSheet, ExportSheetProps>((props, ref) => {
 				// This would use a similar function for Excel
 				filePath = await exportTimeEntriesToCSV(
 					selectedTimeEntries,
-					customForm,
-					employeeUser,
 					fileName,
 					true, // excel format
 				);
@@ -124,14 +118,7 @@ const ExportSheet = forwardRef<BottomSheet, ExportSheetProps>((props, ref) => {
 		} finally {
 			setIsExporting(false);
 		}
-	}, [
-		exportFormat,
-		selectedTimeEntries,
-		customForm,
-		employeeUser,
-		companyId,
-		onClose,
-	]);
+	}, [exportFormat, selectedTimeEntries, employeeUser, companyId, onClose]);
 
 	return (
 		<BottomSheet

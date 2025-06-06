@@ -11,7 +11,6 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { useUser } from "../../contexts/UserContext";
-import { useCompany } from "../../contexts/CompanyContext";
 import {
 	getTimeEntry,
 	updateTimeEntry,
@@ -19,8 +18,6 @@ import {
 	deleteTimeEntry,
 } from "../../services/timeEntryService";
 import { getUser } from "../../services/userService";
-import { getCompanyPreferences } from "../../services/companyService";
-import { getEventsByIds } from "../../services/eventService";
 import { getStatusBadgeColor, getStatusBadgeText } from "../../utils/timeUtils";
 import TimeEntrySummary from "../../components/time/TimeEntrySummary";
 import TimeDetailCard from "../../components/time/TimeDetailCard";
@@ -36,14 +33,11 @@ const TimeEntryDetails = ({ route, navigation }) => {
 
 	const insets = useSafeAreaInsets();
 	const { userId: currentUserId, companyId, isAdmin } = useUser();
-	const { preferences } = useCompany();
 
 	// Core state
 	const [isLoading, setIsLoading] = useState(true);
 	const [timeEntries, setTimeEntries] = useState([]);
 	const [employeeUser, setEmployeeUser] = useState(null);
-	const [customForm, setCustomForm] = useState(null);
-	const [eventForm, setEventForm] = useState(null);
 	const [connectedEvents, setConnectedEvents] = useState({});
 	const [attachmentMap, setAttachmentsMap] = useState({});
 
@@ -147,21 +141,8 @@ const TimeEntryDetails = ({ route, navigation }) => {
 				setEmployeeUser(user);
 			}
 
-			// Get forms
-			if (validEntries.length > 0) {
-				const prefs = await getCompanyPreferences(companyId);
-				if (prefs?.eventForm) setEventForm(prefs.eventForm);
-				if (prefs?.timeEntryForm) {
-					setCustomForm(prefs.timeEntryForm);
-					// Calculate field totals after setting both forms
-					const totals = calculateFieldTotals(
-						validEntries,
-						prefs.timeEntryForm,
-						prefs.eventForm,
-					);
-					setFieldTotals(totals);
-				}
-			}
+			const totals = calculateFieldTotals(validEntries);
+			setFieldTotals(totals);
 
 			// Get connected events
 			const entryConnectionMap = {};
@@ -235,7 +216,7 @@ const TimeEntryDetails = ({ route, navigation }) => {
 	}, []);
 
 	// Update the calculateFieldTotals function
-	const calculateFieldTotals = (entries, form, evForm) => {
+	const calculateFieldTotals = (entries) => {
 		// Initialize an empty totals object
 		const totals = {};
 
@@ -243,141 +224,123 @@ const TimeEntryDetails = ({ route, navigation }) => {
 			return totals;
 		}
 
-		// Process time entry form fields
-		if (form && form.fields) {
-			// Find fields that have showTotal enabled
-			const fieldsToTotal = form.fields.filter(
-				(field) =>
-					field.showTotal === true &&
-					(field.type === "number" ||
-						field.type === "currency" ||
-						field.type === "quantity"),
-			);
+		// Process each time entry using its own form structure
+		entries.forEach((entry) => {
+			// Use the form structure attached to the entry
+			const entryForm = entry.generalForm || null;
 
-			if (fieldsToTotal.length > 0) {
-				// Initialize totals object with field info
+			if (entryForm && entryForm.fields) {
+				// Find fields that have showTotal enabled
+				const fieldsToTotal = entryForm.fields.filter(
+					(field) =>
+						field.showTotal === true &&
+						(field.type === "number" ||
+							field.type === "currency" ||
+							field.type === "quantity"),
+				);
+
+				// Process fields for this entry
 				fieldsToTotal.forEach((field) => {
-					totals[`te_${field.id}`] = {
-						label: field.label,
-						total: 0,
-						unit: field.unit || "",
-						useMultiplier: field.useMultiplier || false,
-						multiplier: field.multiplier || 1,
-						type: field.type,
-						source: "timeEntry",
-					};
-				});
+					// Initialize field in totals if not already there
+					if (!totals[`te_${field.id}`]) {
+						totals[`te_${field.id}`] = {
+							label: field.label,
+							total: 0,
+							unit: field.unit || "",
+							useMultiplier: field.useMultiplier || false,
+							multiplier: field.multiplier || 1,
+							type: field.type,
+							source: "timeEntry",
+						};
+					}
 
-				// Calculate totals from all time entries
-				entries.forEach((entry) => {
-					if (!entry.formResponses) return;
+					// Add this entry's value to the total
+					const value = entry.formResponses?.[field.id];
+					if (value !== undefined && value !== null) {
+						const numValue = parseFloat(value);
+						if (!isNaN(numValue)) {
+							totals[`te_${field.id}`].total += numValue;
 
-					fieldsToTotal.forEach((field) => {
-						const value = entry.formResponses[field.id];
-						if (value !== undefined && value !== null) {
-							const numValue = parseFloat(value);
-							if (!isNaN(numValue)) {
-								totals[`te_${field.id}`].total += numValue;
+							// Store the raw total before multiplier is applied
+							totals[`te_${field.id}`].rawTotal =
+								totals[`te_${field.id}`].total;
 
-								// Store the raw total before multiplier is applied
-								totals[`te_${field.id}`].rawTotal =
-									totals[`te_${field.id}`].total;
-
-								// If this field uses a multiplier, calculate multiplied value
-								if (field.useMultiplier && field.multiplier) {
-									totals[`te_${field.id}`].multipliedTotal =
-										totals[`te_${field.id}`].total *
-										field.multiplier;
-								}
+							// Calculate multiplied value if needed
+							if (field.useMultiplier && field.multiplier) {
+								totals[`te_${field.id}`].multipliedTotal =
+									totals[`te_${field.id}`].total *
+									field.multiplier;
 							}
 						}
-					});
+					}
 				});
 			}
-		}
 
-		// Process event form fields
-		if (evForm && evForm.fields) {
-			// Find event fields that have showTotal enabled
-			const eventFieldsToTotal = evForm.fields.filter(
-				(field) =>
-					field.showTotal === true &&
-					(field.type === "number" ||
-						field.type === "currency" ||
-						field.type === "quantity"),
-			);
+			// Process connected events using their own form structures
+			if (entry.connectedEvents && entry.connectedEvents.length > 0) {
+				entry.connectedEvents.forEach((connection) => {
+					// Use the form structure attached to the event connection
+					const eventForm = entry.eventForm || null;
 
-			if (eventFieldsToTotal.length > 0) {
-				// Initialize totals object with event field info
-				eventFieldsToTotal.forEach((field) => {
-					totals[`ev_${field.id}`] = {
-						label: `${field.label} (Events)`,
-						total: 0,
-						unit: field.unit || "",
-						useMultiplier: field.useMultiplier || false,
-						multiplier: field.multiplier || 1,
-						type: field.type,
-						source: "event",
-					};
-				});
-
-				// Calculate totals from all connected events
-				entries.forEach((entry) => {
-					// Skip if no connected events
-					if (
-						!entry.connectedEvents ||
-						entry.connectedEvents.length === 0
-					)
-						return;
-
-					// Process each connected event
-					entry.connectedEvents.forEach((connection) => {
-						if (!connection.formResponses) return;
+					if (eventForm && eventForm.fields) {
+						const eventFieldsToTotal = eventForm.fields.filter(
+							(field) =>
+								field.showTotal === true &&
+								(field.type === "number" ||
+									field.type === "currency" ||
+									field.type === "quantity"),
+						);
 
 						eventFieldsToTotal.forEach((field) => {
-							const value = connection.formResponses[field.id];
+							// Initialize field in totals if not already there
+							const fieldKey = `ev_${field.id}`;
+							if (!totals[fieldKey]) {
+								totals[fieldKey] = {
+									label: `${field.label} (Events)`,
+									total: 0,
+									unit: field.unit || "",
+									useMultiplier: field.useMultiplier || false,
+									multiplier: field.multiplier || 1,
+									type: field.type,
+									source: "event",
+								};
+							}
+
+							// Add this event's value to the total
+							const value = connection.formResponses?.[field.id];
 							if (value !== undefined && value !== null) {
 								const numValue = parseFloat(value);
 								if (!isNaN(numValue)) {
-									totals[`ev_${field.id}`].total += numValue;
+									totals[fieldKey].total += numValue;
+									totals[fieldKey].rawTotal =
+										totals[fieldKey].total;
 
-									// Store the raw total before multiplier is applied
-									totals[`ev_${field.id}`].rawTotal =
-										totals[`ev_${field.id}`].total;
-
-									// If this field uses a multiplier, calculate multiplied value
 									if (
 										field.useMultiplier &&
 										field.multiplier
 									) {
-										totals[
-											`ev_${field.id}`
-										].multipliedTotal =
-											totals[`ev_${field.id}`].total *
+										totals[fieldKey].multipliedTotal =
+											totals[fieldKey].total *
 											field.multiplier;
 									}
 								}
 							}
 						});
-					});
+					}
 				});
 			}
-		}
+		});
 
 		return totals;
 	};
 
 	// Add this useEffect
 	useEffect(() => {
-		if (timeEntries.length > 0 && (customForm || eventForm)) {
-			const totals = calculateFieldTotals(
-				timeEntries,
-				customForm,
-				eventForm,
-			);
+		if (timeEntries.length > 0) {
+			const totals = calculateFieldTotals(timeEntries);
 			setFieldTotals(totals);
 		}
-	}, [timeEntries, customForm, eventForm]);
+	}, [timeEntries]);
 
 	// If still loading, show loading indicator
 	if (isLoading) {
@@ -628,8 +591,9 @@ const TimeEntryDetails = ({ route, navigation }) => {
 							timestamp: new Date().toISOString(),
 							userId: currentUserId,
 							changeSummary: `Updated field: ${
-								customForm?.fields.find((f) => f.id === fieldId)
-									?.label || fieldId
+								entry.generalForm?.fields.find(
+									(f) => f.id === fieldId,
+								)?.label || fieldId
 							}`,
 						},
 					],
@@ -669,7 +633,7 @@ const TimeEntryDetails = ({ route, navigation }) => {
 							timestamp: new Date().toISOString(),
 							userId: currentUserId,
 							changeSummary: `Updated event field: ${
-								eventForm?.fields.find(
+								entry.eventForm?.fields.find(
 									(f) => f.id === eventFieldId,
 								)?.label || eventFieldId
 							}`,
@@ -749,8 +713,6 @@ const TimeEntryDetails = ({ route, navigation }) => {
 						entry={entry}
 						isSelected={selectedEntries[entry.id]}
 						isAdmin={isAdmin}
-						customForm={customForm}
-						eventForm={eventForm}
 						onToggleSelection={toggleEntrySelection}
 						onEditEntry={handleEditEntry}
 						attachmentMap={attachmentMap}
@@ -766,8 +728,6 @@ const TimeEntryDetails = ({ route, navigation }) => {
 				visible={editModalVisible}
 				snapPoints={editSnapPoints}
 				timeEntry={currentEditEntry}
-				customForm={customForm}
-				eventForm={eventForm}
 				editNotes={editNotes}
 				editChangeSummary={editChangeSummary}
 				setEditNotes={setEditNotes}
@@ -787,7 +747,6 @@ const TimeEntryDetails = ({ route, navigation }) => {
 				timeEntries={timeEntries}
 				employeeUser={employeeUser}
 				companyId={companyId}
-				customForm={customForm}
 			/>
 		</View>
 	);

@@ -24,8 +24,6 @@ const TimeDetailCard = ({
 	entry,
 	isSelected,
 	isAdmin,
-	customForm,
-	eventForm,
 	onToggleSelection,
 	onEditEntry,
 	attachmentMap,
@@ -38,6 +36,8 @@ const TimeDetailCard = ({
 	const [savingFields, setSavingFields] = useState({});
 	const { companyId } = useUser();
 	const { preferences } = useCompany();
+	const customForm = entry.generalForm || null;
+	const eventForm = entry.eventForm || null;
 
 	// Add state for event packages
 	const [eventPackages, setEventPackages] = useState({});
