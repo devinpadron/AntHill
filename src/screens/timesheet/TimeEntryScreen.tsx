@@ -412,7 +412,18 @@ const TimeEntryScreen = ({ navigation }) => {
 
 			{/* 4. Time Entries List */}
 			<View style={styles.entriesSection}>
-				<Text style={styles.sectionTitle}>Time Entries</Text>
+				<TouchableOpacity
+					style={styles.sectionTitleButton}
+					onPress={() =>
+						navigation.navigate("TimeEntryDetails", {
+							entryId: timeEntries.map((e) => e.id),
+							userId,
+						})
+					}
+				>
+					<Text style={styles.sectionTitle}>Time Entries</Text>
+					<Icon name="chevron-right" size={20} color="#007AFF" />
+				</TouchableOpacity>
 				<FlatList
 					data={timeEntries}
 					keyExtractor={(item) => item.id}
@@ -731,6 +742,13 @@ const styles = StyleSheet.create({
 	dateRangeSeparator: {
 		marginHorizontal: 8,
 		color: "#666",
+	},
+	sectionTitleButton: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "space-between",
+		paddingVertical: 6,
+		marginBottom: 12,
 	},
 });
 

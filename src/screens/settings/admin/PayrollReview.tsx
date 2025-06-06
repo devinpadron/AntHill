@@ -242,6 +242,14 @@ const PayrollReview = ({ navigation }) => {
 		return { hours, minutes, totalSeconds };
 	}, [timeEntries]);
 
+	// Add this helper function near your other helper functions
+	const areAllEntriesApproved = (entries) => {
+		return (
+			entries.length > 0 &&
+			entries.every((entry) => entry.status === "approved")
+		);
+	};
+
 	// Render individual time entry item
 	const renderTimeEntryItem = ({ item }) => {
 		const entryDate = parseISO(item.clockInTime);
@@ -482,7 +490,7 @@ const PayrollReview = ({ navigation }) => {
 									<View
 										style={[
 											styles.employeeTextContainer,
-											{ minWidth: 150 },
+											{ minWidth: 125 },
 										]}
 									>
 										<Text
@@ -508,9 +516,6 @@ const PayrollReview = ({ navigation }) => {
 										</Text>
 									</View>
 
-									{/* Add spacing between name and hours */}
-									<View style={{ width: 8 }} />
-
 									<Text style={styles.employeeHours}>
 										{
 											getTotalHours(employeeGroup.entries)
@@ -527,6 +532,19 @@ const PayrollReview = ({ navigation }) => {
 										}
 										m
 									</Text>
+
+									{/* Add approved indicator */}
+									{areAllEntriesApproved(
+										employeeGroup.entries,
+									) && (
+										<View style={styles.approvedBadge}>
+											<Icon
+												name="check-circle"
+												size={16}
+												color="#fff"
+											/>
+										</View>
+									)}
 								</TouchableOpacity>
 
 								<TouchableOpacity
@@ -790,10 +808,17 @@ const styles = StyleSheet.create({
 		fontWeight: "600",
 		color: "#007AFF",
 		marginLeft: 8,
-		paddingLeft: 8,
 		flexShrink: 0, // Prevent hours from shrinking
 	},
-
+	approvedBadge: {
+		width: 24,
+		height: 24,
+		borderRadius: 12,
+		backgroundColor: "#4CAF50",
+		justifyContent: "center",
+		alignItems: "center",
+		marginLeft: 8,
+	},
 	entriesContainer: {
 		paddingHorizontal: 12,
 		paddingVertical: 8,
