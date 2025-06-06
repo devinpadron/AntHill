@@ -534,8 +534,8 @@ const TimeEntryDetails = ({ route, navigation }) => {
 						try {
 							// Delete the time entry
 							await deleteTimeEntry(
-								companyId,
 								currentEditEntry.id,
+								companyId,
 							);
 
 							// Close the edit modal

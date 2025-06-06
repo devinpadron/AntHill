@@ -506,26 +506,8 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 
 		// Add this function inside the EditSheet component
 		const handleDeletePress = () => {
-			Alert.alert(
-				"Delete Time Entry",
-				"Are you sure you want to delete this time entry? This action cannot be undone.",
-				[
-					{
-						text: "Cancel",
-						style: "cancel",
-					},
-					{
-						text: "Delete",
-						onPress: () => {
-							if (onDelete && timeEntry?.id) {
-								onDelete(timeEntry.id);
-								onClose();
-							}
-						},
-						style: "destructive",
-					},
-				],
-			);
+			onDelete(timeEntry.id);
+			onClose();
 		};
 
 		// Add a function to handle focus on the summary field
