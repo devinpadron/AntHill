@@ -264,14 +264,6 @@ const PackageCreator = ({ navigation }) => {
 			return;
 		}
 
-		if (currentPackage.checklists.length === 0) {
-			Alert.alert(
-				"Error",
-				"Please add at least one checklist to the package",
-			);
-			return;
-		}
-
 		try {
 			setSaving(true);
 

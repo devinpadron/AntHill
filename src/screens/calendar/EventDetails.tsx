@@ -346,7 +346,7 @@ const EventDetails = ({ navigation }) => {
 								style={styles.icon}
 							/>
 							<Text style={styles.sectionTitle}>
-								Packages ({packages.length})
+								Packages
 								{totalChecklists > 0 && (
 									<Text style={styles.checklistCount}>
 										{" · "}

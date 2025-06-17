@@ -18,7 +18,11 @@ import {
 	deleteTimeEntry,
 } from "../../services/timeEntryService";
 import { getUser } from "../../services/userService";
-import { getStatusBadgeColor, getStatusBadgeText } from "../../utils/timeUtils";
+import {
+	getStatusBadgeColor,
+	getStatusBadgeText,
+	calculateFieldTotals,
+} from "../../utils/timeUtils";
 import TimeEntrySummary from "../../components/time/TimeEntrySummary";
 import TimeDetailCard from "../../components/time/TimeDetailCard";
 import ManagerActions from "../../components/time/ManagerActions";
@@ -30,6 +34,8 @@ const TimeEntryDetails = ({ route, navigation }) => {
 	// Extract params - handle both single ID and array of IDs
 	const { entryId, userId: passedUserId } = route.params;
 	const entryIdArray = Array.isArray(entryId) ? entryId : [entryId];
+
+	console.log("Entry IDs:", entryIdArray);
 
 	const insets = useSafeAreaInsets();
 	const { userId: currentUserId, companyId, isAdmin } = useUser();
@@ -214,125 +220,6 @@ const TimeEntryDetails = ({ route, navigation }) => {
 	const handleExportSheetClose = useCallback(() => {
 		setExportModalVisible(false);
 	}, []);
-
-	// Update the calculateFieldTotals function
-	const calculateFieldTotals = (entries) => {
-		// Initialize an empty totals object
-		const totals = {};
-
-		if (!entries || entries.length === 0) {
-			return totals;
-		}
-
-		// Process each time entry using its own form structure
-		entries.forEach((entry) => {
-			// Use the form structure attached to the entry
-			const entryForm = entry.generalForm || null;
-
-			if (entryForm && entryForm.fields) {
-				// Find fields that have showTotal enabled
-				const fieldsToTotal = entryForm.fields.filter(
-					(field) =>
-						field.showTotal === true &&
-						(field.type === "number" ||
-							field.type === "currency" ||
-							field.type === "quantity"),
-				);
-
-				// Process fields for this entry
-				fieldsToTotal.forEach((field) => {
-					// Initialize field in totals if not already there
-					if (!totals[`te_${field.id}`]) {
-						totals[`te_${field.id}`] = {
-							label: field.label,
-							total: 0,
-							unit: field.unit || "",
-							useMultiplier: field.useMultiplier || false,
-							multiplier: field.multiplier || 1,
-							type: field.type,
-							source: "timeEntry",
-						};
-					}
-
-					// Add this entry's value to the total
-					const value = entry.formResponses?.[field.id];
-					if (value !== undefined && value !== null) {
-						const numValue = parseFloat(value);
-						if (!isNaN(numValue)) {
-							totals[`te_${field.id}`].total += numValue;
-
-							// Store the raw total before multiplier is applied
-							totals[`te_${field.id}`].rawTotal =
-								totals[`te_${field.id}`].total;
-
-							// Calculate multiplied value if needed
-							if (field.useMultiplier && field.multiplier) {
-								totals[`te_${field.id}`].multipliedTotal =
-									totals[`te_${field.id}`].total *
-									field.multiplier;
-							}
-						}
-					}
-				});
-			}
-
-			// Process connected events using their own form structures
-			if (entry.connectedEvents && entry.connectedEvents.length > 0) {
-				entry.connectedEvents.forEach((connection) => {
-					// Use the form structure attached to the event connection
-					const eventForm = entry.eventForm || null;
-
-					if (eventForm && eventForm.fields) {
-						const eventFieldsToTotal = eventForm.fields.filter(
-							(field) =>
-								field.showTotal === true &&
-								(field.type === "number" ||
-									field.type === "currency" ||
-									field.type === "quantity"),
-						);
-
-						eventFieldsToTotal.forEach((field) => {
-							// Initialize field in totals if not already there
-							const fieldKey = `ev_${field.id}`;
-							if (!totals[fieldKey]) {
-								totals[fieldKey] = {
-									label: `${field.label} (Events)`,
-									total: 0,
-									unit: field.unit || "",
-									useMultiplier: field.useMultiplier || false,
-									multiplier: field.multiplier || 1,
-									type: field.type,
-									source: "event",
-								};
-							}
-
-							// Add this event's value to the total
-							const value = connection.formResponses?.[field.id];
-							if (value !== undefined && value !== null) {
-								const numValue = parseFloat(value);
-								if (!isNaN(numValue)) {
-									totals[fieldKey].total += numValue;
-									totals[fieldKey].rawTotal =
-										totals[fieldKey].total;
-
-									if (
-										field.useMultiplier &&
-										field.multiplier
-									) {
-										totals[fieldKey].multipliedTotal =
-											totals[fieldKey].total *
-											field.multiplier;
-									}
-								}
-							}
-						});
-					}
-				});
-			}
-		});
-
-		return totals;
-	};
 
 	// Add this useEffect
 	useEffect(() => {
@@ -649,6 +536,8 @@ const TimeEntryDetails = ({ route, navigation }) => {
 			throw error;
 		}
 	};
+
+	console.log(fieldTotals);
 
 	return (
 		<View style={[styles.container, { paddingTop: insets.top }]}>

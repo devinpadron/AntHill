@@ -183,7 +183,6 @@ export const getAllTimeEntries = async (
 	companyId: string,
 	startDate?: string,
 	endDate?: string,
-	limit = 50,
 ) => {
 	try {
 		// Start with the collection reference
@@ -207,7 +206,7 @@ export const getAllTimeEntries = async (
 		}
 
 		// Always sort by clockInTime in descending order and limit results
-		queryRef = queryRef.orderBy("clockInTime", "desc").limit(limit);
+		queryRef = queryRef.orderBy("clockInTime", "desc");
 
 		// Execute the query
 		const snapshot = await queryRef.get();
