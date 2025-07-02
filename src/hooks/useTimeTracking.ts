@@ -8,7 +8,6 @@ import {
 	getTimeEntries,
 	subscribeToActiveTimeEntry,
 } from "../services/timeEntryService";
-import { startOfWeek, endOfWeek } from "date-fns";
 import { TimeEntry } from "../types";
 import { useCompany } from "../contexts/CompanyContext";
 
@@ -53,7 +52,7 @@ export const useTimeTracking = ({
 		} finally {
 			setIsLoading(false);
 		}
-	}, [userId, companyId, startDate, endDate]);
+	}, [userId, companyId, startDate, endDate, isPaused]);
 
 	// Check for existing active time entry on load and set up listeners
 	useEffect(() => {

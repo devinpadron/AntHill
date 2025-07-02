@@ -86,6 +86,10 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 		const [formState, setFormState] = useState(customForm);
 
 		// Add these state variables near other state declarations
+		const [pauseDurationHours, setPauseDurationHours] = useState("0");
+		const [pauseDurationMinutes, setPauseDurationMinutes] = useState("0");
+
+		// Add this near other state declarations
 		const [connectedEventResponses, setConnectedEventResponses] = useState<{
 			[eventId: string]: any;
 		}>({});
@@ -147,6 +151,21 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 					setConnectedEventResponses(eventResponses);
 				} else {
 					setLocalConnectedEvents([]);
+				}
+
+				// Initialize pause duration
+				if (timeEntry.totalPausedSeconds) {
+					const hours = Math.floor(
+						timeEntry.totalPausedSeconds / 3600,
+					);
+					const minutes = Math.floor(
+						(timeEntry.totalPausedSeconds % 3600) / 60,
+					);
+					setPauseDurationHours(hours.toString());
+					setPauseDurationMinutes(minutes.toString());
+				} else {
+					setPauseDurationHours("0");
+					setPauseDurationMinutes("0");
 				}
 			}
 		}, [timeEntry]);
@@ -307,6 +326,8 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 				return;
 			}
 
+			const pauseDuration = calculatePauseDuration();
+
 			// Validate form responses
 			if (!isAdmin) {
 				const isFormValid = validateFormResponses();
@@ -429,21 +450,13 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 					});
 				}
 
-				// Update the time entry with the updated form responses
-				const updatedConnectedEvents = timeEntry.connectedEvents
-					? timeEntry.connectedEvents.map((event) => ({
-							...event,
-							formResponses:
-								connectedEventResponses[event.eventId] ||
-								event.formResponses,
-						}))
-					: [];
-
 				const updates = {
+					...timeEntry,
 					notes: editNotes,
 					clockInTime: clockInDate.toISOString(),
 					clockOutTime: clockOutDate.toISOString(),
-					duration: duration,
+					duration: duration - pauseDuration,
+					totalPausedSeconds: pauseDuration, // Add this line
 					formResponses: updatedFormResponses,
 					connectedEvents: localConnectedEvents.map((event) => ({
 						...event,
@@ -508,6 +521,13 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 					"Failed to save changes. Please try again.",
 				);
 			}
+		};
+
+		// Add this helper function
+		const calculatePauseDuration = (): number => {
+			const hours = parseInt(pauseDurationHours) || 0;
+			const minutes = parseInt(pauseDurationMinutes) || 0;
+			return hours * 3600 + minutes * 60;
 		};
 
 		// Add this function inside the EditSheet component
@@ -686,6 +706,58 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 									m ({(calculateDuration() / 3600).toFixed(2)}{" "}
 									hrs)
 								</Text>
+							</View>
+
+							{/* Pause Duration (editable) */}
+							<View style={styles.pauseDurationRow}>
+								<Text style={styles.modalLabel}>
+									Pause Duration
+								</Text>
+								<View
+									style={styles.pauseDurationInputContainer}
+								>
+									<View
+										style={styles.pauseDurationInputWrapper}
+									>
+										<TextInput
+											style={styles.pauseDurationInput}
+											keyboardType="number-pad"
+											value={pauseDurationHours}
+											onChangeText={setPauseDurationHours}
+											maxLength={2}
+										/>
+										<Text style={styles.pauseDurationUnit}>
+											h
+										</Text>
+									</View>
+									<View
+										style={styles.pauseDurationInputWrapper}
+									>
+										<TextInput
+											style={styles.pauseDurationInput}
+											keyboardType="number-pad"
+											value={pauseDurationMinutes}
+											onChangeText={(text) => {
+												// Ensure minutes don't exceed 59
+												const mins =
+													parseInt(text) || 0;
+												if (mins <= 59) {
+													setPauseDurationMinutes(
+														text,
+													);
+												} else {
+													setPauseDurationMinutes(
+														"59",
+													);
+												}
+											}}
+											maxLength={2}
+										/>
+										<Text style={styles.pauseDurationUnit}>
+											m
+										</Text>
+									</View>
+								</View>
 							</View>
 						</View>
 
@@ -1192,6 +1264,39 @@ const styles = StyleSheet.create({
 		color: "#007AFF",
 		fontWeight: "600",
 		fontSize: 15,
+		marginLeft: 8,
+	},
+	pauseDurationRow: {
+		marginTop: 12,
+		borderTopWidth: 1,
+		borderTopColor: "#eee",
+		paddingTop: 12,
+	},
+	pauseDurationInputContainer: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginTop: 8,
+	},
+	pauseDurationInputWrapper: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginRight: 16,
+	},
+	pauseDurationInput: {
+		width: 50,
+		height: 44,
+		borderWidth: 1,
+		borderColor: "#ddd",
+		borderRadius: 8,
+		paddingHorizontal: 12,
+		fontSize: 16,
+		backgroundColor: "#fff",
+		textAlign: "center",
+	},
+	pauseDurationUnit: {
+		fontSize: 16,
+		fontWeight: "600",
+		color: "#333",
 		marginLeft: 8,
 	},
 });
