@@ -12,6 +12,10 @@ import {
 	navigationRef,
 	pendingNavigation,
 } from "./src/navigation/navigationRef";
+import {
+	checkAppVersion,
+	showUpdateNotification,
+} from "./src/utils/versionUtils";
 
 // Component to initialize the company context after user auth
 const CompanyInitializer = () => {
@@ -43,6 +47,26 @@ const App: React.FC = () => {
 
 		return () => clearInterval(checkInterval);
 	}, []);
+
+	// Add a separate useEffect for the version check
+	useEffect(() => {
+		const initApp = async () => {
+			// Check if app needs update
+			const { updateRequired, currentVersion, requiredVersion } =
+				await checkAppVersion();
+
+			console.log(
+				`Current Version: ${currentVersion}, Required Version: ${requiredVersion}`,
+			);
+			if (updateRequired) {
+				showUpdateNotification(currentVersion, requiredVersion);
+			}
+
+			// Continue normal app initialization...
+		};
+
+		initApp();
+	}, []); // Empty dependency array means this runs once on mount
 
 	return (
 		<GestureHandlerRootView style={{ flex: 1 }}>

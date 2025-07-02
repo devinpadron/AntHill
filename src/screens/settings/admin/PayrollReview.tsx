@@ -7,6 +7,7 @@ import {
 	SafeAreaView,
 	ActivityIndicator,
 	ScrollView,
+	RefreshControl,
 } from "react-native";
 import { TouchableOpacity } from "react-native-gesture-handler";
 import {
@@ -52,21 +53,19 @@ const PayrollReview = ({ navigation }) => {
 	});
 
 	// Fetch time entries when screen comes into focus
-	useFocusEffect(
-		useCallback(() => {
-			// This will execute when the screen comes into focus
-			fetchTimeEntries();
-			return () => {
-				// Optional cleanup function
-			};
-		}, [startDate, endDate, companyId]),
-	);
+	useEffect(() => {
+		setIsLoading(true);
+		// This will execute when the screen comes into focus
+		fetchTimeEntries();
+		return () => {
+			// Optional cleanup function
+		};
+	}, [startDate, endDate, companyId]);
 
 	// Fetch time entries for the selected date range
 	const fetchTimeEntries = async () => {
 		if (!companyId) return;
 
-		setIsLoading(true);
 		try {
 			// Get all entries for company within date range
 			// We'll filter by status "pending_approval" or "approved" on the front-end
@@ -245,7 +244,10 @@ const PayrollReview = ({ navigation }) => {
 	const areAllEntriesApproved = (entries) => {
 		return (
 			entries.length > 0 &&
-			entries.every((entry) => entry.status === "approved")
+			entries.every(
+				(entry) =>
+					entry.status === "approved" || entry.status === "rejected",
+			)
 		);
 	};
 
@@ -461,7 +463,15 @@ const PayrollReview = ({ navigation }) => {
 					</Text>
 				</View>
 			) : (
-				<ScrollView style={styles.content}>
+				<ScrollView
+					style={styles.content}
+					refreshControl={
+						<RefreshControl
+							refreshing={false}
+							onRefresh={fetchTimeEntries}
+						/>
+					}
+				>
 					{entriesByEmployee.map((employeeGroup) => (
 						<View
 							key={employeeGroup.userId}
