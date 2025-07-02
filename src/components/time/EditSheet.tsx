@@ -307,16 +307,18 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 				return;
 			}
 
-			// // Validate form responses
-			// const isFormValid = validateFormResponses();
-			// const isEventFormValid = validateEventFormResponses();
-			// if (!isFormValid || !isEventFormValid) {
-			// 	Alert.alert(
-			// 		"Required Fields",
-			// 		"Please fill out all required fields",
-			// 	);
-			// 	return;
-			// }
+			// Validate form responses
+			if (!isAdmin) {
+				const isFormValid = validateFormResponses();
+				const isEventFormValid = validateEventFormResponses();
+				if (!isFormValid || !isEventFormValid) {
+					Alert.alert(
+						"Required Fields",
+						"Please fill out all required fields",
+					);
+					return;
+				}
+			}
 
 			try {
 				// First process deletions if there are any files in the deletion queue
