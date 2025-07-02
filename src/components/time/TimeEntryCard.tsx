@@ -10,6 +10,9 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 	const clockInTime = format(entryDate, "h:mm a");
 
 	const [elapsedSeconds, setElapsedSeconds] = useState(0);
+	const [currentPauseDuration, setCurrentPauseDuration] = useState(
+		timeEntry.totalPausedSeconds || 0,
+	);
 	const intervalRef = useRef(null);
 
 	const clockOutTime = timeEntry.clockOutTime
@@ -60,7 +63,25 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 				const pausedElapsed =
 					differenceInSeconds(pauseDate, startDate) - pauseOffset;
 				setElapsedSeconds(pausedElapsed);
+
+				// Initialize current pause duration
+				const basePauseDuration = timeEntry.totalPausedSeconds || 0;
+
+				// Set up interval to update pause duration in real-time
+				intervalRef.current = setInterval(() => {
+					const pauseStartTime = new Date(timeEntry.pauseStartTime);
+					const currentPauseSeconds = differenceInSeconds(
+						new Date(),
+						pauseStartTime,
+					);
+					setCurrentPauseDuration(
+						basePauseDuration + currentPauseSeconds,
+					);
+				}, 1000);
 			}
+		} else {
+			// For completed or other states, just use the stored totalPausedSeconds
+			setCurrentPauseDuration(timeEntry.totalPausedSeconds || 0);
 		}
 
 		return () => {
@@ -136,6 +157,19 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 		if (onSubmit) onSubmit(timeEntry);
 	};
 
+	// Format pause duration from seconds to h:mm:ss
+	const formatPauseDuration = (totalSeconds) => {
+		const { hours, minutes, seconds } = getDurationValues(totalSeconds);
+
+		if (hours > 0) {
+			return `${hours}h ${minutes}m`;
+		} else if (minutes > 0) {
+			return `${minutes}m ${seconds}s`;
+		} else {
+			return `${seconds}s`;
+		}
+	};
+
 	return (
 		<TouchableOpacity
 			style={styles.card}
@@ -209,6 +243,22 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 				<Text style={styles.durationLabel}>Duration:</Text>
 				<Text style={styles.durationValue}>{durationString}</Text>
 			</View>
+
+			{/* Pause Duration - show only if there's pause time or currently paused */}
+			{(timeEntry.status === "paused" || currentPauseDuration > 0) && (
+				<View style={styles.pauseRow}>
+					<Icon
+						name="pause-circle-outline"
+						size={16}
+						color="#666"
+						style={styles.icon}
+					/>
+					<Text style={styles.pauseLabel}>Paused:</Text>
+					<Text style={styles.pauseValue}>
+						{formatPauseDuration(currentPauseDuration)}
+					</Text>
+				</View>
+			)}
 
 			{/* Event information */}
 			{timeEntry.eventTitle && (
@@ -319,6 +369,21 @@ const styles = StyleSheet.create({
 		fontSize: 15,
 		fontWeight: "600",
 		color: "#333",
+	},
+	pauseRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginBottom: 8,
+	},
+	pauseLabel: {
+		fontSize: 14,
+		color: "#666",
+		marginRight: 6,
+	},
+	pauseValue: {
+		fontSize: 15,
+		fontWeight: "600",
+		color: "#FF9500", // Orange to match the paused status color
 	},
 	eventRow: {
 		flexDirection: "row",

@@ -279,6 +279,21 @@ const TimeDetailCard = ({
 		);
 	};
 
+	// Add this helper function inside the TimeDetailCard component
+	const formatPauseDuration = (totalSeconds) => {
+		const hours = Math.floor(totalSeconds / 3600);
+		const minutes = Math.floor((totalSeconds % 3600) / 60);
+		const seconds = totalSeconds % 60;
+
+		if (hours > 0) {
+			return `${hours}h ${minutes}m`;
+		} else if (minutes > 0) {
+			return `${minutes}m ${seconds}s`;
+		} else {
+			return `${seconds}s`;
+		}
+	};
+
 	return (
 		<View style={styles.timeEntryCard}>
 			<View style={styles.timeEntryHeader}>
@@ -347,6 +362,16 @@ const TimeDetailCard = ({
 							: "N/A"}
 					</Text>
 				</View>
+
+				{/* Total Pause Duration - only show if there's pause time */}
+				{entry.totalPausedSeconds > 0 && (
+					<View style={styles.detailRow}>
+						<Text style={styles.detailLabel}>Paused:</Text>
+						<Text style={styles.pauseValue}>
+							{formatPauseDuration(entry.totalPausedSeconds)}
+						</Text>
+					</View>
+				)}
 
 				{/* Notes Section */}
 				{entry.notes && (
@@ -800,6 +825,10 @@ const styles = StyleSheet.create({
 		fontStyle: "italic",
 		textAlign: "center",
 		marginTop: 4,
+	},
+	pauseValue: {
+		fontSize: 15,
+		flex: 1,
 	},
 });
 

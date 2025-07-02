@@ -48,6 +48,9 @@ export const clockOut = async (timeEntryId: string, companyId: string) => {
 		// Calculate actual billable duration by subtracting paused time
 		let actualDuration = rawDurationSeconds;
 
+		// Track total paused seconds to save in the record
+		let finalTotalPausedSeconds = timeEntry.totalPausedSeconds || 0;
+
 		// Deduct accumulated paused time (now in seconds)
 		if (timeEntry.totalPausedSeconds) {
 			actualDuration -= timeEntry.totalPausedSeconds;
@@ -61,6 +64,9 @@ export const clockOut = async (timeEntryId: string, companyId: string) => {
 					1000,
 			);
 			actualDuration -= currentPauseDuration;
+
+			// Add the current pause duration to the total paused seconds
+			finalTotalPausedSeconds += currentPauseDuration;
 		}
 
 		// Ensure we don't have negative duration
@@ -70,9 +76,17 @@ export const clockOut = async (timeEntryId: string, companyId: string) => {
 			clockOutTime,
 			duration,
 			status: "completed",
+			totalPausedSeconds: finalTotalPausedSeconds,
+			pauseStartTime: null, // Clear pause start time
 		});
 
-		return { ...timeEntry, clockOutTime, duration, status: "completed" };
+		return {
+			...timeEntry,
+			clockOutTime,
+			duration,
+			status: "completed",
+			totalPausedSeconds: finalTotalPausedSeconds,
+		};
 	} catch (error) {
 		console.error("Error clocking out:", error);
 		throw error;
