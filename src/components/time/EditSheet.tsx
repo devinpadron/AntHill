@@ -44,7 +44,6 @@ interface EditSheetProps {
 const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 	(
 		{
-			visible,
 			snapPoints = ["85%"],
 			timeEntry,
 			editNotes,
@@ -73,6 +72,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 		const { uploadFiles, deleteFiles, uploadProgress } = useUploadManager();
 		const customForm = timeEntry?.generalForm || null;
 		const eventForm = timeEntry?.eventForm || null;
+		const { isAdmin } = useUser();
 
 		const [filesToUpload, setFilesToUpload] = useState<{
 			[fieldId: string]: AttachmentItem[];
@@ -93,6 +93,11 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 		const [eventFormErrors, setEventFormErrors] = useState<
 			Record<string, Record<string, string>>
 		>({});
+
+		// Add this near other state declarations
+		const [localConnectedEvents, setLocalConnectedEvents] = useState<any[]>(
+			[],
+		);
 
 		const { userId, user } = useUser();
 
@@ -124,11 +129,13 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 					setFormResponses({ ...timeEntry.formResponses });
 				}
 
-				// Initialize connected event responses
+				// Initialize local connected events
 				if (
 					timeEntry.connectedEvents &&
 					timeEntry.connectedEvents.length > 0
 				) {
+					setLocalConnectedEvents([...timeEntry.connectedEvents]);
+
 					const eventResponses = {};
 					timeEntry.connectedEvents.forEach((event) => {
 						if (event.formResponses) {
@@ -138,6 +145,8 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 						}
 					});
 					setConnectedEventResponses(eventResponses);
+				} else {
+					setLocalConnectedEvents([]);
 				}
 			}
 		}, [timeEntry]);
@@ -167,15 +176,6 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 				setEventFormState({ ...eventForm, fields: updatedFields });
 			}
 		}, [eventForm]);
-
-		// Handle sheet visibility using our local ref
-		useEffect(() => {
-			if (visible && bottomSheetRef.current) {
-				bottomSheetRef.current.expand();
-			} else if (!visible && bottomSheetRef.current) {
-				bottomSheetRef.current.close();
-			}
-		}, [visible]);
 
 		const validateFormResponses = () => {
 			const errors: Record<string, string> = {};
@@ -293,7 +293,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 
 		// Handle save with all updated values
 		const handleSaveChanges = async () => {
-			if (!editChangeSummary.trim()) {
+			if (!editChangeSummary.trim() && !isAdmin) {
 				Alert.alert("Required", "Please provide a summary of changes");
 				return;
 			}
@@ -307,16 +307,16 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 				return;
 			}
 
-			// Validate form responses
-			const isFormValid = validateFormResponses();
-			const isEventFormValid = validateEventFormResponses();
-			if (!isFormValid || !isEventFormValid) {
-				Alert.alert(
-					"Required Fields",
-					"Please fill out all required fields",
-				);
-				return;
-			}
+			// // Validate form responses
+			// const isFormValid = validateFormResponses();
+			// const isEventFormValid = validateEventFormResponses();
+			// if (!isFormValid || !isEventFormValid) {
+			// 	Alert.alert(
+			// 		"Required Fields",
+			// 		"Please fill out all required fields",
+			// 	);
+			// 	return;
+			// }
 
 			try {
 				// First process deletions if there are any files in the deletion queue
@@ -443,7 +443,11 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 					clockOutTime: clockOutDate.toISOString(),
 					duration: duration,
 					formResponses: updatedFormResponses,
-					connectedEvents: updatedConnectedEvents,
+					connectedEvents: localConnectedEvents.map((event) => ({
+						...event,
+						formResponses:
+							connectedEventResponses[event.eventId] || {},
+					})),
 					status: "edited",
 					editHistory: timeEntry.editHistory
 						? [
@@ -520,6 +524,46 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 					});
 				}
 			}, 300);
+		};
+
+		// Add this inside the EditSheet component
+		const handleAddConnectedEvent = () => {
+			const newEventId = `new-event-${Date.now()}`;
+			const newEvent = {
+				eventId: newEventId,
+				eventTitle: "New Event",
+				formResponses: {},
+			};
+
+			setLocalConnectedEvents((prev) => [...prev, newEvent]);
+			setConnectedEventResponses((prev) => ({
+				...prev,
+				[newEventId]: {},
+			}));
+		};
+
+		const handleDeleteConnectedEvent = (eventId) => {
+			// Filter out the event to be deleted
+			setLocalConnectedEvents((prev) =>
+				prev.filter((event) => event.eventId !== eventId),
+			);
+
+			// Remove form responses for this event
+			setConnectedEventResponses((prev) => {
+				const updatedResponses = { ...prev };
+				delete updatedResponses[eventId];
+				return updatedResponses;
+			});
+		};
+
+		const handleEventTitleChange = (eventId, newTitle) => {
+			setLocalConnectedEvents((prev) =>
+				prev.map((event) =>
+					event.eventId === eventId
+						? { ...event, eventTitle: newTitle }
+						: event,
+				),
+			);
 		};
 
 		return (
@@ -657,83 +701,121 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 						</View>
 
 						{/* Connected Events Section */}
-						{timeEntry?.connectedEvents &&
-							timeEntry.connectedEvents.length > 0 &&
-							eventForm && (
-								<View style={styles.connectedEventsSection}>
-									<Text style={styles.sectionTitle}>
-										Connected Events
-									</Text>
+						{eventForm && (
+							<View style={styles.connectedEventsSection}>
+								<Text style={styles.sectionTitle}>
+									Connected Events
+								</Text>
 
-									{timeEntry.connectedEvents.map(
-										(event, index) => (
+								{localConnectedEvents.map((event, index) => (
+									<View
+										key={event.eventId || index}
+										style={styles.formSection}
+									>
+										<View
+											style={styles.connectedEventHeader}
+										>
+											<Icon
+												name="calendar-check"
+												size={18}
+												color="#007AFF"
+											/>
+
+											{/* Editable Event Title */}
 											<View
-												key={event.eventId || index}
-												style={styles.formSection}
+												style={
+													styles.eventTitleContainer
+												}
 											>
-												<View
+												<TextInput
 													style={
-														styles.connectedEventHeader
+														styles.eventTitleInput
+													}
+													value={
+														event.eventTitle ??
+														"Connected Event"
+													} // Change || to ??
+													onChangeText={(text) =>
+														handleEventTitleChange(
+															event.eventId,
+															text,
+														)
+													}
+													placeholder="Event Title"
+												/>
+											</View>
+
+											{/* Delete Button (only show if more than one event) */}
+											{localConnectedEvents.length >
+												1 && (
+												<TouchableOpacity
+													style={
+														styles.deleteEventButton
+													}
+													onPress={() =>
+														handleDeleteConnectedEvent(
+															event.eventId,
+														)
 													}
 												>
 													<Icon
-														name="calendar-check"
-														size={18}
-														color="#007AFF"
+														name="close-circle"
+														size={20}
+														color="#FF3B30"
 													/>
-													<Text
-														style={
-															styles.connectedEventTitle
-														}
-													>
-														{event.eventTitle ||
-															"Connected Event"}
-													</Text>
-												</View>
+												</TouchableOpacity>
+											)}
+										</View>
 
-												{/* Event Form Responses */}
-												<CustomFormRender
-													customForm={eventFormState}
-													formResponses={
-														connectedEventResponses[
-															event.eventId
-														] || {}
-													}
-													formErrors={
-														eventFormErrors[
-															event.eventId
-														] || {}
-													}
-													onFieldChange={(
-														fieldId,
-														fieldType,
-														value,
-													) =>
-														handleEventFormResponseChange(
-															event.eventId,
-															fieldId,
-															fieldType,
-															value,
-														)
-													}
-													setCustomForm={
-														setEventFormState
-													}
-													uploadProgress={
-														uploadProgress
-													}
-													deletionQueue={
-														deletionQueue
-													}
-													setDeletionQueue={
-														setDeletionQueue
-													}
-												/>
-											</View>
-										),
-									)}
-								</View>
-							)}
+										{/* Event Form Responses */}
+										<CustomFormRender
+											customForm={eventFormState}
+											formResponses={
+												connectedEventResponses[
+													event.eventId
+												] || {}
+											}
+											formErrors={
+												eventFormErrors[
+													event.eventId
+												] || {}
+											}
+											onFieldChange={(
+												fieldId,
+												fieldType,
+												value,
+											) =>
+												handleEventFormResponseChange(
+													event.eventId,
+													fieldId,
+													fieldType,
+													value,
+												)
+											}
+											setCustomForm={setEventFormState}
+											uploadProgress={uploadProgress}
+											deletionQueue={deletionQueue}
+											setDeletionQueue={setDeletionQueue}
+										/>
+									</View>
+								))}
+
+								{/* Add Event Button */}
+								<TouchableOpacity
+									style={styles.addEventButton}
+									onPress={handleAddConnectedEvent}
+								>
+									<Icon
+										name="plus-circle"
+										size={18}
+										color="#007AFF"
+									/>
+									<Text style={styles.addEventButtonText}>
+										Add Connected Event
+									</Text>
+								</TouchableOpacity>
+							</View>
+						)}
 
 						{/* Form Responses Section */}
 						{customForm && (
@@ -763,7 +845,9 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 								]}
 							>
 								Change Summary{" "}
-								<Text style={styles.requiredMark}>*</Text>
+								{!isAdmin && (
+									<Text style={styles.requiredMark}>*</Text>
+								)}
 							</Text>
 							<Text style={styles.summarySubtitle}>
 								Explain what changes were made and why
@@ -1079,6 +1163,34 @@ const styles = StyleSheet.create({
 		borderRadius: 8,
 		padding: 12,
 		backgroundColor: "#fff",
+	},
+	eventTitleContainer: {
+		flex: 1,
+		marginLeft: 8,
+	},
+	eventTitleInput: {
+		fontSize: 16,
+		fontWeight: "600",
+		color: "#333",
+		padding: 0,
+	},
+	deleteEventButton: {
+		padding: 4,
+	},
+	addEventButton: {
+		flexDirection: "row",
+		alignItems: "center",
+		backgroundColor: "#f0f8ff",
+		padding: 12,
+		borderRadius: 8,
+		justifyContent: "center",
+		marginTop: 8,
+	},
+	addEventButtonText: {
+		color: "#007AFF",
+		fontWeight: "600",
+		fontSize: 15,
+		marginLeft: 8,
 	},
 });
 

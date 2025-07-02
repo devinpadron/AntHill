@@ -2,7 +2,7 @@ export default {
 	expo: {
 		name: "AntHill",
 		slug: "AntHill",
-		version: "1.0.92",
+		version: "1.0.93",
 		orientation: "portrait",
 		userInterfaceStyle: "light",
 		assetBundlePatterns: ["**/*"],
@@ -27,7 +27,6 @@ export default {
 					"AntHill needs photo library permissions to save photos",
 				NSPhotoLibraryUsageDescription:
 					"AntHill needs photo library permissions to save photos",
-				// if you allow camera, you need to add this
 				NSCameraUsageDescription:
 					"AntHill needs to access your Camera so that you can take photos",
 				NSMicrophoneUsageDescription:
@@ -35,6 +34,7 @@ export default {
 				NSUserNotificationsUsageDescription:
 					"AntHill needs to send you notifications to keep you updated on your tasks and activities.",
 				UIBackgroundModes: ["fetch", "remote-notification"],
+				LSApplicationQueriesSchemes: ["itms-apps"],
 			},
 		},
 		android: {
