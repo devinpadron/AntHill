@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { TouchableOpacity, View, Text, StyleSheet } from "react-native";
 import { format, differenceInSeconds } from "date-fns";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import { getStatusBadgeColor } from "../../utils/timeUtils";
 
 const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 	// Format date and times
@@ -137,17 +138,18 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 	const getStatusColor = () => {
 		switch (timeEntry.status) {
 			case "active":
-				return "#ff9500";
+				return "#007AFF"; // Blue for active
 			case "paused":
-				return "#FFA500"; // Different orange for paused
-			case "pending_approval":
-				return "#FFA500"; // Orange for pending
-			case "edited":
-				return "#007AFF";
+				return "#FFEB3B"; // Yellow for paused
 			case "rejected":
 				return "#FF3B30"; // Red for rejected
-			default:
+			case "approved":
 				return "#34C759";
+			case "completed":
+			case "pending_approval":
+			case "edited":
+			default:
+				return "#FFA500"; // Orange for pending
 		}
 	};
 
@@ -352,7 +354,6 @@ const styles = StyleSheet.create({
 		color: "#333",
 	},
 	activeText: {
-		color: "#ff9500",
 		fontWeight: "600",
 	},
 	durationRow: {
@@ -383,7 +384,6 @@ const styles = StyleSheet.create({
 	pauseValue: {
 		fontSize: 15,
 		fontWeight: "600",
-		color: "#FF9500", // Orange to match the paused status color
 	},
 	eventRow: {
 		flexDirection: "row",
