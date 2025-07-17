@@ -17,6 +17,7 @@ import { CalendarList } from "react-native-calendars";
 import { Dimensions } from "react-native";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import LoadingScreen from "../../screens/LoadingScreen";
+import { useCompany } from "../../contexts/CompanyContext";
 
 export default function Timesheet(
 	props: {
@@ -44,6 +45,7 @@ export default function Timesheet(
 	},
 ) {
 	const { userId, companyId, user } = useUser();
+	const { companyData } = useCompany();
 	const {
 		agendaItems,
 		markedDates,
@@ -338,6 +340,9 @@ export default function Timesheet(
 			<View style={styles.header}>
 				<View>
 					<Text style={styles.headerTitle}>
+						{companyData?.name || "Company"}
+					</Text>
+					<Text style={styles.headerTitle}>
 						{user.firstName.substr(user.firstName.length - 1) == "s"
 							? user.firstName + "' Schedule"
 							: user.firstName + "'s Schedule"}
@@ -495,7 +500,7 @@ const styles = StyleSheet.create({
 		backgroundColor: "#F7F7F9",
 	},
 	headerTitle: {
-		fontSize: 22,
+		fontSize: 18,
 		fontWeight: "bold",
 		color: "#333",
 	},
