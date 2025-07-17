@@ -1,3 +1,4 @@
+import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
 import db from "../constants/firestore";
 import { AttachmentItem, TimeEntry } from "../types";
 import * as FileSystem from "expo-file-system";
@@ -231,6 +232,47 @@ export const getAllTimeEntries = async (
 			id: doc.id,
 			...doc.data(),
 		})) as TimeEntry[];
+	} catch (error) {
+		console.error("Error getting time entries:", error);
+		throw error;
+	}
+};
+
+export const subscribeAllTimeEntries = async (
+	userId: string | null,
+	companyId: string,
+	onSnap: (
+		snapshot: FirebaseFirestoreTypes.QuerySnapshot<FirebaseFirestoreTypes.DocumentData>,
+	) => void,
+	startDate?: string,
+	endDate?: string,
+) => {
+	try {
+		// Start with the collection reference
+		const collectionRef = db
+			.collection("Companies")
+			.doc(companyId)
+			.collection("TimeEntries");
+
+		// Build the query step by step
+		let queryRef = collectionRef as any; // Start with a flexible type
+
+		// Add userId filter if provided
+		if (userId) {
+			queryRef = queryRef.where("userId", "==", userId);
+		}
+
+		// Add date range filters if provided
+		if (startDate && endDate) {
+			queryRef = queryRef.where("clockInTime", ">=", startDate);
+			queryRef = queryRef.where("clockInTime", "<=", endDate);
+		}
+
+		// Always sort by clockInTime in descending order and limit results
+		queryRef = queryRef.orderBy("clockInTime", "desc");
+
+		// Execute the query
+		await queryRef.onSnapshot(onSnap);
 	} catch (error) {
 		console.error("Error getting time entries:", error);
 		throw error;
