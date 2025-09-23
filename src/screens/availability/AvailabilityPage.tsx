@@ -10,6 +10,11 @@ import {
 	ActivityIndicator,
 	Animated,
 	Platform,
+	Modal,
+	TextInput,
+	KeyboardAvoidingView,
+	ScrollView,
+	Alert,
 } from "react-native";
 import { useUser } from "../../contexts/UserContext";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,6 +24,10 @@ import {
 	fetchUnassignedUpcomingEvents,
 	undeclineEvent,
 } from "../../services/availabilityService";
+import {
+	updateCompanyPreferences,
+	getCompanyPreferences,
+} from "../../services/companyService";
 
 const TabIndicator = ({ activeTab }) => {
 	// Animated tab indicator
@@ -59,7 +68,10 @@ const AvailabilityPage = () => {
 	const [activeTab, setActiveTab] = useState("unconfirmed");
 	const [events, setEvents] = useState([]);
 	const [loading, setLoading] = useState(true);
-	const { userId, companyId } = useUser();
+	const [reminderModalVisible, setReminderModalVisible] = useState(false);
+	const [reminderHours, setReminderHours] = useState("24");
+	const [reminderMinutes, setReminderMinutes] = useState("0");
+	const { userId, companyId, isAdmin } = useUser();
 
 	useEffect(() => {
 		fetchEventsFromFirebase();
@@ -343,12 +355,63 @@ const AvailabilityPage = () => {
 		</View>
 	);
 
+	const handleReminderSettings = async () => {
+		try {
+			// Fetch current company preferences
+			const preferences = await getCompanyPreferences(companyId);
+
+			// Set current values
+			const currentHours = preferences?.availabilityReminderHours || 24;
+			const currentMinutes =
+				preferences?.availabilityReminderMinutes || 0;
+
+			setReminderHours(currentHours.toString());
+			setReminderMinutes(currentMinutes.toString());
+			setReminderModalVisible(true);
+		} catch (error) {
+			console.error("Error fetching reminder preferences:", error);
+		}
+	};
+
+	const saveReminderSettings = async () => {
+		try {
+			const hours = parseInt(reminderHours) || 24;
+			const minutes = parseInt(reminderMinutes) || 0;
+
+			await updateCompanyPreferences(companyId, {
+				availabilityReminderHours: hours,
+				availabilityReminderMinutes: minutes,
+				availabilityReminderEnabled: true,
+			});
+
+			setReminderModalVisible(false);
+			Alert.alert("Success", "Reminder settings updated successfully!");
+		} catch (error) {
+			console.error("Error saving reminder preferences:", error);
+			Alert.alert("Error", "Failed to save reminder settings");
+		}
+	};
+
+	// Update the header to include admin button
 	return (
 		<SafeAreaView style={styles.container}>
-			<StatusBar barStyle="dark-content" />
-
 			<View style={styles.header}>
 				<Text style={styles.title}>Availability</Text>
+				{/* Show admin button if user is admin */}
+				{isAdmin && (
+					<TouchableOpacity
+						style={styles.adminButton}
+						onPress={handleReminderSettings}
+						activeOpacity={0.7}
+					>
+						<Ionicons
+							name="notifications-outline"
+							size={20}
+							color="#4A90E2"
+						/>
+						<Text style={styles.adminButtonText}>Reminders</Text>
+					</TouchableOpacity>
+				)}
 			</View>
 
 			<View style={styles.tabOuterContainer}>
@@ -429,6 +492,98 @@ const AvailabilityPage = () => {
 					ListEmptyComponent={renderEmptyState}
 				/>
 			)}
+
+			{/* Add the reminder modal */}
+			<Modal
+				visible={reminderModalVisible}
+				transparent={true}
+				animationType="slide"
+				onRequestClose={() => setReminderModalVisible(false)}
+			>
+				<KeyboardAvoidingView
+					style={styles.modalOverlay}
+					behavior={Platform.OS === "ios" ? "padding" : "height"}
+				>
+					<View style={styles.modalContent}>
+						<View style={styles.modalHeader}>
+							<Text style={styles.modalTitle}>
+								Set Availability Reminder
+							</Text>
+							<TouchableOpacity
+								onPress={() => setReminderModalVisible(false)}
+								style={styles.closeButton}
+							>
+								<Ionicons
+									name="close"
+									size={24}
+									color="#6B7280"
+								/>
+							</TouchableOpacity>
+						</View>
+
+						<ScrollView style={styles.modalBody}>
+							<Text style={styles.modalDescription}>
+								Set how often workers should be reminded to
+								confirm their availability.
+							</Text>
+
+							<View style={styles.timeInputContainer}>
+								<View style={styles.inputGroup}>
+									<Text style={styles.inputLabel}>Hours</Text>
+									<TextInput
+										style={styles.timeInput}
+										value={reminderHours}
+										onChangeText={setReminderHours}
+										keyboardType="numeric"
+										placeholder="24"
+									/>
+								</View>
+
+								<Text style={styles.timeSeparator}>:</Text>
+
+								<View style={styles.inputGroup}>
+									<Text style={styles.inputLabel}>
+										Minutes
+									</Text>
+									<TextInput
+										style={styles.timeInput}
+										value={reminderMinutes}
+										onChangeText={setReminderMinutes}
+										keyboardType="numeric"
+										placeholder="0"
+									/>
+								</View>
+							</View>
+
+							<Text style={styles.previewText}>
+								Workers will be reminded every{" "}
+								{reminderHours || "24"} hours and{" "}
+								{reminderMinutes || "0"} minutes until they
+								confirm or decline their event.
+							</Text>
+						</ScrollView>
+
+						<View style={styles.modalFooter}>
+							<TouchableOpacity
+								style={styles.cancelButton}
+								onPress={() => setReminderModalVisible(false)}
+							>
+								<Text style={styles.cancelButtonText}>
+									Cancel
+								</Text>
+							</TouchableOpacity>
+							<TouchableOpacity
+								style={styles.saveButton}
+								onPress={saveReminderSettings}
+							>
+								<Text style={styles.saveButtonText}>
+									Save Settings
+								</Text>
+							</TouchableOpacity>
+						</View>
+					</View>
+				</KeyboardAvoidingView>
+			</Modal>
 		</SafeAreaView>
 	);
 };
@@ -641,6 +796,133 @@ const styles = StyleSheet.create({
 		color: "#6B7280",
 		textAlign: "center",
 		marginTop: 8,
+	},
+	adminButton: {
+		position: "absolute",
+		right: 16,
+		top: 12,
+		flexDirection: "row",
+		alignItems: "center",
+		backgroundColor: "#F3F4F6",
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 20,
+	},
+	adminButtonText: {
+		fontSize: 12,
+		fontWeight: "600",
+		color: "#4A90E2",
+		marginLeft: 4,
+	},
+	modalOverlay: {
+		flex: 1,
+		backgroundColor: "rgba(0, 0, 0, 0.5)",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	modalContent: {
+		backgroundColor: "#FFFFFF",
+		borderRadius: 16,
+		width: "90%",
+		maxHeight: "80%",
+		overflow: "hidden",
+	},
+	modalHeader: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		padding: 20,
+		borderBottomWidth: 1,
+		borderBottomColor: "#E5E7EB",
+	},
+	modalTitle: {
+		fontSize: 18,
+		fontWeight: "700",
+		color: "#1F2937",
+	},
+	closeButton: {
+		padding: 4,
+	},
+	modalBody: {
+		padding: 20,
+	},
+	modalDescription: {
+		fontSize: 14,
+		color: "#6B7280",
+		marginBottom: 20,
+		lineHeight: 20,
+	},
+	timeInputContainer: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		marginBottom: 20,
+	},
+	inputGroup: {
+		alignItems: "center",
+	},
+	inputLabel: {
+		fontSize: 12,
+		fontWeight: "600",
+		color: "#6B7280",
+		marginBottom: 8,
+	},
+	timeInput: {
+		borderWidth: 2,
+		borderColor: "#E5E7EB",
+		borderRadius: 8,
+		padding: 12,
+		fontSize: 18,
+		fontWeight: "600",
+		textAlign: "center",
+		width: 80,
+		backgroundColor: "#F9FAFB",
+	},
+	timeSeparator: {
+		fontSize: 24,
+		fontWeight: "bold",
+		color: "#6B7280",
+		marginHorizontal: 16,
+	},
+	previewText: {
+		fontSize: 13,
+		color: "#4B5563",
+		textAlign: "center",
+		backgroundColor: "#F3F4F6",
+		padding: 12,
+		borderRadius: 8,
+	},
+	modalFooter: {
+		flexDirection: "row",
+		padding: 20,
+		borderTopWidth: 1,
+		borderTopColor: "#E5E7EB",
+	},
+	cancelButton: {
+		flex: 1,
+		paddingVertical: 12,
+		marginRight: 8,
+		backgroundColor: "#F3F4F6",
+		borderRadius: 8,
+		alignItems: "center",
+	},
+	cancelButtonText: {
+		fontSize: 16,
+		fontWeight: "600",
+		color: "#6B7280",
+	},
+	saveButton: {
+		flex: 1,
+		paddingVertical: 12,
+		marginLeft: 8,
+		backgroundColor: "#4A90E2",
+		borderRadius: 8,
+		alignItems: "center",
+	},
+	saveButtonText: {
+		fontSize: 16,
+		fontWeight: "600",
+		color: "#FFFFFF",
 	},
 });
 
