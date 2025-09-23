@@ -46,7 +46,7 @@ export const useEventForm = (navigation, eventId?: string) => {
 	const [openDate, setOpenDate] = useState(false);
 	const [openStartTime, setOpenStartTime] = useState(false);
 	const [openEndTime, setOpenEndTime] = useState(false);
-	const [availableWorkers, setAvailableWorkers] = useState([]);
+
 	const [isLoading, setIsLoading] = useState(false);
 	const [isEditing, setIsEditing] = useState(!!eventId);
 	const [editID, setEditID] = useState<string | null>(eventId || null);
@@ -463,8 +463,6 @@ export const useEventForm = (navigation, eventId?: string) => {
 		openEndTime,
 		isLoading,
 		isEditing,
-		availableWorkers,
-		setAvailableWorkers,
 		editingLabelForAddress,
 		setEditingLabelForAddress,
 		labelText,

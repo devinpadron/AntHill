@@ -142,3 +142,21 @@ export async function undeclineEvent(
 		throw error;
 	}
 }
+
+export async function getWorkerStatusList(companyId: string, eventId: string) {
+	try {
+		const eventRef = db
+			.collection("Companies")
+			.doc(companyId)
+			.collection("Events")
+			.doc(eventId);
+
+		const eventDoc = await eventRef.get();
+		const eventData = eventDoc.data();
+
+		return eventData.workerStatus || {};
+	} catch (error) {
+		console.error("Error fetching worker status list:", error);
+		throw error;
+	}
+}
