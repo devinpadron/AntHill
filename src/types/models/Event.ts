@@ -10,6 +10,10 @@ export interface Event {
 	assignedWorkers: string[];
 	packages: string[];
 	label?: string;
+	workerStatus?: {
+		userId: string;
+		status: "pending" | "confirmed" | "declined";
+	}[];
 }
 
 type Location = {

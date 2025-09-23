@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import CalendarStack from "./CalendarStack";
 import SettingStack from "./SettingStack";
 import ClockStack from "./ClockStack";
+import AvailabilityStack from "./AvailabilityStack";
 import { useCompany } from "../contexts/CompanyContext";
 
 const Tab = createBottomTabNavigator();
@@ -30,6 +31,20 @@ const HomeTabs = () => {
 					tabBarIcon: ({ focused, color, size }) => (
 						<Ionicons
 							name={focused ? "calendar" : "calendar-outline"}
+							size={size}
+							color={color}
+						/>
+					),
+				}}
+			/>
+			<Tab.Screen
+				name="Availability"
+				component={AvailabilityStack}
+				options={{
+					headerShown: false,
+					tabBarIcon: ({ focused, color, size }) => (
+						<Ionicons
+							name={focused ? "people" : "people-outline"}
 							size={size}
 							color={color}
 						/>
