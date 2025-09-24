@@ -37,20 +37,22 @@ const HomeTabs = () => {
 					),
 				}}
 			/>
-			<Tab.Screen
-				name="Availability"
-				component={AvailabilityStack}
-				options={{
-					headerShown: false,
-					tabBarIcon: ({ focused, color, size }) => (
-						<Ionicons
-							name={focused ? "people" : "people-outline"}
-							size={size}
-							color={color}
-						/>
-					),
-				}}
-			/>
+			{preferences.enableAvailability && (
+				<Tab.Screen
+					name="Availability"
+					component={AvailabilityStack}
+					options={{
+						headerShown: false,
+						tabBarIcon: ({ focused, color, size }) => (
+							<Ionicons
+								name={focused ? "people" : "people-outline"}
+								size={size}
+								color={color}
+							/>
+						),
+					}}
+				/>
+			)}
 			{preferences.enableTimeSheet && (
 				<Tab.Screen
 					name="Clock"

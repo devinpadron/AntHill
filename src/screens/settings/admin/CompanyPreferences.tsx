@@ -175,6 +175,24 @@ const CompanyPreferences = ({ navigation }) => {
 
 					<View style={styles.settingItem}>
 						<Text style={styles.settingLabel}>
+							Enable Availability Confirmation
+						</Text>
+						<Switch
+							value={preferences.enableAvailability}
+							onValueChange={(value) =>
+								handleToggleChange("enableAvailability", value)
+							}
+							trackColor={{ false: "#d3d3d3", true: "#b3e0ff" }}
+							thumbColor={
+								preferences.enableAvailability
+									? "#007AFF"
+									: "#f4f3f4"
+							}
+						/>
+					</View>
+
+					<View style={styles.settingItem}>
+						<Text style={styles.settingLabel}>
 							Allow Users to View Event Labels
 						</Text>
 						<Switch

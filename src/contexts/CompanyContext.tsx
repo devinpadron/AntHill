@@ -15,7 +15,11 @@ import {
 export interface CompanyPreferences {
 	workWeekStarts: "sunday" | "monday";
 	allowUserEventEditing: boolean;
-	enableTimeSheet: boolean;
+	availabilityReminderEnabled?: boolean;
+	availabilityReminderHours?: number;
+	availabilityReminderMinutes?: number;
+	enableTimeSheet?: boolean;
+	enableAvailability?: boolean;
 	timeEntryForm: any;
 	eventForm: any;
 	canViewEventLabels: boolean;

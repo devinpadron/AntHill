@@ -31,6 +31,7 @@ import { getEventAttachments, updateEvent } from "../../services/eventService";
 import { getEventPackages, getPackages } from "../../services/packageService";
 import db from "../../constants/firestore";
 import { getWorkerStatusList } from "../../services/availabilityService";
+import { useCompany } from "../../contexts/CompanyContext";
 
 const EventSubmit = ({ navigation }) => {
 	const insets = useSafeAreaInsets();
@@ -100,6 +101,8 @@ const EventSubmit = ({ navigation }) => {
 	const [openLabelsDropdown, setOpenLabelsDropdown] = useState(false);
 	const [availableWorkers, setAvailableWorkers] = useState([]);
 
+	const { preferences } = useCompany();
+
 	// Add these at the top of your component
 	const isMounted = useRef(true);
 
@@ -166,7 +169,7 @@ const EventSubmit = ({ navigation }) => {
 				);
 
 				// If editing an event, fetch worker status and enhance labels for ALL workers
-				if (eventId) {
+				if (eventId && preferences.enableAvailability == true) {
 					try {
 						const workerStatus = await getWorkerStatusList(
 							currentCompany,
