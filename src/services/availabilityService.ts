@@ -160,3 +160,35 @@ export async function getWorkerStatusList(companyId: string, eventId: string) {
 		throw error;
 	}
 }
+
+export async function fetchUpcomingEventsForUser(
+	companyId: string,
+	userId: string,
+) {
+	try {
+		const today = new Date();
+		const todayFormatted = today.toISOString().split("T")[0];
+
+		const eventsRef = db
+			.collection("Companies")
+			.doc(companyId)
+			.collection("Events");
+
+		// Query events where date is today or later and assignedWorkers contains the userId
+		const querySnapshot = await eventsRef
+			.where("date", ">=", todayFormatted)
+			.where("assignedWorkers", "array-contains", userId)
+			.get();
+
+		// Map the query results to an array of event objects
+		const events = querySnapshot.docs.map((doc) => ({
+			id: doc.id,
+			...doc.data(),
+		}));
+
+		return events;
+	} catch (error) {
+		console.error("Error fetching upcoming events for user:", error);
+		throw error;
+	}
+}

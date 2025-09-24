@@ -28,6 +28,7 @@ import {
 	updateCompanyPreferences,
 	getCompanyPreferences,
 } from "../../services/companyService";
+import { fetchUpcomingEventsForUser } from "../../services/availabilityService"; // Add this import
 
 const TabIndicator = ({ activeTab }) => {
 	// Animated tab indicator
@@ -82,36 +83,44 @@ const AvailabilityPage = () => {
 		setLoading(true);
 
 		try {
-			// Get events from your service
+			// Get unassigned events from your service
 			const fetchedEvents: any =
 				await fetchUnassignedUpcomingEvents(companyId);
 
+			// Get assigned events for the current user to check for conflicts
+			const assignedEvents: any = await fetchUpcomingEventsForUser(
+				companyId,
+				userId,
+			);
+
 			if (fetchedEvents && fetchedEvents.length > 0) {
+				// Create a set of dates where the user already has assigned events
+				const assignedEventDates = new Set(
+					assignedEvents?.map((event) => {
+						const eventDate = new Date(event.date);
+						return eventDate.toDateString(); // Use date string for comparison
+					}) || [],
+				);
+
 				// Transform the fetched events to match the UI requirements
 				const formattedEvents = fetchedEvents.map((event) => {
 					// Parse the start time to get a date object
-					const startDate = new Date(event.startTime);
+					const startDate = new Date(event.date);
+					const eventDateString = startDate.toDateString();
 
 					// Format date to a user-friendly string
 					const formattedDate = startDate.toLocaleDateString("en-US");
 
-					// Format time (e.g., "4:17 PM")
-					const timeOptions: Intl.DateTimeFormatOptions = {
-						hour: "numeric",
-						minute: "2-digit",
-						hour12: true,
-					};
-					const formattedTime = startDate.toLocaleTimeString(
-						"en-US",
-						timeOptions,
-					);
-
-					// Set location (use event.locations if available)
-					const location = event.locations
-						? typeof event.locations === "string"
-							? event.locations
-							: "Multiple locations"
-						: "Location TBD";
+					// Set location based on event.locations map (address -> {lat, lng})
+					let location = "Location TBD";
+					if (event.locations) {
+						const locationKeys = Object.keys(event.locations);
+						if (locationKeys.length === 1) {
+							location = locationKeys[0]; // Use the address (the key) as location
+						} else if (locationKeys.length > 1) {
+							location = "Multiple locations";
+						}
+					}
 
 					// Check if user is in workerStatus map
 					let status = "available";
@@ -120,18 +129,22 @@ const AvailabilityPage = () => {
 					if (event.workerStatus && event.workerStatus[userId]) {
 						const userStatus = event.workerStatus[userId];
 						if (userStatus === "confirmed") {
-							status = "already_on_event";
-							confirmed = true;
-						} else if (userStatus === "declined") {
 							status = "on_potential_event";
-							confirmed = false;
+							confirmed = true;
 						}
+					}
+
+					// Check if user is already assigned to another event on the same day
+					if (
+						assignedEventDates.has(eventDateString) &&
+						status === "available"
+					) {
+						status = "already_on_event";
 					}
 
 					return {
 						id: event.id,
 						date: formattedDate,
-						time: formattedTime,
 						location: location,
 						title: event.title || "Unnamed Event",
 						status: status,
@@ -269,7 +282,6 @@ const AvailabilityPage = () => {
 					<View style={styles.dateLocationContainer}>
 						<Text style={styles.eventTitle}>{item.title}</Text>
 						<Text style={styles.eventDate}>{item.date}</Text>
-						<Text style={styles.eventTime}>{item.time}</Text>
 						<View style={styles.locationContainer}>
 							<Ionicons name="location" size={14} color="#666" />
 							<Text style={styles.eventLocation}>
