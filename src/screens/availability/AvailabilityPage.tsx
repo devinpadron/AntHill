@@ -6,7 +6,6 @@ import {
 	FlatList,
 	TouchableOpacity,
 	SafeAreaView,
-	StatusBar,
 	ActivityIndicator,
 	Animated,
 	Platform,
@@ -15,6 +14,7 @@ import {
 	KeyboardAvoidingView,
 	ScrollView,
 	Alert,
+	Switch,
 } from "react-native";
 import { useUser } from "../../contexts/UserContext";
 import { Ionicons } from "@expo/vector-icons";
@@ -71,6 +71,7 @@ const AvailabilityPage = () => {
 	const [reminderModalVisible, setReminderModalVisible] = useState(false);
 	const [reminderHours, setReminderHours] = useState("24");
 	const [reminderMinutes, setReminderMinutes] = useState("0");
+	const [remindersEnabled, setRemindersEnabled] = useState(true);
 	const { userId, companyId, isAdmin } = useUser();
 
 	useEffect(() => {
@@ -364,9 +365,12 @@ const AvailabilityPage = () => {
 			const currentHours = preferences?.availabilityReminderHours || 24;
 			const currentMinutes =
 				preferences?.availabilityReminderMinutes || 0;
+			const currentEnabled =
+				preferences?.availabilityReminderEnabled !== false; // Default to true if undefined
 
 			setReminderHours(currentHours.toString());
 			setReminderMinutes(currentMinutes.toString());
+			setRemindersEnabled(currentEnabled);
 			setReminderModalVisible(true);
 		} catch (error) {
 			console.error("Error fetching reminder preferences:", error);
@@ -381,7 +385,7 @@ const AvailabilityPage = () => {
 			await updateCompanyPreferences(companyId, {
 				availabilityReminderHours: hours,
 				availabilityReminderMinutes: minutes,
-				availabilityReminderEnabled: true,
+				availabilityReminderEnabled: remindersEnabled,
 			});
 
 			setReminderModalVisible(false);
@@ -523,44 +527,91 @@ const AvailabilityPage = () => {
 
 						<ScrollView style={styles.modalBody}>
 							<Text style={styles.modalDescription}>
-								Set how often workers should be reminded to
-								confirm their availability.
+								Configure when and how often workers should be
+								reminded to confirm their availability.
 							</Text>
 
-							<View style={styles.timeInputContainer}>
-								<View style={styles.inputGroup}>
-									<Text style={styles.inputLabel}>Hours</Text>
-									<TextInput
-										style={styles.timeInput}
-										value={reminderHours}
-										onChangeText={setReminderHours}
-										keyboardType="numeric"
-										placeholder="24"
-									/>
-								</View>
-
-								<Text style={styles.timeSeparator}>:</Text>
-
-								<View style={styles.inputGroup}>
-									<Text style={styles.inputLabel}>
-										Minutes
+							{/* Toggle Switch for Reminders */}
+							<View style={styles.toggleContainer}>
+								<View style={styles.toggleLabelContainer}>
+									<Text style={styles.toggleLabel}>
+										Enable Reminders
 									</Text>
-									<TextInput
-										style={styles.timeInput}
-										value={reminderMinutes}
-										onChangeText={setReminderMinutes}
-										keyboardType="numeric"
-										placeholder="0"
-									/>
+									<Text style={styles.toggleSubLabel}>
+										Send automatic reminders to workers
+									</Text>
 								</View>
+								<Switch
+									value={remindersEnabled}
+									onValueChange={setRemindersEnabled}
+									trackColor={{
+										false: "#E5E7EB",
+										true: "#93C5FD",
+									}}
+									thumbColor={
+										remindersEnabled ? "#4A90E2" : "#F3F4F6"
+									}
+									ios_backgroundColor="#E5E7EB"
+								/>
 							</View>
 
-							<Text style={styles.previewText}>
-								Workers will be reminded every{" "}
-								{reminderHours || "24"} hours and{" "}
-								{reminderMinutes || "0"} minutes until they
-								confirm or decline their event.
-							</Text>
+							{/* Time inputs - only show when reminders are enabled */}
+							{remindersEnabled && (
+								<>
+									<Text style={styles.sectionLabel}>
+										Reminder Frequency
+									</Text>
+									<View style={styles.timeInputContainer}>
+										<View style={styles.inputGroup}>
+											<Text style={styles.inputLabel}>
+												Hours
+											</Text>
+											<TextInput
+												style={styles.timeInput}
+												value={reminderHours}
+												onChangeText={setReminderHours}
+												keyboardType="numeric"
+												placeholder="24"
+											/>
+										</View>
+
+										<Text style={styles.timeSeparator}>
+											:
+										</Text>
+
+										<View style={styles.inputGroup}>
+											<Text style={styles.inputLabel}>
+												Minutes
+											</Text>
+											<TextInput
+												style={styles.timeInput}
+												value={reminderMinutes}
+												onChangeText={
+													setReminderMinutes
+												}
+												keyboardType="numeric"
+												placeholder="0"
+											/>
+										</View>
+									</View>
+
+									<Text style={styles.previewText}>
+										Workers will be reminded every{" "}
+										{reminderHours || "24"} hours and{" "}
+										{reminderMinutes || "0"} minutes until
+										they confirm or decline their event.
+									</Text>
+								</>
+							)}
+
+							{/* Disabled state message */}
+							{!remindersEnabled && (
+								<Text style={styles.disabledText}>
+									Reminders are disabled. Workers will not
+									receive automatic notifications to confirm
+									their availability.
+								</Text>
+							)}
 						</ScrollView>
 
 						<View style={styles.modalFooter}>
@@ -923,6 +974,47 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		fontWeight: "600",
 		color: "#FFFFFF",
+	},
+	toggleContainer: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		paddingVertical: 16,
+		paddingHorizontal: 16,
+		backgroundColor: "#F9FAFB",
+		borderRadius: 12,
+		marginBottom: 24,
+	},
+	toggleLabelContainer: {
+		flex: 1,
+		marginRight: 16,
+	},
+	toggleLabel: {
+		fontSize: 16,
+		fontWeight: "600",
+		color: "#1F2937",
+		marginBottom: 2,
+	},
+	toggleSubLabel: {
+		fontSize: 13,
+		color: "#6B7280",
+	},
+	sectionLabel: {
+		fontSize: 14,
+		fontWeight: "600",
+		color: "#374151",
+		marginBottom: 12,
+	},
+	disabledText: {
+		fontSize: 14,
+		color: "#6B7280",
+		textAlign: "center",
+		backgroundColor: "#FEF3C7",
+		padding: 16,
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: "#F59E0B",
+		marginTop: 16,
 	},
 });
 
