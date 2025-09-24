@@ -30,6 +30,8 @@ import { useUploadManager } from "../../contexts/UploadManagerContext";
 import { getEventAttachments, updateEvent } from "../../services/eventService";
 import { getEventPackages, getPackages } from "../../services/packageService";
 import db from "../../constants/firestore";
+import { getWorkerStatusList } from "../../services/availabilityService";
+import { useCompany } from "../../contexts/CompanyContext";
 
 const EventSubmit = ({ navigation }) => {
 	const insets = useSafeAreaInsets();
@@ -63,8 +65,6 @@ const EventSubmit = ({ navigation }) => {
 		openEndTime,
 		isLoading,
 		isEditing,
-		availableWorkers,
-		setAvailableWorkers,
 		editingLabelForAddress,
 		setEditingLabelForAddress,
 		labelText,
@@ -99,9 +99,14 @@ const EventSubmit = ({ navigation }) => {
 	const [selectedLabelId, setSelectedLabelId] = useState(null);
 	const [loadingLabels, setLoadingLabels] = useState(false);
 	const [openLabelsDropdown, setOpenLabelsDropdown] = useState(false);
+	const [availableWorkers, setAvailableWorkers] = useState([]);
+
+	const { preferences } = useCompany();
 
 	// Add these at the top of your component
 	const isMounted = useRef(true);
+
+	console.log(availableWorkers);
 
 	// Add at the beginning of the component
 	useEffect(() => {
@@ -110,6 +115,40 @@ const EventSubmit = ({ navigation }) => {
 			isMounted.current = false;
 		};
 	}, []);
+
+	const sortWorkersByStatus = (workers, workerStatus) => {
+		if (!workers.length) return workers;
+
+		return workers.sort((a, b) => {
+			// Get status from workerStatus map, default to "pending" if not found
+			const statusA = workerStatus
+				? workerStatus[a.value] || "pending"
+				: "pending";
+			const statusB = workerStatus
+				? workerStatus[b.value] || "pending"
+				: "pending";
+
+			// Define priority order: confirmed -> pending -> declined
+			const statusPriority = { confirmed: 0, pending: 1, declined: 2 };
+
+			// Sort by status priority first
+			const priorityDiff =
+				statusPriority[statusA] - statusPriority[statusB];
+
+			// If same priority, sort alphabetically by name
+			if (priorityDiff === 0) {
+				const nameA = a.userData
+					? `${a.userData.firstName} ${a.userData.lastName}`
+					: a.label;
+				const nameB = b.userData
+					? `${b.userData.firstName} ${b.userData.lastName}`
+					: b.label;
+				return nameA.localeCompare(nameB);
+			}
+
+			return priorityDiff;
+		});
+	};
 
 	// Load available workers
 	useEffect(() => {
@@ -124,15 +163,59 @@ const EventSubmit = ({ navigation }) => {
 						return {
 							label: `${userData.firstName} ${userData.lastName}`,
 							value: doc.id,
+							userData: userData,
 						};
 					}),
 				);
-				setAvailableWorkers(workers);
+
+				// If editing an event, fetch worker status and enhance labels for ALL workers
+				if (eventId && preferences.enableAvailability == true) {
+					try {
+						const workerStatus = await getWorkerStatusList(
+							currentCompany,
+							eventId,
+						);
+
+						// Enhance labels with status indicators for ALL workers
+						const enhancedWorkers = workers.map((worker) => {
+							// Get status - if not in workerStatus map, it's "pending"
+							const status =
+								workerStatus[worker.value] || "pending";
+							const statusEmoji = {
+								confirmed: "✅",
+								pending: "⏳",
+								declined: "❌",
+							};
+
+							return {
+								...worker,
+								label: `${statusEmoji[status]} ${worker.userData.firstName} ${worker.userData.lastName}`,
+								status: status, // Add status to the worker object for easier filtering
+							};
+						});
+
+						// Sort all relevant workers by status priority
+						const sortedWorkers = sortWorkersByStatus(
+							enhancedWorkers,
+							workerStatus,
+						);
+
+						setAvailableWorkers(sortedWorkers); // Show all workers in dropdown, but with status indicators
+					} catch (error) {
+						console.error(
+							"Error fetching worker status for sorting:",
+							error,
+						);
+						setAvailableWorkers(workers);
+					}
+				} else {
+					setAvailableWorkers(workers);
+				}
 			},
 		);
 
 		return () => subscriber();
-	}, [currentCompany]);
+	}, [currentCompany, eventId]); // Remove assignedWorkers from dependencies
 
 	// Load packages
 	useEffect(() => {
@@ -231,17 +314,6 @@ const EventSubmit = ({ navigation }) => {
 	}, [eventId, currentCompany]);
 
 	const canSubmit = () => {
-		// if (hasFormChanged()) {
-		// 	return true;
-		// } else if (attachmentDeletionQueue.length > 0) {
-		// 	return true;
-		// } else if (
-		// 	selectedPackages.length > ogSelectedPackages.length ||
-		// 	selectedPackages.length < ogSelectedPackages.length
-		// ) {
-		// 	return true;
-		// }
-
 		return true;
 	};
 

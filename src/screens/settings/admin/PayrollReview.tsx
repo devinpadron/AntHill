@@ -20,13 +20,12 @@ import {
 } from "date-fns";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { useUser } from "../../../contexts/UserContext";
-import { getAllTimeEntries } from "../../../services/timeEntryService";
+import { subscribeAllTimeEntries } from "../../../services/timeEntryService";
 import { getUser } from "../../../services/userService";
 import DatePicker from "react-native-date-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useCompany } from "../../../contexts/CompanyContext";
-import { useFocusEffect } from "@react-navigation/native";
-import { useCallback } from "react";
+import { TimeEntry } from "../../../types";
 
 const PayrollReview = ({ navigation }) => {
 	// UI state
@@ -56,26 +55,32 @@ const PayrollReview = ({ navigation }) => {
 	useEffect(() => {
 		setIsLoading(true);
 		// This will execute when the screen comes into focus
-		fetchTimeEntries();
+		const subData = async () => {
+			await subscribeAllTimeEntries(
+				null, // No specific userId, get all employees
+				companyId,
+				(snapshot) => {
+					const entries: any = snapshot.docs.map((doc) => ({
+						id: doc.id,
+						...doc.data(),
+					}));
+					fetchTimeEntries(entries);
+				},
+				startDate.toISOString(),
+				endDate.toISOString(),
+			);
+		};
+		subData();
 		return () => {
 			// Optional cleanup function
 		};
 	}, [startDate, endDate, companyId]);
 
 	// Fetch time entries for the selected date range
-	const fetchTimeEntries = async () => {
+	const fetchTimeEntries = async (entries: TimeEntry[]) => {
 		if (!companyId) return;
 
 		try {
-			// Get all entries for company within date range
-			// We'll filter by status "pending_approval" or "approved" on the front-end
-			const entries = await getAllTimeEntries(
-				null, // No specific userId, get all employees
-				companyId,
-				startDate.toISOString(),
-				endDate.toISOString(),
-			);
-
 			// Get user details for each unique userId
 			const userIds = Array.from(
 				new Set(entries.map((entry) => entry.userId)),
@@ -463,15 +468,7 @@ const PayrollReview = ({ navigation }) => {
 					</Text>
 				</View>
 			) : (
-				<ScrollView
-					style={styles.content}
-					refreshControl={
-						<RefreshControl
-							refreshing={false}
-							onRefresh={fetchTimeEntries}
-						/>
-					}
-				>
+				<ScrollView style={styles.content}>
 					{entriesByEmployee.map((employeeGroup) => (
 						<View
 							key={employeeGroup.userId}
