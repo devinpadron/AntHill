@@ -1160,7 +1160,6 @@ const styles = StyleSheet.create({
 		top: 0,
 	},
 	dropdownItem: {
-		padding: 12,
 		borderBottomWidth: 1,
 		borderBottomColor: "#f0f0f0",
 		minHeight: 40,

@@ -15,9 +15,11 @@ import {
 	ScrollView,
 	Alert,
 	Switch,
+	Dimensions,
 } from "react-native";
 import { useUser } from "../../contexts/UserContext";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import {
 	confirmEvent,
 	declineEvent,
@@ -30,6 +32,8 @@ import {
 } from "../../services/companyService";
 import { fetchUpcomingEventsForUser } from "../../services/availabilityService"; // Add this import
 
+const { width: screenWidth } = Dimensions.get("window");
+
 const TabIndicator = ({ activeTab }) => {
 	// Animated tab indicator
 	const [translateX] = useState(new Animated.Value(0));
@@ -39,26 +43,28 @@ const TabIndicator = ({ activeTab }) => {
 		if (activeTab === "confirmed") position = 1;
 		if (activeTab === "declined") position = 2;
 
+		// Calculate tab width and indicator width
+		const tabWidth = (screenWidth - 32) / 3; // 32 for horizontal padding
+		const indicatorWidth = tabWidth * 0.6; // 60% of tab width
+		const centerOffset = (tabWidth - indicatorWidth) / 2;
+
 		Animated.spring(translateX, {
-			toValue: position,
+			toValue: position * tabWidth + centerOffset,
 			useNativeDriver: true,
 			friction: 8,
 		}).start();
 	}, [activeTab]);
+
+	const tabWidth = (screenWidth - 32) / 3;
+	const indicatorWidth = tabWidth * 0.6;
 
 	return (
 		<Animated.View
 			style={[
 				styles.tabIndicator,
 				{
-					transform: [
-						{
-							translateX: translateX.interpolate({
-								inputRange: [0, 1, 2],
-								outputRange: [0, 120, 240], // Adjust based on tab width
-							}),
-						},
-					],
+					width: indicatorWidth,
+					transform: [{ translateX }],
 				},
 			]}
 		/>
@@ -74,6 +80,13 @@ const AvailabilityPage = () => {
 	const [reminderMinutes, setReminderMinutes] = useState("0");
 	const [remindersEnabled, setRemindersEnabled] = useState(true);
 	const { userId, companyId, isAdmin } = useUser();
+
+	// Refresh data every time the screen comes into focus
+	useFocusEffect(
+		React.useCallback(() => {
+			fetchEventsFromFirebase();
+		}, [userId, companyId]),
+	);
 
 	useEffect(() => {
 		fetchEventsFromFirebase();
@@ -97,19 +110,25 @@ const AvailabilityPage = () => {
 				// Create a set of dates where the user already has assigned events
 				const assignedEventDates = new Set(
 					assignedEvents?.map((event) => {
-						const eventDate = new Date(event.date);
-						return eventDate.toDateString(); // Use date string for comparison
+						return event.date; // Use the date string directly for comparison
 					}) || [],
 				);
 
 				// Transform the fetched events to match the UI requirements
 				const formattedEvents = fetchedEvents.map((event) => {
-					// Parse the start time to get a date object
-					const startDate = new Date(event.date);
-					const eventDateString = startDate.toDateString();
+					// Use the date string directly from Firebase (YYYY-MM-DD format)
+					const eventDateString = event.date;
+
+					// Parse the date string correctly to avoid timezone issues
+					const [year, month, day] = event.date.split("-");
+					const eventDate = new Date(
+						parseInt(year),
+						parseInt(month) - 1,
+						parseInt(day),
+					);
 
 					// Format date to a user-friendly string
-					const formattedDate = startDate.toLocaleDateString("en-US");
+					const formattedDate = eventDate.toLocaleDateString("en-US");
 
 					// Set location based on event.locations map (address -> {lat, lng})
 					let location = "Location TBD";
@@ -131,15 +150,20 @@ const AvailabilityPage = () => {
 						if (userStatus === "confirmed") {
 							status = "on_potential_event";
 							confirmed = true;
+						} else if (userStatus === "declined") {
+							status = "on_potential_event";
+							confirmed = false;
 						}
 					}
 
 					// Check if user is already assigned to another event on the same day
+					// Only override status if user hasn't responded to this event yet
 					if (
 						assignedEventDates.has(eventDateString) &&
 						status === "available"
 					) {
 						status = "already_on_event";
+						// Don't change confirmed status - keep it false so it shows in unconfirmed tab
 					}
 
 					return {
@@ -195,9 +219,13 @@ const AvailabilityPage = () => {
 	const getFilteredEvents = () => {
 		switch (activeTab) {
 			case "unconfirmed":
-				// Only show available events that haven't been responded to yet
+				// Show available events and already_on_event events that haven't been responded to
 				return events.filter(
-					(event) => event.status === "available" && !event.confirmed,
+					(event) =>
+						(event.status === "available" ||
+							event.status === "already_on_event" ||
+							event.status === "on_potential_event") &&
+						!event.confirmed,
 				);
 			case "confirmed":
 				return events.filter((event) => event.confirmed === true);
@@ -205,7 +233,7 @@ const AvailabilityPage = () => {
 				return events.filter(
 					(event) =>
 						event.confirmed === false &&
-						event.status !== "available",
+						event.status === "on_potential_event",
 				);
 			default:
 				return events;
@@ -219,30 +247,46 @@ const AvailabilityPage = () => {
 					return "#4ADE80";
 				case "already_on_event":
 					return "#EF4444";
+				case "on_potential_event":
+					return "#F59E0B"; // Orange for confirmed/declined events
 				default:
 					return "#888888";
 			}
 		};
 
 		const getStatusText = () => {
-			switch (item.status) {
-				case "available":
-					return "Available";
-				case "already_on_event":
-					return "Already on Event";
-				default:
-					return "";
+			if (activeTab === "confirmed") {
+				return "Confirmed";
+			} else if (activeTab === "declined") {
+				return "Declined";
+			} else {
+				// Unconfirmed tab
+				switch (item.status) {
+					case "available":
+						return "Available";
+					case "already_on_event":
+						return "Already on Event";
+					default:
+						return "";
+				}
 			}
 		};
 
 		const getStatusIcon = () => {
-			switch (item.status) {
-				case "available":
-					return "checkmark-circle";
-				case "already_on_event":
-					return "calendar";
-				default:
-					return "help-circle";
+			if (activeTab === "confirmed") {
+				return "checkmark-circle";
+			} else if (activeTab === "declined") {
+				return "close-circle";
+			} else {
+				// Unconfirmed tab
+				switch (item.status) {
+					case "available":
+						return "checkmark-circle";
+					case "already_on_event":
+						return "calendar";
+					default:
+						return "help-circle";
+				}
 			}
 		};
 
@@ -267,8 +311,8 @@ const AvailabilityPage = () => {
 			);
 		};
 
-		// Only show status badge on the Unconfirmed tab
-		const showStatusBadge = activeTab === "unconfirmed";
+		// Show status badge on all tabs
+		const showStatusBadge = true;
 
 		// Only show colored border on the Unconfirmed tab
 		const cardStyle =
@@ -290,7 +334,7 @@ const AvailabilityPage = () => {
 						</View>
 					</View>
 
-					{/* Only show status badge on Unconfirmed tab */}
+					{/* Show status badge on all tabs */}
 					{showStatusBadge && (
 						<View
 							style={[
@@ -311,35 +355,37 @@ const AvailabilityPage = () => {
 					)}
 				</View>
 
-				{/* Show action buttons based on tab and status */}
-				{activeTab === "unconfirmed" && item.status === "available" && (
-					<View style={styles.buttonContainer}>
-						<TouchableOpacity
-							style={styles.declineButton}
-							onPress={handleDecline}
-							activeOpacity={0.7}
-						>
-							<Ionicons
-								name="close-circle"
-								size={16}
-								color="#fff"
-							/>
-							<Text style={styles.buttonText}>Decline</Text>
-						</TouchableOpacity>
-						<TouchableOpacity
-							style={styles.confirmButton}
-							onPress={handleConfirm}
-							activeOpacity={0.7}
-						>
-							<Ionicons
-								name="checkmark-circle"
-								size={16}
-								color="#fff"
-							/>
-							<Text style={styles.buttonText}>Confirm</Text>
-						</TouchableOpacity>
-					</View>
-				)}
+				{/* Show action buttons for available and already_on_event status */}
+				{activeTab === "unconfirmed" &&
+					(item.status === "available" ||
+						item.status === "already_on_event") && (
+						<View style={styles.buttonContainer}>
+							<TouchableOpacity
+								style={styles.declineButton}
+								onPress={handleDecline}
+								activeOpacity={0.7}
+							>
+								<Ionicons
+									name="close-circle"
+									size={16}
+									color="#fff"
+								/>
+								<Text style={styles.buttonText}>Decline</Text>
+							</TouchableOpacity>
+							<TouchableOpacity
+								style={styles.confirmButton}
+								onPress={handleConfirm}
+								activeOpacity={0.7}
+							>
+								<Ionicons
+									name="checkmark-circle"
+									size={16}
+									color="#fff"
+								/>
+								<Text style={styles.buttonText}>Confirm</Text>
+							</TouchableOpacity>
+						</View>
+					)}
 
 				{/* Show Undecline button on the Declined tab */}
 				{activeTab === "declined" && (
@@ -719,7 +765,6 @@ const styles = StyleSheet.create({
 	tabIndicator: {
 		position: "absolute",
 		bottom: 0,
-		width: 120, // Adjust based on screen width and number of tabs
 		height: 3,
 		backgroundColor: "#4A90E2",
 		borderRadius: 3,
