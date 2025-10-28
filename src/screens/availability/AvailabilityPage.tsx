@@ -31,6 +31,8 @@ import {
 	getCompanyPreferences,
 } from "../../services/companyService";
 import { fetchUpcomingEventsForUser } from "../../services/availabilityService"; // Add this import
+import { getAllUsersInCompany } from "../../services/companyService"; // Import the new service
+import { User } from "../../types";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -71,7 +73,7 @@ const TabIndicator = ({ activeTab }) => {
 	);
 };
 
-const AvailabilityPage = () => {
+const AvailabilityPage = ({ navigation }) => {
 	const [activeTab, setActiveTab] = useState("unconfirmed");
 	const [events, setEvents] = useState([]);
 	const [loading, setLoading] = useState(true);
@@ -79,6 +81,14 @@ const AvailabilityPage = () => {
 	const [reminderHours, setReminderHours] = useState("24");
 	const [reminderMinutes, setReminderMinutes] = useState("0");
 	const [remindersEnabled, setRemindersEnabled] = useState(true);
+	const [adminModalVisible, setAdminModalVisible] = useState(false);
+	const [selectedEventForAdmin, setSelectedEventForAdmin] = useState(null);
+	const [eventWorkerDetails, setEventWorkerDetails] = useState({
+		confirmed: [],
+		declined: [],
+		unconfirmed: [],
+	});
+	const [loadingWorkerDetails, setLoadingWorkerDetails] = useState(false);
 	const { userId, companyId, isAdmin } = useUser();
 
 	// Refresh data every time the screen comes into focus
@@ -127,8 +137,16 @@ const AvailabilityPage = () => {
 						parseInt(day),
 					);
 
-					// Format date to a user-friendly string
-					const formattedDate = eventDate.toLocaleDateString("en-US");
+					// Format date to a user-friendly string - UPDATE THIS PART:
+					const formattedDate = eventDate.toLocaleDateString(
+						"en-US",
+						{
+							weekday: "short", // Mon, Tue, Wed, etc.
+							month: "short", // Jan, Feb, Mar, etc.
+							day: "numeric", // 1, 2, 3, etc.
+							year: "numeric", // 2024, 2025, etc.
+						},
+					);
 
 					// Set location based on event.locations map (address -> {lat, lng})
 					let location = "Location TBD";
@@ -322,84 +340,103 @@ const AvailabilityPage = () => {
 
 		return (
 			<Animated.View style={cardStyle}>
-				<View style={styles.eventHeader}>
-					<View style={styles.dateLocationContainer}>
-						<Text style={styles.eventTitle}>{item.title}</Text>
-						<Text style={styles.eventDate}>{item.date}</Text>
-						<View style={styles.locationContainer}>
-							<Ionicons name="location" size={14} color="#666" />
-							<Text style={styles.eventLocation}>
-								{item.location}
-							</Text>
+				<TouchableOpacity
+					onPress={
+						isAdmin ? () => handleAdminEventPress(item) : undefined
+					}
+					activeOpacity={isAdmin ? 0.7 : 1}
+				>
+					<View style={styles.eventHeader}>
+						<View style={styles.dateLocationContainer}>
+							<Text style={styles.eventTitle}>{item.title}</Text>
+							<Text style={styles.eventDate}>{item.date}</Text>
+							<View style={styles.locationContainer}>
+								<Ionicons
+									name="location"
+									size={14}
+									color="#666"
+								/>
+								<Text style={styles.eventLocation}>
+									{item.location}
+								</Text>
+							</View>
 						</View>
+
+						{/* Show status badge on all tabs */}
+						{showStatusBadge && (
+							<View
+								style={[
+									styles.statusBadge,
+									{ backgroundColor: getStatusColor() },
+								]}
+							>
+								<Ionicons
+									name={getStatusIcon()}
+									size={14}
+									color="#fff"
+									style={styles.statusIcon}
+								/>
+								<Text style={styles.statusBadgeText}>
+									{getStatusText()}
+								</Text>
+							</View>
+						)}
 					</View>
 
-					{/* Show status badge on all tabs */}
-					{showStatusBadge && (
-						<View
-							style={[
-								styles.statusBadge,
-								{ backgroundColor: getStatusColor() },
-							]}
-						>
-							<Ionicons
-								name={getStatusIcon()}
-								size={14}
-								color="#fff"
-								style={styles.statusIcon}
-							/>
-							<Text style={styles.statusBadgeText}>
-								{getStatusText()}
-							</Text>
-						</View>
-					)}
-				</View>
+					{/* Show action buttons for available and already_on_event status */}
+					{activeTab === "unconfirmed" &&
+						(item.status === "available" ||
+							item.status === "already_on_event") && (
+							<View style={styles.buttonContainer}>
+								<TouchableOpacity
+									style={styles.declineButton}
+									onPress={handleDecline}
+									activeOpacity={0.7}
+								>
+									<Ionicons
+										name="close-circle"
+										size={16}
+										color="#fff"
+									/>
+									<Text style={styles.buttonText}>
+										Decline
+									</Text>
+								</TouchableOpacity>
+								<TouchableOpacity
+									style={styles.confirmButton}
+									onPress={handleConfirm}
+									activeOpacity={0.7}
+								>
+									<Ionicons
+										name="checkmark-circle"
+										size={16}
+										color="#fff"
+									/>
+									<Text style={styles.buttonText}>
+										Confirm
+									</Text>
+								</TouchableOpacity>
+							</View>
+						)}
 
-				{/* Show action buttons for available and already_on_event status */}
-				{activeTab === "unconfirmed" &&
-					(item.status === "available" ||
-						item.status === "already_on_event") && (
+					{/* Show Undecline button on the Declined tab */}
+					{activeTab === "declined" && (
 						<View style={styles.buttonContainer}>
 							<TouchableOpacity
-								style={styles.declineButton}
-								onPress={handleDecline}
+								style={styles.undeclineButton}
+								onPress={handleUndecline}
 								activeOpacity={0.7}
 							>
 								<Ionicons
-									name="close-circle"
+									name="refresh"
 									size={16}
 									color="#fff"
 								/>
-								<Text style={styles.buttonText}>Decline</Text>
-							</TouchableOpacity>
-							<TouchableOpacity
-								style={styles.confirmButton}
-								onPress={handleConfirm}
-								activeOpacity={0.7}
-							>
-								<Ionicons
-									name="checkmark-circle"
-									size={16}
-									color="#fff"
-								/>
-								<Text style={styles.buttonText}>Confirm</Text>
+								<Text style={styles.buttonText}>Undecline</Text>
 							</TouchableOpacity>
 						</View>
 					)}
-
-				{/* Show Undecline button on the Declined tab */}
-				{activeTab === "declined" && (
-					<View style={styles.buttonContainer}>
-						<TouchableOpacity
-							style={styles.undeclineButton}
-							onPress={handleUndecline}
-							activeOpacity={0.7}
-						>
-							<Ionicons name="refresh" size={16} color="#fff" />
-							<Text style={styles.buttonText}>Undecline</Text>
-						</TouchableOpacity>
-					</View>
-				)}
+				</TouchableOpacity>
 			</Animated.View>
 		);
 	};
@@ -452,6 +489,67 @@ const AvailabilityPage = () => {
 			console.error("Error saving reminder preferences:", error);
 			Alert.alert("Error", "Failed to save reminder settings");
 		}
+	};
+
+	// Add this function before your return statement
+	const fetchEventWorkerDetails = async (event) => {
+		setLoadingWorkerDetails(true);
+		try {
+			// Get all users in the company (returns a map)
+			const usersMap = await getAllUsersInCompany(companyId);
+
+			// Convert the map to an array of users
+			const allUsers = Object.values(usersMap);
+
+			// Get worker status for this event from the event's workerStatus map
+			const workerStatus = event.rawData.workerStatus || {};
+
+			// Categorize users based on their status in the workerStatus map
+			const categorizedUsers = {
+				confirmed: [],
+				declined: [],
+				unconfirmed: [],
+			};
+
+			allUsers.forEach((user: User) => {
+				const userStatus = workerStatus[user.id];
+
+				const userWithStatus = {
+					...user,
+					status: userStatus || "available", // No status means they're available
+				};
+
+				if (userStatus === "confirmed") {
+					categorizedUsers.confirmed.push(userWithStatus);
+				} else if (userStatus === "declined") {
+					categorizedUsers.declined.push(userWithStatus);
+				} else if (userStatus === "pending") {
+					// User has been notified but hasn't responded
+					categorizedUsers.unconfirmed.push({
+						...userWithStatus,
+						status: "pending",
+					});
+				} else {
+					// User has no status in the map - they're available
+					categorizedUsers.unconfirmed.push({
+						...userWithStatus,
+						status: "pending",
+					});
+				}
+			});
+
+			setEventWorkerDetails(categorizedUsers);
+		} catch (error) {
+			console.error("Error fetching worker details:", error);
+		} finally {
+			setLoadingWorkerDetails(false);
+		}
+	};
+
+	const handleAdminEventPress = (event) => {
+		setSelectedEventForAdmin(event);
+		setAdminModalVisible(true);
+		fetchEventWorkerDetails(event);
 	};
 
 	// Update the header to include admin button
@@ -687,6 +785,284 @@ const AvailabilityPage = () => {
 							>
 								<Text style={styles.saveButtonText}>
 									Save Settings
+								</Text>
+							</TouchableOpacity>
+						</View>
+					</View>
+				</KeyboardAvoidingView>
+			</Modal>
+
+			{/* Admin modal for event details - new feature */}
+			<Modal
+				visible={adminModalVisible}
+				transparent={true}
+				animationType="slide"
+				onRequestClose={() => setAdminModalVisible(false)}
+			>
+				<KeyboardAvoidingView
+					style={styles.modalOverlay}
+					behavior={Platform.OS === "ios" ? "padding" : "height"}
+				>
+					<View style={styles.adminModalContent}>
+						<View style={styles.modalHeader}>
+							<Text style={styles.modalTitle}>
+								Event Worker Status
+							</Text>
+							<TouchableOpacity
+								onPress={() => setAdminModalVisible(false)}
+								style={styles.closeButton}
+							>
+								<Ionicons
+									name="close"
+									size={24}
+									color="#6B7280"
+								/>
+							</TouchableOpacity>
+						</View>
+
+						{selectedEventForAdmin && (
+							<View style={styles.eventInfoHeader}>
+								<Text style={styles.eventInfoTitle}>
+									{selectedEventForAdmin.title}
+								</Text>
+								<Text style={styles.eventInfoDate}>
+									{selectedEventForAdmin.date}
+								</Text>
+								<Text style={styles.eventInfoLocation}>
+									📍 {selectedEventForAdmin.location}
+								</Text>
+							</View>
+						)}
+
+						<ScrollView style={styles.adminModalBody}>
+							{loadingWorkerDetails ? (
+								<View style={styles.loadingContainer}>
+									<ActivityIndicator
+										size="large"
+										color="#4A90E2"
+									/>
+									<Text style={styles.loadingText}>
+										Loading worker details...
+									</Text>
+								</View>
+							) : (
+								<>
+									{/* Confirmed Users */}
+									<View style={styles.workerSection}>
+										<View style={styles.sectionHeaderRow}>
+											<Ionicons
+												name="checkmark-circle"
+												size={20}
+												color="#4ADE80"
+											/>
+											<Text style={styles.sectionTitle}>
+												Confirmed (
+												{
+													eventWorkerDetails.confirmed
+														.length
+												}
+												)
+											</Text>
+										</View>
+										{eventWorkerDetails.confirmed.length >
+										0 ? (
+											eventWorkerDetails.confirmed.map(
+												(user, index) => (
+													<View
+														key={index}
+														style={
+															styles.workerItem
+														}
+													>
+														<Text
+															style={
+																styles.workerName
+															}
+														>
+															{user.firstName}{" "}
+															{user.lastName}
+														</Text>
+														<View
+															style={[
+																styles.statusBadge,
+																{
+																	backgroundColor:
+																		"#4ADE80",
+																},
+															]}
+														>
+															<Text
+																style={
+																	styles.statusBadgeText
+																}
+															>
+																Confirmed
+															</Text>
+														</View>
+													</View>
+												),
+											)
+										) : (
+											<Text style={styles.emptyText}>
+												No confirmed workers
+											</Text>
+										)}
+									</View>
+
+									{/* Unconfirmed Users */}
+									<View style={styles.workerSection}>
+										<View style={styles.sectionHeaderRow}>
+											<Ionicons
+												name="help-circle-outline"
+												size={20}
+												color="#F59E0B"
+											/>
+											<Text style={styles.sectionTitle}>
+												Unconfirmed (
+												{
+													eventWorkerDetails
+														.unconfirmed.length
+												}
+												)
+											</Text>
+										</View>
+										{eventWorkerDetails.unconfirmed.length >
+										0 ? (
+											eventWorkerDetails.unconfirmed.map(
+												(user, index) => (
+													<View
+														key={index}
+														style={
+															styles.workerItem
+														}
+													>
+														<Text
+															style={
+																styles.workerName
+															}
+														>
+															{user.firstName}{" "}
+															{user.lastName}
+														</Text>
+														<View
+															style={[
+																styles.statusBadge,
+																{
+																	backgroundColor:
+																		user.status ===
+																		"conflicted"
+																			? "#EF4444"
+																			: "#F59E0B",
+																},
+															]}
+														>
+															<Text
+																style={
+																	styles.statusBadgeText
+																}
+															>
+																{user.status ===
+																"conflicted"
+																	? "Conflict"
+																	: "Pending"}
+															</Text>
+														</View>
+													</View>
+												),
+											)
+										) : (
+											<Text style={styles.emptyText}>
+												No unconfirmed workers
+											</Text>
+										)}
+									</View>
+
+									{/* Declined Users */}
+									<View style={styles.workerSection}>
+										<View style={styles.sectionHeaderRow}>
+											<Ionicons
+												name="close-circle-outline"
+												size={20}
+												color="#EF4444"
+											/>
+											<Text style={styles.sectionTitle}>
+												Declined (
+												{
+													eventWorkerDetails.declined
+														.length
+												}
+												)
+											</Text>
+										</View>
+										{eventWorkerDetails.declined.length >
+										0 ? (
+											eventWorkerDetails.declined.map(
+												(user, index) => (
+													<View
+														key={index}
+														style={
+															styles.workerItem
+														}
+													>
+														<Text
+															style={
+																styles.workerName
+															}
+														>
+															{user.firstName}{" "}
+															{user.lastName}
+														</Text>
+														<View
+															style={[
+																styles.statusBadge,
+																{
+																	backgroundColor:
+																		"#EF4444",
+																},
+															]}
+														>
+															<Text
+																style={
+																	styles.statusBadgeText
+																}
+															>
+																Declined
+															</Text>
+														</View>
+													</View>
+												),
+											)
+										) : (
+											<Text style={styles.emptyText}>
+												No declined workers
+											</Text>
+										)}
+									</View>
+								</>
+							)}
+						</ScrollView>
+
+						<View style={styles.adminModalFooter}>
+							<TouchableOpacity
+								style={styles.closeModalButton}
+								onPress={() => setAdminModalVisible(false)}
+							>
+								<Text style={styles.closeModalButtonText}>
+									Close
+								</Text>
+							</TouchableOpacity>
+
+							<TouchableOpacity
+								style={styles.openEventButton}
+								onPress={() => {
+									setAdminModalVisible(false);
+									navigation.navigate("EventDetails", {
+										eventId: selectedEventForAdmin.id,
+									});
+								}}
+							>
+								<Text style={styles.openEventButtonText}>
+									Open Event
 								</Text>
 							</TouchableOpacity>
 						</View>
@@ -1072,6 +1448,170 @@ const styles = StyleSheet.create({
 		borderWidth: 1,
 		borderColor: "#F59E0B",
 		marginTop: 16,
+	},
+	// New styles for admin event details modal
+	eventDetailsContainer: {
+		marginBottom: 24,
+	},
+	eventDetailsTitle: {
+		fontSize: 18,
+		fontWeight: "700",
+		color: "#1F2937",
+		marginBottom: 8,
+	},
+	eventDetailsDate: {
+		fontSize: 14,
+		color: "#6B7280",
+		marginBottom: 4,
+	},
+	eventDetailsLocation: {
+		fontSize: 14,
+		color: "#6B7280",
+		marginBottom: 16,
+	},
+	workerDetailsContainer: {
+		backgroundColor: "#F9FAFB",
+		borderRadius: 12,
+		padding: 16,
+	},
+	workerDetailsTitle: {
+		fontSize: 16,
+		fontWeight: "600",
+		color: "#374151",
+		marginBottom: 12,
+	},
+	workerGroup: {
+		marginBottom: 16,
+	},
+	workerGroupTitle: {
+		fontSize: 14,
+		fontWeight: "600",
+		color: "#1F2937",
+		marginBottom: 8,
+	},
+	workerCard: {
+		backgroundColor: "#FFFFFF",
+		borderRadius: 8,
+		padding: 12,
+		marginBottom: 8,
+		...Platform.select({
+			ios: {
+				shadowColor: "#000",
+				shadowOffset: { width: 0, height: 2 },
+				shadowOpacity: 0.05,
+				shadowRadius: 4,
+			},
+			android: {
+				elevation: 2,
+			},
+		}),
+	},
+	workerName: {
+		fontSize: 14,
+		fontWeight: "500",
+		color: "#374151",
+		flex: 1,
+	},
+	workerStatus: {
+		fontSize: 13,
+		color: "#6B7280",
+		marginTop: 4,
+	},
+	adminModalContent: {
+		backgroundColor: "#FFFFFF",
+		borderRadius: 16,
+		width: "95%",
+		maxHeight: "90%",
+		overflow: "hidden",
+	},
+	adminModalBody: {
+		maxHeight: 400,
+	},
+	eventInfoHeader: {
+		padding: 20,
+		backgroundColor: "#F9FAFB",
+		borderBottomWidth: 1,
+		borderBottomColor: "#E5E7EB",
+	},
+	eventInfoTitle: {
+		fontSize: 18,
+		fontWeight: "700",
+		color: "#1F2937",
+		marginBottom: 4,
+	},
+	eventInfoDate: {
+		fontSize: 14,
+		color: "#6B7280",
+		marginBottom: 2,
+	},
+	eventInfoLocation: {
+		fontSize: 14,
+		color: "#6B7280",
+	},
+	workerSection: {
+		paddingHorizontal: 20,
+		paddingVertical: 16,
+		borderBottomWidth: 1,
+		borderBottomColor: "#F3F4F6",
+	},
+	sectionHeaderRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginBottom: 12,
+	},
+	sectionTitle: {
+		fontSize: 16,
+		fontWeight: "600",
+		color: "#374151",
+		marginLeft: 8,
+	},
+	workerItem: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		paddingVertical: 8,
+		paddingHorizontal: 12,
+		backgroundColor: "#F9FAFB",
+		borderRadius: 8,
+		marginBottom: 8,
+	},
+	emptyText: {
+		fontSize: 14,
+		color: "#9CA3AF",
+		fontStyle: "italic",
+		textAlign: "center",
+		paddingVertical: 12,
+	},
+	adminModalFooter: {
+		flexDirection: "row",
+		padding: 20,
+		borderTopWidth: 1,
+		borderTopColor: "#E5E7EB",
+		gap: 12, // Add spacing between buttons
+	},
+	closeModalButton: {
+		flex: 1,
+		paddingVertical: 12,
+		backgroundColor: "#6B7280",
+		borderRadius: 8,
+		alignItems: "center",
+	},
+	closeModalButtonText: {
+		fontSize: 16,
+		fontWeight: "600",
+		color: "#FFFFFF",
+	},
+	openEventButton: {
+		flex: 1,
+		paddingVertical: 12,
+		backgroundColor: "#4A90E2",
+		borderRadius: 8,
+		alignItems: "center",
+	},
+	openEventButtonText: {
+		fontSize: 16,
+		fontWeight: "600",
+		color: "#FFFFFF",
 	},
 });
 
