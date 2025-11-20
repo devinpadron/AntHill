@@ -6,7 +6,7 @@
 
 **Organize your team. Empower your employees. Focus on what matters.**
 
-[Website](https://www.anthillapp.com) • [Demo Video](https://www.anthillapp.com) • [Get Started](#getting-started)
+[Website](https://www.anthillapp.com) • [Demo Video](https://www.anthillapp.com/about-us) • [Get Started](#getting-started)
 
 </div>
 
@@ -126,7 +126,7 @@ npm run android
 ## 📚 Learn More
 
 - **Website:** [anthillapp.com](https://www.anthillapp.com)
-- **Demo Video:** Watch our full walkthrough at [anthillapp.com](https://www.anthillapp.com)
+- **Demo Video:** Watch our full walkthrough at [anthillapp.com/about-us](https://www.anthillapp.com/about-us)
 - **Documentation:** See [.github/copilot-instructions.md](.github/copilot-instructions.md) for development guidelines
 
 ---
