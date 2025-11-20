@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { useTheme } from "../../contexts/ThemeContext";
 
 type CheckboxProps = {
 	checked: boolean;
@@ -14,6 +15,8 @@ export const Checkbox: React.FC<CheckboxProps> = ({
 	label,
 	disabled = false,
 }) => {
+	const { theme } = useTheme();
+
 	return (
 		<TouchableOpacity
 			style={styles.checkboxRow}
@@ -23,8 +26,16 @@ export const Checkbox: React.FC<CheckboxProps> = ({
 			<View
 				style={[
 					styles.checkbox,
-					checked && styles.checkboxSelected,
-					disabled && styles.checkboxDisabled,
+					{
+						borderColor: disabled
+							? theme.TertiaryText
+							: theme.SecondaryText,
+					},
+					checked && {
+						backgroundColor: theme.LocationBlue,
+						borderColor: theme.LocationBlue,
+					},
+					disabled && { backgroundColor: theme.DateBadge },
 				]}
 			>
 				{checked && <Text style={styles.checkmark}>✓</Text>}
@@ -32,7 +43,8 @@ export const Checkbox: React.FC<CheckboxProps> = ({
 			<Text
 				style={[
 					styles.checkboxLabel,
-					disabled && styles.checkboxLabelDisabled,
+					{ color: theme.PrimaryText },
+					disabled && { color: theme.TertiaryText },
 				]}
 			>
 				{label}
@@ -52,18 +64,9 @@ const styles = StyleSheet.create({
 		height: 22,
 		borderRadius: 4,
 		borderWidth: 1,
-		borderColor: "#ccc",
 		marginRight: 10,
 		justifyContent: "center",
 		alignItems: "center",
-	},
-	checkboxSelected: {
-		backgroundColor: "#2089dc",
-		borderColor: "#2089dc",
-	},
-	checkboxDisabled: {
-		backgroundColor: "#f0f0f0",
-		borderColor: "#e0e0e0",
 	},
 	checkmark: {
 		color: "white",
@@ -72,8 +75,5 @@ const styles = StyleSheet.create({
 	},
 	checkboxLabel: {
 		fontSize: 15,
-	},
-	checkboxLabelDisabled: {
-		color: "#999",
 	},
 });

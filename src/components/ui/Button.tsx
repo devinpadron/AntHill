@@ -9,6 +9,8 @@ import {
 	ViewStyle,
 	TextStyle,
 } from "react-native";
+import { useTheme } from "../../contexts/ThemeContext";
+import { Clock } from "../../constants/colors";
 
 export type ButtonVariant =
 	| "primary"
@@ -47,25 +49,81 @@ export const Button: React.FC<ButtonProps> = ({
 	textStyle,
 	selected = false,
 }) => {
-	// Determine the styles based on props
+	const { theme } = useTheme();
+
+	// Dynamic button background colors
+	const getButtonBackgroundColor = () => {
+		if (disabled) return theme.DateBadge;
+
+		switch (variant) {
+			case "primary":
+				return theme.LocationBlue;
+			case "secondary":
+				return theme.DateBadge;
+			case "outline":
+				return "transparent";
+			case "text":
+				return "transparent";
+			case "destructive":
+				return Clock.ClockOut;
+			default:
+				return theme.LocationBlue;
+		}
+	};
+
+	// Dynamic text colors
+	const getTextColor = () => {
+		if (disabled) return theme.TertiaryText;
+
+		switch (variant) {
+			case "primary":
+				return theme.CardBackground;
+			case "secondary":
+				return theme.PrimaryText;
+			case "outline":
+				return theme.LocationBlue;
+			case "text":
+				return theme.LocationBlue;
+			case "destructive":
+				return theme.CardBackground;
+			default:
+				return theme.CardBackground;
+		}
+	};
+
+	// Dynamic border color for outline variant
+	const getBorderColor = () => {
+		if (variant === "outline") {
+			return disabled ? theme.TertiaryText : theme.LocationBlue;
+		}
+		return "transparent";
+	};
+
 	const buttonStyles = [
 		styles.button,
-		styles[`${variant}Button`],
 		styles[`${size}Button`],
-		disabled && styles.disabledButton,
-		selected && styles.selectedButton,
+		{
+			backgroundColor: getButtonBackgroundColor(),
+			borderColor: getBorderColor(),
+			borderWidth: variant === "outline" ? 1 : 0,
+		},
+		selected && { backgroundColor: theme.SearchBar },
 		fullWidth && styles.fullWidth,
 		style,
 	];
 
 	const textStyles = [
 		styles.text,
-		styles[`${variant}Text`],
 		styles[`${size}Text`],
-		disabled && styles.disabledText,
-		selected && styles[`${variant}SelectedText`],
+		{ color: getTextColor() },
+		selected && variant === "text" && { fontWeight: "bold" as const },
 		textStyle,
 	];
+
+	const spinnerColor =
+		variant === "primary" || variant === "destructive"
+			? theme.CardBackground
+			: theme.LocationBlue;
 
 	return (
 		<TouchableOpacity
@@ -75,10 +133,7 @@ export const Button: React.FC<ButtonProps> = ({
 			activeOpacity={0.7}
 		>
 			{loading ? (
-				<ActivityIndicator
-					size="small"
-					color={variant === "primary" ? "#fff" : "#2089dc"}
-				/>
+				<ActivityIndicator size="small" color={spinnerColor} />
 			) : (
 				<View style={styles.contentContainer}>
 					{icon && iconPosition === "left" && (
@@ -104,24 +159,6 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		flexDirection: "row",
 	},
-	primaryButton: {
-		backgroundColor: "#2089dc",
-		borderWidth: 0,
-	},
-	secondaryButton: {
-		backgroundColor: "#e1e8ee",
-		borderWidth: 0,
-	},
-	outlineButton: {
-		backgroundColor: "transparent",
-		borderWidth: 1,
-		borderColor: "#2089dc",
-	},
-	textButton: {
-		backgroundColor: "transparent",
-		borderWidth: 0,
-		paddingHorizontal: 0,
-	},
 	smallButton: {
 		paddingVertical: 6,
 		paddingHorizontal: 12,
@@ -134,14 +171,6 @@ const styles = StyleSheet.create({
 		paddingVertical: 14,
 		paddingHorizontal: 20,
 	},
-	disabledButton: {
-		backgroundColor: "#e1e8ee",
-		borderColor: "#c4c4c4",
-	},
-	selectedButton: {
-		backgroundColor: "#e0e0e0",
-		borderColor: "#2089dc",
-	},
 	fullWidth: {
 		width: "100%",
 	},
@@ -149,18 +178,6 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 		fontWeight: "500",
 		fontSize: 16,
-	},
-	primaryText: {
-		color: "#ffffff",
-	},
-	secondaryText: {
-		color: "#1c1c1c",
-	},
-	outlineText: {
-		color: "#2089dc",
-	},
-	textText: {
-		color: "#2089dc",
 	},
 	smallText: {
 		fontSize: 14,
@@ -170,22 +187,6 @@ const styles = StyleSheet.create({
 	},
 	largeText: {
 		fontSize: 18,
-	},
-	disabledText: {
-		color: "#999999",
-	},
-	primarySelectedText: {
-		color: "#ffffff",
-	},
-	secondarySelectedText: {
-		color: "#1c1c1c",
-	},
-	outlineSelectedText: {
-		color: "#2089dc",
-	},
-	textSelectedText: {
-		color: "#2089dc",
-		fontWeight: "bold",
 	},
 	contentContainer: {
 		flexDirection: "row",
@@ -201,24 +202,5 @@ const styles = StyleSheet.create({
 	iconCenter: {
 		alignContent: "center",
 		justifyContent: "center",
-	},
-	destructiveButton: {
-		backgroundColor: "#f44336", // Red color
-		borderWidth: 0,
-	},
-	destructiveText: {
-		color: "#ffffff", // White text on red background
-	},
-	destructiveSelectedText: {
-		color: "#ffffff",
-		fontWeight: "bold",
-	},
-	disabledDestructiveButton: {
-		backgroundColor: "#ffcdd2", // Lighter red when disabled
-		opacity: 0.7,
-	},
-	disabledDestructiveText: {
-		color: "#ffffff",
-		opacity: 0.7,
 	},
 });

@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { useTheme } from "../../contexts/ThemeContext";
 
 type ToggleSwitchProps = {
 	value: boolean;
@@ -12,12 +13,23 @@ export const ToggleSwitch = ({
 	onValueChange,
 	label,
 }: ToggleSwitchProps) => {
+	const { theme } = useTheme();
+
 	return (
 		<TouchableOpacity
 			style={styles.toggleContainer}
 			onPress={() => onValueChange(!value)}
 		>
-			<View style={[styles.toggle, value && styles.toggleActive]}>
+			<View
+				style={[
+					styles.toggle,
+					{
+						backgroundColor: value
+							? theme.NotificationGreen
+							: theme.DateBadge,
+					},
+				]}
+			>
 				<View
 					style={[
 						styles.toggleButton,
@@ -25,7 +37,9 @@ export const ToggleSwitch = ({
 					]}
 				/>
 			</View>
-			<Text style={styles.toggleText}>{label}</Text>
+			<Text style={[styles.toggleText, { color: theme.PrimaryText }]}>
+				{label}
+			</Text>
 		</TouchableOpacity>
 	);
 };
@@ -41,11 +55,7 @@ const styles = StyleSheet.create({
 		width: 50,
 		height: 30,
 		borderRadius: 15,
-		backgroundColor: "#e0e0e0",
 		padding: 2,
-	},
-	toggleActive: {
-		backgroundColor: "#4CAF50",
 	},
 	toggleButton: {
 		width: 26,

@@ -24,6 +24,7 @@ import { useEvent } from "expo";
 import WebView from "react-native-webview";
 import { ImageZoom } from "@likashefqet/react-native-image-zoom";
 import { PanGestureHandler, State } from "react-native-gesture-handler";
+import { useTheme } from "../../contexts/ThemeContext";
 
 interface AttachmentGalleryProps {
 	attachments: AttachmentItem[];
@@ -32,6 +33,7 @@ interface AttachmentGalleryProps {
 const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 	attachments,
 }) => {
+	const { theme } = useTheme();
 	const [modalVisible, setModalVisible] = useState(false);
 	const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
 	const [savingMedia, setSavingMedia] = useState(false);
@@ -117,7 +119,7 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 			mimeType.includes("powerpoint")
 		)
 			return "#F39C12";
-		return "#95A5A6";
+		return theme.TertiaryText;
 	};
 
 	// Save media to device
@@ -670,7 +672,14 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 			{/* Media Section */}
 			{mediaAttachments.length > 0 && (
 				<View style={styles.section}>
-					<Text style={styles.sectionTitle}>Photos & Videos</Text>
+					<Text
+						style={[
+							styles.sectionTitle,
+							{ color: theme.PrimaryText },
+						]}
+					>
+						Photos & Videos
+					</Text>
 					<View style={styles.gridContainer}>
 						{mediaAttachments.map((item, index) =>
 							renderMediaItem(item, index),
@@ -682,7 +691,14 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 			{/* Documents Section */}
 			{documentAttachments.length > 0 && (
 				<View style={styles.section}>
-					<Text style={styles.sectionTitle}>Documents</Text>
+					<Text
+						style={[
+							styles.sectionTitle,
+							{ color: theme.PrimaryText },
+						]}
+					>
+						Documents
+					</Text>
 					<View style={styles.gridContainer}>
 						{documentAttachments.map((item, index) =>
 							renderDocumentItem(item, index),
@@ -750,7 +766,6 @@ const styles = StyleSheet.create<Styles>({
 		fontSize: 16,
 		fontWeight: "600",
 		marginBottom: 8,
-		color: "#333",
 		paddingHorizontal: 8,
 	},
 	gridContainer: {
@@ -763,7 +778,6 @@ const styles = StyleSheet.create<Styles>({
 		margin: 4,
 		borderRadius: 8,
 		overflow: "hidden",
-		backgroundColor: "#FFFFFF",
 		shadowColor: "#000",
 		shadowOffset: { width: 0, height: 1 },
 		shadowOpacity: 0.2,
@@ -773,7 +787,6 @@ const styles = StyleSheet.create<Styles>({
 	mediaPreview: {
 		width: "100%",
 		height: "100%",
-		backgroundColor: "#F5F5F5",
 	},
 	documentPreview: {
 		width: "100%",
@@ -797,16 +810,14 @@ const styles = StyleSheet.create<Styles>({
 	},
 	itemName: {
 		fontSize: 12,
-		color: "#333",
 		fontWeight: "500",
 	},
 	itemSize: {
 		fontSize: 10,
-		color: "#666",
 	},
 	carouselContainer: {
 		flex: 1,
-		backgroundColor: "#000000",
+		backgroundColor: "#000",
 	},
 	carouselHeader: {
 		flexDirection: "row",
@@ -820,7 +831,7 @@ const styles = StyleSheet.create<Styles>({
 		padding: 4,
 	},
 	carouselTitle: {
-		color: "#FFFFFF",
+		color: "#FFF",
 		fontSize: 16,
 		fontWeight: "500",
 		flex: 1,
@@ -858,7 +869,7 @@ const styles = StyleSheet.create<Styles>({
 		padding: 8,
 	},
 	pageIndicator: {
-		color: "#FFFFFF",
+		color: "#FFF",
 		fontSize: 14,
 	},
 	videoContainer: {
@@ -891,20 +902,16 @@ const styles = StyleSheet.create<Styles>({
 	},
 	documentViewerContainer: {
 		flex: 1,
-		backgroundColor: "#FFFFFF",
 	},
 	documentViewerHeader: {
 		flexDirection: "row",
 		alignItems: "center",
 		paddingHorizontal: 16,
 		paddingVertical: 12,
-		backgroundColor: "#F8F8F8",
 		borderBottomWidth: 1,
-		borderBottomColor: "#E0E0E0",
 		justifyContent: "space-between",
 	},
 	documentViewerTitle: {
-		color: "#333333",
 		fontSize: 16,
 		fontWeight: "500",
 		flex: 1,
@@ -916,7 +923,6 @@ const styles = StyleSheet.create<Styles>({
 	},
 	webView: {
 		flex: 1,
-		backgroundColor: "#F8F8F8",
 	},
 	documentLoadingContainer: {
 		position: "absolute",
@@ -926,13 +932,11 @@ const styles = StyleSheet.create<Styles>({
 		bottom: 0,
 		justifyContent: "center",
 		alignItems: "center",
-		backgroundColor: "#FFFFFF",
 		zIndex: 10,
 	},
 	documentLoadingText: {
 		marginTop: 12,
 		fontSize: 14,
-		color: "#555555",
 	},
 	carouselItemContainer: {
 		width: Dimensions.get("window").width,

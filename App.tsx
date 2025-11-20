@@ -8,6 +8,7 @@ import { UploadManagerProvider } from "./src/contexts/UploadManagerContext";
 import { NotificationProvider } from "./src/contexts/NotificationContext";
 import { NotifierWrapper } from "react-native-notifier";
 import { NavigationContainer } from "@react-navigation/native";
+import { ThemeProvider } from "./src/contexts/ThemeContext";
 import {
 	navigationRef,
 	pendingNavigation,
@@ -74,19 +75,21 @@ const App: React.FC = () => {
 				<UploadManagerProvider>
 					<UserProvider>
 						<CompanyProvider>
-							<NavigationContainer
-								ref={navigationRef}
-								onReady={() => {
-									pendingNavigation.executeIfReady();
-								}}
-							>
-								<NotificationProvider>
-									<NotifierWrapper>
-										<CompanyInitializer />
-										<AppNavigator />
-									</NotifierWrapper>
-								</NotificationProvider>
-							</NavigationContainer>
+							<ThemeProvider>
+								<NavigationContainer
+									ref={navigationRef}
+									onReady={() => {
+										pendingNavigation.executeIfReady();
+									}}
+								>
+									<NotificationProvider>
+										<NotifierWrapper>
+											<CompanyInitializer />
+											<AppNavigator />
+										</NotifierWrapper>
+									</NotificationProvider>
+								</NavigationContainer>
+							</ThemeProvider>
 						</CompanyProvider>
 					</UserProvider>
 				</UploadManagerProvider>

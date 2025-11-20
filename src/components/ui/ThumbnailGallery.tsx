@@ -12,6 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { AttachmentItem } from "../../types";
 import { UploadProgressMap } from "../../contexts/UploadManagerContext";
+import { useTheme } from "../../contexts/ThemeContext";
 
 interface ThumbnailGalleryProps {
 	files: AttachmentItem[];
@@ -30,6 +31,7 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 	onDelete,
 	onRestore,
 }) => {
+	const { theme } = useTheme();
 	const windowWidth = Dimensions.get("window").width;
 	const numColumns = windowWidth > 600 ? 5 : 3;
 	const thumbnailSize = (windowWidth - 60) / numColumns;
@@ -91,7 +93,10 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 		if (fileProgress.status === "complete" && fileProgress.progress < 100) {
 			return (
 				<View style={styles.progressOverlay}>
-					<ActivityIndicator size="small" color="#3d7eea" />
+					<ActivityIndicator
+						size="small"
+						color={theme.LocationBlue}
+					/>
 					<Text style={styles.progressText}>Processing...</Text>
 				</View>
 			);
@@ -107,7 +112,9 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 
 	return (
 		<View style={styles.container}>
-			<Text style={styles.galleryTitle}>Attachments</Text>
+			<Text style={[styles.galleryTitle, { color: theme.SecondaryText }]}>
+				Attachments
+			</Text>
 			<ScrollView
 				horizontal={false}
 				contentContainerStyle={styles.galleryContainer}
@@ -179,13 +186,20 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 											: "close-circle"
 									}
 									size={22}
-									color={isDeleting ? "#3d7eea" : "#e74c3c"}
+									color={
+										isDeleting
+											? theme.LocationBlue
+											: "#e74c3c"
+									}
 								/>
 							</TouchableOpacity>
 
 							<Text
 								numberOfLines={1}
-								style={styles.thumbnailName}
+								style={[
+									styles.thumbnailName,
+									{ color: theme.SecondaryText },
+								]}
 							>
 								{item.name}
 							</Text>
@@ -210,12 +224,10 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 								<Ionicons
 									name={getFileIcon(item.type)}
 									size={40}
-									color="#3d7eea"
+									color={theme.LocationBlue}
 								/>
-							</View>
-
+							</View>{" "}
 							{renderProgressOverlay(item.id)}
-
 							<TouchableOpacity
 								style={[
 									styles.actionButton,
@@ -240,10 +252,12 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 									color={isDeleting ? "#3d7eea" : "#e74c3c"}
 								/>
 							</TouchableOpacity>
-
 							<Text
 								numberOfLines={1}
-								style={styles.thumbnailName}
+								style={[
+									styles.thumbnailName,
+									{ color: theme.SecondaryText },
+								]}
 							>
 								{item.name}
 							</Text>
@@ -262,7 +276,6 @@ const styles = StyleSheet.create({
 	galleryTitle: {
 		fontSize: 15,
 		marginBottom: 10,
-		color: "#555",
 		fontWeight: "500",
 	},
 	galleryContainer: {
@@ -274,25 +287,20 @@ const styles = StyleSheet.create({
 		borderRadius: 8,
 		overflow: "hidden",
 		borderWidth: 1,
-		borderColor: "#e0e0e0",
-		backgroundColor: "#f8f9fa",
 		position: "relative",
 	},
 	mediaThumbnail: {
 		width: "100%",
 		height: "80%",
-		backgroundColor: "#f0f0f0",
 	},
 	fileThumbnail: {
 		width: "100%",
 		height: "80%",
-		backgroundColor: "#f0f6ff",
 		justifyContent: "center",
 		alignItems: "center",
 	},
 	thumbnailName: {
 		fontSize: 12,
-		color: "#555",
 		padding: 4,
 		textAlign: "center",
 	},
@@ -341,7 +349,7 @@ const styles = StyleSheet.create({
 	},
 	progressBar: {
 		height: "100%",
-		backgroundColor: "#3d7eea",
+		backgroundColor: "#2089dc",
 	},
 	progressText: {
 		color: "#fff",

@@ -24,10 +24,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CustomFormRender from "./CustomFormRender";
 import { useCompany } from "../../contexts/CompanyContext";
 
-//TODO: What I did before was attach the formResponses directly to each connected event
-// Next we need to:
-// 1. Update the timeEntryDetails to handle the new structure and display the form responses correctly
-
 const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const [notes, setNotes] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);

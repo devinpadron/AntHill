@@ -13,6 +13,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import ThumbnailGallery from "./ThumbnailGallery";
 import { AttachmentItem } from "../../types";
+import { useTheme } from "../../contexts/ThemeContext";
 
 interface AttachmentsSelectorProps {
 	// Content configuration
@@ -44,6 +45,7 @@ const AttachmentsSelector: React.FC<AttachmentsSelectorProps> = ({
 	setDeletionQueue,
 	uploadProgress = {},
 }) => {
+	const { theme } = useTheme();
 	// Loading states
 	const [loadingDocuments, setLoadingDocuments] = useState(false);
 	const [loadingMedia, setLoadingMedia] = useState(false);
@@ -206,20 +208,34 @@ const AttachmentsSelector: React.FC<AttachmentsSelectorProps> = ({
 			<View style={styles.buttonsContainer}>
 				{showDocuments && (
 					<TouchableOpacity
-						style={styles.attachButton}
+						style={[
+							styles.attachButton,
+							{
+								backgroundColor: `${theme.LocationBlue}10`,
+								borderColor: `${theme.LocationBlue}40`,
+							},
+						]}
 						onPress={handleDocumentSelect}
 						disabled={loadingDocuments}
 					>
 						{loadingDocuments ? (
-							<ActivityIndicator size="small" color="#3d7eea" />
+							<ActivityIndicator
+								size="small"
+								color={theme.LocationBlue}
+							/>
 						) : (
 							<Ionicons
 								name="document-outline"
 								size={22}
-								color="#3d7eea"
+								color={theme.LocationBlue}
 							/>
 						)}
-						<Text style={styles.attachButtonText}>
+						<Text
+							style={[
+								styles.attachButtonText,
+								{ color: theme.LocationBlue },
+							]}
+						>
 							{loadingDocuments ? "Loading..." : "Documents"}
 						</Text>
 					</TouchableOpacity>
@@ -227,20 +243,34 @@ const AttachmentsSelector: React.FC<AttachmentsSelectorProps> = ({
 
 				{showMedia && (
 					<TouchableOpacity
-						style={styles.attachButton}
+						style={[
+							styles.attachButton,
+							{
+								backgroundColor: `${theme.LocationBlue}10`,
+								borderColor: `${theme.LocationBlue}40`,
+							},
+						]}
 						onPress={handleMediaSelect}
 						disabled={loadingMedia}
 					>
 						{loadingMedia ? (
-							<ActivityIndicator size="small" color="#3d7eea" />
+							<ActivityIndicator
+								size="small"
+								color={theme.LocationBlue}
+							/>
 						) : (
 							<Ionicons
 								name="image-outline"
 								size={22}
-								color="#3d7eea"
+								color={theme.LocationBlue}
 							/>
 						)}
-						<Text style={styles.attachButtonText}>
+						<Text
+							style={[
+								styles.attachButtonText,
+								{ color: theme.LocationBlue },
+							]}
+						>
 							{loadingMedia ? "Loading..." : "Photos & Videos"}
 						</Text>
 					</TouchableOpacity>
@@ -272,16 +302,13 @@ const styles = StyleSheet.create({
 	attachButton: {
 		flexDirection: "row",
 		alignItems: "center",
-		backgroundColor: "#f0f6ff",
 		paddingVertical: 10,
 		paddingHorizontal: 16,
 		borderRadius: 8,
 		borderWidth: 1,
-		borderColor: "#d0e0ff",
 		minWidth: 140,
 	},
 	attachButtonText: {
-		color: "#3d7eea",
 		marginLeft: 8,
 		fontWeight: "500",
 	},
