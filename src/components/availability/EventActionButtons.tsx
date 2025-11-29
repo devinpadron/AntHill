@@ -1,19 +1,34 @@
 import React from "react";
-import { View, TouchableOpacity, Text, StyleSheet } from "react-native";
+import { View, StyleSheet } from "react-native";
+import { Button } from "../ui/Button";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const EventActionButtons = ({ onConfirm, onDecline, eventStatus }) => {
+	const { theme } = useTheme();
+
 	if (eventStatus !== "available") {
 		return null; // Don't show buttons for events that aren't available
 	}
 
 	return (
 		<View style={styles.container}>
-			<TouchableOpacity style={styles.confirmButton} onPress={onConfirm}>
-				<Text style={styles.buttonText}>CONFIRM</Text>
-			</TouchableOpacity>
-			<TouchableOpacity style={styles.declineButton} onPress={onDecline}>
-				<Text style={styles.buttonText}>DECLINE</Text>
-			</TouchableOpacity>
+			<Button
+				variant="primary"
+				size="medium"
+				onPress={onConfirm}
+				title="CONFIRM"
+				style={[
+					styles.button,
+					{ backgroundColor: theme.NotificationGreen },
+				]}
+			/>
+			<Button
+				variant="destructive"
+				size="medium"
+				onPress={onDecline}
+				title="DECLINE"
+				style={styles.button}
+			/>
 		</View>
 	);
 };
@@ -24,25 +39,9 @@ const styles = StyleSheet.create({
 		marginTop: 12,
 		justifyContent: "space-between",
 	},
-	confirmButton: {
-		backgroundColor: "#4ADE80",
-		paddingVertical: 8,
-		paddingHorizontal: 16,
-		borderRadius: 4,
-		borderWidth: 1,
-		borderColor: "#000000",
-	},
-	declineButton: {
-		backgroundColor: "#EF4444",
-		paddingVertical: 8,
-		paddingHorizontal: 16,
-		borderRadius: 4,
-		borderWidth: 1,
-		borderColor: "#000000",
-	},
-	buttonText: {
-		color: "#FFFFFF",
-		fontWeight: "bold",
+	button: {
+		flex: 1,
+		marginHorizontal: 4,
 	},
 });
 

@@ -1,14 +1,17 @@
 import React, { useCallback, useMemo, useState, useEffect } from "react";
 import {
 	View,
-	Text,
 	StyleSheet,
 	TouchableOpacity,
 	FlatList,
 	StatusBar,
 	RefreshControl,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Text } from "../ui/Text";
+import { Badge } from "../ui/Badge";
+import { DetailCard } from "../ui/DetailCard";
+import { IconButton } from "../ui/IconButton";
+import { useTheme } from "../../contexts/ThemeContext";
 import { useUser } from "../../contexts/UserContext";
 import moment from "moment";
 import { usePullEvents } from "../../hooks/usePullEvents";
@@ -46,6 +49,7 @@ export default function Timesheet(
 ) {
 	const { userId, companyId, user } = useUser();
 	const { companyData } = useCompany();
+	const { theme } = useTheme();
 	const {
 		agendaItems,
 		markedDates,
@@ -188,11 +192,17 @@ export default function Timesheet(
 			>
 				<View style={styles.dateNumberContainer}>
 					<View style={styles.dateTextContainer}>
-						<Text style={styles.dateMonth}>{monthName}</Text>
+						<Text variant="body" color="secondary" weight="medium">
+							{monthName}
+						</Text>
 					</View>
-					<Text style={styles.dateNumber}>{dayNumber}</Text>
+					<Text variant="h1" weight="normal" color="primary">
+						{dayNumber}
+					</Text>
 					<View style={styles.dateTextContainer}>
-						<Text style={styles.dateDay}>{dayName}</Text>
+						<Text variant="body" color="secondary">
+							{dayName}
+						</Text>
 					</View>
 				</View>
 
@@ -210,51 +220,63 @@ export default function Timesheet(
 			});
 		};
 
+		const isPast = moment(entry.date).isBefore(moment().startOf("day"));
+		const cardStyle = [
+			styles.entryCard,
+			...(isPast ? [styles.pastEntry] : []),
+		];
+
 		return (
-			<TouchableOpacity onPress={pushDetails}>
-				<View
-					style={[
-						styles.entryCard,
-						moment(entry.date).isBefore(
-							moment().startOf("day"),
-						) && {
-							opacity: 0.5,
-						},
-					]}
-				>
-					{/* Add label indicator if we have a color */}
-					{entry.label && (
-						<View
-							style={[
-								styles.labelIndicator,
-								{ backgroundColor: entry.label },
-							]}
-						/>
-					)}
+			<DetailCard
+				onPress={pushDetails}
+				elevation="sm"
+				padding="none"
+				style={cardStyle as any}
+			>
+				{/* Add label indicator if we have a color */}
+				{entry.label && (
+					<View
+						style={[
+							styles.labelIndicator,
+							{ backgroundColor: entry.label },
+						]}
+					/>
+				)}
 
-					<View style={styles.entryContent}>
+				<View style={styles.entryContent}>
+					<Text
+						variant="body"
+						weight="medium"
+						color="primary"
+						numberOfLines={2}
+					>
+						{entry.title}
+					</Text>
+
+					{entry.description ? (
 						<Text
-							style={styles.projectName}
-							numberOfLines={2}
-							ellipsizeMode="tail"
+							variant="body"
+							color="secondary"
+							style={styles.entryDescription}
 						>
-							{entry.title}
+							{entry.description}
 						</Text>
+					) : null}
 
-						{entry.description ? (
-							<Text style={styles.entryDescription}>
-								{entry.description}
-							</Text>
-						) : null}
-
-						{entry.hours > 0 && (
-							<Text style={styles.hoursValue}>
-								{entry.hours} hrs
-							</Text>
-						)}
-					</View>
+					{entry.hours > 0 && (
+						<Text
+							variant="body"
+							weight="medium"
+							style={[
+								styles.hoursValue,
+								{ color: theme.LocationBlue },
+							]}
+						>
+							{entry.hours} hrs
+						</Text>
+					)}
 				</View>
-			</TouchableOpacity>
+			</DetailCard>
 		);
 	};
 
@@ -333,52 +355,61 @@ export default function Timesheet(
 	}
 
 	return (
-		<View style={styles.container}>
+		<View style={[styles.container, { backgroundColor: theme.Background }]}>
 			<StatusBar barStyle="dark-content" />
 
 			{/* Header */}
-			<View style={styles.header}>
+			<View
+				style={[styles.header, { backgroundColor: theme.Background }]}
+			>
 				<View>
-					<Text style={styles.headerTitle}>
+					<Text variant="h3" weight="bold" color="primary">
 						{companyData?.name || "Company"}
 					</Text>
-					<Text style={styles.headerTitle}>
+					<Text variant="h3" weight="bold" color="primary">
 						{user.firstName.substr(user.firstName.length - 1) == "s"
 							? user.firstName + "' Schedule"
 							: user.firstName + "'s Schedule"}
 					</Text>
 					{totalEvents > 0 && (
-						<View style={styles.eventCountContainer}>
-							<Text style={styles.eventCountText}>
-								{totalEvents}{" "}
-								{totalEvents === 1 ? "event" : "events"}
-							</Text>
-						</View>
+						<Badge
+							variant="info"
+							size="md"
+							style={styles.eventCountContainer}
+						>
+							{totalEvents}{" "}
+							{totalEvents === 1 ? "event" : "events"}
+						</Badge>
 					)}
 				</View>
-				<TouchableOpacity
-					style={styles.headerButton}
+				<IconButton
+					icon="calendar"
 					onPress={() => toggleCalendar()}
-				>
-					<Ionicons name="calendar" size={24} color="#007AFF" />
-				</TouchableOpacity>
+					variant="ghost"
+				/>
 			</View>
 			{includePastEvents && (
 				<View style={styles.pastEventsIndicator}>
-					<Text style={styles.pastEventsText}>
+					<Text variant="body" style={{ color: "#987B30" }}>
 						Showing past events
 					</Text>
 					<TouchableOpacity
 						onPress={() => togglePastEvents()}
 						style={styles.resetButton}
 					>
-						<Text style={styles.resetButtonText}>Reset</Text>
+						<Text
+							variant="body"
+							weight="medium"
+							style={{ color: "#987B30" }}
+						>
+							Reset
+						</Text>
 					</TouchableOpacity>
 				</View>
 			)}
 			{timesheetData.length === 0 && (
 				<View style={styles.pastEventsIndicator}>
-					<Text style={styles.pastEventsText}>
+					<Text variant="body" style={{ color: "#987B30" }}>
 						No scheduled events
 					</Text>
 				</View>
@@ -405,9 +436,26 @@ export default function Timesheet(
 					if (item.isYearHeader) {
 						return (
 							<View style={styles.yearHeader}>
-								<View style={styles.yearLine} />
-								<Text style={styles.yearText}>{item.year}</Text>
-								<View style={styles.yearLine} />
+								<View
+									style={[
+										styles.yearLine,
+										{ backgroundColor: theme.DateBadge },
+									]}
+								/>
+								<Text
+									variant="h3"
+									weight="semibold"
+									color="primary"
+									style={styles.yearText}
+								>
+									{item.year}
+								</Text>
+								<View
+									style={[
+										styles.yearLine,
+										{ backgroundColor: theme.DateBadge },
+									]}
+								/>
 							</View>
 						);
 					}
@@ -453,7 +501,6 @@ export default function Timesheet(
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: "#F7F7F9",
 	},
 	weekSelector: {
 		flexDirection: "row",
@@ -497,15 +544,6 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		paddingHorizontal: 16,
 		paddingVertical: 12,
-		backgroundColor: "#F7F7F9",
-	},
-	headerTitle: {
-		fontSize: 18,
-		fontWeight: "bold",
-		color: "#333",
-	},
-	headerButton: {
-		padding: 8,
 	},
 	summaryCard: {
 		margin: 16,
@@ -550,41 +588,18 @@ const styles = StyleSheet.create({
 		width: "75%",
 	},
 	entryCard: {
-		backgroundColor: "white",
-		borderRadius: 10,
 		marginBottom: 8,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 2,
-		elevation: 2,
-		flexDirection: "row", // Change to row layout to position label indicator
-		overflow: "hidden", // This ensures the indicator doesn't overflow
+		flexDirection: "row",
+		overflow: "hidden",
 	},
 	dateNumberContainer: {
 		width: 50,
 		alignItems: "center",
 		flexDirection: "column",
 	},
-	dateNumber: {
-		fontSize: 32,
-		fontWeight: "300",
-		color: "#333",
-		marginBottom: 2,
-	},
 	dateTextContainer: {
 		flexDirection: "row",
 		alignItems: "center",
-	},
-	dateDay: {
-		fontSize: 14,
-		color: "#666",
-		marginRight: 4,
-	},
-	dateMonth: {
-		fontSize: 14,
-		color: "#666",
-		fontWeight: "500",
 	},
 	sectionLine: {
 		flex: 1,
@@ -617,7 +632,6 @@ const styles = StyleSheet.create({
 	},
 	sectionDivider: {
 		height: 1,
-		backgroundColor: "#E0E0E0",
 		marginLeft: 16,
 		marginRight: 16,
 		marginTop: 8,
@@ -706,25 +720,14 @@ const styles = StyleSheet.create({
 	yearLine: {
 		flex: 1,
 		height: 1,
-		backgroundColor: "#C7C7CC",
 	},
 	yearText: {
-		fontSize: 18,
-		fontWeight: "600",
-		color: "#3C3C43",
 		marginHorizontal: 12,
 	},
 	eventCountContainer: {
-		backgroundColor: "#E9F0FF",
-		paddingHorizontal: 8,
-		paddingVertical: 4,
-		borderRadius: 12,
-		alignSelf: "flex-start",
 		marginTop: 4,
 	},
-	eventCountText: {
-		fontSize: 12,
-		color: "#007AFF",
-		fontWeight: "500",
+	pastEntry: {
+		opacity: 0.5,
 	},
 });

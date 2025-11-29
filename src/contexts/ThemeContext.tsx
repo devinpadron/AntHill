@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, {
+	createContext,
+	useContext,
+	useState,
+	ReactNode,
+	useEffect,
+} from "react";
+import { useColorScheme, Appearance } from "react-native";
 import { AntHill_Light, AntHill_Dark } from "../constants/colors";
 
 type ThemeColors = typeof AntHill_Light;
@@ -16,7 +23,24 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export const ThemeProvider: React.FC<{ children: ReactNode }> = ({
 	children,
 }) => {
-	const [mode, setMode] = useState<ThemeMode>("light");
+	const systemColorScheme = useColorScheme();
+	const [mode, setMode] = useState<ThemeMode>(systemColorScheme || "light");
+
+	// Listen to system appearance changes
+	useEffect(() => {
+		console.log(`Initial system color scheme: ${systemColorScheme}`);
+
+		const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+			console.log(`System appearance changed to: ${colorScheme}`);
+			if (colorScheme) {
+				setMode(colorScheme);
+			}
+		});
+
+		return () => {
+			subscription.remove();
+		};
+	}, []);
 
 	const theme = mode === "light" ? AntHill_Light : AntHill_Dark;
 
