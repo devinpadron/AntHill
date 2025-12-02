@@ -40,6 +40,8 @@ const ChecklistCreator = ({ navigation }) => {
 		null,
 	);
 	const [newItemText, setNewItemText] = useState("");
+	const [itemInputHeight, setItemInputHeight] = useState(44);
+	const [titleInputHeight, setTitleInputHeight] = useState(44);
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [isEditing, setIsEditing] = useState(false);
@@ -263,9 +265,7 @@ const ChecklistCreator = ({ navigation }) => {
 	// Render an individual checklist item
 	const renderChecklistItem = ({ item }: { item: ChecklistItem }) => (
 		<View style={styles.itemContainer}>
-			<Text style={styles.itemText} numberOfLines={2}>
-				{item.text}
-			</Text>
+			<Text style={styles.itemText}>{item.text}</Text>
 			<TouchableOpacity
 				style={styles.removeButton}
 				onPress={() => removeChecklistItem(item.id)}
@@ -381,7 +381,10 @@ const ChecklistCreator = ({ navigation }) => {
 						<View style={styles.formGroup}>
 							<Text style={styles.label}>Checklist Title</Text>
 							<TextInput
-								style={styles.input}
+								style={[
+									styles.input,
+									{ height: Math.max(44, titleInputHeight) },
+								]}
 								value={currentChecklist?.title || ""}
 								onChangeText={(text) =>
 									setCurrentChecklist({
@@ -391,6 +394,13 @@ const ChecklistCreator = ({ navigation }) => {
 									})
 								}
 								placeholder="Enter checklist title"
+								multiline
+								textAlignVertical="top"
+								onContentSizeChange={(e) => {
+									const h =
+										e.nativeEvent.contentSize?.height || 44;
+									setTitleInputHeight(h + 12);
+								}}
 							/>
 						</View>
 
@@ -399,13 +409,29 @@ const ChecklistCreator = ({ navigation }) => {
 							<View style={styles.itemInputContainer}>
 								<TextInput
 									ref={itemInputRef}
-									style={styles.itemInput}
+									style={[
+										styles.itemInput,
+										{
+											height: Math.max(
+												44,
+												itemInputHeight,
+											),
+										},
+									]}
 									value={newItemText}
 									onChangeText={setNewItemText}
 									placeholder="Add new item"
 									onSubmitEditing={addChecklistItem}
 									returnKeyType="done"
 									blurOnSubmit={false} // Add this line to prevent blur on submit
+									multiline
+									onContentSizeChange={(e) => {
+										const h =
+											e.nativeEvent.contentSize?.height ||
+											44;
+										setItemInputHeight(h + 12);
+									}}
+									textAlignVertical="top"
 								/>
 								<TouchableOpacity
 									style={styles.addButton}
@@ -621,7 +647,7 @@ const styles = StyleSheet.create({
 	checklistHeader: {
 		flexDirection: "row",
 		justifyContent: "space-between",
-		alignItems: "center",
+		alignItems: "flex-start",
 		marginBottom: 10,
 	},
 	checklistTitle: {
@@ -629,6 +655,7 @@ const styles = StyleSheet.create({
 		fontWeight: "bold",
 		color: "#333",
 		flex: 1,
+		flexWrap: "wrap",
 	},
 	itemCount: {
 		fontSize: 14,
@@ -704,6 +731,7 @@ const styles = StyleSheet.create({
 		borderRadius: 8,
 		padding: 12,
 		fontSize: 16,
+		minHeight: 44,
 	},
 	itemInputContainer: {
 		flexDirection: "row",
@@ -717,6 +745,7 @@ const styles = StyleSheet.create({
 		borderRadius: 8,
 		padding: 12,
 		fontSize: 16,
+		minHeight: 44,
 	},
 	addButton: {
 		padding: 8,
@@ -740,6 +769,7 @@ const styles = StyleSheet.create({
 		flex: 1,
 		fontSize: 16,
 		color: "#333",
+		flexWrap: "wrap",
 	},
 	removeButton: {
 		padding: 5,

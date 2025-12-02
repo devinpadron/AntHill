@@ -472,23 +472,25 @@ const CompanyCustomForm = ({ navigation }) => {
 							</TouchableOpacity>
 						</View>
 
-						<View style={styles.formControl}>
-							<Text style={styles.label}>Field Label</Text>
-							<TextInput
-								style={styles.expandableInput}
-								value={editingField.label}
-								onChangeText={(text) =>
-									setEditingField({
-										...editingField,
-										label: text,
-									})
-								}
-								placeholder="Enter field label"
-								multiline
-								numberOfLines={1}
-								textAlignVertical="center"
-							/>
-						</View>
+						{currentFieldType !== "checklist" && (
+							<View style={styles.formControl}>
+								<Text style={styles.label}>Field Label</Text>
+								<TextInput
+									style={styles.expandableInput}
+									value={editingField.label}
+									onChangeText={(text) =>
+										setEditingField({
+											...editingField,
+											label: text,
+										})
+									}
+									placeholder="Enter field label"
+									multiline
+									numberOfLines={1}
+									textAlignVertical="center"
+								/>
+							</View>
+						)}
 
 						<View
 							style={[
@@ -579,6 +581,28 @@ const CompanyCustomForm = ({ navigation }) => {
 											: "No checklists found"
 									}
 									disabled={checklists.length === 0}
+									onChangeValue={(value) => {
+										// Guard against unnecessary updates that can trigger re-render loops
+										if (
+											!value ||
+											value === editingField?.checklistId
+										)
+											return;
+										const chosen = checklists.find(
+											(c) => c.id === value,
+										);
+										setEditingField({
+											...editingField,
+											checklistId: value,
+											checklistName:
+												chosen?.name ||
+												editingField?.checklistName ||
+												null,
+											label:
+												chosen?.name ||
+												"New Checklist Field",
+										});
+									}}
 								/>
 							</View>
 						)}
