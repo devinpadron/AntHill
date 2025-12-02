@@ -356,9 +356,8 @@ export const exportTimeEntriesToPDF = async (
 								? " to " +
 									format(
 										new Date(
-											timeEntries[
-												timeEntries.length - 1
-											].clockInTime,
+											timeEntries[timeEntries.length - 1]
+												.clockInTime,
 										),
 										"MMM d, yyyy",
 									)

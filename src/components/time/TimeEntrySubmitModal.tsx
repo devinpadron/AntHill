@@ -98,7 +98,10 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 						preferences.timeEntryForm.fields.forEach((field) => {
 							if (field.type === "checkbox") {
 								initialResponses[field.id] = false;
-							} else if (field.type === "multiSelect") {
+							} else if (
+								field.type === "multiSelect" ||
+								field.type === "checklist"
+							) {
 								initialResponses[field.id] = [];
 							} else {
 								initialResponses[field.id] = "";
@@ -139,7 +142,10 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 			formTemplate.fields.forEach((field) => {
 				if (field.type === "checkbox") {
 					initialResponses[field.id] = false;
-				} else if (field.type === "multiSelect") {
+				} else if (
+					field.type === "multiSelect" ||
+					field.type === "checklist"
+				) {
 					initialResponses[field.id] = [];
 				} else {
 					initialResponses[field.id] = "";
@@ -363,8 +369,41 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 					if (field.required) {
 						const value =
 							formResponsesByEvent[event.id]?.[field.id];
-
-						if (
+						if (field.type === "checklist") {
+							// Use checklistRequiredMode for validation
+							const requiredMode =
+								field.checklistRequiredMode || "atLeastOne";
+							const totalItems =
+								typeof field.checklistItemCount === "number"
+									? field.checklistItemCount
+									: field.options?.length || 0;
+							if (requiredMode === "atLeastOne") {
+								if (
+									!Array.isArray(value) ||
+									value.length === 0
+								) {
+									eventErrors[field.id] =
+										`${field.label} (at least one item) is required`;
+									eventIsValid = false;
+									isValid = false;
+								}
+							} else if (requiredMode === "all") {
+								if (totalItems <= 0) {
+									eventErrors[field.id] =
+										`${field.label} has no items to complete`;
+									eventIsValid = false;
+									isValid = false;
+								} else if (
+									!Array.isArray(value) ||
+									value.length !== totalItems
+								) {
+									eventErrors[field.id] =
+										`${field.label} (all items) is required`;
+									eventIsValid = false;
+									isValid = false;
+								}
+							}
+						} else if (
 							value === undefined ||
 							value === null ||
 							value === "" ||
@@ -392,8 +431,39 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 			customFullForm.fields.forEach((field) => {
 				if (field.required) {
 					const value = fullFormResponses[field.id];
+					if (field.type === "checklist") {
+						const requiredMode =
+							field.checklistRequiredMode || "atLeastOne";
+						const totalItems =
+							typeof field.checklistItemCount === "number"
+								? field.checklistItemCount
+								: field.options?.length || 0;
 
-					if (
+						if (requiredMode === "atLeastOne") {
+							if (!Array.isArray(value) || value.length === 0) {
+								fullFormErrorsObj[field.id] =
+									`${field.label} (at least one item) is required`;
+								fullFormIsValid = false;
+								isValid = false;
+							}
+						} else if (requiredMode === "all") {
+							// If no items are present, treat as invalid to avoid bypassing before load
+							if (totalItems <= 0) {
+								fullFormErrorsObj[field.id] =
+									`${field.label} has no items to complete`;
+								fullFormIsValid = false;
+								isValid = false;
+							} else if (
+								!Array.isArray(value) ||
+								value.length !== totalItems
+							) {
+								fullFormErrorsObj[field.id] =
+									`${field.label} (all items) is required`;
+								fullFormIsValid = false;
+								isValid = false;
+							}
+						}
+					} else if (
 						value === undefined ||
 						value === null ||
 						value === "" ||

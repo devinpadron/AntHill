@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
 	View,
 	Text,
@@ -11,6 +11,8 @@ import DatePicker from "react-native-date-picker";
 import { format } from "date-fns";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import AttachmentsSelector from "../ui/AttachmentsSelector";
+import db from "../../constants/firestore";
+import { useUser } from "../../contexts/UserContext";
 
 // Update the props interface to include the missing properties
 interface CustomFormRenderProps {
@@ -46,6 +48,81 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 	if (!customForm) return null;
 
 	const [multiSelect, setMultiSelect] = useState([]);
+	const { companyId } = useUser();
+	const [checklistItemsByField, setChecklistItemsByField] = useState<{
+		[fieldId: string]: string[];
+	}>({});
+
+	// Load checklist items for all checklist fields from Firestore
+	useEffect(() => {
+		const loadChecklistItems = async () => {
+			if (!companyId || !customForm?.fields) return;
+
+			const newMap: { [fieldId: string]: string[] } = {};
+			// Fetch each checklist's items
+			await Promise.all(
+				customForm.fields
+					.filter((f) => f.type === "checklist" && f.checklistId)
+					.map(async (f) => {
+						try {
+							const docRef = db
+								.collection("Companies")
+								.doc(companyId)
+								.collection("Checklists")
+								.doc(f.checklistId);
+							const snap = await docRef.get();
+							const data =
+								typeof snap?.data === "function"
+									? snap.data()
+									: undefined;
+							const rawItems = Array.isArray(data?.items)
+								? (data?.items as any[])
+								: [];
+							const items = rawItems
+								.map((it: any) =>
+									typeof it === "string" ? it : it?.text,
+								)
+								.filter(
+									(t: any) =>
+										typeof t === "string" &&
+										t.trim().length > 0,
+								);
+							newMap[f.id] = items;
+
+							// Also annotate the field with item count for validation use
+							// without altering other properties
+						} catch (e) {
+							newMap[f.id] = [];
+							console.warn(
+								`Failed to load checklist items for ${f.checklistId}:`,
+								e,
+							);
+						}
+					}),
+			);
+
+			setChecklistItemsByField(newMap);
+
+			// Update customForm with checklistItemCount to aid validation elsewhere
+			if (Object.keys(newMap).length > 0) {
+				setCustomForm((prev) => ({
+					...prev,
+					fields: prev.fields.map((field) =>
+						field.type === "checklist" && field.checklistId
+							? {
+									...field,
+									checklistItemCount:
+										newMap[field.id]?.length || 0,
+								}
+							: field,
+					),
+				}));
+			}
+		};
+
+		loadChecklistItems();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [companyId, customForm?.fields?.map((f) => f.checklistId).join(",")]);
 
 	// Helper function to calculate multiplied value
 	const calculateMultiplied = (value, multiplier) => {
@@ -440,6 +517,60 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 					</View>
 				);
 
+			case "checklist":
+				return (
+					<View style={styles.checklistContainer}>
+						{(checklistItemsByField[field.id] || []).map(
+							(option, index) => {
+								const checkedItems =
+									formResponses[field.id] || [];
+								const isChecked = checkedItems.includes(option);
+								return (
+									<TouchableOpacity
+										key={index}
+										style={styles.checklistItem}
+										onPress={() => {
+											let newCheckedItems;
+											if (isChecked) {
+												newCheckedItems =
+													checkedItems.filter(
+														(item) =>
+															item !== option,
+													);
+											} else {
+												newCheckedItems = [
+													...checkedItems,
+													option,
+												];
+											}
+											onFieldChange(
+												field.id,
+												field.type,
+												newCheckedItems,
+											);
+										}}
+									>
+										<View style={styles.checkbox}>
+											<Icon
+												name={
+													isChecked
+														? "checkbox-marked"
+														: "checkbox-blank-outline"
+												}
+												size={24}
+												color="#3d7eea"
+											/>
+										</View>
+										<Text style={styles.checklistLabel}>
+											{option}
+										</Text>
+									</TouchableOpacity>
+								);
+							},
+						)}
+					</View>
+				);
+
 			default:
 				return null;
 		}
@@ -633,6 +764,20 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		backgroundColor: "white",
 		textAlignVertical: "center",
+	},
+	checklistContainer: {
+		gap: 12,
+	},
+	checklistItem: {
+		flexDirection: "row",
+		alignItems: "center",
+		paddingVertical: 4,
+	},
+	checklistLabel: {
+		fontSize: 16,
+		color: "#333",
+		marginLeft: 10,
+		flex: 1,
 	},
 });
 

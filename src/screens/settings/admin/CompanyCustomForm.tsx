@@ -19,12 +19,15 @@ import DraggableFlatList from "react-native-draggable-flatlist";
 import { useCompany } from "../../../contexts/CompanyContext";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { RouteProp, useRoute } from "@react-navigation/native";
+import { collection, getDocs } from "firebase/firestore";
+import db from "../../../constants/firestore";
 
 // Form field types
 const FIELD_TYPES = [
 	{ label: "Text Input", value: "text" },
 	{ label: "Number Input", value: "number" },
 	{ label: "Checkbox", value: "checkbox" },
+	{ label: "Checklist", value: "checklist" },
 	{ label: "Single Select", value: "select" },
 	{ label: "Multi-Select", value: "multiSelect" },
 	{ label: "Date", value: "date" },
@@ -61,6 +64,15 @@ const CompanyCustomForm = ({ navigation }) => {
 	const [currentFieldType, setCurrentFieldType] = useState("text");
 	const [currentOptions, setCurrentOptions] = useState("");
 	const [showPreview, setShowPreview] = useState(false);
+
+	// Company Checklists state (for checklist field type)
+	const [checklists, setChecklists] = useState<
+		Array<{ id: string; name: string }>
+	>([]);
+	const [checklistDropdownOpen, setChecklistDropdownOpen] = useState(false);
+	const [selectedChecklistId, setSelectedChecklistId] = useState<
+		string | null
+	>(null);
 
 	// Load existing form configuration
 	useEffect(() => {
@@ -178,6 +190,9 @@ const CompanyCustomForm = ({ navigation }) => {
 		setEditingField(field);
 		setCurrentFieldType(field.type);
 		setCurrentOptions(field.options?.join(", ") || "");
+		if (field.type === "checklist") {
+			setSelectedChecklistId(field.checklistId || null);
+		}
 	};
 
 	// Save field changes
@@ -197,6 +212,23 @@ const CompanyCustomForm = ({ navigation }) => {
 				.filter((option) => option);
 		}
 
+		// Checklist-specific data
+		if (currentFieldType === "checklist") {
+			updatedField.checklistRequiredMode =
+				editingField.checklistRequiredMode || "atLeastOne";
+			updatedField.checklistId = selectedChecklistId || null;
+			// Store name for convenience in UI
+			const chosen = checklists.find(
+				(c) =>
+					c.id === selectedChecklistId ||
+					c.id === editingField.checklistId,
+			);
+			updatedField.checklistName =
+				chosen?.name || updatedField.checklistName || null;
+			// Ensure options are not carried over
+			delete updatedField.options;
+		}
+
 		updateField(editingField.id, updatedField);
 		setEditingField(null);
 	};
@@ -205,6 +237,30 @@ const CompanyCustomForm = ({ navigation }) => {
 	const onDragEnd = ({ data }) => {
 		setCustomForm({ ...customForm, fields: data });
 	};
+
+	// Load company checklists once companyId is available
+	useEffect(() => {
+		const loadChecklists = async () => {
+			if (!companyId) return;
+			try {
+				const colRef = db.collection(
+					`Companies/${companyId}/Checklists`,
+				);
+				const snap = await colRef.get();
+				const list: Array<{ id: string; name: string }> = [];
+				snap.forEach((doc) => {
+					const data = doc.data() as any;
+					// Assume checklist has 'name' or 'title'
+					const name = data?.name || data?.title || doc.id;
+					list.push({ id: doc.id, name });
+				});
+				setChecklists(list);
+			} catch (e) {
+				console.error("Failed to load checklists", e);
+			}
+		};
+		loadChecklists();
+	}, [companyId]);
 
 	// Toggle form enabled state
 	const toggleFormEnabled = () => {
@@ -344,21 +400,22 @@ const CompanyCustomForm = ({ navigation }) => {
 													</Text>
 												</View>
 											)}
-											{item.quickEditPayroll && (
-												<View
-													style={
-														styles.quickEditBadge
-													}
-												>
-													<Text
+											{item.quickEditPayroll &&
+												item.type !== "checklist" && (
+													<View
 														style={
-															styles.quickEditText
+															styles.quickEditBadge
 														}
 													>
-														PAYROLL EDIT
-													</Text>
-												</View>
-											)}
+														<Text
+															style={
+																styles.quickEditText
+															}
+														>
+															PAYROLL EDIT
+														</Text>
+													</View>
+												)}
 										</View>
 
 										<View style={styles.fieldActions}>
@@ -454,26 +511,29 @@ const CompanyCustomForm = ({ navigation }) => {
 							/>
 						</View>
 
-						<View style={styles.formControl}>
-							<Text style={styles.label}>Placeholder</Text>
-							<TextInput
-								style={styles.input}
-								value={editingField.placeholder || ""}
-								onChangeText={(text) =>
-									setEditingField({
-										...editingField,
-										placeholder: text,
-									})
-								}
-								placeholder="Enter placeholder text"
-								maxLength={100} // Add character limit
-							/>
-							<Text style={styles.charCount}>
-								{editingField.placeholder?.length || 0}/100
-								characters
-							</Text>
-						</View>
+						{currentFieldType !== "checklist" && (
+							<View style={styles.formControl}>
+								<Text style={styles.label}>Placeholder</Text>
+								<TextInput
+									style={styles.input}
+									value={editingField.placeholder || ""}
+									onChangeText={(text) =>
+										setEditingField({
+											...editingField,
+											placeholder: text,
+										})
+									}
+									placeholder="Enter placeholder text"
+									maxLength={100}
+								/>
+								<Text style={styles.charCount}>
+									{editingField.placeholder?.length || 0}/100
+									characters
+								</Text>
+							</View>
+						)}
 
+						{/* Options: select/multiSelect via comma list; checklist via saved list */}
 						{["select", "multiSelect"].includes(
 							currentFieldType,
 						) && (
@@ -485,9 +545,40 @@ const CompanyCustomForm = ({ navigation }) => {
 									style={styles.textArea}
 									value={currentOptions}
 									onChangeText={setCurrentOptions}
-									placeholder="Option 1, Option 2, Option 3"
+									placeholder={"Option 1, Option 2, Option 3"}
 									multiline
 									numberOfLines={3}
+								/>
+							</View>
+						)}
+
+						{currentFieldType === "checklist" && (
+							<View
+								style={[styles.formControl, { zIndex: 2500 }]}
+							>
+								<Text style={styles.label}>
+									Select Checklist
+								</Text>
+								<DropDownPicker
+									open={checklistDropdownOpen}
+									value={selectedChecklistId}
+									items={checklists.map((c) => ({
+										label: c.name,
+										value: c.id,
+									}))}
+									setOpen={setChecklistDropdownOpen}
+									setValue={setSelectedChecklistId as any}
+									style={styles.dropdown}
+									dropDownContainerStyle={styles.dropdownList}
+									zIndex={2500}
+									zIndexInverse={1500}
+									listMode="SCROLLVIEW"
+									placeholder={
+										checklists.length
+											? "Choose a checklist"
+											: "No checklists found"
+									}
+									disabled={checklists.length === 0}
 								/>
 							</View>
 						)}
@@ -508,6 +599,78 @@ const CompanyCustomForm = ({ navigation }) => {
 								}}
 							/>
 						</View>
+
+						{currentFieldType === "checklist" &&
+							editingField.required && (
+								<View style={styles.formControl}>
+									<Text style={styles.label}>
+										Checklist Required Mode
+									</Text>
+									<View
+										style={{
+											flexDirection: "row",
+											gap: 16,
+											marginTop: 4,
+										}}
+									>
+										<TouchableOpacity
+											style={{
+												flexDirection: "row",
+												alignItems: "center",
+											}}
+											onPress={() =>
+												setEditingField({
+													...editingField,
+													checklistRequiredMode:
+														"atLeastOne",
+												})
+											}
+										>
+											<Ionicons
+												name={
+													editingField.checklistRequiredMode ===
+														"atLeastOne" ||
+													!editingField.checklistRequiredMode
+														? "radio-button-on"
+														: "radio-button-off"
+												}
+												size={20}
+												color="#007AFF"
+											/>
+											<Text style={{ marginLeft: 6 }}>
+												At least one
+											</Text>
+										</TouchableOpacity>
+										<TouchableOpacity
+											style={{
+												flexDirection: "row",
+												alignItems: "center",
+											}}
+											onPress={() =>
+												setEditingField({
+													...editingField,
+													checklistRequiredMode:
+														"all",
+												})
+											}
+										>
+											<Ionicons
+												name={
+													editingField.checklistRequiredMode ===
+													"all"
+														? "radio-button-on"
+														: "radio-button-off"
+												}
+												size={20}
+												color="#007AFF"
+											/>
+											<Text style={{ marginLeft: 6 }}>
+												All items
+											</Text>
+										</TouchableOpacity>
+									</View>
+								</View>
+							)}
 
 						{currentFieldType === "number" && (
 							<>
@@ -670,40 +833,44 @@ const CompanyCustomForm = ({ navigation }) => {
 						)}
 
 						{/* New Quick Edit Toggle */}
-						<View style={styles.switchRow}>
-							<View style={styles.labelWithHelp}>
-								<Text style={styles.label}>
-									Quick Edit in Payroll
-								</Text>
-								<TouchableOpacity
-									onPress={() =>
-										Alert.alert(
-											"Quick Edit in Payroll",
-											"When enabled, this field can be quickly edited when processing payroll entries without needing to open the full edit form.",
-										)
+						{currentFieldType !== "checklist" && (
+							<View style={styles.switchRow}>
+								<View style={styles.labelWithHelp}>
+									<Text style={styles.label}>
+										Quick Edit in Payroll
+									</Text>
+									<TouchableOpacity
+										onPress={() =>
+											Alert.alert(
+												"Quick Edit in Payroll",
+												"When enabled, this field can be quickly edited when processing payroll entries without needing to open the full edit form.",
+											)
+										}
+									>
+										<Ionicons
+											name="information-circle-outline"
+											size={20}
+											color="#777"
+										/>
+									</TouchableOpacity>
+								</View>
+								<Switch
+									value={
+										editingField.quickEditPayroll || false
 									}
-								>
-									<Ionicons
-										name="information-circle-outline"
-										size={20}
-										color="#777"
-									/>
-								</TouchableOpacity>
+									onValueChange={(value) =>
+										setEditingField({
+											...editingField,
+											quickEditPayroll: value,
+										})
+									}
+									trackColor={{
+										false: "#767577",
+										true: "#007AFF",
+									}}
+								/>
 							</View>
-							<Switch
-								value={editingField.quickEditPayroll || false}
-								onValueChange={(value) =>
-									setEditingField({
-										...editingField,
-										quickEditPayroll: value,
-									})
-								}
-								trackColor={{
-									false: "#767577",
-									true: "#007AFF",
-								}}
-							/>
-						</View>
+						)}
 
 						<TouchableOpacity
 							style={styles.saveFieldButton}
@@ -933,6 +1100,19 @@ const CompanyCustomForm = ({ navigation }) => {
 														"Upload Images/Videos"}
 												</Text>
 											</TouchableOpacity>
+										</View>
+									)}
+
+									{field.type === "checklist" && (
+										<View style={styles.checklistPreview}>
+											<Text
+												style={styles.previewSelectText}
+											>
+												Checklist:{" "}
+												{field.checklistName ||
+													field.checklistId ||
+													"(not selected)"}
+											</Text>
 										</View>
 									)}
 								</View>
@@ -1334,6 +1514,9 @@ const styles = StyleSheet.create({
 		marginTop: 8,
 		color: "#666",
 		fontSize: 14,
+	},
+	checklistPreview: {
+		gap: 10,
 	},
 	quickEditBadge: {
 		backgroundColor: "#34c759",
