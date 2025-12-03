@@ -70,12 +70,19 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 		if (bottomSheetRef.current) {
 			bottomSheetRef.current.close();
 		}
+		// Don't reset state here - only reset after successful submission
 		onClose();
 	}, [onClose]);
 
 	useEffect(() => {
 		if (visible && timeEntry) {
-			fetchRelatedEvents();
+			// Only fetch events if we don't already have them loaded for this entry
+			if (
+				selectedEvents.length === 0 &&
+				otherAvailableEvents.length === 0
+			) {
+				fetchRelatedEvents();
+			}
 		}
 	}, [visible, timeEntry]);
 
@@ -115,10 +122,10 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 			}
 		};
 
-		if (visible) {
+		if (visible && !customForm && !customFullForm) {
 			loadCustomForms();
 		}
-	}, [visible, companyId]); // Remove selectedEvents.length
+	}, [visible, companyId]);
 
 	// Second useEffect - only for initializing event form responses
 	useEffect(() => {
@@ -728,7 +735,7 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 			ref={bottomSheetRef}
 			snapPoints={snapPoints}
 			enablePanDownToClose
-			onClose={onClose}
+			onClose={handleClosePress}
 			handleIndicatorStyle={styles.sheetIndicator}
 			backgroundStyle={styles.sheetBackground}
 			keyboardBehavior="extend"
@@ -765,16 +772,23 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 						<Text style={styles.detailValue}>
 							{format(new Date(timeEntry.clockInTime), "h:mm a")}{" "}
 							-{" "}
-							{format(new Date(timeEntry.clockOutTime), "h:mm a")}
+							{timeEntry.clockOutTime
+								? format(
+										new Date(timeEntry.clockOutTime),
+										"h:mm a",
+									)
+								: "Now"}
 						</Text>
 					</View>
 
-					<View style={styles.detailRow}>
-						<Text style={styles.detailLabel}>Duration:</Text>
-						<Text style={styles.detailValue}>
-							{formatDuration(timeEntry.duration)}
-						</Text>
-					</View>
+					{timeEntry.duration && (
+						<View style={styles.detailRow}>
+							<Text style={styles.detailLabel}>Duration:</Text>
+							<Text style={styles.detailValue}>
+								{formatDuration(timeEntry.duration)}
+							</Text>
+						</View>
+					)}
 				</View>
 
 				{isLoadingEvents ? (
