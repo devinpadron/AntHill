@@ -136,35 +136,26 @@ const TimeEntryScreen = ({ navigation }) => {
 
 	// Time entry actions
 	const handleClockOut = async () => {
-		Alert.alert("Clock Out", "Are you sure you want to clock out?", [
-			{
-				text: "Cancel",
-				style: "cancel",
-			},
-			{
-				text: "Clock Out",
-				style: "destructive",
-				onPress: async () => {
-					try {
-						const completedEntry = await clockOut();
-						fetchTimeEntries();
-
-						setTimeout(() => {
-							setSelectedTimeEntry(completedEntry);
-							setSubmitModalVisible(true);
-						}, 500);
-					} catch (error) {
-						console.error("Error clocking out:", error);
-						Alert.alert("Error", "Failed to clock out");
-					}
-				},
-			},
-		]);
+		// Show submit modal immediately with active time entry
+		setSelectedTimeEntry(activeTimeEntry);
+		setSubmitModalVisible(true);
 	};
 
 	const handleSubmitTimeEntry = async (timeEntryId, entry) => {
 		if (!timeEntryId || !companyId) {
 			throw new Error("Missing required data for submission");
+		}
+
+		// If this is the active time entry, clock out first
+		const isActiveEntry =
+			activeTimeEntry && activeTimeEntry.id === timeEntryId;
+		if (isActiveEntry) {
+			try {
+				await clockOut();
+			} catch (error) {
+				console.error("Error clocking out:", error);
+				throw new Error("Failed to clock out");
+			}
 		}
 
 		await submitTimeEntryForApproval(timeEntryId, companyId, entry);
