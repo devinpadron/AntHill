@@ -52,6 +52,9 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 	const [checklistItemsByField, setChecklistItemsByField] = useState<{
 		[fieldId: string]: string[];
 	}>({});
+	const [checklistNamesByField, setChecklistNamesByField] = useState<{
+		[fieldId: string]: string;
+	}>({});
 
 	// Load checklist items for all checklist fields from Firestore
 	useEffect(() => {
@@ -59,6 +62,7 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 			if (!companyId || !customForm?.fields) return;
 
 			const newMap: { [fieldId: string]: string[] } = {};
+			const newNamesMap: { [fieldId: string]: string } = {};
 			// Fetch each checklist's items
 			await Promise.all(
 				customForm.fields
@@ -89,6 +93,11 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 								);
 							newMap[f.id] = items;
 
+							// Store checklist name/title for label display
+							const checklistName =
+								data?.title || data?.name || f.label;
+							newNamesMap[f.id] = checklistName;
+
 							// Also annotate the field with item count for validation use
 							// without altering other properties
 						} catch (e) {
@@ -102,6 +111,7 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 			);
 
 			setChecklistItemsByField(newMap);
+			setChecklistNamesByField(newNamesMap);
 
 			// Update customForm with checklistItemCount to aid validation elsewhere
 			if (Object.keys(newMap).length > 0) {
@@ -590,6 +600,13 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 				// Calculate z-index based on position: higher fields get higher z-index
 				const baseZIndex = customForm.fields.length - index;
 
+				// Use checklist name as label if field is a checklist
+				const displayLabel =
+					field.type === "checklist" &&
+					checklistNamesByField[field.id]
+						? checklistNamesByField[field.id]
+						: field.label;
+
 				return (
 					<View
 						key={field.id}
@@ -602,7 +619,7 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 						]}
 					>
 						<Text style={styles.fieldLabel}>
-							{field.label}
+							{displayLabel}
 							{field.required && (
 								<Text style={styles.requiredIndicator}>*</Text>
 							)}

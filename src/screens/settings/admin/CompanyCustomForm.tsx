@@ -594,13 +594,9 @@ const CompanyCustomForm = ({ navigation }) => {
 										setEditingField({
 											...editingField,
 											checklistId: value,
-											checklistName:
-												chosen?.name ||
-												editingField?.checklistName ||
-												null,
 											label:
 												chosen?.name ||
-												"New Checklist Field",
+												"Checklist Field",
 										});
 									}}
 								/>
