@@ -1,5 +1,6 @@
 import React from "react";
 import { View, StyleSheet, ViewStyle, StyleProp } from "react-native";
+import { SafeAreaView, Edge } from "react-native-safe-area-context";
 import { useTheme } from "../../contexts/ThemeContext";
 
 interface ContainerProps {
@@ -7,6 +8,8 @@ interface ContainerProps {
 	variant?: "default" | "card" | "page";
 	padding?: "none" | "xs" | "sm" | "md" | "lg" | "xl";
 	style?: StyleProp<ViewStyle>;
+	includeSafeArea?: boolean;
+	safeEdges?: Edge[];
 }
 
 export const Container: React.FC<ContainerProps> = ({
@@ -14,6 +17,8 @@ export const Container: React.FC<ContainerProps> = ({
 	variant = "default",
 	padding = "md",
 	style,
+	includeSafeArea = false,
+	safeEdges = ["top", "bottom"],
 }) => {
 	const { theme } = useTheme();
 
@@ -53,9 +58,18 @@ export const Container: React.FC<ContainerProps> = ({
 			backgroundColor: getBackgroundColor(),
 			padding: getPadding(),
 		},
+		variant === "page" && styles.page,
 		variant === "card" && styles.card,
 		style,
 	];
+
+	if (includeSafeArea) {
+		return (
+			<SafeAreaView edges={safeEdges} style={containerStyles}>
+				{children}
+			</SafeAreaView>
+		);
+	}
 
 	return <View style={containerStyles}>{children}</View>;
 };
@@ -63,6 +77,9 @@ export const Container: React.FC<ContainerProps> = ({
 const styles = StyleSheet.create({
 	container: {
 		width: "100%",
+	},
+	page: {
+		flex: 1,
 	},
 	card: {
 		borderRadius: 12,
