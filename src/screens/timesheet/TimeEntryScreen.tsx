@@ -2,13 +2,14 @@
 import React, { useState, useCallback } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import DatePicker from "react-native-date-picker";
-import { Container } from "../../components/ui/Container";
-import { Spacer } from "../../components/ui/Spacer";
-import { DateRangeSelector } from "../../components/time/DateRangeSelector";
-import { WeeklySummary } from "../../components/time/WeeklySummary";
-import { ClockSection } from "../../components/time/ClockSection";
-import { TimeEntriesList } from "../../components/time/TimeEntriesList";
-import TimeEntrySubmitModal from "../../components/time/TimeEntrySubmitModal";
+import { Container, Spacer } from "../../components/ui";
+import {
+	DateRangeSelector,
+	WeeklySummary,
+	ClockSection,
+	TimeEntriesList,
+	TimeEntrySubmitModal,
+} from "../../components/time";
 import { useDateRange } from "../../hooks/useDateRange";
 import { useTimeEntries } from "../../hooks/useTimeEntries";
 import { useActiveTimeEntry } from "../../hooks/useActiveTimeEntry";

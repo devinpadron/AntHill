@@ -3,15 +3,16 @@ import { StyleSheet, ScrollView, ActivityIndicator } from "react-native";
 import { useUser } from "../../contexts/UserContext";
 import { useTheme } from "../../contexts/ThemeContext";
 import { getStatusBadgeColor, getStatusBadgeText } from "../../utils/timeUtils";
-import { Container } from "../../components/ui/Container";
-import { Text } from "../../components/ui/Text";
-import { TimeEntryDetailsHeader } from "../../components/time/TimeEntryDetailsHeader";
-import TimeEntrySummary from "../../components/time/TimeEntrySummary";
-import TimeDetailCard from "../../components/time/TimeDetailCard";
-import ManagerActions from "../../components/time/ManagerActions";
-import EditSheet from "../../components/time/EditSheet";
-import ExportSheet from "../../components/time/ExportSheet";
-import FieldTotalsCard from "../../components/time/FieldTotalsCard";
+import { Text, Container } from "../../components/ui";
+import {
+	FieldTotalsCard,
+	ExportSheet,
+	EditSheet,
+	ManagerActions,
+	TimeDetailCard,
+	TimeEntrySummary,
+	TimeEntryDetailsHeader,
+} from "../../components/time";
 import { useTimeEntryDetails } from "../../hooks/useTimeEntryDetails";
 import { useTimeEntrySelection } from "../../hooks/useTimeEntrySelection";
 import { useTimeEntryActions } from "../../hooks/useTimeEntryActions";
