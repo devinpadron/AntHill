@@ -1,13 +1,15 @@
 import React from "react";
 import { Image, StyleSheet } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { AntHill } from "../../constants/colors";
+import { useTheme } from "../../contexts/ThemeContext";
 import { showPrompt } from "../../utils/alertUtils";
 import { useAuth } from "../../hooks/useAuth";
 import { FormInput } from "../../components/ui/FormInput";
 import { Button } from "../../components/ui/Button";
+import { Container } from "../../components/ui/Container";
+import { Spacing, BorderRadius } from "../../constants/tokens";
 
 const LoginPage = ({ navigation }) => {
+	const { theme } = useTheme();
 	const {
 		email,
 		setEmail,
@@ -52,8 +54,12 @@ const LoginPage = ({ navigation }) => {
 	};
 
 	return (
-		<SafeAreaView style={styles.container}>
-			{/* Logo */}
+		<Container
+			variant="page"
+			padding="none"
+			includeSafeArea
+			style={styles.container}
+		>
 			<Image
 				style={styles.logo}
 				source={require("../../assets/AntHill/Full_Black.png")}
@@ -70,35 +76,31 @@ const LoginPage = ({ navigation }) => {
 				placeholder="Password:"
 				value={password}
 				onChangeText={setPassword}
-				secureTextEntry={true}
+				secureTextEntry
 			/>
 
 			<Button
 				title="Login"
 				onPress={handleLogin}
 				loading={loading}
-				style={styles.primaryButton}
-				textStyle={styles.buttonText}
 				variant="primary"
-				fullWidth
+				style={styles.primaryButton}
 			/>
 
 			<Button
 				title="Signup"
 				onPress={navigateToSignup}
-				style={styles.secondaryButton}
-				textStyle={styles.buttonText}
 				variant="secondary"
+				style={styles.secondaryButton}
 			/>
 
 			<Button
 				title="Forgot Password"
 				onPress={handleForgotPassword}
-				style={styles.textButton}
-				textStyle={styles.linkText}
 				variant="text"
+				style={styles.textButton}
 			/>
-		</SafeAreaView>
+		</Container>
 	);
 };
 
@@ -107,44 +109,25 @@ export default LoginPage;
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: "white",
 		alignItems: "center",
 		justifyContent: "center",
-		paddingHorizontal: 20, // Add padding to prevent buttons stretching too wide
+		paddingHorizontal: Spacing.lg,
 	},
 	logo: {
 		width: 200,
 		height: 150,
 		resizeMode: "contain",
-		marginBottom: 40,
+		marginBottom: Spacing.xxxl,
 	},
 	primaryButton: {
-		height: 48,
-		marginTop: 40,
-		borderRadius: 8,
+		marginTop: Spacing.xxxl,
 		width: "100%",
-		backgroundColor: AntHill.Black,
 	},
 	secondaryButton: {
-		height: 48,
-		marginTop: 16,
-		borderRadius: 8,
+		marginTop: Spacing.md,
 		width: "100%",
-		backgroundColor: AntHill.Black,
 	},
 	textButton: {
-		backgroundColor: "transparent",
-		marginTop: 20,
-		height: 40,
-	},
-	buttonText: {
-		fontSize: 18,
-		fontWeight: "600",
-		color: AntHill.White,
-	},
-	linkText: {
-		fontSize: 16,
-		color: AntHill.Black,
-		textDecorationLine: "underline",
+		marginTop: Spacing.xl,
 	},
 });
