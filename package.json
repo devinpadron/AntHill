@@ -47,6 +47,7 @@
 		"expo-media-library": "~17.0.6",
 		"expo-sharing": "~13.0.1",
 		"expo-status-bar": "~2.0.0",
+		"expo-system-ui": "^6.0.9",
 		"expo-video": "~2.0.6",
 		"expo-video-thumbnails": "~9.0.3",
 		"husky": "^9.1.7",

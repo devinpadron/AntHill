@@ -24,16 +24,16 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({
 	children,
 }) => {
 	const systemColorScheme = useColorScheme();
-	const [mode, setMode] = useState<ThemeMode>(systemColorScheme || "light");
+	console.log("systemColorScheme:", systemColorScheme);
+	const [mode, setMode] = useState<ThemeMode>(
+		(systemColorScheme as ThemeMode) || "light",
+	);
 
 	// Listen to system appearance changes
 	useEffect(() => {
-		console.log(`Initial system color scheme: ${systemColorScheme}`);
-
 		const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-			console.log(`System appearance changed to: ${colorScheme}`);
 			if (colorScheme) {
-				setMode(colorScheme);
+				setMode(colorScheme as ThemeMode);
 			}
 		});
 

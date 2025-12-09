@@ -6,7 +6,7 @@ import { Text } from "../ui/Text";
 import { StatusBadge } from "../ui/StatusBadge";
 import { useTheme } from "../../contexts/ThemeContext";
 
-const EventCard = ({ event, onPress }) => {
+export const EventCard = ({ event, onPress }) => {
 	const { theme } = useTheme();
 
 	return (
@@ -88,5 +88,3 @@ const styles = StyleSheet.create({
 		right: 8,
 	},
 });
-
-export default EventCard;

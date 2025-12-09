@@ -4,7 +4,7 @@ export default {
 		slug: "AntHill",
 		version: "1.0.96",
 		orientation: "portrait",
-		userInterfaceStyle: "light",
+		userInterfaceStyle: "automatic",
 		assetBundlePatterns: ["**/*"],
 		splash: {
 			image: "./src/assets/AntHill/Full_Black.png",
@@ -47,6 +47,7 @@ export default {
 			"@react-native-firebase/auth",
 			"@react-native-firebase/crashlytics",
 			"expo-video",
+			["expo-system-ui", { appearance: "automatic" }],
 			[
 				"expo-build-properties",
 				{
