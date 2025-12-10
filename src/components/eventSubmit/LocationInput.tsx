@@ -8,10 +8,9 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
-import { GOOGLE_PLACES_API_KEY } from "@env";
 
-// Ensure the API key is loaded as a string
-const API_KEY = String(GOOGLE_PLACES_API_KEY || "");
+// Use process.env for non-development builds, @env for development
+const API_KEY = String(process.env.GOOGLE_PLACES_API_KEY || "");
 
 type Location = {
 	[address: string]: {

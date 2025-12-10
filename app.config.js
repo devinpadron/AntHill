@@ -14,9 +14,7 @@ export default {
 		icon: "./src/assets/AntHill/AH_Icon.png",
 		ios: {
 			supportsTablet: true,
-			googleServicesFile:
-				process.env.GOOGLE_SERVICES_PLIST ??
-				"./GoogleService-Info.plist",
+			googleServicesFile: process.env.GOOGLE_SERVICES_PLIST,
 			bundleIdentifier: "com.anthillapp.anthill",
 			entitlements: {
 				"aps-environment": "production",
@@ -38,8 +36,7 @@ export default {
 			},
 		},
 		android: {
-			googleServicesFile:
-				process.env.GOOGLE_SERVICES_JSON ?? "./google-services.json",
+			googleServicesFile: process.env.GOOGLE_SERVICES_JSON,
 			package: "com.anthillapp.anthill",
 		},
 		plugins: [
