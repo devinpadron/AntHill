@@ -2,7 +2,7 @@ export default {
 	expo: {
 		name: "AntHill",
 		slug: "AntHill",
-		version: "1.0.97",
+		version: "1.0.9",
 		orientation: "portrait",
 		userInterfaceStyle: "light",
 		assetBundlePatterns: ["**/*"],
@@ -14,7 +14,9 @@ export default {
 		icon: "./src/assets/AntHill/AH_Icon.png",
 		ios: {
 			supportsTablet: true,
-			googleServicesFile: process.env.GOOGLE_SERVICES_PLIST,
+			googleServicesFile:
+				process.env.GOOGLE_SERVICES_PLIST ??
+				"./GoogleService-Info.plist",
 			bundleIdentifier: "com.anthillapp.anthill",
 			entitlements: {
 				"aps-environment": "production",
@@ -36,7 +38,8 @@ export default {
 			},
 		},
 		android: {
-			googleServicesFile: process.env.GOOGLE_SERVICES_JSON,
+			googleServicesFile:
+				process.env.GOOGLE_SERVICES_JSON ?? "./google-services.json",
 			package: "com.anthillapp.anthill",
 		},
 		plugins: [
