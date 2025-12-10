@@ -10,6 +10,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
 import { GOOGLE_PLACES_API_KEY } from "@env";
 
+// Ensure the API key is loaded as a string
+const API_KEY = String(GOOGLE_PLACES_API_KEY || "");
+
 type Location = {
 	[address: string]: {
 		latitude: number;
@@ -54,7 +57,7 @@ export const LocationInput = ({
 					}
 				}}
 				query={{
-					key: GOOGLE_PLACES_API_KEY,
+					key: API_KEY,
 					language: "en",
 				}}
 				styles={{
@@ -63,6 +66,7 @@ export const LocationInput = ({
 					row: styles.placesRow,
 				}}
 				fetchDetails={true}
+				enablePoweredByContainer={false}
 			/>
 		</View>
 

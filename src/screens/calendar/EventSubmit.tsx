@@ -10,7 +10,7 @@ import {
 	Platform,
 	ActivityIndicator,
 } from "react-native";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { KeyboardAwareFlatList } from "react-native-keyboard-aware-scroll-view";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRoute } from "@react-navigation/native";
@@ -440,155 +440,100 @@ const EventSubmit = ({ navigation }) => {
 	const [openPackagesDropdown, setOpenPackagesDropdown] = useState(false);
 	return (
 		<View style={[{ flex: 1, paddingTop: insets.top }, styles.container]}>
-			<KeyboardAwareScrollView
-				contentContainerStyle={styles.scrollContainer}
-				nestedScrollEnabled={true}
-				keyboardShouldPersistTaps="handled"
-			>
-				<EventFormHeader
-					title={isEditing ? "Edit Event" : "Submit New Event"}
-					onBack={handleBackPress}
-				/>
-
-				{/* Form Container */}
-				<View style={styles.formCard}>
-					{/* Title Section */}
-					<View style={styles.sectionContainer}>
-						<Text style={styles.sectionTitle}>Event Details</Text>
-						<View style={styles.inputContainer}>
-							<Text style={styles.label}>Title</Text>
-							<TextInput
-								style={styles.input}
-								placeholder="Enter Title"
-								value={title}
-								onChangeText={setTitle}
-								placeholderTextColor="#A0A0A0"
-							/>
-						</View>
-
-						{/* Location Section */}
-						<LocationInput
-							locations={locations}
-							onLocationSelect={updateLocation}
-							onLocationDelete={deleteLocation}
-							onLabelChange={setLocationLabel}
-							editingLabelForAddress={editingLabelForAddress}
-							setEditingLabelForAddress={
-								setEditingLabelForAddress
+			<KeyboardAwareFlatList
+				data={[]}
+				renderItem={null}
+				ListHeaderComponent={
+					<>
+						<EventFormHeader
+							title={
+								isEditing ? "Edit Event" : "Submit New Event"
 							}
-							labelText={labelText}
-							setLabelText={setLabelText}
-							googlePlacesRef={googlePlacesRef}
+							onBack={handleBackPress}
 						/>
-					</View>
 
-					{/* Date & Time Section */}
-					<View style={styles.sectionContainer}>
-						<Text style={styles.sectionTitle}>Date & Time</Text>
-
-						{/* Date Toggle */}
-						<View style={styles.inputContainer}>
-							<Text style={styles.label}>Date</Text>
-							<TouchableOpacity
-								onPress={() => toggleDatePicker("date")}
-								style={styles.dateButton}
-							>
-								<Text style={styles.dateButtonText}>
-									{formatDate(date)}
+						{/* Form Container */}
+						<View style={styles.formCard}>
+							{/* Title Section */}
+							<View style={styles.sectionContainer}>
+								<Text style={styles.sectionTitle}>
+									Event Details
 								</Text>
-								<Ionicons
-									name="calendar-outline"
-									size={22}
-									color="#555"
-								/>
-							</TouchableOpacity>
-							<DatePicker
-								modal
-								open={openDate}
-								date={date}
-								mode="date"
-								onConfirm={(date) => {
-									toggleDatePicker("date");
-									setDate(date);
-								}}
-								onCancel={() => {
-									toggleDatePicker("date");
-								}}
-							/>
-						</View>
-
-						<View style={styles.checkboxWrapper}>
-							<TouchableOpacity
-								onPress={toggleAllDay}
-								style={styles.checkboxContainer}
-							>
-								<View style={styles.checkbox}>
-									<Ionicons
-										name={
-											allDay
-												? "checkbox"
-												: "square-outline"
-										}
-										size={24}
-										color="#3d7eea"
+								<View style={styles.inputContainer}>
+									<Text style={styles.label}>Title</Text>
+									<TextInput
+										style={styles.input}
+										placeholder="Enter Title"
+										value={title}
+										onChangeText={setTitle}
+										placeholderTextColor="#A0A0A0"
 									/>
 								</View>
-								<Text style={styles.checkboxLabel}>
-									All Day
-								</Text>
-							</TouchableOpacity>
-						</View>
 
-						{!allDay && (
-							<View style={styles.timeContainer}>
-								{/* Start Time Section */}
-								<View
-									style={[
-										styles.inputContainer,
-										styles.timeField,
-									]}
-								>
-									<Text style={styles.label}>Start Time</Text>
+								{/* Location Section */}
+								<LocationInput
+									locations={locations}
+									onLocationSelect={updateLocation}
+									onLocationDelete={deleteLocation}
+									onLabelChange={setLocationLabel}
+									editingLabelForAddress={
+										editingLabelForAddress
+									}
+									setEditingLabelForAddress={
+										setEditingLabelForAddress
+									}
+									labelText={labelText}
+									setLabelText={setLabelText}
+									googlePlacesRef={googlePlacesRef}
+								/>
+							</View>
+
+							{/* Date & Time Section */}
+							<View style={styles.sectionContainer}>
+								<Text style={styles.sectionTitle}>
+									Date & Time
+								</Text>
+
+								{/* Date Toggle */}
+								<View style={styles.inputContainer}>
+									<Text style={styles.label}>Date</Text>
 									<TouchableOpacity
-										onPress={() =>
-											toggleDatePicker("startTime")
-										}
+										onPress={() => toggleDatePicker("date")}
 										style={styles.dateButton}
 									>
 										<Text style={styles.dateButtonText}>
-											{formatTime(startTime)}
+											{formatDate(date)}
 										</Text>
 										<Ionicons
-											name="time-outline"
+											name="calendar-outline"
 											size={22}
 											color="#555"
 										/>
 									</TouchableOpacity>
 									<DatePicker
 										modal
-										open={openStartTime}
-										date={startTime}
-										mode="time"
+										open={openDate}
+										date={date}
+										mode="date"
 										onConfirm={(date) => {
-											toggleDatePicker("startTime");
-											setStartTime(date);
+											toggleDatePicker("date");
+											setDate(date);
 										}}
 										onCancel={() => {
-											toggleDatePicker("startTime");
+											toggleDatePicker("date");
 										}}
 									/>
 								</View>
 
-								{/* End Time Toggle */}
 								<View style={styles.checkboxWrapper}>
 									<TouchableOpacity
-										onPress={toggleEndTime}
+										onPress={toggleAllDay}
 										style={styles.checkboxContainer}
 									>
 										<View style={styles.checkbox}>
 											<Ionicons
 												name={
-													hasEndTime
+													allDay
 														? "checkbox"
 														: "square-outline"
 												}
@@ -597,128 +542,174 @@ const EventSubmit = ({ navigation }) => {
 											/>
 										</View>
 										<Text style={styles.checkboxLabel}>
-											End Time
+											All Day
 										</Text>
 									</TouchableOpacity>
 								</View>
 
-								{hasEndTime && (
-									<View
-										style={[
-											styles.inputContainer,
-											styles.timeField,
-										]}
-									>
-										<Text style={styles.label}>
-											End Time
-										</Text>
-										<TouchableOpacity
-											onPress={() =>
-												toggleDatePicker("endTime")
-											}
-											style={styles.dateButton}
+								{!allDay && (
+									<View style={styles.timeContainer}>
+										{/* Start Time Section */}
+										<View
+											style={[
+												styles.inputContainer,
+												styles.timeField,
+											]}
 										>
-											<Text style={styles.dateButtonText}>
-												{formatTime(endTime, false)}
+											<Text style={styles.label}>
+												Start Time
 											</Text>
-											<Ionicons
-												name="time-outline"
-												size={22}
-												color="#555"
+											<TouchableOpacity
+												onPress={() =>
+													toggleDatePicker(
+														"startTime",
+													)
+												}
+												style={styles.dateButton}
+											>
+												<Text
+													style={
+														styles.dateButtonText
+													}
+												>
+													{formatTime(startTime)}
+												</Text>
+												<Ionicons
+													name="time-outline"
+													size={22}
+													color="#555"
+												/>
+											</TouchableOpacity>
+											<DatePicker
+												modal
+												open={openStartTime}
+												date={startTime}
+												mode="time"
+												onConfirm={(date) => {
+													toggleDatePicker(
+														"startTime",
+													);
+													setStartTime(date);
+												}}
+												onCancel={() => {
+													toggleDatePicker(
+														"startTime",
+													);
+												}}
 											/>
-										</TouchableOpacity>
-										<DatePicker
-											modal
-											open={openEndTime}
-											date={endTime}
-											mode="datetime"
-											onConfirm={(date) => {
-												toggleDatePicker("endTime");
-												setEndTime(date);
-											}}
-											onCancel={() => {
-												toggleDatePicker("endTime");
-											}}
-										/>
+										</View>
+
+										{/* End Time Toggle */}
+										<View style={styles.checkboxWrapper}>
+											<TouchableOpacity
+												onPress={toggleEndTime}
+												style={styles.checkboxContainer}
+											>
+												<View style={styles.checkbox}>
+													<Ionicons
+														name={
+															hasEndTime
+																? "checkbox"
+																: "square-outline"
+														}
+														size={24}
+														color="#3d7eea"
+													/>
+												</View>
+												<Text
+													style={styles.checkboxLabel}
+												>
+													End Time
+												</Text>
+											</TouchableOpacity>
+										</View>
+
+										{hasEndTime && (
+											<View
+												style={[
+													styles.inputContainer,
+													styles.timeField,
+												]}
+											>
+												<Text style={styles.label}>
+													End Time
+												</Text>
+												<TouchableOpacity
+													onPress={() =>
+														toggleDatePicker(
+															"endTime",
+														)
+													}
+													style={styles.dateButton}
+												>
+													<Text
+														style={
+															styles.dateButtonText
+														}
+													>
+														{formatTime(
+															endTime,
+															false,
+														)}
+													</Text>
+													<Ionicons
+														name="time-outline"
+														size={22}
+														color="#555"
+													/>
+												</TouchableOpacity>
+												<DatePicker
+													modal
+													open={openEndTime}
+													date={endTime}
+													mode="datetime"
+													onConfirm={(date) => {
+														toggleDatePicker(
+															"endTime",
+														);
+														setEndTime(date);
+													}}
+													onCancel={() => {
+														toggleDatePicker(
+															"endTime",
+														);
+													}}
+												/>
+											</View>
+										)}
 									</View>
 								)}
 							</View>
-						)}
-					</View>
 
-					{/* Assigned Workers Section */}
-					<View style={styles.sectionContainer}>
-						<Text style={styles.sectionTitle}>People</Text>
-						<View
-							style={[
-								styles.inputContainer,
-								{ zIndex: 3000, elevation: 3 },
-							]}
-						>
-							<Text style={styles.label}>Assigned Workers</Text>
-							<DropDownPicker
-								searchPlaceholder="Search workers"
-								multiple={true}
-								min={0}
-								max={5}
-								value={assignedWorkers}
-								setValue={setAssignedWorkers}
-								items={availableWorkers}
-								setItems={setAvailableWorkers}
-								open={openSelect}
-								setOpen={() => toggleDatePicker("select")}
-								mode="BADGE"
-								listMode="SCROLLVIEW"
-								searchable={true}
-								maxHeight={200}
-								style={styles.dropdown}
-								dropDownContainerStyle={styles.dropdownList}
-								listItemContainerStyle={styles.dropdownItem}
-								badgeColors={["#3d7eea"]}
-								badgeTextStyle={{ color: "white" }}
-								zIndex={3000}
-								placeholder="Select workers"
-							/>
-						</View>
-					</View>
-
-					{/* Packages Section */}
-					<View style={[styles.sectionContainer, { zIndex: 2 }]}>
-						<Text style={styles.sectionTitle}>Packages</Text>
-						<View style={styles.inputContainer}>
-							<Text style={styles.label}>Attach Packages</Text>
-							<Text style={styles.helperText}>
-								Select packages to attach to this event
-							</Text>
-
-							{loadingPackages ? (
-								<ActivityIndicator
-									style={{ marginVertical: 20 }}
-								/>
-							) : availablePackages.length === 0 ? (
-								<View style={styles.emptyPackagesContainer}>
-									<Text style={styles.emptyPackagesText}>
-										No packages available
+							{/* Assigned Workers Section */}
+							<View style={styles.sectionContainer}>
+								<Text style={styles.sectionTitle}>People</Text>
+								<View
+									style={[
+										styles.inputContainer,
+										{ zIndex: 3000, elevation: 3 },
+									]}
+								>
+									<Text style={styles.label}>
+										Assigned Workers
 									</Text>
-								</View>
-							) : (
-								<>
-									{/* Package Dropdown Selector */}
 									<DropDownPicker
-										open={openPackagesDropdown}
-										setOpen={setOpenPackagesDropdown}
-										items={availablePackages.map((pkg) => ({
-											label: pkg.title, // Just use the package title as the label
-											value: pkg.id,
-										}))}
-										value={[]} // Use null for single selection mode
-										setValue={(callback) => {
-											// Keep this empty as we handle selection manually
-										}}
-										multiple={false}
+										searchPlaceholder="Search workers"
+										multiple={true}
+										min={0}
+										max={5}
+										value={assignedWorkers}
+										setValue={setAssignedWorkers}
+										items={availableWorkers}
+										setItems={setAvailableWorkers}
+										open={openSelect}
+										setOpen={() =>
+											toggleDatePicker("select")
+										}
+										mode="BADGE"
+										listMode="SCROLLVIEW"
 										searchable={true}
-										searchPlaceholder="Search packages..."
-										placeholder="Select a package"
+										maxHeight={200}
 										style={styles.dropdown}
 										dropDownContainerStyle={
 											styles.dropdownList
@@ -726,328 +717,450 @@ const EventSubmit = ({ navigation }) => {
 										listItemContainerStyle={
 											styles.dropdownItem
 										}
-										listMode="SCROLLVIEW" // Add this to ensure scrolling works
-										maxHeight={300} // Set a reasonable max height
-										onSelectItem={(item) => {
-											if (
-												item &&
-												!selectedPackages.includes(
-													item.value,
-												)
-											) {
-												togglePackageSelection(
-													item.value,
-												);
-											}
-											setOpenPackagesDropdown(false);
-										}}
-										zIndex={2000}
+										badgeColors={["#3d7eea"]}
+										badgeTextStyle={{ color: "white" }}
+										zIndex={3000}
+										placeholder="Select workers"
 									/>
+								</View>
+							</View>
 
-									{/* Display Selected Packages */}
-									{selectedPackages.length > 0 && (
+							{/* Packages Section */}
+							<View
+								style={[styles.sectionContainer, { zIndex: 2 }]}
+							>
+								<Text style={styles.sectionTitle}>
+									Packages
+								</Text>
+								<View style={styles.inputContainer}>
+									<Text style={styles.label}>
+										Attach Packages
+									</Text>
+									<Text style={styles.helperText}>
+										Select packages to attach to this event
+									</Text>
+
+									{loadingPackages ? (
+										<ActivityIndicator
+											style={{ marginVertical: 20 }}
+										/>
+									) : availablePackages.length === 0 ? (
 										<View
 											style={
-												styles.selectedPackagesContainer
+												styles.emptyPackagesContainer
 											}
 										>
 											<Text
-												style={
-													styles.selectedPackagesTitle
-												}
+												style={styles.emptyPackagesText}
 											>
-												Selected Packages (
-												{selectedPackages.length})
+												No packages available
 											</Text>
-											{availablePackages
-												.filter((pkg) =>
-													selectedPackages.includes(
-														pkg.id,
-													),
-												)
-												.map((pkg) => (
-													<View
-														key={pkg.id}
-														style={
-															styles.packageItem
-														}
-													>
-														<View
-															style={
-																styles.packageItemContent
-															}
-														>
-															<View
-																style={
-																	styles.packageItemHeader
-																}
-															>
-																<Text
-																	style={
-																		styles.packageItemTitle
-																	}
-																>
-																	{pkg.title}
-																</Text>
-																<TouchableOpacity
-																	onPress={() =>
-																		togglePackageSelection(
-																			pkg.id,
-																		)
-																	}
-																	style={
-																		styles.removePackageButton
-																	}
-																>
-																	<Ionicons
-																		name="close-circle"
-																		size={
-																			24
-																		}
-																		color="#e74c3c"
-																	/>
-																</TouchableOpacity>
-															</View>
-
-															{pkg.description ? (
-																<Text
-																	style={
-																		styles.packageItemDescription
-																	}
-																	numberOfLines={
-																		2
-																	}
-																>
-																	{
-																		pkg.description
-																	}
-																</Text>
-															) : null}
-
-															<Text
-																style={
-																	styles.packageItemStats
-																}
-															>
-																{
-																	pkg
-																		.checklists
-																		.length
-																}{" "}
-																{pkg.checklists
-																	.length ===
-																1
-																	? "checklist"
-																	: "checklists"}
-															</Text>
-														</View>
-													</View>
-												))}
 										</View>
-									)}
-								</>
-							)}
-						</View>
-					</View>
-
-					{/* Label Section */}
-					<View style={[styles.sectionContainer, { zIndex: 1 }]}>
-						<Text style={styles.sectionTitle}>Label</Text>
-						<View style={styles.inputContainer}>
-							<Text style={styles.label}>Event Label</Text>
-							<Text style={styles.helperText}>
-								Categorize this event with a label
-							</Text>
-
-							{loadingLabels ? (
-								<ActivityIndicator
-									style={{ marginVertical: 10 }}
-								/>
-							) : availableLabels.length === 0 ? (
-								<View style={styles.emptyLabelsContainer}>
-									<Text style={styles.emptyLabelsText}>
-										No labels available
-									</Text>
-								</View>
-							) : (
-								<View style={styles.labelSelectorContainer}>
-									<View style={styles.labelsGrid}>
-										{/* Option for no label */}
-										<TouchableOpacity
-											style={[
-												styles.labelOption,
-												!selectedLabelId &&
-													styles.labelOptionSelected,
-											]}
-											onPress={() =>
-												setSelectedLabelId(null)
-											}
-										>
-											<View style={styles.labelColorNone}>
-												<Ionicons
-													name="close"
-													size={16}
-													color="#999"
-												/>
-											</View>
-											<Text
-												style={styles.labelOptionText}
-											>
-												None
-											</Text>
-										</TouchableOpacity>
-
-										{/* Available labels */}
-										{availableLabels.map((label) => (
-											<TouchableOpacity
-												key={label.id}
-												style={[
-													styles.labelOption,
-													selectedLabelId ===
-														label.id &&
-														styles.labelOptionSelected,
-												]}
-												onPress={() =>
-													setSelectedLabelId(label.id)
+									) : (
+										<>
+											{/* Package Dropdown Selector */}
+											<DropDownPicker
+												open={openPackagesDropdown}
+												setOpen={
+													setOpenPackagesDropdown
 												}
-											>
-												<View
-													style={[
-														styles.labelColor,
-														{
-															backgroundColor:
-																label.color,
-														},
-													]}
-												/>
-												<Text
-													style={
-														styles.labelOptionText
+												items={availablePackages.map(
+													(pkg) => ({
+														label: pkg.title, // Just use the package title as the label
+														value: pkg.id,
+													}),
+												)}
+												value={[]} // Use null for single selection mode
+												setValue={(callback) => {
+													// Keep this empty as we handle selection manually
+												}}
+												multiple={false}
+												searchable={true}
+												searchPlaceholder="Search packages..."
+												placeholder="Select a package"
+												style={styles.dropdown}
+												dropDownContainerStyle={
+													styles.dropdownList
+												}
+												listItemContainerStyle={
+													styles.dropdownItem
+												}
+												listMode="SCROLLVIEW" // Add this to ensure scrolling works
+												maxHeight={300} // Set a reasonable max height
+												onSelectItem={(item) => {
+													if (
+														item &&
+														!selectedPackages.includes(
+															item.value,
+														)
+													) {
+														togglePackageSelection(
+															item.value,
+														);
 													}
-												>
-													{label.name}
-												</Text>
-											</TouchableOpacity>
-										))}
-									</View>
-								</View>
-							)}
+													setOpenPackagesDropdown(
+														false,
+													);
+												}}
+												zIndex={2000}
+											/>
 
-							{/* Selected Label Preview */}
-							{selectedLabelId && (
-								<View style={styles.selectedLabelContainer}>
-									{availableLabels.map((label) => {
-										if (label.id === selectedLabelId) {
-											return (
+											{/* Display Selected Packages */}
+											{selectedPackages.length > 0 && (
 												<View
-													key={label.id}
-													style={[
-														styles.selectedLabel,
-														{
-															backgroundColor:
-																label.color,
-														},
-													]}
+													style={
+														styles.selectedPackagesContainer
+													}
 												>
 													<Text
 														style={
-															styles.selectedLabelText
+															styles.selectedPackagesTitle
 														}
 													>
-														{label.name}
+														Selected Packages (
+														{
+															selectedPackages.length
+														}
+														)
 													</Text>
+													{availablePackages
+														.filter((pkg) =>
+															selectedPackages.includes(
+																pkg.id,
+															),
+														)
+														.map((pkg) => (
+															<View
+																key={pkg.id}
+																style={
+																	styles.packageItem
+																}
+															>
+																<View
+																	style={
+																		styles.packageItemContent
+																	}
+																>
+																	<View
+																		style={
+																			styles.packageItemHeader
+																		}
+																	>
+																		<Text
+																			style={
+																				styles.packageItemTitle
+																			}
+																		>
+																			{
+																				pkg.title
+																			}
+																		</Text>
+																		<TouchableOpacity
+																			onPress={() =>
+																				togglePackageSelection(
+																					pkg.id,
+																				)
+																			}
+																			style={
+																				styles.removePackageButton
+																			}
+																		>
+																			<Ionicons
+																				name="close-circle"
+																				size={
+																					24
+																				}
+																				color="#e74c3c"
+																			/>
+																		</TouchableOpacity>
+																	</View>
+
+																	{pkg.description ? (
+																		<Text
+																			style={
+																				styles.packageItemDescription
+																			}
+																			numberOfLines={
+																				2
+																			}
+																		>
+																			{
+																				pkg.description
+																			}
+																		</Text>
+																	) : null}
+
+																	<Text
+																		style={
+																			styles.packageItemStats
+																		}
+																	>
+																		{
+																			pkg
+																				.checklists
+																				.length
+																		}{" "}
+																		{pkg
+																			.checklists
+																			.length ===
+																		1
+																			? "checklist"
+																			: "checklists"}
+																	</Text>
+																</View>
+															</View>
+														))}
 												</View>
-											);
-										}
-										return null;
-									})}
+											)}
+										</>
+									)}
 								</View>
+							</View>
+
+							{/* Label Section */}
+							<View
+								style={[styles.sectionContainer, { zIndex: 1 }]}
+							>
+								<Text style={styles.sectionTitle}>Label</Text>
+								<View style={styles.inputContainer}>
+									<Text style={styles.label}>
+										Event Label
+									</Text>
+									<Text style={styles.helperText}>
+										Categorize this event with a label
+									</Text>
+
+									{loadingLabels ? (
+										<ActivityIndicator
+											style={{ marginVertical: 10 }}
+										/>
+									) : availableLabels.length === 0 ? (
+										<View
+											style={styles.emptyLabelsContainer}
+										>
+											<Text
+												style={styles.emptyLabelsText}
+											>
+												No labels available
+											</Text>
+										</View>
+									) : (
+										<View
+											style={
+												styles.labelSelectorContainer
+											}
+										>
+											<View style={styles.labelsGrid}>
+												{/* Option for no label */}
+												<TouchableOpacity
+													style={[
+														styles.labelOption,
+														!selectedLabelId &&
+															styles.labelOptionSelected,
+													]}
+													onPress={() =>
+														setSelectedLabelId(null)
+													}
+												>
+													<View
+														style={
+															styles.labelColorNone
+														}
+													>
+														<Ionicons
+															name="close"
+															size={16}
+															color="#999"
+														/>
+													</View>
+													<Text
+														style={
+															styles.labelOptionText
+														}
+													>
+														None
+													</Text>
+												</TouchableOpacity>
+
+												{/* Available labels */}
+												{availableLabels.map(
+													(label) => (
+														<TouchableOpacity
+															key={label.id}
+															style={[
+																styles.labelOption,
+																selectedLabelId ===
+																	label.id &&
+																	styles.labelOptionSelected,
+															]}
+															onPress={() =>
+																setSelectedLabelId(
+																	label.id,
+																)
+															}
+														>
+															<View
+																style={[
+																	styles.labelColor,
+																	{
+																		backgroundColor:
+																			label.color,
+																	},
+																]}
+															/>
+															<Text
+																style={
+																	styles.labelOptionText
+																}
+															>
+																{label.name}
+															</Text>
+														</TouchableOpacity>
+													),
+												)}
+											</View>
+										</View>
+									)}
+
+									{/* Selected Label Preview */}
+									{selectedLabelId && (
+										<View
+											style={
+												styles.selectedLabelContainer
+											}
+										>
+											{availableLabels.map((label) => {
+												if (
+													label.id === selectedLabelId
+												) {
+													return (
+														<View
+															key={label.id}
+															style={[
+																styles.selectedLabel,
+																{
+																	backgroundColor:
+																		label.color,
+																},
+															]}
+														>
+															<Text
+																style={
+																	styles.selectedLabelText
+																}
+															>
+																{label.name}
+															</Text>
+														</View>
+													);
+												}
+												return null;
+											})}
+										</View>
+									)}
+								</View>
+							</View>
+
+							{/* Notes Section */}
+							<View
+								style={[styles.sectionContainer, { zIndex: 1 }]}
+							>
+								<Text style={styles.sectionTitle}>
+									Additional Information
+								</Text>
+								<View style={styles.inputContainer}>
+									<Text style={styles.label}>Notes</Text>
+									<TextInput
+										style={styles.notesInput}
+										placeholder="Add any additional notes about this event"
+										placeholderTextColor="#A0A0A0"
+										multiline={true}
+										numberOfLines={4}
+										value={notes}
+										onChangeText={setNotes}
+									/>
+								</View>
+
+								{/* Attachments Section */}
+								<View style={styles.attachmentsContainer}>
+									<Text style={styles.label}>
+										Attachments
+									</Text>
+									<AttachmentsSelector
+										showDocuments={true}
+										showMedia={true}
+										attachments={attachments}
+										setAttachments={setAttachments}
+										deletionQueue={attachmentDeletionQueue}
+										setDeletionQueue={
+											setAttachmentDeletionQueue
+										}
+										uploadProgress={uploadProgress}
+									/>
+								</View>
+							</View>
+						</View>
+
+						{/* Action Buttons */}
+						<View style={styles.actionButtonsContainer}>
+							<Button
+								title={
+									isEditing ? "Update Event" : "Create Event"
+								}
+								onPress={() => {
+									// Validate before submitting
+									if (!title.trim()) {
+										Alert.alert(
+											"Error",
+											"Please enter a title for the event",
+										);
+										return;
+									}
+
+									handleSubmit();
+								}}
+								style={styles.submitButton}
+								textStyle={styles.submitButtonText}
+								variant="primary"
+								fullWidth
+								loading={isLoading || isUploading}
+								disabled={
+									(isEditing && !canSubmit()) ||
+									isUploading ||
+									isLoading
+								}
+								icon={
+									<Ionicons
+										name="send"
+										size={22}
+										color="white"
+									/>
+								}
+							/>
+
+							{isEditing && (
+								<Button
+									title="Delete Event"
+									onPress={handleDelete}
+									style={styles.deleteButton}
+									textStyle={styles.submitButtonText}
+									variant="destructive"
+									fullWidth
+									icon={
+										<Ionicons
+											name="trash-outline"
+											size={22}
+											color="white"
+										/>
+									}
+								/>
 							)}
 						</View>
-					</View>
-
-					{/* Notes Section */}
-					<View style={[styles.sectionContainer, { zIndex: 1 }]}>
-						<Text style={styles.sectionTitle}>
-							Additional Information
-						</Text>
-						<View style={styles.inputContainer}>
-							<Text style={styles.label}>Notes</Text>
-							<TextInput
-								style={styles.notesInput}
-								placeholder="Add any additional notes about this event"
-								placeholderTextColor="#A0A0A0"
-								multiline={true}
-								numberOfLines={4}
-								value={notes}
-								onChangeText={setNotes}
-							/>
-						</View>
-
-						{/* Attachments Section */}
-						<View style={styles.attachmentsContainer}>
-							<Text style={styles.label}>Attachments</Text>
-							<AttachmentsSelector
-								showDocuments={true}
-								showMedia={true}
-								attachments={attachments}
-								setAttachments={setAttachments}
-								deletionQueue={attachmentDeletionQueue}
-								setDeletionQueue={setAttachmentDeletionQueue}
-								uploadProgress={uploadProgress}
-							/>
-						</View>
-					</View>
-				</View>
-
-				{/* Action Buttons */}
-				<View style={styles.actionButtonsContainer}>
-					<Button
-						title={isEditing ? "Update Event" : "Create Event"}
-						onPress={() => {
-							// Validate before submitting
-							if (!title.trim()) {
-								Alert.alert(
-									"Error",
-									"Please enter a title for the event",
-								);
-								return;
-							}
-
-							handleSubmit();
-						}}
-						style={styles.submitButton}
-						textStyle={styles.submitButtonText}
-						variant="primary"
-						fullWidth
-						loading={isLoading || isUploading}
-						disabled={
-							(isEditing && !canSubmit()) ||
-							isUploading ||
-							isLoading
-						}
-						icon={<Ionicons name="send" size={22} color="white" />}
-					/>
-
-					{isEditing && (
-						<Button
-							title="Delete Event"
-							onPress={handleDelete}
-							style={styles.deleteButton}
-							textStyle={styles.submitButtonText}
-							variant="destructive"
-							fullWidth
-							icon={
-								<Ionicons
-									name="trash-outline"
-									size={22}
-									color="white"
-								/>
-							}
-						/>
-					)}
-				</View>
-			</KeyboardAwareScrollView>
+					</>
+				}
+				keyboardShouldPersistTaps="handled"
+				contentContainerStyle={styles.scrollContainer}
+			/>
 		</View>
 	);
 };
