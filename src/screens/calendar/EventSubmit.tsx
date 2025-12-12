@@ -106,8 +106,6 @@ const EventSubmit = ({ navigation }) => {
 	// Add these at the top of your component
 	const isMounted = useRef(true);
 
-	console.log(availableWorkers);
-
 	// Add at the beginning of the component
 	useEffect(() => {
 		isMounted.current = true;

@@ -537,8 +537,6 @@ const TimeEntryDetails = ({ route, navigation }) => {
 		}
 	};
 
-	console.log(fieldTotals);
-
 	return (
 		<View style={[styles.container, { paddingTop: insets.top }]}>
 			{/* Header */}
