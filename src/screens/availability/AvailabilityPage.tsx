@@ -25,6 +25,7 @@ import {
 	declineEvent,
 	fetchUnassignedUpcomingEvents,
 	undeclineEvent,
+	getWorkerStatusList,
 } from "../../services/availabilityService";
 import {
 	updateCompanyPreferences,
@@ -241,8 +242,7 @@ const AvailabilityPage = ({ navigation }) => {
 				return events.filter(
 					(event) =>
 						(event.status === "available" ||
-							event.status === "already_on_event" ||
-							event.status === "on_potential_event") &&
+							event.status === "already_on_event") &&
 						!event.confirmed,
 				);
 			case "confirmed":
@@ -260,13 +260,16 @@ const AvailabilityPage = ({ navigation }) => {
 
 	const renderEventCard = ({ item }) => {
 		const getStatusColor = () => {
+			if (activeTab === "confirmed") {
+				return "#4ADE80";
+			} else if (activeTab === "declined") {
+				return "#EF4444";
+			}
 			switch (item.status) {
 				case "available":
 					return "#4ADE80";
 				case "already_on_event":
 					return "#EF4444";
-				case "on_potential_event":
-					return "#F59E0B"; // Orange for confirmed/declined events
 				default:
 					return "#888888";
 			}
@@ -501,8 +504,8 @@ const AvailabilityPage = ({ navigation }) => {
 			// Convert the map to an array of users
 			const allUsers = Object.values(usersMap);
 
-			// Get worker status for this event from the event's workerStatus map
-			const workerStatus = event.rawData.workerStatus || {};
+			// Fetch fresh worker status from Firebase instead of using stale local data
+			const workerStatus = await getWorkerStatusList(companyId, event.id);
 
 			// Categorize users based on their status in the workerStatus map
 			const categorizedUsers = {
@@ -544,6 +547,22 @@ const AvailabilityPage = ({ navigation }) => {
 		} finally {
 			setLoadingWorkerDetails(false);
 		}
+	};
+
+	const handleAdminStatusChange = async (targetUserId, newStatus) => {
+		if (!selectedEventForAdmin) return;
+		const eventId = selectedEventForAdmin.id;
+
+		if (newStatus === "confirmed") {
+			await confirmEvent(companyId, eventId, targetUserId);
+		} else if (newStatus === "declined") {
+			await declineEvent(companyId, eventId, targetUserId);
+		}
+
+		// Refresh worker details in the modal
+		fetchEventWorkerDetails(selectedEventForAdmin);
+		// Refresh the main event list
+		fetchEventsFromFirebase();
 	};
 
 	const handleAdminEventPress = (event) => {
@@ -883,21 +902,34 @@ const AvailabilityPage = ({ navigation }) => {
 															{user.lastName}
 														</Text>
 														<View
-															style={[
-																styles.statusBadge,
-																{
-																	backgroundColor:
-																		"#4ADE80",
-																},
-															]}
+															style={
+																styles.workerItemActions
+															}
 														>
-															<Text
+															<TouchableOpacity
 																style={
-																	styles.statusBadgeText
+																	styles.adminDeclineBtn
+																}
+																onPress={() =>
+																	handleAdminStatusChange(
+																		user.id,
+																		"declined",
+																	)
 																}
 															>
-																Confirmed
-															</Text>
+																<Ionicons
+																	name="close-circle"
+																	size={14}
+																	color="#fff"
+																/>
+																<Text
+																	style={
+																		styles.adminBtnText
+																	}
+																>
+																	Decline
+																</Text>
+															</TouchableOpacity>
 														</View>
 													</View>
 												),
@@ -945,27 +977,58 @@ const AvailabilityPage = ({ navigation }) => {
 															{user.lastName}
 														</Text>
 														<View
-															style={[
-																styles.statusBadge,
-																{
-																	backgroundColor:
-																		user.status ===
-																		"conflicted"
-																			? "#EF4444"
-																			: "#F59E0B",
-																},
-															]}
+															style={
+																styles.workerItemActions
+															}
 														>
-															<Text
+															<TouchableOpacity
 																style={
-																	styles.statusBadgeText
+																	styles.adminDeclineBtn
+																}
+																onPress={() =>
+																	handleAdminStatusChange(
+																		user.id,
+																		"declined",
+																	)
 																}
 															>
-																{user.status ===
-																"conflicted"
-																	? "Conflict"
-																	: "Pending"}
-															</Text>
+																<Ionicons
+																	name="close-circle"
+																	size={14}
+																	color="#fff"
+																/>
+																<Text
+																	style={
+																		styles.adminBtnText
+																	}
+																>
+																	Decline
+																</Text>
+															</TouchableOpacity>
+															<TouchableOpacity
+																style={
+																	styles.adminConfirmBtn
+																}
+																onPress={() =>
+																	handleAdminStatusChange(
+																		user.id,
+																		"confirmed",
+																	)
+																}
+															>
+																<Ionicons
+																	name="checkmark-circle"
+																	size={14}
+																	color="#fff"
+																/>
+																<Text
+																	style={
+																		styles.adminBtnText
+																	}
+																>
+																	Confirm
+																</Text>
+															</TouchableOpacity>
 														</View>
 													</View>
 												),
@@ -1013,21 +1076,34 @@ const AvailabilityPage = ({ navigation }) => {
 															{user.lastName}
 														</Text>
 														<View
-															style={[
-																styles.statusBadge,
-																{
-																	backgroundColor:
-																		"#EF4444",
-																},
-															]}
+															style={
+																styles.workerItemActions
+															}
 														>
-															<Text
+															<TouchableOpacity
 																style={
-																	styles.statusBadgeText
+																	styles.adminConfirmBtn
+																}
+																onPress={() =>
+																	handleAdminStatusChange(
+																		user.id,
+																		"confirmed",
+																	)
 																}
 															>
-																Declined
-															</Text>
+																<Ionicons
+																	name="checkmark-circle"
+																	size={14}
+																	color="#fff"
+																/>
+																<Text
+																	style={
+																		styles.adminBtnText
+																	}
+																>
+																	Confirm
+																</Text>
+															</TouchableOpacity>
 														</View>
 													</View>
 												),
@@ -1574,6 +1650,32 @@ const styles = StyleSheet.create({
 		backgroundColor: "#F9FAFB",
 		borderRadius: 8,
 		marginBottom: 8,
+	},
+	workerItemActions: {
+		flexDirection: "row",
+		gap: 8,
+	},
+	adminConfirmBtn: {
+		flexDirection: "row",
+		alignItems: "center",
+		backgroundColor: "#4ADE80",
+		paddingVertical: 4,
+		paddingHorizontal: 10,
+		borderRadius: 6,
+	},
+	adminDeclineBtn: {
+		flexDirection: "row",
+		alignItems: "center",
+		backgroundColor: "#EF4444",
+		paddingVertical: 4,
+		paddingHorizontal: 10,
+		borderRadius: 6,
+	},
+	adminBtnText: {
+		color: "#FFFFFF",
+		fontSize: 12,
+		fontWeight: "600",
+		marginLeft: 4,
 	},
 	emptyText: {
 		fontSize: 14,
