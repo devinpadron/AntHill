@@ -2,7 +2,7 @@ export default {
 	expo: {
 		name: "AntHill",
 		slug: "AntHill",
-		version: "1.0.96",
+		version: "1.0.98",
 		orientation: "portrait",
 		userInterfaceStyle: "automatic",
 		assetBundlePatterns: ["**/*"],
@@ -61,6 +61,7 @@ export default {
 			eas: {
 				projectId: "1a855cc1-8887-47e2-a13a-fd2fbb15b8c1",
 			},
+			GOOGLE_PLACES_API_KEY: process.env.GOOGLE_PLACES_API_KEY,
 		},
 	},
 };
