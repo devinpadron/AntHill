@@ -1,13 +1,14 @@
 import React from "react";
-import { StyleSheet } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { StyleSheet, ScrollView } from "react-native";
+import { useTheme } from "../../contexts/ThemeContext";
 import { FormInput } from "../../components/ui/FormInput";
 import { Button } from "../../components/ui/Button";
-import { ToggleSwitch } from "../../components/ui/ToggleSwitch";
+import { Container } from "../../components/ui/Container";
 import { useSignUp } from "../../hooks/useSignUp";
-import { AntHill } from "../../constants/colors";
+import { Spacing } from "../../constants/tokens";
 
 const SignUpPage = ({ navigation }) => {
+	const { theme } = useTheme();
 	const {
 		firstName,
 		setFirstName,
@@ -26,88 +27,71 @@ const SignUpPage = ({ navigation }) => {
 	} = useSignUp(navigation);
 
 	return (
-		<SafeAreaView style={styles.container}>
-			<FormInput
-				placeholder="First Name:"
-				value={firstName}
-				onChangeText={setFirstName}
-			/>
+		<Container variant="page" padding="none" includeSafeArea>
+			<ScrollView
+				contentContainerStyle={styles.scrollContent}
+				showsVerticalScrollIndicator={false}
+			>
+				<FormInput
+					placeholder="First Name:"
+					value={firstName}
+					onChangeText={setFirstName}
+				/>
 
-			<FormInput
-				placeholder="Last Name:"
-				value={lastName}
-				onChangeText={setLastName}
-			/>
+				<FormInput
+					placeholder="Last Name:"
+					value={lastName}
+					onChangeText={setLastName}
+				/>
 
-			<FormInput
-				placeholder="Email:"
-				value={email}
-				onChangeText={setEmail}
-				keyboardType="email-address"
-			/>
+				<FormInput
+					placeholder="Email:"
+					value={email}
+					onChangeText={setEmail}
+					keyboardType="email-address"
+				/>
 
-			<FormInput
-				placeholder="Password:"
-				value={password}
-				onChangeText={setPassword}
-				secureTextEntry
-			/>
+				<FormInput
+					placeholder="Password:"
+					value={password}
+					onChangeText={setPassword}
+					secureTextEntry
+				/>
 
-			<FormInput
-				placeholder="Confirm Password:"
-				value={confPassword}
-				onChangeText={setConfPassword}
-				secureTextEntry
-			/>
+				<FormInput
+					placeholder="Confirm Password:"
+					value={confPassword}
+					onChangeText={setConfPassword}
+					secureTextEntry
+				/>
 
-			<FormInput
-				placeholder="Company Code:"
-				value={accessCode}
-				onChangeText={setAccessCode}
-			/>
+				<FormInput
+					placeholder="Company Code:"
+					value={accessCode}
+					onChangeText={setAccessCode}
+				/>
 
-			<Button
-				title="Sign Up"
-				onPress={handleSignUp}
-				loading={isLoading}
-				style={styles.signUpButton}
-				textStyle={styles.buttonText}
-				variant="primary"
-				fullWidth
-			/>
-		</SafeAreaView>
+				<Button
+					title="Sign Up"
+					onPress={handleSignUp}
+					loading={isLoading}
+					variant="primary"
+					style={styles.signUpButton}
+				/>
+			</ScrollView>
+		</Container>
 	);
 };
 
 export default SignUpPage;
 
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		alignItems: "center",
-		//justifyContent: "center",
-		paddingHorizontal: 20,
-		backgroundColor: "white",
+	scrollContent: {
+		paddingHorizontal: Spacing.lg,
+		paddingVertical: Spacing.xl,
 	},
 	signUpButton: {
-		height: 48,
-		marginTop: 20,
-		borderRadius: 8,
+		marginTop: Spacing.xxxl,
 		width: "100%",
-		backgroundColor: AntHill.Black,
-	},
-	buttonText: {
-		fontSize: 18,
-		fontWeight: "600",
-		color: AntHill.White,
-	},
-	backButton: {
-		backgroundColor: "transparent",
-		marginTop: 16,
-	},
-	backButtonText: {
-		fontSize: 16,
-		color: AntHill.Black,
-		textDecorationLine: "underline",
 	},
 });

@@ -1,6 +1,7 @@
 import React from "react";
-import { TextInput, StyleSheet } from "react-native";
-import { AntHill } from "../../constants/colors";
+import { TextInput, StyleSheet, ViewStyle } from "react-native";
+import { useTheme } from "../../contexts/ThemeContext";
+import { Spacing, BorderRadius } from "../../constants/tokens";
 
 type FormInputProps = {
 	placeholder: string;
@@ -8,6 +9,7 @@ type FormInputProps = {
 	onChangeText: (text: string) => void;
 	secureTextEntry?: boolean;
 	keyboardType?: "default" | "email-address" | "numeric" | "phone-pad";
+	style?: ViewStyle;
 };
 
 export const FormInput = ({
@@ -16,11 +18,26 @@ export const FormInput = ({
 	onChangeText,
 	secureTextEntry = false,
 	keyboardType = "default",
+	style,
 }: FormInputProps) => {
+	const { theme } = useTheme();
+
+	const inputStyles = [
+		styles.textInput,
+		{
+			color: theme.PrimaryText,
+			borderColor: theme.BorderColor || theme.SecondaryText,
+			backgroundColor: theme.CardBackground,
+			placeholderTextColor: theme.TertiaryText,
+		},
+		style,
+	];
+
 	return (
 		<TextInput
-			style={styles.textInput}
+			style={inputStyles}
 			placeholder={placeholder}
+			placeholderTextColor={theme.TertiaryText}
 			onChangeText={onChangeText}
 			value={value}
 			secureTextEntry={secureTextEntry}
@@ -33,14 +50,12 @@ export const FormInput = ({
 
 const styles = StyleSheet.create({
 	textInput: {
-		width: 350,
-		height: 40,
-		color: AntHill.Black,
-		margin: 10,
-		padding: 5,
+		width: "100%",
+		height: 48,
+		marginVertical: Spacing.md,
+		paddingHorizontal: Spacing.md,
 		fontSize: 16,
-		borderColor: AntHill.Black,
 		borderWidth: 1,
-		borderRadius: 5,
+		borderRadius: BorderRadius.md,
 	},
 });

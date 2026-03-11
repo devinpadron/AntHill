@@ -25,7 +25,13 @@ export { Spacer } from "./Spacer";
 export { DetailCard } from "./DetailCard";
 export { AppHeader } from "./AppHeader";
 export { Checkbox } from "./Checkbox";
-
-// New utility components
+export { Skeleton } from "./Skeleton";
+export { FormInput } from "./FormInput";
 export { EmptyState } from "./EmptyState";
 export { LoadingScreen } from "./LoadingScreen";
+export { InfoRow } from "./InfoRow";
+export { StatusBadge } from "./StatusBadge";
+export { ToggleSwitch } from "./ToggleSwitch";
+export { default as AttachmentGallery } from "./AttachmentGallery";
+export { default as AttachmentsSelector } from "./AttachmentsSelector";
+export { default as ThumbnailGallery } from "./ThumbnailGallery";
