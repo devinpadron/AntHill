@@ -1,5 +1,5 @@
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
-import { AttachmentItem, Event } from "../types";
+import { AttachmentItem, Event, Checklist } from "../types";
 import db from "../constants/firestore";
 /* An EventController that contains:
   - An event interface that provides the structure of event data
@@ -166,6 +166,70 @@ export async function deleteEvent(eventID: string, company: string) {
 	}
 }
 
+export async function getEventLabels(
+	company: string,
+): Promise<{ id: string; name: string; color: string }[]> {
+	try {
+		const snapshot = await db
+			.collection("Companies")
+			.doc(company)
+			.collection("EventLabels")
+			.get();
+
+		return snapshot.docs.map((doc) => ({
+			id: doc.id,
+			...(doc.data() as { name: string; color: string }),
+		}));
+	} catch (error) {
+		console.error("Error fetching event labels:", error);
+		return [];
+	}
+}
+
+export async function getEventLabelId(
+	company: string,
+	eventId: string,
+): Promise<string | null> {
+	try {
+		const eventDoc = await db
+			.collection("Companies")
+			.doc(company)
+			.collection("Events")
+			.doc(eventId)
+			.get();
+
+		return eventDoc.exists ? eventDoc.data()?.labelId || null : null;
+	} catch (error) {
+		console.error("Error fetching event label ID:", error);
+		return null;
+	}
+}
+
+export async function getEventLabel(
+	company: string,
+	labelId: string,
+): Promise<{ id: string; name: string; color: string } | null> {
+	try {
+		const labelDoc = await db
+			.collection("Companies")
+			.doc(company)
+			.collection("EventLabels")
+			.doc(labelId)
+			.get();
+
+		if (labelDoc.exists) {
+			return {
+				id: labelDoc.id,
+				...(labelDoc.data() as { name: string; color: string }),
+			};
+		}
+		return null;
+	} catch (error) {
+		console.error("Error fetching event label:", error);
+		return null;
+	}
+}
+
 export async function updateEvent(
 	company: string,
 	eventID: string,
@@ -217,11 +281,29 @@ export const getEventsByIds = async (companyId: string, eventIds: string[]) => {
 	}
 };
 
+export const getChecklistsByIds = async (
+	companyId: string,
+	checklistIds: string[],
+): Promise<Checklist[]> => {
+	const promises = checklistIds.map((id) =>
+		db
+			.collection("Companies")
+			.doc(companyId)
+			.collection("Checklists")
+			.doc(id)
+			.get(),
+	);
+	const docs = await Promise.all(promises);
+	return docs
+		.filter((doc) => doc.exists)
+		.map((doc) => ({ id: doc.id, ...doc.data() }) as Checklist);
+};
+
 export const updateEventChecklist = async (
 	companyId: string,
 	eventId: string,
 	checklistId: string,
-	checklistItem: { [key: string]: boolean },
+	checklistItem: { [key: string]: number | boolean },
 ) => {
 	try {
 		const eventRef = db

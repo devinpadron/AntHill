@@ -1,89 +1,70 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useMemo, useCallback } from "react";
 import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import moment from "moment";
 import { useUser } from "../../contexts/UserContext";
-import { useBottomSheetController } from "../../hooks/useBottomSheetController";
+import { useTheme } from "../../contexts/ThemeContext";
+import { useCalendarScreenState } from "../../hooks/calendar/useCalendarScreenState";
 import { FilterPanel } from "../../components/calendar/FilterPanel";
 import { FloatingActionButtons } from "../../components/calendar/FloatingActionButtons";
 import LoadingScreen from "../LoadingScreen";
-import { FilterType } from "../../types";
 import Timesheet from "../../components/calendar/Timesheet";
-import { set } from "lodash";
-import { Filter } from "react-native-feather";
 
 const today = moment().format("YYYY-MM-DD");
 
 const CalendarScreen = ({ navigation }: { navigation: any }) => {
 	// User State
 	const { user, isAdmin, isLoading, settings } = useUser();
-
-	// Date Selection
-	const [selectedDate, setSelectedDate] = useState<string>(null);
-
-	// Filter Options
-	const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-	const [availableWorkers, setAvailableWorkers] = useState([]);
-	const [openSelect, setOpenSelect] = useState(false);
-	const [showAllSelectedOnly, setShowAllSelectedOnly] = useState(false);
-	const [showExactSelectedOnly, setShowExactSelectedOnly] = useState(false);
-	const [calendarOpen, setCalendarOpen] = useState(false);
-	const [filterType, setFilterType] = useState<FilterType>(FilterType.MY);
-
-	useEffect(() => {
-		if (isAdmin) {
-			setFilterType(
-				settings?.defaultCalendarFilter
-					? settings.defaultCalendarFilter
-					: FilterType.ALL,
-			);
-		} else {
-			setFilterType(FilterType.MY);
-		}
-	}, [isLoading, isAdmin]);
-
-	const handleFilterChange = (type: FilterType) => {
-		if (!isAdmin) return;
-
-		setFilterType(type);
-		if (type === FilterType.SPECIFIC && !selectedUsers.length) {
-			return;
-		}
-		closeBottomSheet();
-	};
-
-	// Bottom Sheet
-	const snapPoints = useMemo(() => ["65%", "90%"], []);
+	const { theme } = useTheme();
 	const {
+		selectedDate,
+		setSelectedDate,
+		selectedUsers,
+		setSelectedUsers,
+		availableWorkers,
+		setAvailableWorkers,
+		openSelect,
+		showAllSelectedOnly,
+		setShowAllSelectedOnly,
+		showExactSelectedOnly,
+		setShowExactSelectedOnly,
+		calendarOpen,
+		filterType,
+		setFilterType,
+		handleFilterChange,
+		snapPoints,
 		bottomSheetRef,
 		bottomSheetPosition,
 		isBottomSheetVisible,
 		handleToggleBottomSheet,
 		handleSheetChanges,
-		closeBottomSheet,
-	} = useBottomSheetController(snapPoints);
-
-	const checkSelectOpen = () => {
-		setOpenSelect(!openSelect);
-		if (!openSelect) {
-			bottomSheetRef.current?.snapToIndex(1);
-		}
-	};
+		checkSelectOpen,
+		handleTodayPress,
+		handleCalendarOpen,
+		handleCalendarClose,
+	} = useCalendarScreenState({ isAdmin, isLoading, settings });
 
 	const insets = useSafeAreaInsets();
+	const rootStyle = useMemo(
+		() => [
+			styles.root,
+			{
+				paddingTop: insets.top,
+				backgroundColor: theme.Background,
+			},
+		],
+		[insets.top, theme.Background],
+	);
+	const handleAddEvent = useCallback(() => {
+		navigation.navigate("EditEvent", { event: null });
+	}, [navigation]);
 
 	if (isLoading || isAdmin === null) {
 		return <LoadingScreen />;
 	}
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				paddingTop: insets.top,
-				backgroundColor: "#f2f7f7",
-			}}
-		>
+		<View style={rootStyle}>
 			<View style={styles.container}>
 				{user ? (
 					<Timesheet
@@ -92,8 +73,8 @@ const CalendarScreen = ({ navigation }: { navigation: any }) => {
 						showAllSelectedOnly={showAllSelectedOnly}
 						showExactSelectedOnly={showExactSelectedOnly}
 						navigation={navigation}
-						onCalOpen={() => setCalendarOpen(true)}
-						onCalClose={() => setCalendarOpen(false)}
+						onCalOpen={handleCalendarOpen}
+						onCalClose={handleCalendarClose}
 						selectedDate={selectedDate}
 						setSelectedDate={setSelectedDate}
 						locked={isBottomSheetVisible}
@@ -130,28 +111,20 @@ const CalendarScreen = ({ navigation }: { navigation: any }) => {
 				selectedDate={selectedDate}
 				today={today}
 				isBottomSheetVisible={isBottomSheetVisible || calendarOpen}
-				onAddEvent={() =>
-					navigation.navigate("EditEvent", { event: null })
-				}
+				onAddEvent={handleAddEvent}
 				onFilterPress={handleToggleBottomSheet}
-				onTodayPress={() => setSelectedDate(null)}
+				onTodayPress={handleTodayPress}
 			/>
 		</View>
 	);
 };
 
 const styles = StyleSheet.create({
-	container: {
+	root: {
 		flex: 1,
 	},
-	calendar: {
-		paddingLeft: 20,
-		paddingRight: 20,
-	},
-	section: {
-		backgroundColor: "#f2f7f7",
-		color: "grey",
-		textTransform: "capitalize",
+	container: {
+		flex: 1,
 	},
 });
 

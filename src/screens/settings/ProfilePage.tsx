@@ -12,7 +12,7 @@ import { Dropdown } from "react-native-element-dropdown";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import LoadingScreen from "../LoadingScreen";
-import { useProfile } from "../../hooks/useProfile";
+import { useProfile } from "../../hooks/settings/useProfile";
 import { showPrompt, showConfirmation } from "../../utils/alertUtils";
 import { Button } from "../../components/ui/Button";
 import { useUser } from "../../contexts/UserContext";

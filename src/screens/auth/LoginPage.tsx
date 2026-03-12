@@ -2,7 +2,7 @@ import React from "react";
 import { Image, StyleSheet } from "react-native";
 import { useTheme } from "../../contexts/ThemeContext";
 import { showPrompt } from "../../utils/alertUtils";
-import { useAuth } from "../../hooks/useAuth";
+import { useAuth } from "../../hooks/auth/useAuth";
 import { FormInput } from "../../components/ui/FormInput";
 import { Button } from "../../components/ui/Button";
 import { Container } from "../../components/ui/Container";

@@ -4,7 +4,7 @@ import { useTheme } from "../../contexts/ThemeContext";
 import { FormInput } from "../../components/ui/FormInput";
 import { Button } from "../../components/ui/Button";
 import { Container } from "../../components/ui/Container";
-import { useSignUp } from "../../hooks/useSignUp";
+import { useSignUp } from "../../hooks/auth/useSignUp";
 import { Spacing } from "../../constants/tokens";
 
 const SignUpPage = ({ navigation }) => {

@@ -14,7 +14,7 @@ import { IconButton } from "../ui/IconButton";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useUser } from "../../contexts/UserContext";
 import moment from "moment";
-import { usePullEvents } from "../../hooks/usePullEvents";
+import { usePullEvents } from "../../hooks/calendar/usePullEvents";
 import { FilterType } from "../../types";
 import { CalendarList } from "react-native-calendars";
 import { Dimensions } from "react-native";

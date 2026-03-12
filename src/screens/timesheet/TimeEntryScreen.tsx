@@ -10,11 +10,11 @@ import {
 	TimeEntriesList,
 	TimeEntrySubmitModal,
 } from "../../components/time";
-import { useDateRange } from "../../hooks/useDateRange";
-import { useTimeEntries } from "../../hooks/useTimeEntries";
-import { useActiveTimeEntry } from "../../hooks/useActiveTimeEntry";
-import { useClockActions } from "../../hooks/useClockActions";
-import { useWeeklySummary } from "../../hooks/useWeeklySummary";
+import { useDateRange } from "../../hooks/timesheet/useDateRange";
+import { useTimeEntries } from "../../hooks/timesheet/useTimeEntries";
+import { useActiveTimeEntry } from "../../hooks/timesheet/useActiveTimeEntry";
+import { useClockActions } from "../../hooks/timesheet/useClockActions";
+import { useWeeklySummary } from "../../hooks/timesheet/useWeeklySummary";
 import { submitTimeEntryForApproval } from "../../services/timeEntryService";
 import { useUser } from "../../contexts/UserContext";
 import { useCompany } from "../../contexts/CompanyContext";

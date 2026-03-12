@@ -15,7 +15,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUser } from "../../../contexts/UserContext";
-import { useEmployeeData } from "../../../hooks/useEmployeeData";
+import { useEmployeeData } from "../../../hooks/settings/useEmployeeData";
 import { handleEmployeeAction } from "../../../utils/employeeUtils";
 
 // Enable LayoutAnimation on Android
