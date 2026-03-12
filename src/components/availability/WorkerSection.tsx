@@ -1,15 +1,15 @@
 import React from "react";
-import { View, TouchableOpacity, StyleSheet } from "react-native";
+import { View, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "../ui/Text";
+import { Button, ButtonVariant } from "../ui/Button";
 import { useTheme } from "../../contexts/ThemeContext";
 import { Spacing, BorderRadius } from "../../constants/tokens";
 
 interface WorkerAction {
 	label: string;
 	status: string;
-	color: string;
-	icon: keyof typeof Ionicons.glyphMap;
+	variant: ButtonVariant;
 }
 
 interface Worker {
@@ -54,9 +54,9 @@ export const WorkerSection: React.FC<WorkerSectionProps> = ({
 			</View>
 
 			{workers.length > 0 ? (
-				workers.map((user, index) => (
+				workers.map((user) => (
 					<View
-						key={index}
+						key={user.id}
 						style={[
 							styles.workerItem,
 							{ backgroundColor: theme.DateBadge },
@@ -72,30 +72,16 @@ export const WorkerSection: React.FC<WorkerSectionProps> = ({
 						</Text>
 						<View style={styles.workerActions}>
 							{actions.map((action) => (
-								<TouchableOpacity
+								<Button
 									key={action.status}
-									style={[
-										styles.actionBtn,
-										{ backgroundColor: action.color },
-									]}
+									variant={action.variant}
+									size="small"
+									title={action.label}
+									style={styles.actionBtn}
 									onPress={() =>
 										onStatusChange(user.id, action.status)
 									}
-								>
-									<Ionicons
-										name={action.icon}
-										size={14}
-										color="#fff"
-									/>
-									<Text
-										variant="small"
-										color="white"
-										weight="semibold"
-										style={styles.actionBtnText}
-									>
-										{action.label}
-									</Text>
-								</TouchableOpacity>
+								/>
 							))}
 						</View>
 					</View>
@@ -142,17 +128,10 @@ const styles = StyleSheet.create({
 	},
 	workerActions: {
 		flexDirection: "row",
-		gap: 8,
+		gap: Spacing.sm,
 	},
 	actionBtn: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingVertical: 4,
-		paddingHorizontal: 10,
-		borderRadius: BorderRadius.sm + 2,
-	},
-	actionBtnText: {
-		marginLeft: 4,
+		minWidth: 90,
 	},
 	emptyText: {
 		fontStyle: "italic",

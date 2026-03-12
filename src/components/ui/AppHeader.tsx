@@ -18,7 +18,6 @@ interface AppHeaderProps {
 	actionLabel?: string;
 	canPerformAction?: boolean;
 	showBackButton?: boolean;
-	centered?: boolean;
 	style?: ViewStyle;
 	titleStyle?: TextStyle;
 }
@@ -31,7 +30,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 	actionLabel,
 	canPerformAction = true,
 	showBackButton = true,
-	centered = true,
 	style,
 	titleStyle,
 }) => {
@@ -48,24 +46,26 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 				style,
 			]}
 		>
-			{showBackButton && onBack && (
-				<TouchableOpacity
-					style={styles.backButton}
-					onPress={onBack}
-					hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-				>
-					<Ionicons
-						name="chevron-back"
-						size={28}
-						color={theme.PrimaryText}
-					/>
-				</TouchableOpacity>
-			)}
+			<View style={styles.sideSlot}>
+				{showBackButton && onBack && (
+					<TouchableOpacity
+						style={styles.backButton}
+						onPress={onBack}
+						hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+					>
+						<Ionicons
+							name="chevron-back"
+							size={28}
+							color={theme.PrimaryText}
+						/>
+					</TouchableOpacity>
+				)}
+			</View>
 
 			<View
 				style={[
 					styles.titleContainer,
-					centered && styles.titleContainerCentered,
+					styles.titleContainerCentered,
 					!showBackButton && styles.titleContainerNoBack,
 				]}
 			>
@@ -73,40 +73,40 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 					style={[
 						styles.title,
 						{ color: theme.PrimaryText },
-						centered && styles.titleCentered,
+						styles.titleCentered,
 						titleStyle,
 					]}
-					numberOfLines={2}
-					ellipsizeMode="tail"
 				>
 					{title}
 				</Text>
 			</View>
 
-			{canPerformAction && onAction && (
-				<TouchableOpacity
-					style={styles.actionButton}
-					onPress={onAction}
-					hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-				>
-					{actionLabel ? (
-						<Text
-							style={[
-								styles.actionLabel,
-								{ color: theme.LocationBlue },
-							]}
-						>
-							{actionLabel}
-						</Text>
-					) : (
-						<Ionicons
-							name={actionIcon}
-							size={28}
-							color={theme.PrimaryText}
-						/>
-					)}
-				</TouchableOpacity>
-			)}
+			<View style={styles.sideSlot}>
+				{canPerformAction && onAction && (
+					<TouchableOpacity
+						style={styles.actionButton}
+						onPress={onAction}
+						hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+					>
+						{actionLabel ? (
+							<Text
+								style={[
+									styles.actionLabel,
+									{ color: theme.PrimaryText },
+								]}
+							>
+								{actionLabel}
+							</Text>
+						) : (
+							<Ionicons
+								name={actionIcon}
+								size={28}
+								color={theme.PrimaryText}
+							/>
+						)}
+					</TouchableOpacity>
+				)}
+			</View>
 		</View>
 	);
 };
@@ -119,6 +119,10 @@ const styles = StyleSheet.create({
 		borderBottomWidth: 1,
 		alignItems: "center",
 		minHeight: 60,
+	},
+	sideSlot: {
+		width: 96,
+		justifyContent: "center",
 	},
 	backButton: {
 		width: 40,
@@ -145,7 +149,7 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 	},
 	actionButton: {
-		width: 40,
+		width: "100%",
 		zIndex: 1,
 		paddingLeft: 8,
 		alignItems: "flex-end",

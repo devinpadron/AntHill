@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { Text } from "../ui/Text";
 import { useTheme } from "../../contexts/ThemeContext";
-import { Spacing } from "../../constants/tokens";
+import { Spacing, Shadow } from "../../constants/tokens";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -33,7 +33,7 @@ const TabIndicator: React.FC<{ activeTab: AvailabilityTab }> = ({
 
 	useEffect(() => {
 		const position = TABS.findIndex((t) => t.key === activeTab);
-		const tabWidth = (screenWidth - 32) / 3;
+		const tabWidth = (screenWidth - Spacing.lg * 2) / 3;
 		const indicatorWidth = tabWidth * 0.6;
 		const centerOffset = (tabWidth - indicatorWidth) / 2;
 
@@ -42,9 +42,9 @@ const TabIndicator: React.FC<{ activeTab: AvailabilityTab }> = ({
 			useNativeDriver: true,
 			friction: 8,
 		}).start();
-	}, [activeTab]);
+	}, [activeTab, translateX]);
 
-	const tabWidth = (screenWidth - 32) / 3;
+	const tabWidth = (screenWidth - Spacing.lg * 2) / 3;
 	const indicatorWidth = tabWidth * 0.6;
 
 	return (
@@ -101,11 +101,7 @@ const styles = StyleSheet.create({
 	outerContainer: {
 		paddingHorizontal: Spacing.lg,
 		marginBottom: Spacing.lg,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.05,
-		shadowRadius: 1,
-		elevation: 1,
+		...Shadow.sm,
 	},
 	container: {
 		flexDirection: "row",

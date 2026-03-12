@@ -13,7 +13,7 @@ export const AntHill = {
 };
 
 export const AntHill_Light = {
-	Background: "#E8DED0",
+	Background: "#FAF6F0",
 	CardBackground: "#FFFFFF",
 	DateBadge: "#F5F0E8",
 	SearchBar: "#D4C5B3",

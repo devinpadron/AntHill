@@ -7,7 +7,6 @@ import { Button } from "../ui/Button";
 import { StatusBadge } from "../ui/StatusBadge";
 import { useTheme } from "../../contexts/ThemeContext";
 import { Spacing } from "../../constants/tokens";
-import { Clock } from "../../constants/colors";
 import type { AvailabilityTab } from "./AvailabilityTabBar";
 
 interface AvailabilityEvent {
@@ -61,16 +60,17 @@ const getStatusLabel = (
 
 const getBorderColor = (
 	activeTab: AvailabilityTab,
+	theme: any,
 	eventStatus?: string,
 ): string | undefined => {
 	if (activeTab !== "unconfirmed") return undefined;
 	switch (eventStatus) {
 		case "available":
-			return "#4ADE80";
+			return theme.NotificationGreen;
 		case "already_on_event":
-			return Clock.ClockOut;
+			return theme.SecondaryText;
 		default:
-			return "#888888";
+			return theme.TertiaryText;
 	}
 };
 
@@ -83,7 +83,7 @@ export const EventCard: React.FC<EventCardProps> = ({
 	onPress,
 }) => {
 	const { theme } = useTheme();
-	const borderColor = getBorderColor(activeTab, event.status);
+	const borderColor = getBorderColor(activeTab, theme, event.status);
 	const statusLabel = getStatusLabel(activeTab, event.status);
 
 	const cardStyle = borderColor
@@ -162,9 +162,10 @@ export const EventCard: React.FC<EventCardProps> = ({
 							<Ionicons
 								name="close-circle"
 								size={16}
-								color="#fff"
+								color={theme.CardBackground}
 							/>
 						}
+						style={styles.button}
 					/>
 					<Button
 						variant="primary"
@@ -175,13 +176,10 @@ export const EventCard: React.FC<EventCardProps> = ({
 							<Ionicons
 								name="checkmark-circle"
 								size={16}
-								color="#fff"
+								color={theme.CardBackground}
 							/>
 						}
-						style={{
-							backgroundColor: theme.NotificationGreen,
-							marginLeft: Spacing.md,
-						}}
+						style={[styles.button, styles.confirmButton]}
 					/>
 				</View>
 			)}
@@ -195,9 +193,13 @@ export const EventCard: React.FC<EventCardProps> = ({
 						title="Undecline"
 						onPress={onUndecline}
 						icon={
-							<Ionicons name="refresh" size={16} color="#fff" />
+							<Ionicons
+								name="refresh"
+								size={16}
+								color={theme.CardBackground}
+							/>
 						}
-						style={{ backgroundColor: "#6366F1" }}
+						style={styles.undeclineButton}
 					/>
 				</View>
 			)}
@@ -215,21 +217,31 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	title: {
-		marginBottom: 4,
+		marginBottom: Spacing.xs,
 	},
 	date: {
-		marginBottom: 4,
+		marginBottom: Spacing.xs,
 	},
 	locationRow: {
 		flexDirection: "row",
 		alignItems: "center",
 	},
 	location: {
-		marginLeft: 4,
+		marginLeft: Spacing.xs,
 	},
 	buttonRow: {
 		flexDirection: "row",
 		marginTop: Spacing.lg,
 		justifyContent: "flex-end",
+		gap: Spacing.md,
+	},
+	button: {
+		minWidth: 110,
+	},
+	confirmButton: {
+		minWidth: 120,
+	},
+	undeclineButton: {
+		minWidth: 130,
 	},
 });

@@ -74,7 +74,6 @@ const AvailabilityPage = ({ navigation }) => {
 				showBackButton={false}
 				onAction={isAdmin ? openReminderSettings : undefined}
 				actionIcon="notifications-outline"
-				actionLabel="Reminders"
 				canPerformAction={isAdmin}
 			/>
 

@@ -2,7 +2,6 @@ import React from "react";
 import {
 	View,
 	Modal,
-	TouchableOpacity,
 	ScrollView,
 	KeyboardAvoidingView,
 	Platform,
@@ -65,7 +64,10 @@ export const AdminWorkerModal: React.FC<AdminWorkerModalProps> = ({
 			onRequestClose={onClose}
 		>
 			<KeyboardAvoidingView
-				style={styles.overlay}
+				style={[
+					styles.overlay,
+					{ backgroundColor: `${theme.PrimaryText}80` },
+				]}
 				behavior={Platform.OS === "ios" ? "padding" : "height"}
 			>
 				<View
@@ -84,16 +86,18 @@ export const AdminWorkerModal: React.FC<AdminWorkerModalProps> = ({
 						<Text variant="h3" weight="bold" color="primary">
 							Event Worker Status
 						</Text>
-						<TouchableOpacity
+						<Button
+							variant="text"
 							onPress={onClose}
-							style={styles.closeButton}
-						>
-							<Ionicons
-								name="close"
-								size={24}
-								color={theme.SecondaryText}
-							/>
-						</TouchableOpacity>
+							icon={
+								<Ionicons
+									name="close"
+									size={22}
+									color={theme.SecondaryText}
+								/>
+							}
+							iconPosition="center"
+						/>
 					</View>
 
 					{/* Event Info */}
@@ -146,8 +150,7 @@ export const AdminWorkerModal: React.FC<AdminWorkerModalProps> = ({
 										{
 											label: "Decline",
 											status: "declined",
-											color: Clock.ClockOut,
-											icon: "close-circle",
+											variant: "destructive",
 										},
 									]}
 									onStatusChange={onStatusChange}
@@ -156,20 +159,18 @@ export const AdminWorkerModal: React.FC<AdminWorkerModalProps> = ({
 								<WorkerSection
 									title="Unconfirmed"
 									icon="help-circle-outline"
-									iconColor="#F59E0B"
+									iconColor={theme.LocationBlue}
 									workers={workerDetails.unconfirmed}
 									actions={[
 										{
 											label: "Decline",
 											status: "declined",
-											color: Clock.ClockOut,
-											icon: "close-circle",
+											variant: "destructive",
 										},
 										{
 											label: "Confirm",
 											status: "confirmed",
-											color: theme.NotificationGreen,
-											icon: "checkmark-circle",
+											variant: "primary",
 										},
 									]}
 									onStatusChange={onStatusChange}
@@ -184,8 +185,7 @@ export const AdminWorkerModal: React.FC<AdminWorkerModalProps> = ({
 										{
 											label: "Confirm",
 											status: "confirmed",
-											color: theme.NotificationGreen,
-											icon: "checkmark-circle",
+											variant: "primary",
 										},
 									]}
 									onStatusChange={onStatusChange}
@@ -224,7 +224,6 @@ export const AdminWorkerModal: React.FC<AdminWorkerModalProps> = ({
 const styles = StyleSheet.create({
 	overlay: {
 		flex: 1,
-		backgroundColor: "rgba(0, 0, 0, 0.5)",
 		justifyContent: "center",
 		alignItems: "center",
 	},
@@ -241,18 +240,15 @@ const styles = StyleSheet.create({
 		padding: Spacing.xl,
 		borderBottomWidth: 1,
 	},
-	closeButton: {
-		padding: 4,
-	},
 	eventInfo: {
 		padding: Spacing.xl,
 		borderBottomWidth: 1,
 	},
 	eventTitle: {
-		marginBottom: 4,
+		marginBottom: Spacing.xs,
 	},
 	eventDate: {
-		marginBottom: 2,
+		marginBottom: Spacing.xs,
 	},
 	body: {
 		maxHeight: 400,

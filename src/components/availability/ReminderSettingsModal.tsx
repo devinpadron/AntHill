@@ -2,17 +2,16 @@ import React from "react";
 import {
 	View,
 	Modal,
-	TouchableOpacity,
 	ScrollView,
 	KeyboardAvoidingView,
 	Platform,
-	Switch,
 	StyleSheet,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "../ui/Text";
 import { Button } from "../ui/Button";
 import { FormInput } from "../ui/FormInput";
+import { ToggleSwitch } from "../ui/ToggleSwitch";
 import { useTheme } from "../../contexts/ThemeContext";
 import { Spacing, BorderRadius } from "../../constants/tokens";
 
@@ -49,7 +48,10 @@ export const ReminderSettingsModal: React.FC<ReminderSettingsModalProps> = ({
 			onRequestClose={onClose}
 		>
 			<KeyboardAvoidingView
-				style={styles.overlay}
+				style={[
+					styles.overlay,
+					{ backgroundColor: `${theme.PrimaryText}80` },
+				]}
 				behavior={Platform.OS === "ios" ? "padding" : "height"}
 			>
 				<View
@@ -68,16 +70,18 @@ export const ReminderSettingsModal: React.FC<ReminderSettingsModalProps> = ({
 						<Text variant="h3" weight="bold" color="primary">
 							Set Availability Reminder
 						</Text>
-						<TouchableOpacity
+						<Button
+							variant="text"
 							onPress={onClose}
-							style={styles.closeButton}
-						>
-							<Ionicons
-								name="close"
-								size={24}
-								color={theme.SecondaryText}
-							/>
-						</TouchableOpacity>
+							icon={
+								<Ionicons
+									name="close"
+									size={22}
+									color={theme.SecondaryText}
+								/>
+							}
+							iconPosition="center"
+						/>
 					</View>
 
 					{/* Body */}
@@ -98,33 +102,15 @@ export const ReminderSettingsModal: React.FC<ReminderSettingsModalProps> = ({
 								{ backgroundColor: theme.Background },
 							]}
 						>
-							<View style={styles.toggleLabelContainer}>
-								<Text
-									variant="body"
-									weight="semibold"
-									color="primary"
-								>
-									Enable Reminders
-								</Text>
-								<Text variant="small" color="secondary">
-									Send automatic reminders to workers
-								</Text>
-							</View>
-							<Switch
+							<ToggleSwitch
+								label="Enable Reminders"
 								value={remindersEnabled}
 								onValueChange={setRemindersEnabled}
-								trackColor={{
-									false: theme.DateBadge,
-									true: theme.LocationBlue,
-								}}
-								thumbColor={
-									remindersEnabled
-										? theme.LocationBlue
-										: theme.DateBadge
-								}
-								ios_backgroundColor={theme.DateBadge}
 							/>
 						</View>
+						<Text variant="small" color="secondary">
+							Send automatic reminders to workers
+						</Text>
 
 						{/* Time inputs - only show when reminders are enabled */}
 						{remindersEnabled && (
@@ -207,7 +193,13 @@ export const ReminderSettingsModal: React.FC<ReminderSettingsModalProps> = ({
 								variant="caption"
 								color="secondary"
 								align="center"
-								style={styles.disabledText}
+								style={[
+									styles.disabledText,
+									{
+										backgroundColor: theme.DateBadge,
+										borderColor: theme.BorderColor,
+									},
+								]}
 							>
 								Reminders are disabled. Workers will not receive
 								automatic notifications to confirm their
@@ -245,7 +237,6 @@ export const ReminderSettingsModal: React.FC<ReminderSettingsModalProps> = ({
 const styles = StyleSheet.create({
 	overlay: {
 		flex: 1,
-		backgroundColor: "rgba(0, 0, 0, 0.5)",
 		justifyContent: "center",
 		alignItems: "center",
 	},
@@ -263,7 +254,7 @@ const styles = StyleSheet.create({
 		borderBottomWidth: 1,
 	},
 	closeButton: {
-		padding: 4,
+		padding: Spacing.xs,
 	},
 	body: {
 		padding: Spacing.xl,
@@ -312,11 +303,9 @@ const styles = StyleSheet.create({
 		borderRadius: BorderRadius.md,
 	},
 	disabledText: {
-		backgroundColor: "#FEF3C7",
 		padding: Spacing.lg,
 		borderRadius: BorderRadius.md,
 		borderWidth: 1,
-		borderColor: "#F59E0B",
 		marginTop: Spacing.lg,
 	},
 	footer: {
@@ -326,6 +315,6 @@ const styles = StyleSheet.create({
 	},
 	footerButton: {
 		flex: 1,
-		marginHorizontal: 4,
+		marginHorizontal: Spacing.xs,
 	},
 });
