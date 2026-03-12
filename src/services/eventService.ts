@@ -1,5 +1,5 @@
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
-import { AttachmentItem, Event } from "../types";
+import { AttachmentItem, Event, Checklist } from "../types";
 import db from "../constants/firestore";
 /* An EventController that contains:
   - An event interface that provides the structure of event data
@@ -217,11 +217,29 @@ export const getEventsByIds = async (companyId: string, eventIds: string[]) => {
 	}
 };
 
+export const getChecklistsByIds = async (
+	companyId: string,
+	checklistIds: string[],
+): Promise<Checklist[]> => {
+	const promises = checklistIds.map((id) =>
+		db
+			.collection("Companies")
+			.doc(companyId)
+			.collection("Checklists")
+			.doc(id)
+			.get(),
+	);
+	const docs = await Promise.all(promises);
+	return docs
+		.filter((doc) => doc.exists)
+		.map((doc) => ({ id: doc.id, ...doc.data() }) as Checklist);
+};
+
 export const updateEventChecklist = async (
 	companyId: string,
 	eventId: string,
 	checklistId: string,
-	checklistItem: { [key: string]: boolean },
+	checklistItem: { [key: string]: number | boolean },
 ) => {
 	try {
 		const eventRef = db

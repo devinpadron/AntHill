@@ -16,6 +16,9 @@ export { useReminderSettings } from "./useReminderSettings";
 export { useAdminWorkerDetails } from "./useAdminWorkerDetails";
 export { useCalendarScreenState } from "./useCalendarScreenState";
 
+// Calendar hooks
+export { useEventChecklists } from "./useEventChecklists";
+
 // Legacy hook - kept for backward compatibility
 // Consider migrating to the new individual hooks above
 export { useTimeTracking } from "./useTimeTracking";
