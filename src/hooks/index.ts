@@ -10,6 +10,11 @@ export { useTimeEntryDetails } from "./useTimeEntryDetails";
 export { useTimeEntrySelection } from "./useTimeEntrySelection";
 export { useTimeEntryActions } from "./useTimeEntryActions";
 
+// Availability hooks
+export { useAvailabilityEvents } from "./useAvailabilityEvents";
+export { useReminderSettings } from "./useReminderSettings";
+export { useAdminWorkerDetails } from "./useAdminWorkerDetails";
+
 // Legacy hook - kept for backward compatibility
 // Consider migrating to the new individual hooks above
 export { useTimeTracking } from "./useTimeTracking";

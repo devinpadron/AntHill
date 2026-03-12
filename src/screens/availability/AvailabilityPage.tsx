@@ -13,27 +13,14 @@ import {
 	TextInput,
 	KeyboardAvoidingView,
 	ScrollView,
-	Alert,
 	Switch,
 	Dimensions,
 } from "react-native";
 import { useUser } from "../../contexts/UserContext";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
-import {
-	confirmEvent,
-	declineEvent,
-	fetchUnassignedUpcomingEvents,
-	undeclineEvent,
-	getWorkerStatusList,
-} from "../../services/availabilityService";
-import {
-	updateCompanyPreferences,
-	getCompanyPreferences,
-} from "../../services/companyService";
-import { fetchUpcomingEventsForUser } from "../../services/availabilityService"; // Add this import
-import { getAllUsersInCompany } from "../../services/companyService"; // Import the new service
-import { User } from "../../types";
+import { useAvailabilityEvents } from "../../hooks/useAvailabilityEvents";
+import { useReminderSettings } from "../../hooks/useReminderSettings";
+import { useAdminWorkerDetails } from "../../hooks/useAdminWorkerDetails";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -75,188 +62,43 @@ const TabIndicator = ({ activeTab }) => {
 };
 
 const AvailabilityPage = ({ navigation }) => {
-	const [activeTab, setActiveTab] = useState("unconfirmed");
-	const [events, setEvents] = useState([]);
-	const [loading, setLoading] = useState(true);
-	const [reminderModalVisible, setReminderModalVisible] = useState(false);
-	const [reminderHours, setReminderHours] = useState("24");
-	const [reminderMinutes, setReminderMinutes] = useState("0");
-	const [remindersEnabled, setRemindersEnabled] = useState(true);
-	const [adminModalVisible, setAdminModalVisible] = useState(false);
-	const [selectedEventForAdmin, setSelectedEventForAdmin] = useState(null);
-	const [eventWorkerDetails, setEventWorkerDetails] = useState({
-		confirmed: [],
-		declined: [],
-		unconfirmed: [],
-	});
-	const [loadingWorkerDetails, setLoadingWorkerDetails] = useState(false);
 	const { userId, companyId, isAdmin } = useUser();
 
-	// Refresh data every time the screen comes into focus
-	useFocusEffect(
-		React.useCallback(() => {
-			fetchEventsFromFirebase();
-		}, [userId, companyId]),
-	);
+	// Event fetching, filtering, and status management
+	const {
+		activeTab,
+		setActiveTab,
+		loading,
+		getFilteredEvents,
+		updateEventStatus,
+		handleUndecline,
+		refetch,
+	} = useAvailabilityEvents(companyId, userId);
 
-	useEffect(() => {
-		fetchEventsFromFirebase();
-	}, [userId]);
+	// Reminder settings modal state and logic
+	const {
+		reminderModalVisible,
+		reminderHours,
+		setReminderHours,
+		reminderMinutes,
+		setReminderMinutes,
+		remindersEnabled,
+		setRemindersEnabled,
+		openReminderSettings,
+		saveReminderSettings,
+		closeReminderModal,
+	} = useReminderSettings(companyId);
 
-	const fetchEventsFromFirebase = async () => {
-		setLoading(true);
-
-		try {
-			// Get unassigned events from your service
-			const fetchedEvents: any =
-				await fetchUnassignedUpcomingEvents(companyId);
-
-			// Get assigned events for the current user to check for conflicts
-			const assignedEvents: any = await fetchUpcomingEventsForUser(
-				companyId,
-				userId,
-			);
-
-			if (fetchedEvents && fetchedEvents.length > 0) {
-				// Create a set of dates where the user already has assigned events
-				const assignedEventDates = new Set(
-					assignedEvents?.map((event) => {
-						return event.date; // Use the date string directly for comparison
-					}) || [],
-				);
-
-				// Transform the fetched events to match the UI requirements
-				const formattedEvents = fetchedEvents.map((event) => {
-					// Use the date string directly from Firebase (YYYY-MM-DD format)
-					const eventDateString = event.date;
-
-					// Parse the date string correctly to avoid timezone issues
-					const [year, month, day] = event.date.split("-");
-					const eventDate = new Date(
-						parseInt(year),
-						parseInt(month) - 1,
-						parseInt(day),
-					);
-
-					// Format date to a user-friendly string - UPDATE THIS PART:
-					const formattedDate = eventDate.toLocaleDateString(
-						"en-US",
-						{
-							weekday: "short", // Mon, Tue, Wed, etc.
-							month: "short", // Jan, Feb, Mar, etc.
-							day: "numeric", // 1, 2, 3, etc.
-							year: "numeric", // 2024, 2025, etc.
-						},
-					);
-
-					// Set location based on event.locations map (address -> {lat, lng})
-					let location = "Location TBD";
-					if (event.locations) {
-						const locationKeys = Object.keys(event.locations);
-						if (locationKeys.length === 1) {
-							location = locationKeys[0]; // Use the address (the key) as location
-						} else if (locationKeys.length > 1) {
-							location = "Multiple locations";
-						}
-					}
-
-					// Check if user is in workerStatus map
-					let status = "available";
-					let confirmed = false;
-
-					if (event.workerStatus && event.workerStatus[userId]) {
-						const userStatus = event.workerStatus[userId];
-						if (userStatus === "confirmed") {
-							status = "on_potential_event";
-							confirmed = true;
-						} else if (userStatus === "declined") {
-							status = "on_potential_event";
-							confirmed = false;
-						}
-					}
-
-					// Check if user is already assigned to another event on the same day
-					// Only override status if user hasn't responded to this event yet
-					if (
-						assignedEventDates.has(eventDateString) &&
-						status === "available"
-					) {
-						status = "already_on_event";
-						// Don't change confirmed status - keep it false so it shows in unconfirmed tab
-					}
-
-					return {
-						id: event.id,
-						date: formattedDate,
-						location: location,
-						title: event.title || "Unnamed Event",
-						status: status,
-						confirmed: confirmed,
-						rawData: event,
-					};
-				});
-
-				setEvents(formattedEvents);
-			} else {
-				// No events found
-				setEvents([]);
-			}
-		} catch (error) {
-			console.error("Error fetching events:", error);
-			// Set fallback empty state
-			setEvents([]);
-		} finally {
-			setLoading(false);
-		}
-	};
-
-	const updateEventStatus = async (eventId, confirmed) => {
-		// Firebase update will go here
-
-		if (confirmed) {
-			await confirmEvent(companyId, eventId, userId);
-		} else {
-			await declineEvent(companyId, eventId, userId);
-		}
-
-		// Mock update for now
-		setEvents((prevEvents) =>
-			prevEvents.map((event) =>
-				event.id === eventId
-					? {
-							...event,
-							confirmed,
-							status: confirmed
-								? "already_on_event"
-								: "on_potential_event",
-						}
-					: event,
-			),
-		);
-	};
-
-	const getFilteredEvents = () => {
-		switch (activeTab) {
-			case "unconfirmed":
-				// Show available events and already_on_event events that haven't been responded to
-				return events.filter(
-					(event) =>
-						(event.status === "available" ||
-							event.status === "already_on_event") &&
-						!event.confirmed,
-				);
-			case "confirmed":
-				return events.filter((event) => event.confirmed === true);
-			case "declined":
-				return events.filter(
-					(event) =>
-						event.confirmed === false &&
-						event.status === "on_potential_event",
-				);
-			default:
-				return events;
-		}
-	};
+	// Admin worker details modal state and logic
+	const {
+		adminModalVisible,
+		selectedEventForAdmin,
+		eventWorkerDetails,
+		loadingWorkerDetails,
+		handleAdminEventPress,
+		handleAdminStatusChange,
+		closeAdminModal,
+	} = useAdminWorkerDetails(companyId, refetch);
 
 	const renderEventCard = ({ item }) => {
 		const getStatusColor = () => {
@@ -319,17 +161,8 @@ const AvailabilityPage = ({ navigation }) => {
 			updateEventStatus(item.id, false);
 		};
 
-		const handleUndecline = () => {
-			// Change status from declined/on_potential_event back to available
-			undeclineEvent(companyId, item.id, userId);
-
-			setEvents((prevEvents) =>
-				prevEvents.map((event) =>
-					event.id === item.id
-						? { ...event, status: "available", confirmed: false }
-						: event,
-				),
-			);
+		const handleUndeclinePress = () => {
+			handleUndecline(item.id);
 		};
 
 		// Show status badge on all tabs
@@ -427,7 +260,7 @@ const AvailabilityPage = ({ navigation }) => {
 						<View style={styles.buttonContainer}>
 							<TouchableOpacity
 								style={styles.undeclineButton}
-								onPress={handleUndecline}
+								onPress={handleUndeclinePress}
 								activeOpacity={0.7}
 							>
 								<Ionicons
@@ -454,123 +287,6 @@ const AvailabilityPage = ({ navigation }) => {
 		</View>
 	);
 
-	const handleReminderSettings = async () => {
-		try {
-			// Fetch current company preferences
-			const preferences = await getCompanyPreferences(companyId);
-
-			// Set current values
-			const currentHours = preferences?.availabilityReminderHours || 24;
-			const currentMinutes =
-				preferences?.availabilityReminderMinutes || 0;
-			const currentEnabled =
-				preferences?.availabilityReminderEnabled !== false; // Default to true if undefined
-
-			setReminderHours(currentHours.toString());
-			setReminderMinutes(currentMinutes.toString());
-			setRemindersEnabled(currentEnabled);
-			setReminderModalVisible(true);
-		} catch (error) {
-			console.error("Error fetching reminder preferences:", error);
-		}
-	};
-
-	const saveReminderSettings = async () => {
-		try {
-			const hours = parseInt(reminderHours) || 24;
-			const minutes = parseInt(reminderMinutes) || 0;
-
-			await updateCompanyPreferences(companyId, {
-				availabilityReminderHours: hours,
-				availabilityReminderMinutes: minutes,
-				availabilityReminderEnabled: remindersEnabled,
-			});
-
-			setReminderModalVisible(false);
-			Alert.alert("Success", "Reminder settings updated successfully!");
-		} catch (error) {
-			console.error("Error saving reminder preferences:", error);
-			Alert.alert("Error", "Failed to save reminder settings");
-		}
-	};
-
-	// Add this function before your return statement
-	const fetchEventWorkerDetails = async (event) => {
-		setLoadingWorkerDetails(true);
-		try {
-			// Get all users in the company (returns a map)
-			const usersMap = await getAllUsersInCompany(companyId);
-
-			// Convert the map to an array of users
-			const allUsers = Object.values(usersMap);
-
-			// Fetch fresh worker status from Firebase instead of using stale local data
-			const workerStatus = await getWorkerStatusList(companyId, event.id);
-
-			// Categorize users based on their status in the workerStatus map
-			const categorizedUsers = {
-				confirmed: [],
-				declined: [],
-				unconfirmed: [],
-			};
-
-			allUsers.forEach((user: User) => {
-				const userStatus = workerStatus[user.id];
-
-				const userWithStatus = {
-					...user,
-					status: userStatus || "available", // No status means they're available
-				};
-
-				if (userStatus === "confirmed") {
-					categorizedUsers.confirmed.push(userWithStatus);
-				} else if (userStatus === "declined") {
-					categorizedUsers.declined.push(userWithStatus);
-				} else if (userStatus === "pending") {
-					// User has been notified but hasn't responded
-					categorizedUsers.unconfirmed.push({
-						...userWithStatus,
-						status: "pending",
-					});
-				} else {
-					// User has no status in the map - they're available
-					categorizedUsers.unconfirmed.push({
-						...userWithStatus,
-						status: "pending",
-					});
-				}
-			});
-
-			setEventWorkerDetails(categorizedUsers);
-		} catch (error) {
-			console.error("Error fetching worker details:", error);
-		} finally {
-			setLoadingWorkerDetails(false);
-		}
-	};
-
-	const handleAdminStatusChange = async (targetUserId, newStatus) => {
-		if (!selectedEventForAdmin) return;
-		const eventId = selectedEventForAdmin.id;
-
-		if (newStatus === "confirmed") {
-			await confirmEvent(companyId, eventId, targetUserId);
-		} else if (newStatus === "declined") {
-			await declineEvent(companyId, eventId, targetUserId);
-		}
-
-		// Refresh worker details in the modal
-		fetchEventWorkerDetails(selectedEventForAdmin);
-		// Refresh the main event list
-		fetchEventsFromFirebase();
-	};
-
-	const handleAdminEventPress = (event) => {
-		setSelectedEventForAdmin(event);
-		setAdminModalVisible(true);
-		fetchEventWorkerDetails(event);
-	};
-
 	// Update the header to include admin button
 	return (
 		<SafeAreaView style={styles.container}>
@@ -580,7 +296,7 @@ const AvailabilityPage = ({ navigation }) => {
 				{isAdmin && (
 					<TouchableOpacity
 						style={styles.adminButton}
-						onPress={handleReminderSettings}
+						onPress={openReminderSettings}
 						activeOpacity={0.7}
 					>
 						<Ionicons
@@ -677,7 +393,7 @@ const AvailabilityPage = ({ navigation }) => {
 				visible={reminderModalVisible}
 				transparent={true}
 				animationType="slide"
-				onRequestClose={() => setReminderModalVisible(false)}
+				onRequestClose={closeReminderModal}
 			>
 				<KeyboardAvoidingView
 					style={styles.modalOverlay}
@@ -689,7 +405,7 @@ const AvailabilityPage = ({ navigation }) => {
 								Set Availability Reminder
 							</Text>
 							<TouchableOpacity
-								onPress={() => setReminderModalVisible(false)}
+								onPress={closeReminderModal}
 								style={styles.closeButton}
 							>
 								<Ionicons
@@ -792,7 +508,7 @@ const AvailabilityPage = ({ navigation }) => {
 						<View style={styles.modalFooter}>
 							<TouchableOpacity
 								style={styles.cancelButton}
-								onPress={() => setReminderModalVisible(false)}
+								onPress={closeReminderModal}
 							>
 								<Text style={styles.cancelButtonText}>
 									Cancel
@@ -816,7 +532,7 @@ const AvailabilityPage = ({ navigation }) => {
 				visible={adminModalVisible}
 				transparent={true}
 				animationType="slide"
-				onRequestClose={() => setAdminModalVisible(false)}
+				onRequestClose={closeAdminModal}
 			>
 				<KeyboardAvoidingView
 					style={styles.modalOverlay}
@@ -828,7 +544,7 @@ const AvailabilityPage = ({ navigation }) => {
 								Event Worker Status
 							</Text>
 							<TouchableOpacity
-								onPress={() => setAdminModalVisible(false)}
+								onPress={closeAdminModal}
 								style={styles.closeButton}
 							>
 								<Ionicons
@@ -1121,7 +837,7 @@ const AvailabilityPage = ({ navigation }) => {
 						<View style={styles.adminModalFooter}>
 							<TouchableOpacity
 								style={styles.closeModalButton}
-								onPress={() => setAdminModalVisible(false)}
+								onPress={closeAdminModal}
 							>
 								<Text style={styles.closeModalButtonText}>
 									Close
@@ -1131,7 +847,7 @@ const AvailabilityPage = ({ navigation }) => {
 							<TouchableOpacity
 								style={styles.openEventButton}
 								onPress={() => {
-									setAdminModalVisible(false);
+									closeAdminModal();
 									navigation.navigate("EventDetails", {
 										eventId: selectedEventForAdmin.id,
 									});
