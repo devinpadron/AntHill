@@ -14,6 +14,7 @@ export { useTimeEntryActions } from "./useTimeEntryActions";
 export { useAvailabilityEvents } from "./useAvailabilityEvents";
 export { useReminderSettings } from "./useReminderSettings";
 export { useAdminWorkerDetails } from "./useAdminWorkerDetails";
+export { useCalendarScreenState } from "./useCalendarScreenState";
 
 // Legacy hook - kept for backward compatibility
 // Consider migrating to the new individual hooks above
