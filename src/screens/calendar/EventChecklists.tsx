@@ -12,7 +12,7 @@ import { AppHeader } from "../../components/ui/AppHeader";
 import { LoadingScreen } from "../../components/ui/LoadingScreen";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { ChecklistSection } from "../../components/calendar/ChecklistSection";
-import { useEventChecklists } from "../../hooks/useEventChecklists";
+import { useEventChecklists } from "../../hooks/calendar/useEventChecklists";
 import { useTheme } from "../../contexts/ThemeContext";
 import { Spacing } from "../../constants/tokens";
 

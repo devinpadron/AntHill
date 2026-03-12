@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import moment from "moment";
 import { useUser } from "../../contexts/UserContext";
 import { useTheme } from "../../contexts/ThemeContext";
-import { useCalendarScreenState } from "../../hooks/useCalendarScreenState";
+import { useCalendarScreenState } from "../../hooks/calendar/useCalendarScreenState";
 import { FilterPanel } from "../../components/calendar/FilterPanel";
 import { FloatingActionButtons } from "../../components/calendar/FloatingActionButtons";
 import LoadingScreen from "../LoadingScreen";

@@ -5,12 +5,12 @@ import { KeyboardAwareFlatList } from "react-native-keyboard-aware-scroll-view";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute } from "@react-navigation/native";
 
-import { useEventForm } from "../../hooks/useEventForm";
-import { useEventWorkers } from "../../hooks/useEventWorkers";
-import { useEventFormPackages } from "../../hooks/useEventFormPackages";
-import { useEventLabels } from "../../hooks/useEventLabels";
-import { useEventAttachments } from "../../hooks/useEventAttachments";
-import { useEventSubmission } from "../../hooks/useEventSubmission";
+import { useEventForm } from "../../hooks/eventSubmit/useEventForm";
+import { useEventWorkers } from "../../hooks/eventSubmit/useEventWorkers";
+import { useEventFormPackages } from "../../hooks/eventSubmit/useEventFormPackages";
+import { useEventLabels } from "../../hooks/eventSubmit/useEventLabels";
+import { useEventAttachments } from "../../hooks/eventSubmit/useEventAttachments";
+import { useEventSubmission } from "../../hooks/eventSubmit/useEventSubmission";
 
 import { EventFormHeader } from "../../components/eventSubmit/EventFormHeader";
 import { EventDetailsSection } from "../../components/eventSubmit/EventDetailsSection";

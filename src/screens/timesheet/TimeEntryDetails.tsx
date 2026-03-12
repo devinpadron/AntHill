@@ -13,9 +13,9 @@ import {
 	TimeEntrySummary,
 	TimeEntryDetailsHeader,
 } from "../../components/time";
-import { useTimeEntryDetails } from "../../hooks/useTimeEntryDetails";
-import { useTimeEntrySelection } from "../../hooks/useTimeEntrySelection";
-import { useTimeEntryActions } from "../../hooks/useTimeEntryActions";
+import { useTimeEntryDetails } from "../../hooks/timesheet/useTimeEntryDetails";
+import { useTimeEntrySelection } from "../../hooks/timesheet/useTimeEntrySelection";
+import { useTimeEntryActions } from "../../hooks/timesheet/useTimeEntryActions";
 
 /**
  * TimeEntryDetails - Detailed view of time entries

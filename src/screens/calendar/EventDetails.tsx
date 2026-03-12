@@ -5,11 +5,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScrollView } from "react-native-gesture-handler";
 
 // Hooks
-import { useEventDetails } from "../../hooks/useEventDetails";
-import { useEventPackages } from "../../hooks/useEventPackages";
-import { useEventLabel } from "../../hooks/useEventLabel";
-import { useLocationMarkers } from "../../hooks/useLocationMarkers";
-import { useUserNotes } from "../../hooks/useUserNotes";
+import { useEventDetails } from "../../hooks/eventDetails/useEventDetails";
+import { useEventPackages } from "../../hooks/eventDetails/useEventPackages";
+import { useEventLabel } from "../../hooks/eventDetails/useEventLabel";
+import { useLocationMarkers } from "../../hooks/eventDetails/useLocationMarkers";
+import { useUserNotes } from "../../hooks/eventDetails/useUserNotes";
 import { useUser } from "../../contexts/UserContext";
 import { useCompany } from "../../contexts/CompanyContext";
 import { useTheme } from "../../contexts/ThemeContext";

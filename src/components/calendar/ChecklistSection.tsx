@@ -11,7 +11,7 @@ import {
 	Shadow,
 } from "../../constants/tokens";
 import { Checklist } from "../../types";
-import { UNCHECKED } from "../../hooks/useEventChecklists";
+import { UNCHECKED } from "../../hooks/calendar/useEventChecklists";
 import { ChecklistItem } from "./ChecklistItem";
 
 interface ChecklistSectionProps {

@@ -8,7 +8,7 @@ import {
 	UNCHECKED,
 	CHECKED,
 	STRIKETHROUGH,
-} from "../../hooks/useEventChecklists";
+} from "../../hooks/calendar/useEventChecklists";
 
 interface ChecklistItemProps {
 	item: { id: string; text: string };
