@@ -1,2 +1,9 @@
 export { EventFormHeader } from "./EventFormHeader";
 export { LocationInput } from "./LocationInput";
+export { EventDetailsSection } from "./EventDetailsSection";
+export { DateTimeSection } from "./DateTimeSection";
+export { WorkersSection } from "./WorkersSection";
+export { PackagesSection } from "./PackagesSection";
+export { LabelsSection } from "./LabelsSection";
+export { NotesAttachmentsSection } from "./NotesAttachmentsSection";
+export { FormActionButtons } from "./FormActionButtons";

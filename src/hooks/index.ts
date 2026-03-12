@@ -19,6 +19,19 @@ export { useCalendarScreenState } from "./useCalendarScreenState";
 // Calendar hooks
 export { useEventChecklists } from "./useEventChecklists";
 
+// Event details hooks
+export { useEventPackages } from "./useEventPackages";
+export { useEventLabel } from "./useEventLabel";
+export { useLocationMarkers } from "./useLocationMarkers";
+export { useUserNotes } from "./useUserNotes";
+
+// Event submit hooks
+export { useEventWorkers } from "./useEventWorkers";
+export { useEventFormPackages } from "./useEventFormPackages";
+export { useEventLabels } from "./useEventLabels";
+export { useEventAttachments } from "./useEventAttachments";
+export { useEventSubmission } from "./useEventSubmission";
+
 // Legacy hook - kept for backward compatibility
 // Consider migrating to the new individual hooks above
 export { useTimeTracking } from "./useTimeTracking";
