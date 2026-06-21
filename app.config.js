@@ -62,6 +62,8 @@ export default {
 				projectId: "1a855cc1-8887-47e2-a13a-fd2fbb15b8c1",
 			},
 			GOOGLE_PLACES_API_KEY: process.env.GOOGLE_PLACES_API_KEY,
+			SUPABASE_URL: process.env.SUPABASE_URL,
+			SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
 		},
 	},
 };
