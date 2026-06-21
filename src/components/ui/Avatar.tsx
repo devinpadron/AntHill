@@ -2,6 +2,7 @@ import React from "react";
 import {
 	View,
 	Image,
+	Text,
 	StyleSheet,
 	ViewStyle,
 	StyleProp,
@@ -9,18 +10,47 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../contexts/ThemeContext";
+import { AvatarSize } from "../../constants/tokens";
+import { FontFamily } from "../../constants/tokens";
 
 interface AvatarProps {
 	source?: ImageSourcePropType | string;
-	size?: "xs" | "sm" | "md" | "lg" | "xl";
+	name?: string;
+	size?: keyof typeof AvatarSize | number;
 	fallbackIcon?: keyof typeof Ionicons.glyphMap;
 	showBadge?: boolean;
 	badgeColor?: string;
 	style?: StyleProp<ViewStyle>;
 }
 
+// Tint pairs (bg, fg) — matches ui.jsx AVATAR_TINTS so the family stays consistent.
+const AVATAR_TINTS: Array<[string, string]> = [
+	["#E7E9D4", "#475821"],
+	["#F2D9CB", "#8E4029"],
+	["#F0E0BE", "#A8821F"],
+	["#CFE1E7", "#3F7184"],
+	["#E3D5C5", "#6B5A45"],
+	["#D8E5D0", "#3F6A4A"],
+	["#F5D6D6", "#923A3A"],
+	["#E1D6E8", "#52406F"],
+];
+
+function tintFor(seed: string): [string, string] {
+	let h = 0;
+	for (let i = 0; i < seed.length; i++) {
+		h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+	}
+	return AVATAR_TINTS[h % AVATAR_TINTS.length];
+}
+
+function resolveSize(size: AvatarProps["size"]): number {
+	if (typeof size === "number") return size;
+	return AvatarSize[size ?? "md"];
+}
+
 export const Avatar: React.FC<AvatarProps> = ({
 	source,
+	name,
 	size = "md",
 	fallbackIcon = "person",
 	showBadge = false,
@@ -28,96 +58,61 @@ export const Avatar: React.FC<AvatarProps> = ({
 	style,
 }) => {
 	const { theme } = useTheme();
+	const avatarSize = resolveSize(size);
 
-	const getSize = () => {
-		switch (size) {
-			case "xs":
-				return 24;
-			case "sm":
-				return 32;
-			case "md":
-				return 40;
-			case "lg":
-				return 56;
-			case "xl":
-				return 80;
-			default:
-				return 40;
-		}
-	};
+	const [bg, fg] = name ? tintFor(name) : [theme.AccentSoft, theme.Accent];
+	const initials = name
+		? name
+				.split(/\s+/)
+				.slice(0, 2)
+				.map((n) => n[0]?.toUpperCase() ?? "")
+				.join("")
+		: "";
 
-	const getIconSize = () => {
-		switch (size) {
-			case "xs":
-				return 12;
-			case "sm":
-				return 16;
-			case "md":
-				return 20;
-			case "lg":
-				return 28;
-			case "xl":
-				return 40;
-			default:
-				return 20;
-		}
-	};
-
-	const getBadgeSize = () => {
-		switch (size) {
-			case "xs":
-				return 8;
-			case "sm":
-				return 10;
-			case "md":
-				return 12;
-			case "lg":
-				return 14;
-			case "xl":
-				return 16;
-			default:
-				return 12;
-		}
-	};
-
-	const avatarSize = getSize();
-	const iconSize = getIconSize();
-	const badgeSize = getBadgeSize();
-
-	const avatarStyles = [
-		styles.avatar,
-		{
-			width: avatarSize,
-			height: avatarSize,
-			borderRadius: avatarSize / 2,
-			backgroundColor: theme.ProfileBackground,
-		},
-		style,
-	];
-
-	// Handle both URI string and require() source
 	const imageSource = typeof source === "string" ? { uri: source } : source;
+	const badgeSize = Math.max(8, Math.round(avatarSize * 0.28));
 
 	return (
 		<View style={styles.container}>
-			<View style={avatarStyles}>
+			<View
+				style={[
+					styles.avatar,
+					{
+						width: avatarSize,
+						height: avatarSize,
+						borderRadius: avatarSize / 2,
+						backgroundColor: bg,
+					},
+					style,
+				]}
+			>
 				{source ? (
 					<Image
 						source={imageSource}
-						style={[
-							styles.image,
-							{
-								width: avatarSize,
-								height: avatarSize,
-								borderRadius: avatarSize / 2,
-							},
-						]}
+						style={{
+							width: avatarSize,
+							height: avatarSize,
+							borderRadius: avatarSize / 2,
+							resizeMode: "cover",
+						}}
 					/>
+				) : initials ? (
+					<Text
+						style={{
+							fontFamily: FontFamily.ui,
+							fontWeight: "600",
+							fontSize: avatarSize * 0.36,
+							letterSpacing: 0.2,
+							color: fg,
+						}}
+					>
+						{initials}
+					</Text>
 				) : (
 					<Ionicons
 						name={fallbackIcon}
-						size={iconSize}
-						color={theme.SecondaryText}
+						size={avatarSize * 0.5}
+						color={fg}
 					/>
 				)}
 			</View>
@@ -129,9 +124,8 @@ export const Avatar: React.FC<AvatarProps> = ({
 							width: badgeSize,
 							height: badgeSize,
 							borderRadius: badgeSize / 2,
-							backgroundColor:
-								badgeColor || theme.NotificationGreen,
-							borderColor: theme.CardBackground,
+							backgroundColor: badgeColor ?? theme.Success,
+							borderColor: theme.Surface,
 						},
 					]}
 				/>
@@ -148,9 +142,6 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 		alignItems: "center",
 		overflow: "hidden",
-	},
-	image: {
-		resizeMode: "cover",
 	},
 	badge: {
 		position: "absolute",

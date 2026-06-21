@@ -7,87 +7,75 @@ import {
 	TouchableOpacity,
 } from "react-native";
 import { useTheme } from "../../contexts/ThemeContext";
+import { Cream, Ink, Olive } from "../../constants/colors";
+import { BorderRadius, Shadow } from "../../constants/tokens";
+
+export type CardTone = "paper" | "cream" | "olive" | "ink";
+export type CardElevation = "none" | "sm" | "md" | "lg";
+export type CardPadding = "none" | "xs" | "sm" | "md" | "lg";
 
 interface CardProps {
 	children: React.ReactNode;
 	onPress?: () => void;
-	padding?: "none" | "xs" | "sm" | "md" | "lg";
-	elevation?: "none" | "sm" | "md" | "lg";
+	padding?: CardPadding;
+	elevation?: CardElevation;
+	tone?: CardTone;
 	style?: StyleProp<ViewStyle>;
 }
+
+const PADDING_MAP: Record<CardPadding, number> = {
+	none: 0,
+	xs: 8,
+	sm: 12,
+	md: 16,
+	lg: 20,
+};
 
 export const Card: React.FC<CardProps> = ({
 	children,
 	onPress,
 	padding = "md",
-	elevation = "md",
+	elevation = "sm",
+	tone = "paper",
 	style,
 }) => {
 	const { theme } = useTheme();
 
-	const getPadding = () => {
-		switch (padding) {
-			case "none":
-				return 0;
-			case "xs":
-				return 8;
-			case "sm":
-				return 12;
-			case "md":
-				return 16;
-			case "lg":
-				return 20;
+	const toneStyles = (() => {
+		switch (tone) {
+			case "cream":
+				return {
+					backgroundColor: Cream[50],
+					borderColor: theme.BorderSoft,
+				};
+			case "olive":
+				return {
+					backgroundColor: Olive[100],
+					borderColor: "transparent",
+				};
+			case "ink":
+				return {
+					backgroundColor: Ink[900],
+					borderColor: "transparent",
+				};
 			default:
-				return 16;
+				return {
+					backgroundColor: theme.Surface,
+					borderColor: theme.BorderSoft,
+				};
 		}
-	};
+	})();
 
-	const getElevationStyles = () => {
-		switch (elevation) {
-			case "none":
-				return {};
-			case "sm":
-				return {
-					shadowColor: "#000",
-					shadowOffset: { width: 0, height: 1 },
-					shadowOpacity: 0.05,
-					shadowRadius: 2,
-					elevation: 1,
-				};
-			case "md":
-				return {
-					shadowColor: "#000",
-					shadowOffset: { width: 0, height: 2 },
-					shadowOpacity: 0.1,
-					shadowRadius: 4,
-					elevation: 3,
-				};
-			case "lg":
-				return {
-					shadowColor: "#000",
-					shadowOffset: { width: 0, height: 4 },
-					shadowOpacity: 0.15,
-					shadowRadius: 8,
-					elevation: 5,
-				};
-			default:
-				return {
-					shadowColor: "#000",
-					shadowOffset: { width: 0, height: 2 },
-					shadowOpacity: 0.1,
-					shadowRadius: 4,
-					elevation: 3,
-				};
-		}
-	};
+	const shadow = tone === "ink" ? Shadow.lg : Shadow[elevation];
 
 	const cardStyles = [
 		styles.card,
 		{
-			backgroundColor: theme.CardBackground,
-			padding: getPadding(),
+			padding: PADDING_MAP[padding],
+			borderWidth: tone === "paper" || tone === "cream" ? 0.5 : 0,
+			...toneStyles,
 		},
-		getElevationStyles(),
+		shadow,
 		style,
 	];
 
@@ -96,7 +84,7 @@ export const Card: React.FC<CardProps> = ({
 			<TouchableOpacity
 				style={cardStyles}
 				onPress={onPress}
-				activeOpacity={0.7}
+				activeOpacity={0.85}
 			>
 				{children}
 			</TouchableOpacity>
@@ -108,7 +96,7 @@ export const Card: React.FC<CardProps> = ({
 
 const styles = StyleSheet.create({
 	card: {
-		borderRadius: 12,
+		borderRadius: BorderRadius.xl,
 		width: "100%",
 	},
 });
