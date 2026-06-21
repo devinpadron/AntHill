@@ -1,0 +1,140 @@
+/* AntHill web — design tokens (shared language with the mobile app) */
+:root {
+	/* Brand ramps */
+	--cream-50: #f6f1e9;
+	--cream-100: #efe7da;
+	--cream-200: #e9e1d6;
+	--cream-paper: #fbf8f3;
+	--ink-900: #1d1d27;
+	--ink-700: #3a3a47;
+	--ink-500: #6b6657;
+	--ink-400: #8a8678;
+	--olive-700: #2f3b16;
+	--olive-600: #4f6322;
+	--olive-500: #6b8e23;
+	--olive-100: #e7e9d4;
+	--terra-500: #c26543;
+	--terra-100: #f2d9cb;
+	--amber-600: #a8821f;
+	--amber-100: #f0e0be;
+	--rust-500: #b3402f;
+	--rust-100: #f5d6d6;
+	--info-500: #3f7184;
+	--line: #ddd3c4;
+	--line-soft: #e8e0d3;
+
+	/* Semantic */
+	--bg: var(--cream-100);
+	--surface: #ffffff;
+	--surface-2: var(--cream-50);
+	--text: var(--ink-900);
+	--text-secondary: var(--ink-500);
+	--text-tertiary: var(--ink-400);
+	--accent: var(--olive-600);
+	--accent-soft: var(--olive-100);
+	--border: var(--line);
+
+	--radius-sm: 8px;
+	--radius-md: 12px;
+	--radius-lg: 18px;
+	--shadow-sm: 0 1px 2px rgba(29, 29, 39, 0.04);
+	--shadow-md: 0 4px 12px rgba(29, 29, 39, 0.06);
+
+	--font-sans:
+		ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	--font-serif: "Instrument Serif", Georgia, "Times New Roman", serif;
+	--font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+* {
+	box-sizing: border-box;
+}
+html,
+body {
+	margin: 0;
+	padding: 0;
+	background: var(--bg);
+	color: var(--text);
+	font-family: var(--font-sans);
+	-webkit-font-smoothing: antialiased;
+}
+a {
+	color: inherit;
+	text-decoration: none;
+}
+button {
+	font-family: inherit;
+	cursor: pointer;
+}
+
+.eyebrow {
+	font-size: 11px;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--text-tertiary);
+	font-weight: 600;
+}
+.card {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-lg);
+	box-shadow: var(--shadow-sm);
+}
+.pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 10px;
+	border-radius: 999px;
+	font-size: 12px;
+	font-weight: 600;
+}
+.pill--olive {
+	background: var(--olive-100);
+	color: var(--olive-700);
+}
+.pill--amber {
+	background: var(--amber-100);
+	color: var(--amber-600);
+}
+.pill--rust {
+	background: var(--rust-100);
+	color: var(--rust-500);
+}
+.pill--neutral {
+	background: rgba(29, 29, 39, 0.05);
+	color: var(--ink-700);
+}
+.pill--info {
+	background: #d9e7ec;
+	color: var(--info-500);
+}
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	height: 38px;
+	padding: 0 16px;
+	border-radius: 12px;
+	border: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--text);
+	font-size: 14px;
+	font-weight: 600;
+}
+.btn--primary {
+	background: var(--ink-900);
+	color: var(--cream-50);
+	border-color: var(--ink-900);
+}
+.btn--accent {
+	background: var(--accent);
+	color: var(--cream-50);
+	border-color: var(--accent);
+}
+.btn:disabled {
+	opacity: 0.6;
+	cursor: default;
+}
