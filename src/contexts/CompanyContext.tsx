@@ -6,8 +6,8 @@ import React, {
 	useContext,
 	ReactNode,
 } from "react";
-import db from "../constants/firestore";
 import {
+	getCompanyById,
 	getCompanyPreferences,
 	updateCompanyPreferences,
 } from "../services/companyService";
@@ -101,16 +101,12 @@ export const CompanyProvider: React.FC<CompanyProviderProps> = ({
 
 			try {
 				// Get company document
-				const companyDoc = await db
-					.collection("Companies")
-					.doc(activeCompanyId)
-					.get();
+				const data = await getCompanyById(activeCompanyId);
 
-				if (!companyDoc.exists) {
+				if (!data) {
 					throw new Error("Company not found");
 				}
 
-				const data = companyDoc.data();
 				setCompanyData({
 					id: activeCompanyId,
 					name: data?.name || "Unknown Company",

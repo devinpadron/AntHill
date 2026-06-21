@@ -108,6 +108,35 @@ export async function updateUser(userID: string, userData: any) {
 	}
 }
 
+/**
+ * Updates a user's phone number on their user document and, if present, on
+ * their company employee record. Returns false on error.
+ */
+export async function updateUserPhone(
+	userID: string,
+	companyID: string,
+	phone: string,
+): Promise<boolean> {
+	try {
+		await db.collection("Users").doc(userID).update({ phone });
+
+		const employeeRef = db
+			.collection("Companies")
+			.doc(companyID)
+			.collection("Employees")
+			.doc(userID);
+		const employeeDoc = await employeeRef.get();
+		if (employeeDoc.exists) {
+			await employeeRef.update({ phone });
+		}
+
+		return true;
+	} catch (error) {
+		console.error("Error updating phone number:", error);
+		return false;
+	}
+}
+
 export async function swapUserCompany(userID: string, companyID: string) {
 	const userData = await getUser(userID);
 	var companyID = companyID;

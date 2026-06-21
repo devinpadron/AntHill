@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Alert } from "react-native";
-import auth from "@react-native-firebase/auth";
 import { getUser, updateUser } from "../../services/userService";
-import { sendResetPassword } from "../../services/authService";
+import { sendResetPassword, signInWithEmail } from "../../services/authService";
 
 export const useAuth = () => {
 	const [email, setEmail] = useState("");
@@ -38,10 +37,7 @@ export const useAuth = () => {
 	const login = async () => {
 		try {
 			setLoading(true);
-			const userCredential = await auth().signInWithEmailAndPassword(
-				email,
-				password,
-			);
+			const userCredential = await signInWithEmail(email, password);
 
 			// If login successful, sync email in database
 			const user = userCredential.user;

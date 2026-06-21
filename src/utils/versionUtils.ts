@@ -1,6 +1,6 @@
 import { compareVersions } from "compare-versions";
 import * as AppConfig from "../../app.config";
-import db from "../constants/firestore";
+import { getRequiredVersion } from "../services/appService";
 import { Alert, Linking, Platform } from "react-native";
 
 // App store URLs - replace with your actual app IDs
@@ -21,8 +21,7 @@ export const getCurrentAppVersion = (): string => {
  */
 export const fetchRequiredVersion = async (): Promise<string> => {
 	try {
-		const data = await db.collection("AppData").doc("Data").get();
-		return data.data()?.required_version;
+		return await getRequiredVersion();
 	} catch (error) {
 		console.error("Failed to fetch required version:", error);
 		// Return current version to avoid false update prompts on error

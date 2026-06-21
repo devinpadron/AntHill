@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import AttachmentGallery from "../ui/AttachmentGallery";
 import { calculateMultipliedValue } from "../../utils/timeUtils";
-import db from "../../constants/firestore";
+import { getChecklistForForm } from "../../services/eventService";
 import { useUser } from "../../contexts/UserContext";
 
 const FormFieldValue = ({ field, response, attachments = [] }) => {
@@ -20,32 +20,11 @@ const FormFieldValue = ({ field, response, attachments = [] }) => {
 				return;
 			}
 			if (!companyId || !field?.checklistId) return;
-			try {
-				const snap = await db
-					.collection("Companies")
-					.doc(companyId)
-					.collection("Checklists")
-					.doc(field.checklistId)
-					.get();
-				const data =
-					typeof snap?.data === "function" ? snap.data() : undefined;
-				const rawItems = Array.isArray(data?.items)
-					? (data.items as any[])
-					: [];
-				const items = rawItems
-					.map((it: any) => (typeof it === "string" ? it : it?.text))
-					.filter(
-						(t: any) =>
-							typeof t === "string" && t.trim().length > 0,
-					);
-				setChecklistItems(items);
-			} catch (e) {
-				setChecklistItems([]);
-				console.warn(
-					"Failed to load checklist items for details view:",
-					e,
-				);
-			}
+			const { items } = await getChecklistForForm(
+				companyId,
+				field.checklistId,
+			);
+			setChecklistItems(items);
 		};
 		loadChecklistItems();
 		// eslint-disable-next-line react-hooks/exhaustive-deps

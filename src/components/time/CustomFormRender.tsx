@@ -11,7 +11,7 @@ import DatePicker from "react-native-date-picker";
 import { format } from "date-fns";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import AttachmentsSelector from "../ui/AttachmentsSelector";
-import db from "../../constants/firestore";
+import { getChecklistForForm } from "../../services/eventService";
 import { useUser } from "../../contexts/UserContext";
 
 // Update the props interface to include the missing properties
@@ -68,45 +68,15 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 				customForm.fields
 					.filter((f) => f.type === "checklist" && f.checklistId)
 					.map(async (f) => {
-						try {
-							const docRef = db
-								.collection("Companies")
-								.doc(companyId)
-								.collection("Checklists")
-								.doc(f.checklistId);
-							const snap = await docRef.get();
-							const data =
-								typeof snap?.data === "function"
-									? snap.data()
-									: undefined;
-							const rawItems = Array.isArray(data?.items)
-								? (data?.items as any[])
-								: [];
-							const items = rawItems
-								.map((it: any) =>
-									typeof it === "string" ? it : it?.text,
-								)
-								.filter(
-									(t: any) =>
-										typeof t === "string" &&
-										t.trim().length > 0,
-								);
-							newMap[f.id] = items;
+						const { title, items } = await getChecklistForForm(
+							companyId,
+							f.checklistId,
+						);
+						newMap[f.id] = items;
 
-							// Store checklist name/title for label display
-							const checklistName =
-								data?.title || data?.name || f.label;
-							newNamesMap[f.id] = checklistName;
-
-							// Also annotate the field with item count for validation use
-							// without altering other properties
-						} catch (e) {
-							newMap[f.id] = [];
-							console.warn(
-								`Failed to load checklist items for ${f.checklistId}:`,
-								e,
-							);
-						}
+						// Store checklist name/title for label display,
+						// falling back to the field label when none is set.
+						newNamesMap[f.id] = title || f.label;
 					}),
 			);
 

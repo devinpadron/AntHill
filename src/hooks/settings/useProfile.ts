@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import {
-	subscribeCurrentUser,
 	updateUser,
 	swapUserCompany,
-	deleteUser,
+	updateUserPhone,
 } from "../../services/userService";
 import {
 	joinCompanyWithAccessCode,
@@ -11,10 +10,12 @@ import {
 } from "../../services/companyService";
 import { Alert } from "react-native";
 import { showPrompt } from "../../utils/alertUtils";
-import auth from "@react-native-firebase/auth";
-import { reAuth, sendResetPassword } from "../../services/authService";
+import {
+	reAuth,
+	sendResetPassword,
+	updateAuthEmail,
+} from "../../services/authService";
 import { useUser } from "../../contexts/UserContext";
-import db from "../../constants/firestore";
 
 export const useProfile = () => {
 	const [isLoading, setIsLoading] = useState(false);
@@ -103,12 +104,8 @@ export const useProfile = () => {
 
 	// Update email
 	const updateEmail = async (newEmail: string) => {
-		const user = auth().currentUser;
-		if (!user) return false;
-
 		try {
-			await user.verifyBeforeUpdateEmail(newEmail);
-			return true;
+			return await updateAuthEmail(newEmail);
 		} catch (error) {
 			switch (error.code) {
 				case "auth/invalid-email":
@@ -154,37 +151,7 @@ export const useProfile = () => {
 	const updatePhone = async (phone: string): Promise<boolean> => {
 		if (!userId || !companyId) return false;
 
-		try {
-			// Update in user document
-			await db.collection("Users").doc(userId).update({
-				phone: phone,
-			});
-
-			// Update in company employee record if exists
-			const employeeRef = db
-				.collection("Companies")
-				.doc(companyId)
-				.collection("Employees")
-				.doc(userId);
-
-			const employeeDoc = await employeeRef.get();
-
-			if (employeeDoc.exists) {
-				await employeeRef.update({
-					phone: phone,
-				});
-			}
-
-			// Update local state
-			updateUser(userId, {
-				phone: phone,
-			});
-
-			return true;
-		} catch (error) {
-			console.error("Error updating phone number:", error);
-			return false;
-		}
+		return updateUserPhone(userId, companyId, phone);
 	};
 
 	return {

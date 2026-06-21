@@ -31,3 +31,6 @@ GoogleService-Info.plist
 
 # macOS
 .DS_Store
+
+# Firestore data export (contains real data — never commit)
+scripts/firestore-export.json

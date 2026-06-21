@@ -1,6 +1,9 @@
 import { useState } from "react";
-import auth from "@react-native-firebase/auth";
 import { addUser } from "../../services/userService";
+import {
+	createAuthAccount,
+	sendVerificationEmail,
+} from "../../services/authService";
 import {
 	addUserToCompany,
 	compareAccessCode,
@@ -49,17 +52,12 @@ export const useSignUp = (navigation: any) => {
 		setIsLoading(true);
 
 		try {
-			// Create user account
-			const userCredential = await auth().createUserWithEmailAndPassword(
+			// Create user account and set the display name
+			const uid = await createAuthAccount(
 				email,
 				password,
+				`${capitalize(firstName)} ${capitalize(lastName)}`,
 			);
-			const user = userCredential.user;
-
-			// Update display name
-			await user.updateProfile({
-				displayName: `${capitalize(firstName)} ${capitalize(lastName)}`,
-			});
 
 			// Prepare user data based on account type
 			const companyId = company;
@@ -69,15 +67,15 @@ export const useSignUp = (navigation: any) => {
 				lastName,
 				email,
 				companyId,
-				user.uid,
+				uid,
 			);
 
 			// Save user data
-			await addUser(userData, user.uid);
-			await addUserToCompany(companyId, user.uid, role);
+			await addUser(userData, uid);
+			await addUserToCompany(companyId, uid, role);
 
 			// Send verification email
-			await user.sendEmailVerification();
+			await sendVerificationEmail();
 			console.log("User account created & signed in!");
 
 			// Navigate back

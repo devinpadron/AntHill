@@ -3,10 +3,12 @@ import {
 	getAgendaItems,
 	getMarkedDates,
 } from "../../services/agendaItemService";
-import { subscribeAllEvents } from "../../services/eventService";
+import {
+	getEventLabels,
+	subscribeAllEvents,
+} from "../../services/eventService";
 import { FilterType } from "../../types/enums/FilterType";
 import { useEffect, useState, useCallback } from "react";
-import db from "../../constants/firestore";
 
 export const usePullEvents = (
 	companyId: string,
@@ -127,16 +129,11 @@ export const usePullEvents = (
 
 		const fetchLabels = async () => {
 			try {
-				const labelsRef = db
-					.collection("Companies")
-					.doc(companyId)
-					.collection("EventLabels");
-
-				const snapshot = await labelsRef.get();
+				const labelList = await getEventLabels(companyId);
 				const labels = {};
 
-				snapshot.docs.forEach((doc) => {
-					labels[doc.id] = doc.data().color;
+				labelList.forEach((label) => {
+					labels[label.id] = label.color;
 				});
 
 				setLabelMap(labels);

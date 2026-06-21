@@ -299,6 +299,40 @@ export const getChecklistsByIds = async (
 		.map((doc) => ({ id: doc.id, ...doc.data() }) as Checklist);
 };
 
+/**
+ * Loads a checklist's title and its item texts, normalized for rendering in a
+ * custom form (checklist-type field). Items may be stored as strings or as
+ * `{ text }` objects; both are flattened to non-empty strings. Returns empty
+ * values on error so the form can degrade gracefully.
+ */
+export const getChecklistForForm = async (
+	companyId: string,
+	checklistId: string,
+): Promise<{ title: string; items: string[] }> => {
+	try {
+		const snap = await db
+			.collection("Companies")
+			.doc(companyId)
+			.collection("Checklists")
+			.doc(checklistId)
+			.get();
+
+		const data = snap.exists ? snap.data() : undefined;
+		const rawItems = Array.isArray(data?.items)
+			? (data?.items as any[])
+			: [];
+		const items = rawItems
+			.map((it: any) => (typeof it === "string" ? it : it?.text))
+			.filter((t: any) => typeof t === "string" && t.trim().length > 0);
+		const title = data?.title || data?.name || "";
+
+		return { title, items };
+	} catch (e) {
+		console.warn("Failed to load checklist for form:", e);
+		return { title: "", items: [] };
+	}
+};
+
 export const updateEventChecklist = async (
 	companyId: string,
 	eventId: string,
