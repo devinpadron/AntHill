@@ -12,6 +12,7 @@ Design source of truth: [`../DB_SCHEMA_DESIGN.md`](../DB_SCHEMA_DESIGN.md).
 | `20260620000003_triggers.sql` | `updated_at`, auth→profile sync, attachment validation, time-entry edit audit |
 | `20260620000004_realtime.sql` | Realtime publication for the 6 subscribed tables |
 | `20260620000005_storage.sql` | Storage buckets (`event-attachments`, `time-entry-attachments`, `avatars`) + path RLS |
+| `20260620000006_onboarding_rpcs.sql` | `create_company_with_owner` + `join_company_with_code` (security-definer; membership writes are owner-only under RLS) |
 
 All migrations were applied to a throwaway Supabase project and run through the
 security + performance advisors. Remediations are folded into the files above:
@@ -45,13 +46,16 @@ supabase gen types typescript --linked > src/types/supabase.ts   # generate clie
 For local development: `supabase start` then `supabase db reset` applies all
 migrations against the local stack.
 
+## Migration job
+
+`scripts/migrate-to-supabase.js` ports a Firestore export
+(`scripts/firestore-export.json`) into this schema — generating UUIDs,
+preserving `legacy_firestore_id`, and building an in-memory id map so foreign
+references resolve. See the header of that file for usage and env vars.
+
 ## Not yet written (next steps in Workstream B)
 
-- **Onboarding RPC** — create-company / join-by-access-code as `security definer`
-  functions (RLS intentionally restricts direct membership writes to owners).
 - **Notification edge function** — drains `notification_outbox` → FCM.
 - **Seed script** — synthetic company with realistic data for the web console.
-- **Firestore → Supabase migration job** — Node (`firebase-admin` +
-  `@supabase/supabase-js`) over `scripts/firestore-export.json`, generating
-  UUIDs and preserving `legacy_firestore_id`; one company end-to-end first.
-- **Supabase adapter** behind `src/services/*` (the seam from commit `9c38ebe`).
+- **Supabase adapter** behind `src/services/*` (the seam from commit `9c38ebe`)
+  — in progress.
