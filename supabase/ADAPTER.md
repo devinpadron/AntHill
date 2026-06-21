@@ -27,9 +27,9 @@ subscribes to the user's data. You can't run Supabase auth with Firestore data
 
 | Service | Firestore today | Supabase target |
 |---|---|---|
-| `authService` | `@react-native-firebase/auth` | `supabase.auth.*` (done — shadow). Add a `delete_own_account` RPC/edge fn. |
-| `userService` | `Users/{uid}` docs, `onSnapshot` | `users` table; `subscribeCurrentUser`/`subscribeUserPrivilege` → `supabase.channel('users:'+id)` / `company_members`. `swapUserCompany` → update `users.active_company_id`. Preferences → `user_preferences`. |
-| `companyService` | `Companies/*`, junction `Users` subcol | `companies`/`company_members`/`company_settings`. `compareAccessCode`/`joinCompanyWithAccessCode` → `rpc('join_company_with_code')`; create-company → `rpc('create_company_with_owner')`. `changeUserRole` → update `company_members.role`. |
+| `authService` | `@react-native-firebase/auth` | **done (shadow)** — `supabase.auth.*`. Add a `delete_own_account` RPC/edge fn. |
+| `userService` | `Users/{uid}` docs, `onSnapshot` | **done (shadow)** — `users` + derived `companies[]`/`loggedInCompany`; subscriptions via `postgres_changes` channels emitting snapshot-shaped objects; preferences → `user_preferences`. |
+| `companyService` | `Companies/*`, junction `Users` subcol | **done (shadow)** — `companies`/`company_members`/`company_settings`; onboarding via RPCs (`join_company_with_code`, `create_company_with_owner`, `lookup_company_by_access_code`); prefs map camelCase↔snake_case. |
 | `eventService` | `Events/*`, `onSnapshot` | `events` (+ `event_workers`, `event_packages`, `event_checklists`); `subscribeAllEvents`/`subscribeEvent` → `channel('events:'+companyId)`. Labels → `event_labels`. Checklists → `checklists`/`checklist_items`. |
 | `timeEntryService` | `TimeEntries/*` | `time_entries`; clock in/out/pause = inserts/updates; `getActiveTimeEntry` uses the partial-unique active row. Audit via the DB trigger (drop the client `editHistory` write). |
 | `availabilityService` | events + `workerStatus{}` | `event_workers` (status + `(user_id,status)` index); confirm/decline → update own `event_workers` row (RLS allows self-update). |

@@ -73,8 +73,29 @@ begin
 end;
 $$;
 
+-- Resolve a company id from an access code without exposing the companies row
+-- (RLS hides companies from non-members). Used by the signup access-code check,
+-- which runs before the account exists — hence anon-callable. (Alternatively,
+-- refactor signup to create the account first and let join_company_with_code do
+-- the validation; then this can be dropped.)
+create or replace function public.lookup_company_by_access_code(
+  p_access_code text
+)
+returns uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select id from public.companies where access_code = p_access_code;
+$$;
+
 -- Callable only by signed-in users.
 revoke execute on function public.create_company_with_owner(text, text) from public, anon;
 revoke execute on function public.join_company_with_code(text)         from public, anon;
 grant  execute on function public.create_company_with_owner(text, text) to authenticated;
 grant  execute on function public.join_company_with_code(text)         to authenticated;
+
+-- Access-code lookup is intentionally available pre-auth (signup).
+revoke execute on function public.lookup_company_by_access_code(text) from public;
+grant  execute on function public.lookup_company_by_access_code(text) to anon, authenticated;
