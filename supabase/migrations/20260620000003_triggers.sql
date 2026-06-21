@@ -5,7 +5,8 @@
 -- ---------------------------------------------------------------------------
 create or replace function public.touch_updated_at()
 returns trigger
-language plpgsql as $$
+language plpgsql
+set search_path = public as $$
 begin
   new.updated_at = now();
   return new;
@@ -46,12 +47,18 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_auth_user();
 
+-- Trigger-only function: never callable via the API. The trigger fires
+-- regardless of caller EXECUTE grants; Supabase default-grants EXECUTE to
+-- anon/authenticated, so revoke from them explicitly.
+revoke execute on function public.handle_new_auth_user() from public, anon, authenticated;
+
 -- ---------------------------------------------------------------------------
 -- 8.3 Polymorphic attachment validation
 -- ---------------------------------------------------------------------------
 create or replace function public.validate_attachment_target()
 returns trigger
-language plpgsql as $$
+language plpgsql
+set search_path = public as $$
 declare ok boolean;
 begin
   if new.target_type = 'event' then
@@ -83,7 +90,8 @@ create trigger attachments_validate
 -- ---------------------------------------------------------------------------
 create or replace function public.log_time_entry_edit()
 returns trigger
-language plpgsql as $$
+language plpgsql
+set search_path = public as $$
 begin
   if auth.uid() is null then
     return new;

@@ -13,6 +13,14 @@ Design source of truth: [`../DB_SCHEMA_DESIGN.md`](../DB_SCHEMA_DESIGN.md).
 | `20260620000004_realtime.sql` | Realtime publication for the 6 subscribed tables |
 | `20260620000005_storage.sql` | Storage buckets (`event-attachments`, `time-entry-attachments`, `avatars`) + path RLS |
 
+All migrations were applied to a throwaway Supabase project and run through the
+security + performance advisors. Remediations are folded into the files above:
+extensions live in the `extensions` schema, functions pin `search_path`, the
+auth-trigger function is not API-callable, RLS policies are scoped
+`to authenticated`, `auth.uid()` is wrapped `(select auth.uid())` (initplan),
+admin writes are split per-action to avoid overlapping permissive policies, and
+the membership helpers are `STABLE`.
+
 ## Resolved schema decisions (DB_SCHEMA_DESIGN.md §11)
 
 1. **A time entry can span multiple events** → kept the `time_entry_events` join table.

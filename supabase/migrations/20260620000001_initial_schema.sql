@@ -10,8 +10,12 @@
 -- Every domain row carries company_id (RLS rides on it) and a nullable
 -- legacy_firestore_id for the migration window. Timestamps are timestamptz.
 
-create extension if not exists citext;
-create extension if not exists pgcrypto;
+-- Keep extensions out of the public schema (Supabase advisor 0014).
+create schema if not exists extensions;
+create extension if not exists citext with schema extensions;
+create extension if not exists pgcrypto with schema extensions;
+-- gen_random_uuid() is built-in (pg_catalog) in PG13+, so table defaults below
+-- need no schema qualification; only the citext type is qualified.
 
 -- ---------------------------------------------------------------------------
 -- Enums
@@ -43,7 +47,7 @@ create table public.users (
   id                  uuid primary key references auth.users(id) on delete cascade,
   first_name          text not null,
   last_name           text not null,
-  email               citext not null unique,
+  email               extensions.citext not null unique,
   phone               text,
   avatar_path         text,                 -- Storage path; never a raw URL
   active_company_id   uuid references public.companies(id) on delete set null,
