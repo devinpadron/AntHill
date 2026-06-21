@@ -40,6 +40,35 @@ subscribes to the user's data. You can't run Supabase auth with Firestore data
 | `exportService` | reads Firestore | reads `time_entries` (+ joins); CSV/PDF logic unchanged. |
 | `appService` | `AppData/Data.required_version` | No table yet — add a small `app_config` table or use Supabase remote config; decide at cutover. |
 
+## Data services — shape mismatch (decision needed)
+
+`authService`, `userService`, and `companyService` are done as shadows and
+establish every pattern (auth calls, CRUD + shape mapping, realtime/snapshot
+shims, RPCs, camel↔snake). The remaining **data** services hit a real model
+mismatch that is a design decision, not just a call swap:
+
+- **Events**: the legacy `Event` stores `startTime`/`endTime` as display
+  *strings*, `locations` as an address-keyed map, and `assignedWorkers[]` +
+  `workerStatus{}`. The schema stores `start_at`/`end_at` (`timestamptz`),
+  flat `address`/`lat`/`lng`, and `event_workers` rows. Reconstructing the exact
+  legacy shape (esp. the time strings) is lossy.
+- **Time entries**: status strings → enum; `editHistory[]`/`connectedEvents[]`
+  → child tables (and the edit audit is now a DB trigger, so the client must
+  stop writing edit history).
+
+**Recommendation:** at cutover, update the consuming screens/components to read
+the **new** shape (timestamptz, `event_workers`) rather than reconstructing the
+legacy denormalized shape in the adapter. Reconstruction shims are possible but
+fragile and re-introduce the very denormalization the schema removed. This
+touches the calendar/timesheet screens, so it should be done with the live DB
+where it can be verified — which is why these services are deferred to the
+cutover branch rather than written blind here.
+
+Remaining services to convert during the cutover: `eventService`,
+`timeEntryService`, `availabilityService`, `packageService`,
+`agendaItemService`, `notificationService`, `storageService`, `exportService`,
+`appService`.
+
 ## Realtime pattern
 
 ```ts
