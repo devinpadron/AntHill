@@ -163,8 +163,12 @@ const TimeEntryDetails = ({ route, navigation }) => {
 				padding="lg"
 				style={styles.loadingContainer}
 			>
-				<ActivityIndicator size="large" color={theme.LocationBlue} />
-				<Text style={styles.loadingText}>
+				<ActivityIndicator size="large" color={theme.Accent} />
+				<Text
+					variant="caption"
+					color="secondary"
+					style={styles.loadingText}
+				>
 					Loading time entry details...
 				</Text>
 			</Container>
@@ -274,8 +278,6 @@ const styles = StyleSheet.create({
 	},
 	loadingText: {
 		marginTop: 16,
-		fontSize: 16,
-		color: "#666",
 	},
 	scrollContainer: {
 		flex: 1,

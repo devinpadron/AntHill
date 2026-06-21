@@ -1,24 +1,29 @@
-import React, { useState } from "react";
+import React from "react";
 import {
 	View,
-	Text,
-	StyleSheet,
 	Alert,
 	ScrollView,
 	TouchableOpacity,
 	StatusBar,
+	StyleProp,
+	ViewStyle,
 } from "react-native";
 import { Dropdown } from "react-native-element-dropdown";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native-safe-area-context";
 import LoadingScreen from "../LoadingScreen";
 import { useProfile } from "../../hooks/settings/useProfile";
 import { showPrompt, showConfirmation } from "../../utils/alertUtils";
-import { Button } from "../../components/ui/Button";
+import { Text } from "../../components/ui/Text";
+import { Icon } from "../../components/ui/Icon";
+import { Card } from "../../components/ui/Card";
+import { Avatar } from "../../components/ui/Avatar";
+import { Divider } from "../../components/ui/Divider";
 import { useUser } from "../../contexts/UserContext";
+import { useTheme } from "../../contexts/ThemeContext";
+import { Rust } from "../../constants/colors";
 
 const ProfilePage = ({ navigation }) => {
-	const insets = useSafeAreaInsets();
+	const { theme, mode } = useTheme();
 	const {
 		isLoading,
 		userData,
@@ -210,441 +215,315 @@ const ProfilePage = ({ navigation }) => {
 		return <LoadingScreen />;
 	}
 
-	return (
-		<View style={[{ flex: 1, paddingTop: insets.top }, styles.container]}>
-			<StatusBar barStyle="dark-content" />
+	const fullName =
+		`${userData.firstName ?? ""} ${userData.lastName ?? ""}`.trim();
 
-			<View style={styles.header}>
+	return (
+		<SafeAreaView
+			style={{ flex: 1, backgroundColor: theme.Background }}
+			edges={["top"]}
+		>
+			<StatusBar
+				barStyle={mode === "dark" ? "light-content" : "dark-content"}
+			/>
+
+			{/* Header */}
+			<View
+				style={{
+					flexDirection: "row",
+					alignItems: "center",
+					gap: 12,
+					paddingHorizontal: 20,
+					paddingTop: 8,
+					paddingBottom: 12,
+				}}
+			>
 				<TouchableOpacity
-					style={styles.backButton}
 					onPress={() => navigation.goBack()}
+					hitSlop={8}
+					style={{
+						width: 38,
+						height: 38,
+						borderRadius: 12,
+						alignItems: "center",
+						justifyContent: "center",
+						backgroundColor: theme.Surface,
+						borderWidth: 0.5,
+						borderColor: theme.BorderColor,
+					}}
 				>
-					<Ionicons name="arrow-back" size={24} color="#333" />
+					<Icon name="chevL" size={18} color={theme.PrimaryText} />
 				</TouchableOpacity>
-				<Text style={styles.headerTitle}>Profile</Text>
-				<View style={{ width: 40 }} />
+				<Text variant="h2" weight="semibold">
+					Profile
+				</Text>
 			</View>
 
 			<ScrollView
-				style={styles.scrollView}
-				contentContainerStyle={styles.contentContainer}
+				contentContainerStyle={{
+					paddingHorizontal: 20,
+					paddingTop: 8,
+					paddingBottom: 40,
+				}}
 				showsVerticalScrollIndicator={false}
 			>
-				{/* Profile Card */}
-				<View style={styles.profileCard}>
+				{/* Identity hero */}
+				<Card padding="md" onPress={handleNameChange}>
+					<View
+						style={{
+							flexDirection: "row",
+							alignItems: "center",
+							gap: 16,
+						}}
+					>
+						<Avatar name={fullName || userData.email} size="lg" />
+						<View style={{ flex: 1 }}>
+							<Text variant="h2" weight="semibold">
+								{fullName || "Your name"}
+							</Text>
+							<Text
+								variant="caption"
+								color="tertiary"
+								style={{ marginTop: 2 }}
+							>
+								Tap to edit name
+							</Text>
+						</View>
+						<Icon
+							name="chev"
+							size={18}
+							color={theme.TertiaryText}
+						/>
+					</View>
+				</Card>
+
+				{/* Account */}
+				<SectionLabel>Account</SectionLabel>
+				<Card padding="none">
+					<InfoRow
+						label="Email"
+						value={userData.email}
+						action={
+							<ActionChip
+								label="Change"
+								onPress={handleEmailChange}
+							/>
+						}
+					/>
+					<Divider soft inset={20} />
+					<InfoRow
+						label="Phone"
+						value={userData.phone}
+						placeholder="No phone number added"
+						action={
+							<ActionChip
+								label={userData.phone ? "Change" : "Add"}
+								onPress={handlePhoneChange}
+							/>
+						}
+					/>
+				</Card>
+
+				{/* Company */}
+				<SectionLabel>Company</SectionLabel>
+				<Card padding="md">
+					<Text
+						variant="eyebrow"
+						color="tertiary"
+						style={{ fontSize: 11, marginBottom: 8 }}
+					>
+						Active company
+					</Text>
+					<Dropdown
+						data={userData.companies.map((company) => ({
+							label: company,
+							value: company,
+						}))}
+						value={userData.loggedInCompany}
+						onChange={(item) => handleCompanyChange(item.value)}
+						labelField="label"
+						valueField="value"
+						style={{
+							height: 50,
+							borderColor: theme.BorderColor,
+							borderWidth: 0.5,
+							borderRadius: 14,
+							paddingHorizontal: 16,
+							backgroundColor: theme.Surface2 ?? theme.Surface,
+						}}
+						placeholderStyle={{
+							color: theme.TertiaryText,
+							fontSize: 15,
+						}}
+						selectedTextStyle={{
+							color: theme.PrimaryText,
+							fontSize: 15,
+							fontWeight: "500",
+						}}
+						activeColor={theme.AccentSoft}
+						containerStyle={{ borderRadius: 14, marginTop: 4 }}
+						maxHeight={220}
+						disable={userData.companies.length <= 1}
+					/>
 					<TouchableOpacity
-						style={styles.profileHeader}
-						onPress={handleNameChange}
-						activeOpacity={0.7}
+						onPress={handleJoinCompany}
+						activeOpacity={0.9}
+						style={{
+							marginTop: 12,
+							height: 48,
+							borderRadius: 14,
+							alignItems: "center",
+							justifyContent: "center",
+							flexDirection: "row",
+							gap: 8,
+							borderWidth: 0.5,
+							borderColor: theme.BorderColor,
+							backgroundColor: theme.AccentSoft,
+						}}
 					>
-						<View style={styles.avatarContainer}>
-							<Text style={styles.avatarText}>
-								{userData.firstName?.charAt(0) || ""}
-								{userData.lastName?.charAt(0) || ""}
-							</Text>
-						</View>
-
-						<View style={styles.nameContainer}>
-							<Text style={styles.nameText}>
-								{userData.firstName} {userData.lastName}
-							</Text>
-							<Text style={styles.editText}>Tap to edit</Text>
-						</View>
-
-						<Ionicons
-							name="create-outline"
-							size={20}
-							color="#2089dc"
+						<Icon
+							name="plus"
+							size={16}
+							color={theme.AccentStrong}
 						/>
+						<Text variant="body" color="accent" weight="semibold">
+							Join another company
+						</Text>
 					</TouchableOpacity>
-				</View>
+				</Card>
 
-				{/* Email Card */}
-				<View style={styles.card}>
-					<View style={styles.cardHeader}>
-						<Ionicons
-							name="mail-outline"
-							size={20}
-							color="#2089dc"
-							style={styles.cardIcon}
-						/>
-						<Text style={styles.cardTitle}>Email Address</Text>
-					</View>
+				{/* Security */}
+				<SectionLabel>Security</SectionLabel>
+				<Card padding="none">
+					<InfoRow
+						label="Password"
+						value="••••••••"
+						action={
+							<ActionChip
+								label="Reset"
+								onPress={handlePasswordReset}
+							/>
+						}
+					/>
+				</Card>
 
-					<View style={styles.cardContent}>
-						<Text style={styles.valueText}>{userData.email}</Text>
-
-						<Button
-							title="Change"
-							onPress={handleEmailChange}
-							style={styles.actionButton}
-							textStyle={styles.actionButtonText}
-							variant="outline"
-							size="small"
-						/>
-					</View>
-				</View>
-
-				{/* Phone Number Card */}
-				<View style={styles.card}>
-					<View style={styles.cardHeader}>
-						<Ionicons
-							name="call-outline"
-							size={20}
-							color="#2089dc"
-							style={styles.cardIcon}
-						/>
-						<Text style={styles.cardTitle}>Phone Number</Text>
-					</View>
-
-					<View style={styles.cardContent}>
-						<Text style={styles.valueText}>
-							{userData.phone || "No phone number added"}
-						</Text>
-
-						<Button
-							title={userData.phone ? "Change" : "Add"}
-							onPress={handlePhoneChange}
-							style={styles.actionButton}
-							textStyle={styles.actionButtonText}
-							variant="outline"
-							size="small"
-						/>
-					</View>
-				</View>
-
-				{/* Company Card */}
-				<View style={styles.card}>
-					<View style={styles.cardHeader}>
-						<Ionicons
-							name="business-outline"
-							size={20}
-							color="#2089dc"
-							style={styles.cardIcon}
-						/>
-						<Text style={styles.cardTitle}>Company</Text>
-					</View>
-
-					<View
-						style={[
-							styles.cardContent,
-							{ flexDirection: "column" },
-						]}
+				{/* Danger zone */}
+				<SectionLabel>Danger zone</SectionLabel>
+				<TouchableOpacity
+					onPress={handleDeleteAccount}
+					activeOpacity={0.9}
+					style={{
+						height: 52,
+						borderRadius: 16,
+						alignItems: "center",
+						justifyContent: "center",
+						flexDirection: "row",
+						gap: 8,
+						borderWidth: 0.5,
+						borderColor: Rust[500],
+						backgroundColor: theme.ErrorSoft ?? Rust[100],
+					}}
+				>
+					<Text
+						variant="body"
+						weight="semibold"
+						style={{ color: Rust[500] }}
 					>
-						<Dropdown
-							data={userData.companies.map((company) => ({
-								label: company,
-								value: company,
-							}))}
-							value={userData.loggedInCompany}
-							onChange={(item) => handleCompanyChange(item.value)}
-							labelField="label"
-							valueField="value"
-							style={styles.dropdown}
-							placeholderStyle={styles.dropdownPlaceholder}
-							selectedTextStyle={styles.dropdownSelectedText}
-							activeColor="#e6f2ff" // Highlight color when item is selected
-							containerStyle={{
-								borderRadius: 8,
-								marginTop: 4,
-							}}
-							maxHeight={200} // Maximum height of dropdown list
-							disable={userData.companies.length <= 1}
-						/>
-
-						<Button
-							title="Join Another Company"
-							onPress={handleJoinCompany}
-							style={styles.joinButton}
-							textStyle={styles.joinButtonText}
-							variant="outline"
-							fullWidth
-						/>
-					</View>
-				</View>
-
-				{/* Security Card */}
-				<View style={styles.card}>
-					<View style={styles.cardHeader}>
-						<Ionicons
-							name="shield-outline"
-							size={20}
-							color="#2089dc"
-							style={styles.cardIcon}
-						/>
-						<Text style={styles.cardTitle}>Security</Text>
-					</View>
-
-					<View
-						style={[
-							styles.cardContent,
-							{ flexDirection: "column" },
-						]}
-					>
-						<Button
-							title="Reset Password"
-							onPress={handlePasswordReset}
-							style={styles.resetButton}
-							textStyle={styles.resetButtonText}
-							variant="outline"
-							fullWidth
-							icon={
-								<Ionicons
-									name="key-outline"
-									size={18}
-									color="#666"
-									style={{ marginRight: 8 }}
-								/>
-							}
-						/>
-					</View>
-				</View>
-
-				{/* Danger Zone */}
-				<View style={styles.dangerCard}>
-					<View style={styles.cardHeader}>
-						<Ionicons
-							name="warning-outline"
-							size={20}
-							color="#d32f2f"
-							style={styles.cardIcon}
-						/>
-						<Text style={[styles.cardTitle, { color: "#d32f2f" }]}>
-							Danger Zone
-						</Text>
-					</View>
-
-					<View
-						style={[
-							styles.cardContent,
-							{ flexDirection: "column" },
-						]}
-					>
-						<Button
-							title={`Delete ${userData?.loggedInCompany} Profile`}
-							onPress={handleDeleteAccount}
-							style={styles.deleteButton}
-							textStyle={styles.deleteButtonText}
-							variant="destructive"
-							fullWidth
-							icon={
-								<Ionicons
-									name="trash-outline"
-									size={18}
-									color="#d32f2f"
-									style={{ marginRight: 8 }}
-								/>
-							}
-						/>
-					</View>
-				</View>
+						Delete {userData?.loggedInCompany} profile
+					</Text>
+				</TouchableOpacity>
 			</ScrollView>
-		</View>
+		</SafeAreaView>
 	);
 };
 
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: "#f8f9fa",
-	},
-	header: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		backgroundColor: "white",
-		borderBottomWidth: 1,
-		borderBottomColor: "#e1e4e8",
-	},
-	headerTitle: {
-		fontSize: 18,
-		fontWeight: "600",
-		color: "#333",
-		textAlign: "center",
-		flex: 1,
-	},
-	backButton: {
-		padding: 8,
-	},
-	scrollView: {
-		flex: 1,
-	},
-	contentContainer: {
-		padding: 16,
-		paddingBottom: 32,
-	},
-	profileCard: {
-		backgroundColor: "white",
-		borderRadius: 12,
-		marginBottom: 16,
-		overflow: "hidden",
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 3,
-		elevation: 2,
-	},
-	profileHeader: {
-		flexDirection: "row",
-		alignItems: "center",
-		padding: 16,
-	},
-	avatarContainer: {
-		width: 60,
-		height: 60,
-		borderRadius: 30,
-		backgroundColor: "#e6f2ff",
-		alignItems: "center",
-		justifyContent: "center",
-		marginRight: 16,
-	},
-	avatarText: {
-		fontSize: 22,
-		fontWeight: "600",
-		color: "#2089dc",
-	},
-	nameContainer: {
-		flex: 1,
-	},
-	nameText: {
-		fontSize: 18,
-		fontWeight: "600",
-		color: "#333",
-		marginBottom: 4,
-	},
-	editText: {
-		fontSize: 12,
-		color: "#888",
-		fontStyle: "italic",
-	},
-	card: {
-		backgroundColor: "white",
-		borderRadius: 12,
-		marginBottom: 16,
-		overflow: "hidden",
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 3,
-		elevation: 2,
-	},
-	dangerCard: {
-		backgroundColor: "white",
-		borderRadius: 12,
-		marginBottom: 16,
-		overflow: "hidden",
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 3,
-		elevation: 2,
-		borderLeftWidth: 4,
-		borderLeftColor: "#d32f2f",
-	},
-	cardHeader: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingHorizontal: 16,
-		paddingTop: 16,
-		paddingBottom: 12,
-		borderBottomWidth: 1,
-		borderBottomColor: "#f0f0f0",
-	},
-	cardIcon: {
-		marginRight: 10,
-	},
-	cardTitle: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#333",
-	},
-	cardContent: {
-		padding: 16,
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-	},
-	valueText: {
-		fontSize: 15,
-		color: "#444",
-		flex: 1,
-	},
-	actionButton: {
-		paddingHorizontal: 16,
-		paddingVertical: 8,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: "#2089dc",
-		backgroundColor: "transparent",
-	},
-	actionButtonText: {
-		fontSize: 13,
-		fontWeight: "500",
-		color: "#2089dc",
-	},
-	dropdown: {
-		height: 50,
-		width: "100%",
-		borderColor: "#e0e0e0",
-		borderWidth: 1,
-		borderRadius: 8,
-		paddingHorizontal: 16,
-		marginBottom: 16,
-		backgroundColor: "#f9f9f9", // Add background color for better contrast
-	},
-	dropdownPlaceholder: {
-		color: "#999",
-		fontSize: 16,
-	},
-	dropdownSelectedText: {
-		color: "#333",
-		fontSize: 16,
-		fontWeight: "500", // Make selected text more visible
-	},
-	joinButton: {
-		paddingVertical: 12,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: "#2089dc",
-		backgroundColor: "#e6f2ff",
-	},
-	joinButtonText: {
-		fontSize: 14,
-		fontWeight: "500",
-		color: "#2089dc",
-	},
-	resetButton: {
-		paddingVertical: 12,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: "#666",
-		backgroundColor: "#f5f5f5",
-		flexDirection: "row",
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	resetButtonText: {
-		fontSize: 14,
-		fontWeight: "500",
-		color: "#666",
-	},
-	deleteButton: {
-		paddingVertical: 12,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: "#d32f2f",
-		backgroundColor: "#ffebee",
-		flexDirection: "row",
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	deleteButtonText: {
-		fontSize: 14,
-		fontWeight: "500",
-		color: "#d32f2f",
-	},
-});
+function SectionLabel({ children }: { children: React.ReactNode }) {
+	return (
+		<Text
+			variant="eyebrow"
+			color="tertiary"
+			style={{
+				fontSize: 11,
+				marginTop: 24,
+				marginBottom: 10,
+				marginLeft: 4,
+			}}
+		>
+			{children}
+		</Text>
+	);
+}
+
+function InfoRow({
+	label,
+	value,
+	placeholder,
+	action,
+}: {
+	label: string;
+	value?: string;
+	placeholder?: string;
+	action: React.ReactNode;
+}) {
+	return (
+		<View
+			style={{
+				flexDirection: "row",
+				alignItems: "center",
+				gap: 12,
+				padding: 16,
+			}}
+		>
+			<View style={{ flex: 1 }}>
+				<Text
+					variant="eyebrow"
+					color="tertiary"
+					style={{ fontSize: 11, marginBottom: 4 }}
+				>
+					{label}
+				</Text>
+				<Text variant="body" color={value ? "primary" : "tertiary"}>
+					{value || placeholder}
+				</Text>
+			</View>
+			{action}
+		</View>
+	);
+}
+
+function ActionChip({
+	label,
+	onPress,
+	style,
+}: {
+	label: string;
+	onPress: () => void;
+	style?: StyleProp<ViewStyle>;
+}) {
+	const { theme } = useTheme();
+	return (
+		<TouchableOpacity
+			onPress={onPress}
+			activeOpacity={0.85}
+			style={[
+				{
+					paddingHorizontal: 16,
+					height: 36,
+					borderRadius: 999,
+					alignItems: "center",
+					justifyContent: "center",
+					borderWidth: 0.5,
+					borderColor: theme.BorderColor,
+					backgroundColor: theme.Surface,
+				},
+				style,
+			]}
+		>
+			<Text variant="small" color="accent" weight="semibold">
+				{label}
+			</Text>
+		</TouchableOpacity>
+	);
+}
 
 export default ProfilePage;

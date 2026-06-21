@@ -1,5 +1,5 @@
 import React from "react";
-import HomeTabs from "../navigation/HomeTabs";
+import RootStack from "../navigation/RootStack";
 import AuthStack from "../navigation/AuthStack";
 import SplashScreen from "../screens/SplashScreen";
 import { useUser } from "../contexts/UserContext";
@@ -11,5 +11,5 @@ export const AppNavigator = () => {
 		return <SplashScreen />;
 	}
 
-	return loggedIn ? <HomeTabs /> : <AuthStack />;
+	return loggedIn ? <RootStack /> : <AuthStack />;
 };

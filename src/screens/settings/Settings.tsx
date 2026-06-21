@@ -1,22 +1,35 @@
-import React from "react";
-import { View, Text, StyleSheet, StatusBar, Alert } from "react-native";
-import { SettingsItem } from "../../components/settings/SettingsItem";
-import { ExpandableSettingsSection } from "../../components/settings/ExpandableSettingsSection";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import React, { useState } from "react";
+import {
+	View,
+	StatusBar,
+	Alert,
+	ScrollView,
+	TouchableOpacity,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "../../contexts/UserContext";
 import { useCompany } from "../../contexts/CompanyContext";
+import { Text } from "../../components/ui/Text";
+import { Icon } from "../../components/ui/Icon";
+import { Card } from "../../components/ui/Card";
+import { Pill } from "../../components/ui/Pill";
+import { Avatar } from "../../components/ui/Avatar";
+import { Divider } from "../../components/ui/Divider";
+import { useTheme } from "../../contexts/ThemeContext";
+import { Rust } from "../../constants/colors";
 
 const Settings = ({ navigation }: any) => {
-	const insets = useSafeAreaInsets();
-
-	const { isAdmin, logout, companyId } = useUser();
-	const { preferences, isLoading } = useCompany();
+	const { theme, mode } = useTheme();
+	const { isAdmin, logout } = useUser();
+	const { companyData, preferences, isLoading } = useCompany();
+	const [createOpen, setCreateOpen] = useState(false);
 
 	const handleLogout = () => {
-		Alert.alert("Logout", "Are you sure you want to logout?", [
+		Alert.alert("Log out", "Are you sure you want to log out?", [
 			{ text: "Cancel", style: "cancel" },
 			{
-				text: "Logout",
+				text: "Log out",
+				style: "destructive",
 				onPress: async () => {
 					try {
 						await logout();
@@ -29,124 +42,258 @@ const Settings = ({ navigation }: any) => {
 	};
 
 	if (isLoading) {
-		return null; // or a loading spinner
+		return (
+			<SafeAreaView
+				style={{ flex: 1, backgroundColor: theme.Background }}
+			/>
+		);
 	}
 
 	return (
-		<View style={[{ flex: 1, paddingTop: insets.top }, styles.container]}>
-			<StatusBar barStyle="dark-content" />
-			<View style={styles.header}>
-				<Text style={styles.headerTitle}>Settings</Text>
-			</View>
+		<SafeAreaView
+			style={{ flex: 1, backgroundColor: theme.Background }}
+			edges={["top"]}
+		>
+			<StatusBar
+				barStyle={mode === "dark" ? "light-content" : "dark-content"}
+			/>
 
-			<View style={styles.section}>
-				<Text style={styles.sectionTitle}>ACCOUNT INFORMATION</Text>
-				<SettingsItem
-					title="Profile"
-					onPress={() => navigation.push("Profile")}
-				/>
-				<SettingsItem
-					title="User Preferences"
-					onPress={() => navigation.push("UserPreferences")}
-				/>
-			</View>
+			<ScrollView
+				contentContainerStyle={{
+					paddingHorizontal: 20,
+					paddingTop: 12,
+					paddingBottom: 40,
+				}}
+				showsVerticalScrollIndicator={false}
+			>
+				<Text variant="display" style={{ marginBottom: 16 }}>
+					Settings
+				</Text>
 
-			{isAdmin ? (
-				<View style={styles.section}>
-					<Text style={styles.sectionTitle}>ADMIN</Text>
-					<SettingsItem
-						title="Company Preferences"
-						onPress={() => navigation.push("CompanyPreferences")}
+				{/* Active company */}
+				<Card padding="md">
+					<View
+						style={{
+							flexDirection: "row",
+							alignItems: "center",
+							gap: 14,
+						}}
+					>
+						<Avatar
+							name={companyData?.name || "Company"}
+							size="md"
+							fallbackIcon="business"
+						/>
+						<View style={{ flex: 1 }}>
+							<Text
+								variant="eyebrow"
+								color="tertiary"
+								style={{ fontSize: 11, marginBottom: 2 }}
+							>
+								Active company
+							</Text>
+							<Text variant="h3" weight="semibold">
+								{companyData?.name || "—"}
+							</Text>
+						</View>
+						<Pill tone={isAdmin ? "olive" : "neutral"}>
+							{isAdmin ? "Manager" : "Employee"}
+						</Pill>
+					</View>
+				</Card>
+
+				{/* Account */}
+				<SectionLabel>Account</SectionLabel>
+				<Card padding="none">
+					<NavRow
+						title="Profile"
+						onPress={() => navigation.push("Profile")}
 					/>
-					<SettingsItem
-						title="Employee List"
-						onPress={() => navigation.push("EmployeeList")}
+					<Divider soft inset={16} />
+					<NavRow
+						title="Preferences"
+						onPress={() => navigation.push("UserPreferences")}
 					/>
-					{preferences.enableTimeSheet && (
-						<SettingsItem
-							title="Payroll Review"
-							onPress={() => navigation.push("PayrollReview")}
-						/>
-					)}
+				</Card>
 
-					{/* Add the expandable Create section */}
-					<ExpandableSettingsSection title="Create">
-						<SettingsItem
-							title="Submission Form"
-							onPress={() =>
-								navigation.push("CompanyCustomForm", {
-									isEventForm: false,
-								})
-							}
-							style={styles.nestedItem}
-						/>
-						<SettingsItem
-							title="Event Forms"
-							onPress={() =>
-								navigation.push("CompanyCustomForm", {
-									isEventForm: true,
-								})
-							}
-							style={styles.nestedItem}
-						/>
-						<SettingsItem
-							title="Checklists"
-							onPress={() => navigation.push("ChecklistCreator")}
-							style={styles.nestedItem}
-						/>
-						<SettingsItem
-							title="Packages"
-							onPress={() => navigation.push("PackageCreator")}
-							style={styles.nestedItem}
-						/>
-						<SettingsItem
-							title="Labels"
-							onPress={() => navigation.push("LabelCreator")}
-							style={styles.nestedItem}
-						/>
-					</ExpandableSettingsSection>
-				</View>
-			) : null}
+				{/* Admin — present on mobile until the web console reaches parity */}
+				{isAdmin && (
+					<>
+						<SectionLabel>Admin</SectionLabel>
+						<Card padding="none">
+							<NavRow
+								title="Company preferences"
+								onPress={() =>
+									navigation.push("CompanyPreferences")
+								}
+							/>
+							<Divider soft inset={16} />
+							<NavRow
+								title="Employee list"
+								onPress={() => navigation.push("EmployeeList")}
+							/>
+							{preferences.enableTimeSheet && (
+								<>
+									<Divider soft inset={16} />
+									<NavRow
+										title="Payroll review"
+										onPress={() =>
+											navigation.push("PayrollReview")
+										}
+									/>
+								</>
+							)}
+							<Divider soft inset={16} />
+							<NavRow
+								title="Create"
+								expanded={createOpen}
+								onPress={() => setCreateOpen((v) => !v)}
+							/>
+							{createOpen && (
+								<View
+									style={{ backgroundColor: theme.Surface2 }}
+								>
+									<NavRow
+										title="Submission form"
+										nested
+										onPress={() =>
+											navigation.push(
+												"CompanyCustomForm",
+												{
+													isEventForm: false,
+												},
+											)
+										}
+									/>
+									<NavRow
+										title="Event forms"
+										nested
+										onPress={() =>
+											navigation.push(
+												"CompanyCustomForm",
+												{
+													isEventForm: true,
+												},
+											)
+										}
+									/>
+									<NavRow
+										title="Checklists"
+										nested
+										onPress={() =>
+											navigation.push("ChecklistCreator")
+										}
+									/>
+									<NavRow
+										title="Packages"
+										nested
+										onPress={() =>
+											navigation.push("PackageCreator")
+										}
+									/>
+									<NavRow
+										title="Labels"
+										nested
+										onPress={() =>
+											navigation.push("LabelCreator")
+										}
+									/>
+								</View>
+							)}
+						</Card>
+					</>
+				)}
 
-			<View style={styles.section}>
-				<Text style={styles.sectionTitle}>ACTIONS</Text>
-				<SettingsItem title="Log Out" isAction onPress={handleLogout} />
-			</View>
-		</View>
+				{/* Actions */}
+				<SectionLabel>Account actions</SectionLabel>
+				<Card padding="none">
+					<TouchableOpacity
+						onPress={handleLogout}
+						activeOpacity={0.7}
+						style={{
+							flexDirection: "row",
+							alignItems: "center",
+							justifyContent: "space-between",
+							paddingHorizontal: 16,
+							paddingVertical: 16,
+						}}
+					>
+						<Text
+							variant="body"
+							weight="medium"
+							style={{ color: Rust[500] }}
+						>
+							Log out
+						</Text>
+					</TouchableOpacity>
+				</Card>
+			</ScrollView>
+		</SafeAreaView>
 	);
 };
 
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: "#fff",
-	},
-	header: {
-		display: "flex",
-		paddingTop: 10,
-		paddingBottom: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: "#e0e0e0",
-		justifyContent: "center",
-	},
-	headerTitle: {
-		fontSize: 20,
-		fontWeight: "bold",
-		textAlign: "center",
-	},
-	section: {
-		marginTop: 24,
-	},
-	sectionTitle: {
-		fontSize: 12,
-		fontWeight: "bold",
-		color: "#888",
-		marginLeft: 16,
-		marginBottom: 8,
-	},
-	nestedItem: {
-		paddingLeft: 16, // Indentation for nested items
-	},
-});
+function SectionLabel({ children }: { children: React.ReactNode }) {
+	return (
+		<Text
+			variant="eyebrow"
+			color="tertiary"
+			style={{
+				fontSize: 11,
+				marginTop: 24,
+				marginBottom: 10,
+				marginLeft: 4,
+			}}
+		>
+			{children}
+		</Text>
+	);
+}
+
+function NavRow({
+	title,
+	onPress,
+	nested = false,
+	expanded,
+}: {
+	title: string;
+	onPress: () => void;
+	nested?: boolean;
+	expanded?: boolean;
+}) {
+	const { theme } = useTheme();
+	return (
+		<TouchableOpacity
+			onPress={onPress}
+			activeOpacity={0.7}
+			style={{
+				flexDirection: "row",
+				alignItems: "center",
+				justifyContent: "space-between",
+				paddingHorizontal: 16,
+				paddingLeft: nested ? 28 : 16,
+				paddingVertical: 15,
+			}}
+		>
+			<Text
+				variant="body"
+				weight={nested ? "normal" : "medium"}
+				color={nested ? "secondary" : "primary"}
+			>
+				{title}
+			</Text>
+			<View
+				style={
+					expanded ? { transform: [{ rotate: "180deg" }] } : undefined
+				}
+			>
+				<Icon
+					name={expanded === undefined ? "chev" : "chevD"}
+					size={18}
+					color={theme.TertiaryText}
+				/>
+			</View>
+		</TouchableOpacity>
+	);
+}
 
 export default Settings;

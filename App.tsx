@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import * as SplashScreen from "expo-splash-screen";
 import { AppNavigator } from "./src/navigation/AppNavigator";
 import { UserProvider, useUser } from "./src/contexts/UserContext";
 import { CompanyProvider, useCompany } from "./src/contexts/CompanyContext";
@@ -6,6 +7,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { UploadManagerProvider } from "./src/contexts/UploadManagerContext";
 import { NotificationProvider } from "./src/contexts/NotificationContext";
+import { NetworkProvider } from "./src/contexts/NetworkContext";
 import { NotifierWrapper } from "react-native-notifier";
 import { NavigationContainer } from "@react-navigation/native";
 import { ThemeProvider } from "./src/contexts/ThemeContext";
@@ -17,6 +19,9 @@ import {
 	checkAppVersion,
 	showUpdateNotification,
 } from "./src/utils/versionUtils";
+import { useAppFonts } from "./src/hooks/useAppFonts";
+
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Component to initialize the company context after user auth
 const CompanyInitializer = () => {
@@ -33,6 +38,14 @@ const CompanyInitializer = () => {
 };
 
 const App: React.FC = () => {
+	const [fontsLoaded, fontsError] = useAppFonts();
+
+	useEffect(() => {
+		if (fontsLoaded || fontsError) {
+			SplashScreen.hideAsync().catch(() => {});
+		}
+	}, [fontsLoaded, fontsError]);
+
 	// Add this effect to check pending navigation periodically
 	useEffect(() => {
 		// Check for pending navigation every 500ms for the first few seconds
@@ -69,30 +82,36 @@ const App: React.FC = () => {
 		initApp();
 	}, []); // Empty dependency array means this runs once on mount
 
+	if (!fontsLoaded && !fontsError) {
+		return null;
+	}
+
 	return (
 		<GestureHandlerRootView style={{ flex: 1 }}>
 			<SafeAreaProvider>
-				<UploadManagerProvider>
-					<UserProvider>
-						<CompanyProvider>
-							<ThemeProvider>
-								<NavigationContainer
-									ref={navigationRef}
-									onReady={() => {
-										pendingNavigation.executeIfReady();
-									}}
-								>
-									<NotificationProvider>
-										<NotifierWrapper>
-											<CompanyInitializer />
-											<AppNavigator />
-										</NotifierWrapper>
-									</NotificationProvider>
-								</NavigationContainer>
-							</ThemeProvider>
-						</CompanyProvider>
-					</UserProvider>
-				</UploadManagerProvider>
+				<NetworkProvider>
+					<UploadManagerProvider>
+						<UserProvider>
+							<CompanyProvider>
+								<ThemeProvider>
+									<NavigationContainer
+										ref={navigationRef}
+										onReady={() => {
+											pendingNavigation.executeIfReady();
+										}}
+									>
+										<NotificationProvider>
+											<NotifierWrapper>
+												<CompanyInitializer />
+												<AppNavigator />
+											</NotifierWrapper>
+										</NotificationProvider>
+									</NavigationContainer>
+								</ThemeProvider>
+							</CompanyProvider>
+						</UserProvider>
+					</UploadManagerProvider>
+				</NetworkProvider>
 			</SafeAreaProvider>
 		</GestureHandlerRootView>
 	);

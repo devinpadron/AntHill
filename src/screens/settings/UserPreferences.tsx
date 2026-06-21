@@ -1,24 +1,25 @@
 import React, { useState, useEffect } from "react";
 import {
 	View,
-	Text,
-	StyleSheet,
 	TouchableOpacity,
 	ScrollView,
 	ActivityIndicator,
 	Alert,
 	Platform,
+	StatusBar,
 } from "react-native";
 import { useUser } from "../../contexts/UserContext";
 import {
 	getUserPreferences,
 	setUserPreferences,
 } from "../../services/userService";
-import {
-	SafeAreaView,
-	useSafeAreaInsets,
-} from "react-native-safe-area-context";
-import Icon from "react-native-vector-icons/MaterialIcons";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Text } from "../../components/ui/Text";
+import { Icon } from "../../components/ui/Icon";
+import { Card } from "../../components/ui/Card";
+import { Divider } from "../../components/ui/Divider";
+import { useTheme } from "../../contexts/ThemeContext";
+import { Cream, Olive } from "../../constants/colors";
 
 // Map app options
 const mapAppOptions =
@@ -33,14 +34,16 @@ const mapAppOptions =
 				{ label: "Waze", value: "waze" },
 			];
 
-// Calendar filter options (for admin users)
+// Calendar filter options (admin-only; removed from mobile once the web
+// console covers admin calendar views).
 const calendarFilterOptions = [
-	{ label: "All Events", value: "all" },
-	{ label: "My Events", value: "my" },
+	{ label: "All events", value: "all" },
+	{ label: "My events", value: "my" },
 ];
 
 const UserPreferences = ({ navigation }) => {
-	const { userId, isAdmin, companyId } = useUser();
+	const { theme, mode } = useTheme();
+	const { userId, isAdmin } = useUser();
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [prefMap, setPrefMap] = useState(
@@ -94,235 +97,219 @@ const UserPreferences = ({ navigation }) => {
 		}
 	};
 
-	// Option selector component
-	const PreferenceOption = ({ option, selected, onSelect }) => (
-		<TouchableOpacity
-			style={[styles.optionItem, selected && styles.selectedOption]}
-			onPress={() => onSelect(option.value)}
-		>
-			<Text
-				style={[
-					styles.optionText,
-					selected && styles.selectedOptionText,
-				]}
-			>
-				{option.label}
-			</Text>
-			{selected && (
-				<Icon
-					name="check-circle"
-					size={24}
-					color="#4CAF50"
-					style={styles.checkIcon}
-				/>
-			)}
-		</TouchableOpacity>
-	);
-
 	if (loading) {
 		return (
-			<SafeAreaView style={styles.loadingContainer}>
-				<ActivityIndicator size="large" color="#0000ff" />
-				<Text style={styles.loadingText}>Loading preferences...</Text>
+			<SafeAreaView
+				style={{
+					flex: 1,
+					backgroundColor: theme.Background,
+					alignItems: "center",
+					justifyContent: "center",
+					gap: 12,
+				}}
+			>
+				<ActivityIndicator size="large" color={theme.Accent} />
+				<Text variant="caption" color="secondary">
+					Loading preferences…
+				</Text>
 			</SafeAreaView>
 		);
 	}
 
-	const insets = useSafeAreaInsets();
-
 	return (
-		<View style={[styles.container, { paddingTop: insets.top }]}>
-			<View style={styles.header}>
-				<View style={styles.headerRow}>
-					<TouchableOpacity
-						style={styles.backButton}
-						onPress={() => navigation.goBack()}
-					>
-						<Icon name="arrow-back" size={24} color="#333" />
-					</TouchableOpacity>
-					<View style={styles.headerTextContainer}>
-						<Text style={styles.headerTitle}>User Preferences</Text>
-						<Text style={styles.headerSubtitle}>
-							Customize your application settings
-						</Text>
-					</View>
+		<SafeAreaView
+			style={{ flex: 1, backgroundColor: theme.Background }}
+			edges={["top", "bottom"]}
+		>
+			<StatusBar
+				barStyle={mode === "dark" ? "light-content" : "dark-content"}
+			/>
+
+			{/* Header */}
+			<View
+				style={{
+					flexDirection: "row",
+					alignItems: "center",
+					gap: 12,
+					paddingHorizontal: 20,
+					paddingTop: 8,
+					paddingBottom: 12,
+				}}
+			>
+				<TouchableOpacity
+					onPress={() => navigation.goBack()}
+					hitSlop={8}
+					style={{
+						width: 38,
+						height: 38,
+						borderRadius: 12,
+						alignItems: "center",
+						justifyContent: "center",
+						backgroundColor: theme.Surface,
+						borderWidth: 0.5,
+						borderColor: theme.BorderColor,
+					}}
+				>
+					<Icon name="chevL" size={18} color={theme.PrimaryText} />
+				</TouchableOpacity>
+				<View style={{ flex: 1 }}>
+					<Text variant="h2" weight="semibold">
+						Preferences
+					</Text>
+					<Text variant="caption" color="tertiary">
+						Customize your app settings
+					</Text>
 				</View>
 			</View>
 
-			<ScrollView>
-				<View style={styles.section}>
-					<Text style={styles.sectionTitle}>
-						Preferred Map Application
-					</Text>
-					<Text style={styles.sectionDescription}>
-						Choose which map app to use when navigating to locations
-					</Text>
-					<View style={styles.optionsContainer}>
-						{mapAppOptions.map((option) => (
-							<PreferenceOption
-								key={option.value}
-								option={option}
-								selected={prefMap === option.value}
-								onSelect={(value) => setPrefMap(value)}
-							/>
-						))}
-					</View>
-				</View>
+			<ScrollView
+				contentContainerStyle={{
+					paddingHorizontal: 20,
+					paddingTop: 8,
+					paddingBottom: 32,
+				}}
+				showsVerticalScrollIndicator={false}
+			>
+				<SectionLabel>Preferred map app</SectionLabel>
+				<Text
+					variant="caption"
+					color="secondary"
+					style={{ marginBottom: 10, marginLeft: 4 }}
+				>
+					Used when navigating to event locations.
+				</Text>
+				<SelectGroup
+					options={mapAppOptions}
+					selected={prefMap}
+					onSelect={setPrefMap}
+				/>
 
 				{isAdmin && (
-					<View style={styles.section}>
-						<Text style={styles.sectionTitle}>
-							Default Calendar Filter
+					<>
+						<SectionLabel>Default calendar filter</SectionLabel>
+						<Text
+							variant="caption"
+							color="secondary"
+							style={{ marginBottom: 10, marginLeft: 4 }}
+						>
+							Which events the calendar shows by default.
 						</Text>
-						<Text style={styles.sectionDescription}>
-							Set your default calendar view filter
-						</Text>
-						<View style={styles.optionsContainer}>
-							{calendarFilterOptions.map((option) => (
-								<PreferenceOption
-									key={option.value}
-									option={option}
-									selected={prefFilter === option.value}
-									onSelect={(value) => setPrefFilter(value)}
-								/>
-							))}
-						</View>
-					</View>
+						<SelectGroup
+							options={calendarFilterOptions}
+							selected={prefFilter}
+							onSelect={setPrefFilter}
+						/>
+					</>
 				)}
 			</ScrollView>
 
-			<View style={styles.footer}>
+			{/* Footer */}
+			<View
+				style={{
+					paddingHorizontal: 20,
+					paddingTop: 12,
+					paddingBottom: 8,
+				}}
+			>
 				<TouchableOpacity
-					style={styles.saveButton}
 					onPress={savePreferences}
 					disabled={saving}
+					activeOpacity={0.9}
+					style={{
+						height: 56,
+						borderRadius: 18,
+						backgroundColor: Olive[600],
+						alignItems: "center",
+						justifyContent: "center",
+						opacity: saving ? 0.7 : 1,
+						shadowColor: Olive[600],
+						shadowOffset: { width: 0, height: 8 },
+						shadowOpacity: 0.18,
+						shadowRadius: 20,
+						elevation: 6,
+					}}
 				>
 					{saving ? (
-						<ActivityIndicator size="small" color="#ffffff" />
+						<ActivityIndicator color={Cream[50]} />
 					) : (
-						<Text style={styles.saveButtonText}>
-							Save Preferences
+						<Text style={{ color: Cream[50] }} weight="bold">
+							Save preferences
 						</Text>
 					)}
 				</TouchableOpacity>
 			</View>
-		</View>
+		</SafeAreaView>
 	);
 };
 
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: "#f5f5f5",
-	},
-	loadingContainer: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-		backgroundColor: "#f5f5f5",
-	},
-	loadingText: {
-		marginTop: 10,
-		fontSize: 16,
-		color: "#666",
-	},
-	header: {
-		padding: 15,
-		backgroundColor: "#fff",
-		borderBottomWidth: 1,
-		borderBottomColor: "#e0e0e0",
-	},
-	headerRow: {
-		flexDirection: "row",
-		alignItems: "center",
-	},
-	backButton: {
-		padding: 5,
-		marginRight: 10,
-	},
-	headerTextContainer: {
-		flex: 1,
-	},
-	headerTitle: {
-		fontSize: 24,
-		fontWeight: "bold",
-		color: "#333",
-	},
-	headerSubtitle: {
-		fontSize: 16,
-		color: "#666",
-		marginTop: 5,
-	},
-	section: {
-		backgroundColor: "#fff",
-		marginTop: 15,
-		padding: 20,
-		borderRadius: 8,
-		marginHorizontal: 15,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 3,
-		elevation: 2,
-	},
-	sectionTitle: {
-		fontSize: 18,
-		fontWeight: "bold",
-		color: "#333",
-	},
-	sectionDescription: {
-		fontSize: 14,
-		color: "#666",
-		marginTop: 5,
-		marginBottom: 15,
-	},
-	optionsContainer: {
-		marginTop: 10,
-	},
-	optionItem: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		padding: 15,
-		borderRadius: 8,
-		backgroundColor: "#f9f9f9",
-		marginBottom: 10,
-		borderWidth: 1,
-		borderColor: "#e0e0e0",
-	},
-	selectedOption: {
-		backgroundColor: "#e8f5e9",
-		borderColor: "#4CAF50",
-	},
-	optionText: {
-		fontSize: 16,
-		color: "#333",
-	},
-	selectedOptionText: {
-		fontWeight: "bold",
-		color: "#1B5E20",
-	},
-	checkIcon: {
-		marginLeft: 10,
-	},
-	footer: {
-		padding: 15,
-		backgroundColor: "#fff",
-		borderTopWidth: 1,
-		borderTopColor: "#e0e0e0",
-	},
-	saveButton: {
-		backgroundColor: "#2196F3",
-		borderRadius: 8,
-		padding: 15,
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	saveButtonText: {
-		color: "#fff",
-		fontSize: 16,
-		fontWeight: "bold",
-	},
-});
+function SectionLabel({ children }: { children: React.ReactNode }) {
+	return (
+		<Text
+			variant="eyebrow"
+			color="tertiary"
+			style={{
+				fontSize: 11,
+				marginTop: 24,
+				marginBottom: 6,
+				marginLeft: 4,
+			}}
+		>
+			{children}
+		</Text>
+	);
+}
+
+function SelectGroup({
+	options,
+	selected,
+	onSelect,
+}: {
+	options: { label: string; value: string }[];
+	selected: string;
+	onSelect: (value: string) => void;
+}) {
+	const { theme } = useTheme();
+	return (
+		<Card padding="none">
+			{options.map((option, index) => {
+				const isSelected = selected === option.value;
+				return (
+					<View key={option.value}>
+						{index > 0 && <Divider soft inset={16} />}
+						<TouchableOpacity
+							onPress={() => onSelect(option.value)}
+							activeOpacity={0.7}
+							style={{
+								flexDirection: "row",
+								alignItems: "center",
+								justifyContent: "space-between",
+								paddingHorizontal: 16,
+								paddingVertical: 16,
+								backgroundColor: isSelected
+									? theme.AccentSoft
+									: "transparent",
+							}}
+						>
+							<Text
+								variant="body"
+								color={isSelected ? "accent" : "primary"}
+								weight={isSelected ? "semibold" : "normal"}
+							>
+								{option.label}
+							</Text>
+							{isSelected && (
+								<Icon
+									name="check"
+									size={20}
+									color={theme.AccentStrong}
+								/>
+							)}
+						</TouchableOpacity>
+					</View>
+				);
+			})}
+		</Card>
+	);
+}
 
 export default UserPreferences;

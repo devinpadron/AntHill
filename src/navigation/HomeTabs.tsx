@@ -1,87 +1,57 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { Ionicons } from "@expo/vector-icons";
+import TodayScreen from "../screens/today/TodayScreen";
 import CalendarStack from "./CalendarStack";
 import SettingStack from "./SettingStack";
 import ClockStack from "./ClockStack";
 import AvailabilityStack from "./AvailabilityStack";
 import { useCompany } from "../contexts/CompanyContext";
+import { TabBar } from "../components/ui/TabBar";
 
 const Tab = createBottomTabNavigator();
 
 const HomeTabs = () => {
 	const { preferences } = useCompany();
 
-	useEffect(() => {}, [preferences]);
-
 	return (
 		<Tab.Navigator
+			initialRouteName="Today"
+			tabBar={(props) => <TabBar {...props} />}
 			screenOptions={{
-				tabBarShowLabel: false, // Hide the labels
-				tabBarStyle: {
-					paddingVertical: 5, // Optional: add some padding
-				},
+				headerShown: false,
+				tabBarShowLabel: false,
 			}}
 		>
 			<Tab.Screen
+				name="Today"
+				component={TodayScreen}
+				options={{ tabBarLabel: "Today" }}
+			/>
+			<Tab.Screen
 				name="Calendar"
 				component={CalendarStack}
-				options={{
-					headerShown: false,
-					tabBarIcon: ({ focused, color, size }) => (
-						<Ionicons
-							name={focused ? "calendar" : "calendar-outline"}
-							size={size}
-							color={color}
-						/>
-					),
-				}}
+				options={{ tabBarLabel: "Calendar" }}
 			/>
 			{preferences.enableAvailability && (
 				<Tab.Screen
 					name="Availability"
 					component={AvailabilityStack}
-					options={{
-						headerShown: false,
-						tabBarIcon: ({ focused, color, size }) => (
-							<Ionicons
-								name={focused ? "people" : "people-outline"}
-								size={size}
-								color={color}
-							/>
-						),
-					}}
+					options={{ tabBarLabel: "Shifts" }}
 				/>
 			)}
 			{preferences.enableTimeSheet && (
 				<Tab.Screen
 					name="Clock"
 					component={ClockStack}
-					options={{
-						headerShown: false,
-						tabBarIcon: ({ focused, color, size }) => (
-							<Ionicons
-								name={focused ? "time" : "time-outline"}
-								size={size}
-								color={color}
-							/>
-						),
-					}}
+					options={{ tabBarLabel: "Clock" }}
 				/>
 			)}
 			<Tab.Screen
 				name="Settings"
 				component={SettingStack}
 				options={{
-					headerShown: false,
+					tabBarLabel: "Me",
 					unmountOnBlur: false,
-					tabBarIcon: ({ focused, color, size }) => (
-						<Ionicons
-							name={focused ? "settings" : "settings-outline"}
-							size={size}
-							color={color}
-						/>
-					),
 				}}
 			/>
 		</Tab.Navigator>
