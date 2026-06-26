@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 
@@ -119,7 +120,18 @@ export default function EmployeesPage() {
 								}}
 							>
 								<Td>
-									<strong>{r.name}</strong>
+									<Link
+										href={`/employees/${r.id}`}
+										style={{
+											fontWeight: 700,
+											textDecoration: "underline",
+											textDecorationColor:
+												"var(--border)",
+											textUnderlineOffset: 3,
+										}}
+									>
+										{r.name}
+									</Link>
 								</Td>
 								<Td>
 									<span

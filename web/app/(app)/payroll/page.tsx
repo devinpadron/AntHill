@@ -106,6 +106,40 @@ export default function PayrollPage() {
 		else await load();
 	}
 
+	function exportCsv() {
+		const rows =
+			selected.size > 0
+				? (entries ?? []).filter((e) => selected.has(e.id))
+				: (entries ?? []);
+		const header = [
+			"Employee",
+			"Date",
+			"Clock in",
+			"Clock out",
+			"Hours",
+			"Status",
+		];
+		const body = rows.map((e) => [
+			e.name,
+			new Date(e.clock_in_at).toLocaleDateString(),
+			new Date(e.clock_in_at).toLocaleTimeString(),
+			e.clock_out_at ? new Date(e.clock_out_at).toLocaleTimeString() : "",
+			hoursFromSeconds(e.duration_seconds).toFixed(2),
+			e.status,
+		]);
+		const csv = [header, ...body]
+			.map((r) =>
+				r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","),
+			)
+			.join("\n");
+		const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = `payroll-${new Date().toISOString().slice(0, 10)}.csv`;
+		a.click();
+		URL.revokeObjectURL(url);
+	}
+
 	return (
 		<div>
 			<div
@@ -161,6 +195,13 @@ export default function PayrollPage() {
 						: `${entries?.length ?? 0} entr${entries?.length === 1 ? "y" : "ies"}`}
 				</span>
 				<div style={{ flex: 1 }} />
+				<button
+					className="btn"
+					disabled={(entries?.length ?? 0) === 0}
+					onClick={exportCsv}
+				>
+					Export CSV
+				</button>
 				<button
 					className="btn btn--accent"
 					disabled={busy || selected.size === 0}
