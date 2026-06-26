@@ -31,6 +31,7 @@ export default function SchedulePage() {
 	const [roster, setRoster] = useState<RosterMember[]>([]);
 	const [busy, setBusy] = useState(false);
 	const [editorFor, setEditorFor] = useState<string | "new" | null>(null);
+	const [dropTarget, setDropTarget] = useState<string | null>(null);
 
 	const load = useCallback(async () => {
 		if (!company) return;
@@ -154,6 +155,44 @@ export default function SchedulePage() {
 				/>
 			)}
 
+			{roster.length > 0 && (
+				<div
+					className="card"
+					style={{
+						padding: 14,
+						marginBottom: 20,
+						display: "flex",
+						alignItems: "center",
+						gap: 10,
+						flexWrap: "wrap",
+					}}
+				>
+					<span className="eyebrow" style={{ marginRight: 4 }}>
+						Drag to assign →
+					</span>
+					{roster.map((r) => (
+						<span
+							key={r.id}
+							draggable
+							onDragStart={(ev) =>
+								ev.dataTransfer.setData("text/plain", r.id)
+							}
+							style={{
+								cursor: "grab",
+								padding: "6px 12px",
+								borderRadius: 999,
+								border: "1px solid var(--border)",
+								background: "var(--surface-2)",
+								fontSize: 13,
+								userSelect: "none",
+							}}
+						>
+							{r.name}
+						</span>
+					))}
+				</div>
+			)}
+
 			{events === null && (
 				<p style={{ color: "var(--text-secondary)" }}>Loading…</p>
 			)}
@@ -194,11 +233,40 @@ export default function SchedulePage() {
 									<div
 										key={e.id}
 										className="card"
+										onDragOver={(ev) => {
+											ev.preventDefault();
+											if (dropTarget !== e.id)
+												setDropTarget(e.id);
+										}}
+										onDragLeave={() =>
+											setDropTarget((t) =>
+												t === e.id ? null : t,
+											)
+										}
+										onDrop={(ev) => {
+											ev.preventDefault();
+											setDropTarget(null);
+											const uid =
+												ev.dataTransfer.getData(
+													"text/plain",
+												);
+											if (uid && !assignedIds.has(uid))
+												assign(e.id, uid);
+										}}
 										style={{
 											padding: 18,
 											display: "flex",
 											gap: 18,
 											borderLeft: `3px solid ${e.label?.color ?? "var(--olive-500)"}`,
+											outline:
+												dropTarget === e.id
+													? "2px solid var(--olive-500)"
+													: "none",
+											outlineOffset: 2,
+											background:
+												dropTarget === e.id
+													? "var(--accent-soft)"
+													: undefined,
 										}}
 									>
 										<div style={{ minWidth: 150 }}>
