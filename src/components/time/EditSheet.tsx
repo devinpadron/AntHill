@@ -72,7 +72,6 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 		const { uploadFiles, deleteFiles, uploadProgress } = useUploadManager();
 		const customForm = timeEntry?.generalForm || null;
 		const eventForm = timeEntry?.eventForm || null;
-		const { isAdmin } = useUser();
 
 		const [filesToUpload, setFilesToUpload] = useState<{
 			[fieldId: string]: AttachmentItem[];
@@ -312,7 +311,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 
 		// Handle save with all updated values
 		const handleSaveChanges = async () => {
-			if (!editChangeSummary.trim() && !isAdmin) {
+			if (!editChangeSummary.trim()) {
 				Alert.alert("Required", "Please provide a summary of changes");
 				return;
 			}
@@ -329,16 +328,14 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 			const pauseDuration = calculatePauseDuration();
 
 			// Validate form responses
-			if (!isAdmin) {
-				const isFormValid = validateFormResponses();
-				const isEventFormValid = validateEventFormResponses();
-				if (!isFormValid || !isEventFormValid) {
-					Alert.alert(
-						"Required Fields",
-						"Please fill out all required fields",
-					);
-					return;
-				}
+			const isFormValid = validateFormResponses();
+			const isEventFormValid = validateEventFormResponses();
+			if (!isFormValid || !isEventFormValid) {
+				Alert.alert(
+					"Required Fields",
+					"Please fill out all required fields",
+				);
+				return;
 			}
 
 			try {
@@ -919,9 +916,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 								]}
 							>
 								Change Summary{" "}
-								{!isAdmin && (
-									<Text style={styles.requiredMark}>*</Text>
-								)}
+								<Text style={styles.requiredMark}>*</Text>
 							</Text>
 							<Text style={styles.summarySubtitle}>
 								Explain what changes were made and why

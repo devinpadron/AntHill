@@ -11,7 +11,6 @@ export { default as EditSheet } from "./EditSheet";
 export { default as ExportSheet } from "./ExportSheet";
 export { default as FieldTotalsCard } from "./FieldTotalsCard";
 export { default as FormFieldValue } from "./FormFieldValue";
-export { default as ManagerActions } from "./ManagerActions";
 export { default as TimeDetailCard } from "./TimeDetailCard";
 export { default as TimeEntryCard } from "./TimeEntryCard";
 export { default as TimeEntrySummary } from "./TimeEntrySummary";

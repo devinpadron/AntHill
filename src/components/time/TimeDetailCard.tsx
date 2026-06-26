@@ -22,9 +22,6 @@ import { useCompany } from "../../contexts/CompanyContext";
 
 const TimeDetailCard = ({
 	entry,
-	isSelected,
-	isAdmin,
-	onToggleSelection,
 	onEditEntry,
 	attachmentMap,
 	connectedEvents,
@@ -298,22 +295,6 @@ const TimeDetailCard = ({
 		<View style={styles.timeEntryCard}>
 			<View style={styles.timeEntryHeader}>
 				<View style={styles.headerLeftSection}>
-					{isAdmin && (
-						<TouchableOpacity
-							style={styles.selectionCheckbox}
-							onPress={() => onToggleSelection(entry.id)}
-						>
-							<Icon
-								name={
-									isSelected
-										? "checkbox-marked"
-										: "checkbox-blank-outline"
-								}
-								size={24}
-								color="#007AFF"
-							/>
-						</TouchableOpacity>
-					)}
 					<Text style={styles.dateTimeText}>
 						{format(
 							new Date(entry.clockInTime),
@@ -475,29 +456,18 @@ const TimeDetailCard = ({
 																	}
 																</Text>
 
-																{field.quickEditPayroll &&
-																isAdmin ? (
-																	renderEditableField(
-																		{
-																			...field,
-																			id: fieldKey,
-																		},
-																		response,
-																	)
-																) : (
-																	<FormFieldValue
-																		field={
-																			field
-																		}
-																		response={
-																			response
-																		}
-																		attachments={
-																			connection.attachments ||
-																			[]
-																		}
-																	/>
-																)}
+																<FormFieldValue
+																	field={
+																		field
+																	}
+																	response={
+																		response
+																	}
+																	attachments={
+																		connection.attachments ||
+																		[]
+																	}
+																/>
 															</View>
 														);
 													},
@@ -530,17 +500,13 @@ const TimeDetailCard = ({
 										{field.label}
 									</Text>
 
-									{field.quickEditPayroll && isAdmin ? (
-										renderEditableField(field, response)
-									) : (
-										<FormFieldValue
-											field={field}
-											response={response}
-											attachments={
-												attachmentMap[entry.id] || []
-											}
-										/>
-									)}
+									<FormFieldValue
+										field={field}
+										response={response}
+										attachments={
+											attachmentMap[entry.id] || []
+										}
+									/>
 								</View>
 							);
 						})}
@@ -571,7 +537,7 @@ const TimeDetailCard = ({
 
 				{/* Actions */}
 				{!(entry.status === "active" || entry.status === "paused") &&
-				(isAdmin || preferences?.allowUserEventEditing) ? (
+				preferences?.allowUserEventEditing ? (
 					<View style={styles.entryActions}>
 						<TouchableOpacity
 							style={styles.editButton}

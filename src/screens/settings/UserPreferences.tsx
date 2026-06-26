@@ -43,7 +43,7 @@ const calendarFilterOptions = [
 
 const UserPreferences = ({ navigation }) => {
 	const { theme, mode } = useTheme();
-	const { userId, isAdmin } = useUser();
+	const { userId } = useUser();
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [prefMap, setPrefMap] = useState(
@@ -82,7 +82,7 @@ const UserPreferences = ({ navigation }) => {
 	const savePreferences = async () => {
 		const preferences = {
 			preferredMapApp: prefMap,
-			defaultCalendarFilter: isAdmin ? prefFilter : "my",
+			defaultCalendarFilter: "my",
 		};
 		try {
 			setSaving(true);
@@ -183,24 +183,6 @@ const UserPreferences = ({ navigation }) => {
 					selected={prefMap}
 					onSelect={setPrefMap}
 				/>
-
-				{isAdmin && (
-					<>
-						<SectionLabel>Default calendar filter</SectionLabel>
-						<Text
-							variant="caption"
-							color="secondary"
-							style={{ marginBottom: 10, marginLeft: 4 }}
-						>
-							Which events the calendar shows by default.
-						</Text>
-						<SelectGroup
-							options={calendarFilterOptions}
-							selected={prefFilter}
-							onSelect={setPrefFilter}
-						/>
-					</>
-				)}
 			</ScrollView>
 
 			{/* Footer */}

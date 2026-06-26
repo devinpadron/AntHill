@@ -7,7 +7,6 @@ import { useTheme } from "../../contexts/ThemeContext";
 
 interface TimeEntryDetailsHeaderProps {
 	entryCount: number;
-	isAdmin: boolean;
 	onBack: () => void;
 	onExport?: () => void;
 }
@@ -22,7 +21,6 @@ interface TimeEntryDetailsHeaderProps {
  */
 export const TimeEntryDetailsHeader: React.FC<TimeEntryDetailsHeaderProps> = ({
 	entryCount,
-	isAdmin,
 	onBack,
 	onExport,
 }) => {
@@ -45,7 +43,7 @@ export const TimeEntryDetailsHeader: React.FC<TimeEntryDetailsHeaderProps> = ({
 			<Text variant="h3" color="primary" style={styles.headerTitle}>
 				{entryCount > 1 ? "Time Entries" : "Time Entry"}
 			</Text>
-			{isAdmin && onExport ? (
+			{onExport ? (
 				<TouchableOpacity onPress={onExport}>
 					<Icon
 						name="export-variant"

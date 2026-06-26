@@ -9,12 +9,10 @@ import auth from "@react-native-firebase/auth";
 import { Alert } from "react-native";
 import {
 	subscribeCurrentUser,
-	subscribeUserPrivilege,
 	subscribeUserPreferences,
 } from "../services/userService";
 import { signOut } from "../services/authService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Role } from "../types";
 import messaging from "@react-native-firebase/messaging";
 import { clearNotificationToken } from "../services/notificationService";
 
@@ -22,8 +20,6 @@ import { clearNotificationToken } from "../services/notificationService";
 type UserContextType = {
 	user: any | null;
 	userId: string;
-	userPrivilege: string;
-	isAdmin: boolean | null;
 	isLoading: boolean;
 	loggedIn: boolean;
 	companyId: string | undefined;
@@ -36,8 +32,6 @@ type UserContextType = {
 const UserContext = createContext<UserContextType>({
 	user: null,
 	userId: "",
-	userPrivilege: "",
-	isAdmin: null,
 	isLoading: true,
 	loggedIn: false,
 	companyId: undefined,
@@ -50,12 +44,10 @@ const UserContext = createContext<UserContextType>({
 export const UserProvider = ({ children }: { children: ReactNode }) => {
 	const [user, setUser] = useState<any | null>(null);
 	const [userId, setUserId] = useState("");
-	const [userPrivilege, setUserPrivilege] = useState("");
 	const [isLoading, setIsLoading] = useState(true);
 	const [loggedIn, setLoggedIn] = useState(false);
 	const [hasShownAlert, setHasShownAlert] = useState(false);
 	const [initializing, setInitializing] = useState(true);
-	const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 	const [companyId, setCompanyId] = useState<string | undefined>(undefined);
 	const [settings, setSettings] = useState<any>(null);
 
@@ -164,7 +156,6 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 					setLoggedIn(false);
 					setUser(null);
 					setUserId("");
-					setUserPrivilege("");
 					clearAuthState();
 					setIsLoading(false);
 				}
@@ -229,23 +220,6 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 		};
 	}, [userId, loggedIn]);
 
-	useEffect(() => {
-		const privSubscriber = subscribeUserPrivilege(
-			userId,
-			companyId,
-			async (userPrivilegeSnapshot) => {
-				if (userPrivilegeSnapshot.exists) {
-					const privilege = userPrivilegeSnapshot.data().role;
-					setUserPrivilege(privilege);
-					setIsAdmin(
-						privilege === Role.MANAGER || privilege === Role.OWNER,
-					);
-				}
-			},
-		);
-		privSubscriber;
-	}, [user, userId, companyId]);
-
 	const logout = async () => {
 		console.log("Logging out user:", userId);
 		try {
@@ -272,8 +246,6 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 	const value = {
 		user,
 		userId,
-		userPrivilege,
-		isAdmin,
 		isLoading,
 		loggedIn,
 		companyId,

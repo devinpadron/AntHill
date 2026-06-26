@@ -8,7 +8,6 @@ import {
 	FieldTotalsCard,
 	ExportSheet,
 	EditSheet,
-	ManagerActions,
 	TimeDetailCard,
 	TimeEntrySummary,
 	TimeEntryDetailsHeader,
@@ -32,7 +31,7 @@ const TimeEntryDetails = ({ route, navigation }) => {
 	const { entryId, userId: passedUserId } = route.params;
 	const entryIdArray = Array.isArray(entryId) ? entryId : [entryId];
 
-	const { userId: currentUserId, companyId, isAdmin } = useUser();
+	const { userId: currentUserId, companyId } = useUser();
 	const { theme } = useTheme();
 
 	// Custom hooks for data management
@@ -185,7 +184,6 @@ const TimeEntryDetails = ({ route, navigation }) => {
 			{/* Header */}
 			<TimeEntryDetailsHeader
 				entryCount={timeEntries.length}
-				isAdmin={isAdmin}
 				onBack={() => navigation.goBack()}
 				onExport={() => setExportModalVisible(true)}
 			/>
@@ -211,27 +209,11 @@ const TimeEntryDetails = ({ route, navigation }) => {
 					<FieldTotalsCard fieldTotals={fieldTotals} />
 				)}
 
-				{/* Manager Actions */}
-				{isAdmin && timeEntries.length > 0 && (
-					<ManagerActions
-						selectAll={selectAll}
-						toggleSelectAll={toggleSelectAll}
-						selectedCount={getSelectedEntryIds().length}
-						totalCount={timeEntries.length}
-						isApproving={isApproving}
-						onApprove={() => approveEntries(getSelectedEntryIds())}
-						onReject={() => rejectEntries(getSelectedEntryIds())}
-					/>
-				)}
-
 				{/* Time Entries List */}
 				{timeEntries.map((entry) => (
 					<TimeDetailCard
 						key={entry.id}
 						entry={entry}
-						isSelected={selectedEntries[entry.id]}
-						isAdmin={isAdmin}
-						onToggleSelection={toggleEntrySelection}
 						onEditEntry={handleEditEntry}
 						attachmentMap={attachmentMap}
 						connectedEvents={connectedEvents[entry.id] || []}

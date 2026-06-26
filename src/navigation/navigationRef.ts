@@ -5,7 +5,6 @@ export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 export type RootStackParamList = {
 	Details: { eventId: string };
 	TimeEntryDetails: { entryId: string[] | string; userId: string };
-	EmployeeList: {};
 	// Add other screens as needed
 };
 

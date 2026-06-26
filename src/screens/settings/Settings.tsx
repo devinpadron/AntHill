@@ -20,9 +20,8 @@ import { Rust } from "../../constants/colors";
 
 const Settings = ({ navigation }: any) => {
 	const { theme, mode } = useTheme();
-	const { isAdmin, logout } = useUser();
-	const { companyData, preferences, isLoading } = useCompany();
-	const [createOpen, setCreateOpen] = useState(false);
+	const { logout } = useUser();
+	const { companyData, isLoading } = useCompany();
 
 	const handleLogout = () => {
 		Alert.alert("Log out", "Are you sure you want to log out?", [
@@ -96,9 +95,7 @@ const Settings = ({ navigation }: any) => {
 								{companyData?.name || "—"}
 							</Text>
 						</View>
-						<Pill tone={isAdmin ? "olive" : "neutral"}>
-							{isAdmin ? "Manager" : "Employee"}
-						</Pill>
+						<Pill tone="neutral">Employee</Pill>
 					</View>
 				</Card>
 
@@ -115,94 +112,6 @@ const Settings = ({ navigation }: any) => {
 						onPress={() => navigation.push("UserPreferences")}
 					/>
 				</Card>
-
-				{/* Admin — present on mobile until the web console reaches parity */}
-				{isAdmin && (
-					<>
-						<SectionLabel>Admin</SectionLabel>
-						<Card padding="none">
-							<NavRow
-								title="Company preferences"
-								onPress={() =>
-									navigation.push("CompanyPreferences")
-								}
-							/>
-							<Divider soft inset={16} />
-							<NavRow
-								title="Employee list"
-								onPress={() => navigation.push("EmployeeList")}
-							/>
-							{preferences.enableTimeSheet && (
-								<>
-									<Divider soft inset={16} />
-									<NavRow
-										title="Payroll review"
-										onPress={() =>
-											navigation.push("PayrollReview")
-										}
-									/>
-								</>
-							)}
-							<Divider soft inset={16} />
-							<NavRow
-								title="Create"
-								expanded={createOpen}
-								onPress={() => setCreateOpen((v) => !v)}
-							/>
-							{createOpen && (
-								<View
-									style={{ backgroundColor: theme.Surface2 }}
-								>
-									<NavRow
-										title="Submission form"
-										nested
-										onPress={() =>
-											navigation.push(
-												"CompanyCustomForm",
-												{
-													isEventForm: false,
-												},
-											)
-										}
-									/>
-									<NavRow
-										title="Event forms"
-										nested
-										onPress={() =>
-											navigation.push(
-												"CompanyCustomForm",
-												{
-													isEventForm: true,
-												},
-											)
-										}
-									/>
-									<NavRow
-										title="Checklists"
-										nested
-										onPress={() =>
-											navigation.push("ChecklistCreator")
-										}
-									/>
-									<NavRow
-										title="Packages"
-										nested
-										onPress={() =>
-											navigation.push("PackageCreator")
-										}
-									/>
-									<NavRow
-										title="Labels"
-										nested
-										onPress={() =>
-											navigation.push("LabelCreator")
-										}
-									/>
-								</View>
-							)}
-						</Card>
-					</>
-				)}
 
 				{/* Actions */}
 				<SectionLabel>Account actions</SectionLabel>

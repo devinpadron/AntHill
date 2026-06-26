@@ -29,7 +29,7 @@ type ViewMode = "Month" | "Week" | "List";
 
 const CalendarScreen = ({ navigation }: { navigation: any }) => {
 	const { theme } = useTheme();
-	const { user, isAdmin } = useUser();
+	const { user } = useUser();
 	const { companyData } = useCompany();
 	const { isConnected } = useNetwork();
 	const companyId = companyData?.id;
@@ -350,39 +350,6 @@ const CalendarScreen = ({ navigation }: { navigation: any }) => {
 
 				<View style={{ height: 24 }} />
 			</ScrollView>
-
-			{/* FAB — admins only */}
-			{isAdmin && (
-				<TouchableOpacity
-					onPress={() =>
-						navigation.navigate("EditEvent", { event: null })
-					}
-					activeOpacity={0.9}
-					style={{
-						position: "absolute",
-						right: 22,
-						bottom: 100,
-						width: 52,
-						height: 52,
-						borderRadius: 26,
-						backgroundColor: Olive[600],
-						alignItems: "center",
-						justifyContent: "center",
-						shadowColor: Olive[600],
-						shadowOffset: { width: 0, height: 8 },
-						shadowOpacity: 0.32,
-						shadowRadius: 22,
-						elevation: 10,
-					}}
-				>
-					<Icon
-						name="plus"
-						size={22}
-						color={Cream[50]}
-						strokeWidth={2}
-					/>
-				</TouchableOpacity>
-			)}
 
 			<CompanySwitcherSheet
 				visible={companySwitcherOpen}
