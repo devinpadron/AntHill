@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { fmtDate, fmtTimeRange } from "@/lib/format";
+import { EventEditor } from "@/components/EventEditor";
 
 type Worker = { userId: string; name: string; status: string };
 type Event = {
@@ -29,6 +30,7 @@ export default function SchedulePage() {
 	const [events, setEvents] = useState<Event[] | null>(null);
 	const [roster, setRoster] = useState<RosterMember[]>([]);
 	const [busy, setBusy] = useState(false);
+	const [editorFor, setEditorFor] = useState<string | "new" | null>(null);
 
 	const load = useCallback(async () => {
 		if (!company) return;
@@ -111,19 +113,46 @@ export default function SchedulePage() {
 
 	return (
 		<div>
-			<div style={{ marginBottom: 24 }}>
-				<div className="eyebrow">Scheduling</div>
-				<h1
-					style={{
-						fontFamily: "var(--font-serif)",
-						fontSize: 34,
-						fontWeight: 400,
-						margin: "4px 0 0",
-					}}
+			<div
+				style={{
+					display: "flex",
+					alignItems: "flex-end",
+					justifyContent: "space-between",
+					marginBottom: 24,
+				}}
+			>
+				<div>
+					<div className="eyebrow">Scheduling</div>
+					<h1
+						style={{
+							fontFamily: "var(--font-serif)",
+							fontSize: 34,
+							fontWeight: 400,
+							margin: "4px 0 0",
+						}}
+					>
+						Schedule
+					</h1>
+				</div>
+				<button
+					className="btn btn--accent"
+					onClick={() => setEditorFor("new")}
 				>
-					Schedule
-				</h1>
+					+ New event
+				</button>
 			</div>
+
+			{editorFor && company && (
+				<EventEditor
+					companyId={company.companyId}
+					eventId={editorFor === "new" ? null : editorFor}
+					onClose={() => setEditorFor(null)}
+					onSaved={() => {
+						setEditorFor(null);
+						load();
+					}}
+				/>
+			)}
 
 			{events === null && (
 				<p style={{ color: "var(--text-secondary)" }}>Loading…</p>
@@ -219,6 +248,22 @@ export default function SchedulePage() {
 													{e.label.name}
 												</span>
 											)}
+											<div>
+												<button
+													className="btn"
+													style={{
+														height: 28,
+														padding: "0 10px",
+														marginTop: 12,
+														fontSize: 12,
+													}}
+													onClick={() =>
+														setEditorFor(e.id)
+													}
+												>
+													Edit
+												</button>
+											</div>
 										</div>
 
 										<div style={{ flex: 1 }}>
