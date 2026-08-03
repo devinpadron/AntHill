@@ -11,11 +11,7 @@ import {
 } from "react-native";
 
 export type ButtonVariant =
-	| "primary"
-	| "secondary"
-	| "outline"
-	| "text"
-	| "destructive";
+	"primary" | "secondary" | "outline" | "text" | "destructive";
 export type ButtonSize = "small" | "medium" | "large";
 
 type ButtonProps = {

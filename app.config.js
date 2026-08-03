@@ -2,7 +2,7 @@ export default {
 	expo: {
 		name: "AntHill",
 		slug: "AntHill",
-		version: "1.0.98",
+		version: "1.0.99",
 		orientation: "portrait",
 		userInterfaceStyle: "light",
 		assetBundlePatterns: ["**/*"],

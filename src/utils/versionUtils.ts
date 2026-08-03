@@ -1,118 +1,79 @@
 import { compareVersions } from "compare-versions";
 import * as AppConfig from "../../app.config";
-import db from "../constants/firestore";
-import { Alert, Linking, Platform } from "react-native";
+import { Linking, Platform } from "react-native";
+import { getRequiredVersion } from "../services/appConfigService";
 
-// App store URLs - replace with your actual app IDs
-const APP_STORE_ID = "6739265058"; // Your iOS App Store ID
-const PLAY_STORE_ID = "YOUR_PACKAGE_NAME"; // Your Android package name
+const APP_STORE_ID = "6739265058";
+const PLAY_STORE_ID = "com.anthillapp.anthill";
 
 /**
  * Gets the current app version
  * @returns The current app version string
  */
 export const getCurrentAppVersion = (): string => {
-	return AppConfig.default.expo.version; // Replace with actual implementation
+	return AppConfig.default.expo.version;
 };
 
 /**
  * Fetches the required version from the database
- * @returns Promise resolving to the required version string
+ * @returns Promise resolving to the required version string, or null if unknown
  */
-export const fetchRequiredVersion = async (): Promise<string> => {
-	try {
-		const data = await db.collection("AppData").doc("Data").get();
-		return data.data()?.required_version;
-	} catch (error) {
-		console.error("Failed to fetch required version:", error);
-		// Return current version to avoid false update prompts on error
-		return getCurrentAppVersion();
-	}
+export const fetchRequiredVersion = async (): Promise<string | null> => {
+	return getRequiredVersion();
 };
 
 /**
- * Checks if the app needs to be updated
- * @returns Promise resolving to an object with update status and versions
+ * Checks if the app needs to be updated.
+ *
+ * Fails open: when the required version cannot be read or does not parse, this
+ * reports no update required. A Firestore outage must not brick the app.
  */
 export const checkAppVersion = async (): Promise<{
 	updateRequired: boolean;
 	currentVersion: string;
-	requiredVersion: string;
+	requiredVersion: string | null;
 }> => {
 	const currentVersion = getCurrentAppVersion();
 	const requiredVersion = await fetchRequiredVersion();
 
-	// Compare versions (returns -1 if current < required, 0 if equal, 1 if current > required)
-	const updateRequired = compareVersions(currentVersion, requiredVersion) < 0;
+	if (!requiredVersion) {
+		return { updateRequired: false, currentVersion, requiredVersion };
+	}
 
-	return {
-		updateRequired,
-		currentVersion,
-		requiredVersion,
-	};
+	let updateRequired = false;
+	try {
+		updateRequired = compareVersions(currentVersion, requiredVersion) < 0;
+	} catch (e) {
+		console.error("Error comparing app versions", e);
+	}
+
+	return { updateRequired, currentVersion, requiredVersion };
 };
 
 /**
- * Shows update notification to the user and redirects to store when confirmed
- * @param currentVersion Current app version
- * @param requiredVersion Required app version
+ * Opens this app's listing in the platform app store.
  */
-export const showUpdateNotification = (
-	currentVersion: string,
-	requiredVersion: string,
-): void => {
-	console.warn(
-		`App update required! Current version: ${currentVersion}, Required version: ${requiredVersion}`,
-	);
+export const openAppStore = async (): Promise<void> => {
+	const url =
+		Platform.OS === "ios"
+			? `itms-apps://apps.apple.com/app/id${APP_STORE_ID}`
+			: `market://details?id=${PLAY_STORE_ID}`;
 
-	// Get the appropriate store URL based on platform
-	const getStoreURL = () => {
-		if (Platform.OS === "ios") {
-			return `itms-apps://apps.apple.com/app/id${APP_STORE_ID}`;
-		} else {
-			// Google Play fallback to browser if Play Store isn't available
-			return `market://details?id=${PLAY_STORE_ID}`;
+	try {
+		const supported = await Linking.canOpenURL(url);
+
+		if (supported) {
+			await Linking.openURL(url);
+			return;
 		}
-	};
 
-	// Open the appropriate app store
-	const openAppStore = async () => {
-		const url = getStoreURL();
-
-		try {
-			const supported = await Linking.canOpenURL(url);
-
-			if (supported) {
-				await Linking.openURL(url);
-			} else {
-				// Fallback for Android if market:// scheme isn't supported
-				if (Platform.OS === "android") {
-					await Linking.openURL(
-						`https://play.google.com/store/apps/details?id=${PLAY_STORE_ID}`,
-					);
-				} else {
-					console.warn("Cannot open app store URL:", url);
-				}
-			}
-		} catch (error) {
-			console.error("Error opening app store:", error);
-		}
-	};
-
-	// Show alert with update option
-	Alert.alert(
-		"Update Required",
-		`Your app version (${currentVersion}) is outdated. Please update to the latest version (${requiredVersion}).`,
-		[
-			{
-				text: "Update Now",
-				onPress: openAppStore,
-			},
-			// {
-			// 	text: "Later",
-			// 	style: "cancel",
-			// },
-		],
-		{ cancelable: false },
-	);
+		// Fall back to the browser when the store app isn't installed
+		await Linking.openURL(
+			Platform.OS === "ios"
+				? `https://apps.apple.com/app/id${APP_STORE_ID}`
+				: `https://play.google.com/store/apps/details?id=${PLAY_STORE_ID}`,
+		);
+	} catch (e) {
+		console.error("Error opening app store:", e);
+	}
 };

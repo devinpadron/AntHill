@@ -12,10 +12,9 @@ import {
 	navigationRef,
 	pendingNavigation,
 } from "./src/navigation/navigationRef";
-import {
-	checkAppVersion,
-	showUpdateNotification,
-} from "./src/utils/versionUtils";
+import { AppGate } from "./src/components/ui/AppGate";
+import { getCurrentAppVersion } from "./src/utils/versionUtils";
+import { recordAppLaunch } from "./src/services/appConfigService";
 
 // Component to initialize the company context after user auth
 const CompanyInitializer = () => {
@@ -27,6 +26,20 @@ const CompanyInitializer = () => {
 			setActiveCompany(user.loggedInCompany);
 		}
 	}, [user?.loggedInCompany]);
+
+	return null;
+};
+
+// Records which build this user is on, so update adoption can be measured
+// before a forced cutover. Best-effort and non-blocking.
+const LaunchTelemetry = () => {
+	const { userId, loggedIn } = useUser();
+
+	useEffect(() => {
+		if (loggedIn && userId) {
+			recordAppLaunch(userId, getCurrentAppVersion());
+		}
+	}, [userId, loggedIn]);
 
 	return null;
 };
@@ -48,48 +61,31 @@ const App: React.FC = () => {
 		return () => clearInterval(checkInterval);
 	}, []);
 
-	// Add a separate useEffect for the version check
-	useEffect(() => {
-		const initApp = async () => {
-			// Check if app needs update
-			const { updateRequired, currentVersion, requiredVersion } =
-				await checkAppVersion();
-
-			console.log(
-				`Current Version: ${currentVersion}, Required Version: ${requiredVersion}`,
-			);
-			if (updateRequired) {
-				showUpdateNotification(currentVersion, requiredVersion);
-			}
-
-			// Continue normal app initialization...
-		};
-
-		initApp();
-	}, []); // Empty dependency array means this runs once on mount
-
 	return (
 		<GestureHandlerRootView style={{ flex: 1 }}>
 			<SafeAreaProvider>
-				<UploadManagerProvider>
-					<UserProvider>
-						<CompanyProvider>
-							<NavigationContainer
-								ref={navigationRef}
-								onReady={() => {
-									pendingNavigation.executeIfReady();
-								}}
-							>
-								<NotificationProvider>
-									<NotifierWrapper>
-										<CompanyInitializer />
-										<AppNavigator />
-									</NotifierWrapper>
-								</NotificationProvider>
-							</NavigationContainer>
-						</CompanyProvider>
-					</UserProvider>
-				</UploadManagerProvider>
+				<AppGate>
+					<UploadManagerProvider>
+						<UserProvider>
+							<CompanyProvider>
+								<NavigationContainer
+									ref={navigationRef}
+									onReady={() => {
+										pendingNavigation.executeIfReady();
+									}}
+								>
+									<NotificationProvider>
+										<NotifierWrapper>
+											<CompanyInitializer />
+											<LaunchTelemetry />
+											<AppNavigator />
+										</NotifierWrapper>
+									</NotificationProvider>
+								</NavigationContainer>
+							</CompanyProvider>
+						</UserProvider>
+					</UploadManagerProvider>
+				</AppGate>
 			</SafeAreaProvider>
 		</GestureHandlerRootView>
 	);
