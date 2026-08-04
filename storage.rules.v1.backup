@@ -1,0 +1,22 @@
+// CAPTURED FROM LIVE PRODUCTION 2026-08-03 (project anthill-51de0)
+// via Firebase MCP `firebase_get_security_rules`, BEFORE any rules were
+// written or deployed from this repo. Do not edit.
+//
+// NOTE: this denies ALL client access, yet the app uploads and downloads
+// attachments through UploadManagerContext against bucket
+// `anthill-51de0.firebasestorage.app`. Either attachments are broken in
+// production, or the app's bucket is not the default bucket these rules
+// govern. Verify before deploying anything to Storage.
+
+rules_version = '2';
+
+// Craft rules based on data in your Firestore database
+// allow write: if firestore.get(
+//    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

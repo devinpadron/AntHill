@@ -1,0 +1,154 @@
+rules_version = '2';
+
+// INTERIM RULES — v1 (PascalCase) schema.
+//
+// Replaces the previous allow-all ruleset (see firestore.rules.v1.backup),
+// which exposed the entire database to unauthenticated readers and let any
+// signed-in account write any document.
+//
+// This is a stopgap shaped to the CURRENT collection layout so it can ship
+// ahead of the v2 re-model. Known limitations, all fixed by the v2 rules:
+//   - Any signed-in user can read any Users/{uid} doc and any Companies/{cid}
+//     doc. Scoping those to "shares a company with me" needs the denormalized
+//     membership records that v2 introduces; doing it here would require a
+//     get() against `Users.companies`, whose shape is unreliable in legacy
+//     data (it may still be a map rather than an array).
+//   - Membership is checked with exists()/get() on Companies/{cid}/Users/{uid},
+//     which bills one extra document read per request.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function membership(companyId) {
+      return /databases/$(database)/documents/Companies/$(companyId)/Users/$(request.auth.uid);
+    }
+
+    function isMember(companyId) {
+      return isSignedIn() && exists(membership(companyId));
+    }
+
+    // NOTE: the capitalized variants are deliberate. src/utils/dbMigrationUtils.ts
+    // was supposed to normalize "Owner"/"Admin" to "owner"/"manager" but is dead
+    // code (checkAndRunMigrations has no callers), so legacy role values are
+    // still live. Dropping them here would lock existing admins out.
+    function isManager(companyId) {
+      return isMember(companyId)
+        && get(membership(companyId)).data.role in
+             ["owner", "manager", "Owner", "Admin", "Manager"];
+    }
+
+    // ---- Public, pre-auth reads --------------------------------------------
+    // Both are read before sign-in by the launch gate (src/hooks/useAppGate.ts).
+    // They contain no user data.
+
+    match /AppData/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /appConfig/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ---- Users -------------------------------------------------------------
+
+    match /Users/{userId} {
+      // Member lists, event assignment and payroll all read other users'
+      // profiles directly (userService.batchGetUsers and friends).
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSelf(userId);
+
+      match /Preferences/{docId} {
+        allow read, write: if isSelf(userId);
+      }
+    }
+
+    // ---- Companies ---------------------------------------------------------
+
+    match /Companies/{companyId} {
+      // TEMPORARY: public read.
+      //
+      // Signup on the CURRENTLY RELEASED app (1.0.98) queries this collection
+      // by accessCode BEFORE creating the auth account (useSignUp.ts, pre-fix
+      // ordering). Requiring auth here breaks signup for every live user.
+      //
+      // 1.0.99 reorders that flow to authenticate first. TIGHTEN THIS TO
+      // `isSignedIn()` once 1.0.99 adoption is complete — until then, company
+      // names and access codes are publicly readable, which means an access
+      // code can be harvested and used to join a company.
+      //
+      // Everything reachable THROUGH a company (members, events, time entries,
+      // settings) is already locked to members below, so this leak is bounded
+      // to the company document itself.
+      allow read: if true;
+      // Companies are provisioned out of band; the app never writes them.
+      allow write: if false;
+
+      match /Users/{userId} {
+        allow read: if isMember(companyId);
+        // Joining a company: you may create only your own membership, and only
+        // as a plain user. This is the privilege-escalation guard.
+        allow create: if isSelf(userId)
+                      && request.resource.data.role == "user";
+        allow update: if isManager(companyId);
+        allow delete: if isManager(companyId) || isSelf(userId);
+      }
+
+      // Legacy collection — a conditional phone write in useProfile.ts is its
+      // only remaining reference. Not migrated to v2.
+      match /Employees/{userId} {
+        allow read: if isMember(companyId);
+        allow write: if isSelf(userId);
+      }
+
+      match /Settings/{docId} {
+        allow read: if isMember(companyId);
+        allow write: if isManager(companyId);
+      }
+
+      // Workers write to events too: availabilityService records confirm/decline
+      // into the event's workerStatus map, and useEventDetails saves userNotes.
+      match /Events/{eventId} {
+        allow read, write: if isMember(companyId);
+
+        match /{document=**} {
+          allow read, write: if isMember(companyId);
+        }
+      }
+
+      match /TimeEntries/{entryId} {
+        allow read, write: if isMember(companyId);
+
+        match /{document=**} {
+          allow read, write: if isMember(companyId);
+        }
+      }
+
+      // Admin-authored company config. Only the screens under
+      // src/screens/settings/admin/ write these.
+      match /Packages/{packageId} {
+        allow read: if isMember(companyId);
+        allow write: if isManager(companyId);
+      }
+
+      match /Checklists/{checklistId} {
+        allow read: if isMember(companyId);
+        allow write: if isManager(companyId);
+      }
+
+      match /EventLabels/{labelId} {
+        allow read: if isMember(companyId);
+        allow write: if isManager(companyId);
+      }
+    }
+  }
+}

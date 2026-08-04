@@ -1,0 +1,30 @@
+diff --git a/node_modules/react-native-date-picker/ios/RNDatePicker.mm b/node_modules/react-native-date-picker/ios/RNDatePicker.mm
+index 7ec2dd2..eae54b2 100644
+--- a/node_modules/react-native-date-picker/ios/RNDatePicker.mm
++++ b/node_modules/react-native-date-picker/ios/RNDatePicker.mm
+@@ -1,5 +1,10 @@
+ #import "RNDatePicker.h"
+ 
++// iso8601StringToNSDate below uses std::string, but on the legacy architecture
++// none of the imports below pull in <string>. Clang 21 (Xcode 26) no longer
++// provides it transitively, so include it explicitly.
++#include <string>
++
+ #ifdef RCT_NEW_ARCH_ENABLED
+ #import "RCTConvert.h"
+ #import <React/RCTConversions.h>
+diff --git a/node_modules/react-native-date-picker/ios/RNDatePickerManager.mm b/node_modules/react-native-date-picker/ios/RNDatePickerManager.mm
+index da42873..67348f3 100644
+--- a/node_modules/react-native-date-picker/ios/RNDatePickerManager.mm
++++ b/node_modules/react-native-date-picker/ios/RNDatePickerManager.mm
+@@ -2,6 +2,10 @@
+ #import <React/RCTUIManager.h>
+ #import <React/RCTViewManager.h>
+ 
++// Uses std::string below without including <string>. Clang 21 (Xcode 26) no
++// longer provides it transitively on the legacy architecture.
++#include <string>
++
+ #import "RNDatePickerManager.h"
+ #import "RCTConvert.h"
+ #import "DatePicker.h"

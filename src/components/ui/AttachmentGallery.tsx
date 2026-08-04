@@ -15,7 +15,9 @@ import {
 	FlatList,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import * as FileSystem from "expo-file-system";
+// SDK 54 repointed the default export to the new File/Paths API; this file
+// uses documentDirectory + downloadAsync, which live in the legacy entrypoint.
+import * as FileSystem from "expo-file-system/legacy";
 import * as MediaLibrary from "expo-media-library";
 import * as Sharing from "expo-sharing";
 import { useVideoPlayer, VideoView } from "expo-video";

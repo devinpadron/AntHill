@@ -1,0 +1,25 @@
+// CAPTURED FROM LIVE PRODUCTION 2026-08-03 (project anthill-51de0)
+// via Firebase MCP `firebase_get_security_rules`, BEFORE any rules were
+// written or deployed from this repo. Do not edit — this is the rollback
+// target for the v2 cutover.
+//
+// WARNING: these rules are NOT safe. They are recorded here verbatim only
+// so the pre-migration state is recoverable. See the v2 rules for the
+// intended replacement.
+//   - `allow read: if true` exposes the ENTIRE database to unauthenticated
+//     readers: every user's name/email/phone, every company's events and
+//     time entries, and every FCM token.
+//   - `allow write: if request.auth != null` lets ANY signed-in account
+//     write to ANY document, including other companies' data and its own
+//     role field in Companies/{c}/Users/{uid}.
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow write: if request.auth != null;
+      allow read: if true;
+    }
+  }
+}

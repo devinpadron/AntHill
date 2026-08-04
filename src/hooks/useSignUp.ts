@@ -38,23 +38,34 @@ export const useSignUp = (navigation: any) => {
 			return;
 		}
 
-		// Check company code
-		let company = "";
-		company = await compareAccessCode(accessCode);
-		if (!company) {
-			Alert.alert("Invalid Access Code");
-			return;
-		}
-
 		setIsLoading(true);
 
 		try {
-			// Create user account
+			// Create the account BEFORE looking up the access code. Reading the
+			// Companies collection requires authentication, so this order is
+			// load-bearing — see firestore.rules.
 			const userCredential = await auth().createUserWithEmailAndPassword(
 				email,
 				password,
 			);
 			const user = userCredential.user;
+
+			// Check company code
+			const company = await compareAccessCode(accessCode);
+			if (!company) {
+				// Roll the account back so an invalid code doesn't strand a
+				// half-created user with no profile document.
+				try {
+					await user.delete();
+				} catch (deleteError) {
+					console.error(
+						"Failed to roll back account after invalid access code",
+						deleteError,
+					);
+				}
+				Alert.alert("Invalid Access Code");
+				return;
+			}
 
 			// Update display name
 			await user.updateProfile({

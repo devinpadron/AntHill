@@ -1,7 +1,6 @@
 import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
 import db from "../constants/firestore";
 import { AttachmentItem, TimeEntry } from "../types";
-import * as FileSystem from "expo-file-system";
 
 export const clockIn = async (userId: string, companyId: string) => {
 	const timeEntryRef = db
