@@ -25,10 +25,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CustomFormRender from "./CustomFormRender";
 import { useCompany } from "../../contexts/CompanyContext";
 import { styles } from "./TimeEntrySubmitModal.styles";
-
-//TODO: What I did before was attach the formResponses directly to each connected event
-// Next we need to:
-// 1. Update the timeEntryDetails to handle the new structure and display the form responses correctly
+import type { RenderableForm } from "./CustomFormRender";
+import {
+	blankResponsesFor,
+	useSubmitFormSchemas,
+} from "../../hooks/useSubmitFormSchemas";
 
 const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const [notes, setNotes] = useState("");
@@ -39,8 +40,15 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const [isLoadingEvents, setIsLoadingEvents] = useState(false);
 	const [showOtherEvents, setShowOtherEvents] = useState(false);
 	const { userId, companyId } = useUser();
-	const [customForm, setCustomForm] = useState(null);
-	const [customFullForm, setCustomFullForm] = useState(null);
+	/*
+	 * Local copies of the two schemas, seeded from useSubmitFormSchemas below.
+	 * Local because CustomFormRender writes resolved checklist item counts back
+	 * into the fields as it renders them.
+	 */
+	const [customForm, setCustomForm] = useState<RenderableForm | null>(null);
+	const [customFullForm, setCustomFullForm] = useState<RenderableForm | null>(
+		null,
+	);
 	const [fullFormResponses, setFullFormResponses] = useState({});
 	// Replace single formResponses with a map keyed by event ID
 	const [formResponsesByEvent, setFormResponsesByEvent] = useState({});
@@ -57,6 +65,15 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const snapPoints = useRef(["85%"]).current;
 	const insets = useSafeAreaInsets();
 	const { preferences, isLoading: preferencesLoading } = useCompany();
+	const { eventSchema, entrySchema, isSchemaLoading } = useSubmitFormSchemas(
+		companyId,
+		preferences.eventFormSchemaId,
+		preferences.timeEntryFormSchemaId,
+	);
+
+	// Enabled schemas only; null means the form is off for this company.
+	useEffect(() => setCustomForm(eventSchema), [eventSchema]);
+	useEffect(() => setCustomFullForm(entrySchema), [entrySchema]);
 
 	/*
 	 * Whether the custom form is ready to be filled in.
@@ -75,7 +92,6 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	 * v1 had one await here and v2 has two, so the window got WIDER, not
 	 * narrower.
 	 */
-	const [isSchemaLoading, setIsSchemaLoading] = useState(true);
 	const isFormReady = !preferencesLoading && !isSchemaLoading;
 
 	useEffect(() => {
@@ -108,59 +124,17 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	}, [visible, timeEntry]);
 
 	/*
-	 * Resolve the two form schemas by reference.
-	 *
-	 * Preferences used to carry the schema objects inline; they now hold ids
-	 * pointing at immutable versioned documents, so an entry submitted today
-	 * keeps rendering against today's schema no matter how the form is edited
-	 * later.
+	 * Seed the time-entry form's responses once its schema arrives. The schema
+	 * resolution itself lives in useSubmitFormSchemas.
 	 */
 	useEffect(() => {
-		if (!companyId) return;
-		let cancelled = false;
-		setIsSchemaLoading(true);
-
-		(async () => {
-			const [eventSchema, entrySchema] = await Promise.all([
-				getSchema(preferences.eventFormSchemaId),
-				getSchema(preferences.timeEntryFormSchemaId),
-			]);
-			if (cancelled) return;
-
-			if (eventSchema?.isEnabled) setCustomForm(eventSchema);
-
-			if (entrySchema?.isEnabled) {
-				setCustomFullForm(entrySchema);
-
-				if (Object.keys(fullFormResponses).length === 0) {
-					const initialResponses = {};
-					entrySchema.fields.forEach((field) => {
-						if (field.type === "checkbox") {
-							initialResponses[field.id] = false;
-						} else if (
-							field.type === "multiSelect" ||
-							field.type === "checklist"
-						) {
-							initialResponses[field.id] = [];
-						} else {
-							initialResponses[field.id] = "";
-						}
-					});
-					setFullFormResponses(initialResponses);
-				}
-			}
-
-			setIsSchemaLoading(false);
-		})();
-
-		return () => {
-			cancelled = true;
-		};
-	}, [
-		companyId,
-		preferences.eventFormSchemaId,
-		preferences.timeEntryFormSchemaId,
-	]);
+		if (!customFullForm) return;
+		setFullFormResponses((prev) =>
+			Object.keys(prev).length === 0
+				? blankResponsesFor(customFullForm)
+				: prev,
+		);
+	}, [customFullForm]);
 
 	// Second useEffect - only for initializing event form responses
 	useEffect(() => {
@@ -180,21 +154,7 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 			// Skip if we already have responses for this event
 			if (newResponsesByEvent[event.id]) return;
 
-			const initialResponses = {};
-			formTemplate.fields.forEach((field) => {
-				if (field.type === "checkbox") {
-					initialResponses[field.id] = false;
-				} else if (
-					field.type === "multiSelect" ||
-					field.type === "checklist"
-				) {
-					initialResponses[field.id] = [];
-				} else {
-					initialResponses[field.id] = "";
-				}
-			});
-
-			newResponsesByEvent[event.id] = initialResponses;
+			newResponsesByEvent[event.id] = blankResponsesFor(formTemplate);
 		});
 
 		setFormResponsesByEvent(newResponsesByEvent);
