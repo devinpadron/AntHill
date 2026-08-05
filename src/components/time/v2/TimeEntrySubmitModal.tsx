@@ -56,7 +56,27 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const notesInputRef = useRef(null);
 	const snapPoints = useRef(["85%"]).current;
 	const insets = useSafeAreaInsets();
-	const { preferences } = useCompany();
+	const { preferences, isLoading: preferencesLoading } = useCompany();
+
+	/*
+	 * Whether the custom form is ready to be filled in.
+	 *
+	 * This gates SUBMISSION, and it has to. The form is not part of the first
+	 * render: company preferences arrive over a subscription, and the schema
+	 * they name is a second round trip after that. Until both land there are no
+	 * fields on screen — so a fast tap submitted an entry containing clock
+	 * times and nothing else, silently, with no way to tell afterwards that
+	 * anything was missing.
+	 *
+	 * Production has 57 such entries in one company alone, spread thinly across
+	 * 19 people (most of them a single entry out of dozens) and still arriving
+	 * — the shape of a race, not of a misconfigured user.
+	 *
+	 * v1 had one await here and v2 has two, so the window got WIDER, not
+	 * narrower.
+	 */
+	const [isSchemaLoading, setIsSchemaLoading] = useState(true);
+	const isFormReady = !preferencesLoading && !isSchemaLoading;
 
 	useEffect(() => {
 		if (visible && bottomSheetRef.current) {
@@ -98,6 +118,7 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	useEffect(() => {
 		if (!companyId) return;
 		let cancelled = false;
+		setIsSchemaLoading(true);
 
 		(async () => {
 			const [eventSchema, entrySchema] = await Promise.all([
@@ -128,6 +149,8 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 					setFullFormResponses(initialResponses);
 				}
 			}
+
+			setIsSchemaLoading(false);
 		})();
 
 		return () => {
@@ -510,6 +533,17 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 
 	// Updated to handle file uploads before submission
 	const handleSubmit = async () => {
+		/*
+		 * Refuse while the form is still arriving. The button is disabled too,
+		 * but this is the check that matters: submitting here writes an entry
+		 * with no form data and no record that any was expected, and nobody
+		 * finds out until payroll.
+		 */
+		if (!isFormReady) {
+			setError("Still loading this company's form — one moment.");
+			return;
+		}
+
 		if (selectedEvents.length === 0) {
 			setError("Please attach at least one event to this time entry.");
 			return;
@@ -1083,12 +1117,13 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 						style={[
 							styles.button,
 							styles.submitButton,
-							isSubmitting && styles.disabledButton,
+							(isSubmitting || !isFormReady) &&
+								styles.disabledButton,
 						]}
 						onPress={handleSubmit}
-						disabled={isSubmitting}
+						disabled={isSubmitting || !isFormReady}
 					>
-						{isSubmitting ? (
+						{isSubmitting || !isFormReady ? (
 							<ActivityIndicator size="small" color="white" />
 						) : (
 							<Text style={styles.submitButtonText}>

@@ -440,6 +440,36 @@ function check(label, ok, detail = "") {
 	if (ok) pass(label);
 }
 
+/*
+ * Entries that reference a form but carry no answers to it.
+ *
+ * Reported, not failed — these are inherited, and the migration is faithful to
+ * what v1 recorded. They come from a race in the submit modal: the schema is
+ * two round trips behind the first render, so a fast tap wrote clock times and
+ * nothing else. Production had 57 in one company, spread across 19 people and
+ * still accumulating.
+ *
+ * Worth watching after cutover. v2 now disables submission until the form has
+ * loaded, so this number should stop growing — if it does grow, that gate has
+ * regressed and payroll is quietly losing data again.
+ */
+let formRefNoAnswers = 0;
+for (const doc of v2[C.timeEntries].docs) {
+	const d = doc.data();
+	if (!d.formSchemaIds?.timeEntry) continue;
+	const answers = d.formResponses ?? {};
+	if (Object.keys(answers).length === 0) formRefNoAnswers += 1;
+}
+
+console.log("\n=== TIME ENTRIES WITH A FORM BUT NO ANSWERS ===");
+console.log(
+	`  ${String(formRefNoAnswers).padStart(6)}  of ${v2[C.timeEntries].size} entries`,
+);
+console.log(
+	"  Inherited from a v1 submit race, not a migration fault. Should stop\n" +
+		"  growing now that v2 blocks submission until the form has loaded.",
+);
+
 console.log("\n=== APPROVAL PROVENANCE ===");
 for (const [k, v] of Object.entries(provenance).sort((a, b) => b[1] - a[1])) {
 	console.log(`  ${k.padEnd(30)} ${v}`);
