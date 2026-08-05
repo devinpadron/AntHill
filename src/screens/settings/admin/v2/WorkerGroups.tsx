@@ -155,6 +155,23 @@ const WorkerGroups = ({ navigation }) => {
 		);
 	};
 
+	/*
+	 * What the two kinds of code actually do.
+	 *
+	 * "Open" and "Restricted" are not self-explanatory next to each other, and
+	 * the buttons do not otherwise say they MINT a code rather than toggle a
+	 * setting — so the explanation sits one tap away instead of being folded
+	 * into a label that would have to be too long to fit.
+	 */
+	const explainCodes = () =>
+		Alert.alert(
+			"Join codes",
+			"A join code puts whoever signs up with it straight into this group.\n\n" +
+				"Open — they join the group and still see every unassigned job that wasn't sent to a specific group, like any other employee.\n\n" +
+				"Restricted — they only see jobs sent to their group, or to them by name. Nothing else in the company appears for them. This is the one for 1099 contractors.\n\n" +
+				"You can change any individual's access later from the employee list.",
+		);
+
 	const remove = (group) => {
 		const count = counts[group.id] ?? 0;
 		Alert.alert(
@@ -243,6 +260,17 @@ const WorkerGroups = ({ navigation }) => {
 							</Text>
 						</View>
 						<TouchableOpacity
+							style={styles.codeInfo}
+							onPress={explainCodes}
+							accessibilityLabel="What join codes do"
+						>
+							<Ionicons
+								name="information-circle-outline"
+								size={18}
+								color="#8a8aa0"
+							/>
+						</TouchableOpacity>
+						<TouchableOpacity
 							style={styles.codeAction}
 							onPress={() =>
 								issueCode(item, item.joinVisibility ?? "open")
@@ -271,6 +299,17 @@ const WorkerGroups = ({ navigation }) => {
 							in this group.
 						</Text>
 						<TouchableOpacity
+							style={styles.codeInfo}
+							onPress={explainCodes}
+							accessibilityLabel="What join codes do"
+						>
+							<Ionicons
+								name="information-circle-outline"
+								size={18}
+								color="#8a8aa0"
+							/>
+						</TouchableOpacity>
+						<TouchableOpacity
 							style={styles.codeAction}
 							onPress={() => issueCode(item, "open")}
 						>
@@ -281,7 +320,7 @@ const WorkerGroups = ({ navigation }) => {
 							onPress={() => issueCode(item, "restricted")}
 						>
 							<Text style={styles.codeActionText}>
-								Contractor
+								Restricted
 							</Text>
 						</TouchableOpacity>
 					</View>
@@ -450,6 +489,7 @@ const styles = StyleSheet.create({
 	codeMeta: { fontSize: 11, color: "#888", marginTop: 2 },
 	codeHint: { flex: 1, fontSize: 12, color: "#888", paddingRight: 8 },
 	codeAction: { paddingHorizontal: 8, paddingVertical: 6 },
+	codeInfo: { paddingHorizontal: 4, paddingVertical: 6 },
 	codeActionText: { fontSize: 12, fontWeight: "700", color: "#2078c8" },
 	rowMain: { flex: 1, paddingRight: 8 },
 	rowName: { fontSize: 16, fontWeight: "600", color: "#222" },
