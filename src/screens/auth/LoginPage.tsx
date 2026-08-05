@@ -59,7 +59,7 @@ const LoginPage = ({ navigation }) => {
 			{/* Logo */}
 			<Image
 				style={styles.logo}
-				source={require("../../../assets/AntHill/Full_Black.png")}
+				source={require("../../assets/AntHill/Full_Black.png")}
 			/>
 
 			<FormInput

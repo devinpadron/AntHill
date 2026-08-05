@@ -39,7 +39,7 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 			// Calculate initial elapsed time in seconds
 			const startDate = timeEntry.clockInAt.toDate();
 
-			// Account for any previous pause time (now using totalPausedSeconds directly)
+			// Account for any previous pause time
 			const pauseOffset = timeEntry.pausedSeconds || 0;
 
 			const initialElapsed =
@@ -81,7 +81,7 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 				}, 1000);
 			}
 		} else {
-			// For completed or other states, just use the stored totalPausedSeconds
+			// For completed or other states, use the stored total
 			setCurrentPauseDuration(timeEntry.pausedSeconds || 0);
 		}
 
