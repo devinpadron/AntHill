@@ -73,6 +73,19 @@ for (const company of companies.docs) {
 	}
 }
 
+/*
+ * Membership names, so a response breakdown reads as people rather than uids.
+ * A count alone is not something a human can check; a list is.
+ */
+const memberNames = {};
+for (const d of (await firestore.collection(C.memberships).get()).docs) {
+	const m = d.data();
+	memberNames[m.userId] =
+		`${m.firstName ?? ""} ${m.lastName ?? ""}`.trim() ||
+		m.email ||
+		m.userId;
+}
+
 const getV2 = async (collection, id) => {
 	const snap = await firestore.collection(collection).doc(id).get();
 	return snap.exists ? snap.data() : null;
@@ -136,14 +149,64 @@ if (busiest) {
 		.where("eventId", "==", busiest.id)
 		.get();
 	const orphaned = responses.docs.filter((d) => d.data().orphanedResponse);
+	/*
+	 * Rendered per user, not as totals. The whole point of a golden specimen is
+	 * that a human can confirm it, and "confirmed: 9" is not checkable — "these
+	 * nine people confirmed" is.
+	 */
+	const v1Status = busiest.data.workerStatus ?? {};
+	const assigned = busiest.data.assignedWorkers ?? [];
+	const byUser = {};
+	for (const doc of responses.docs) {
+		const r = doc.data();
+		byUser[r.userId] = {
+			status: r.status,
+			orphaned: Boolean(r.orphanedResponse),
+		};
+	}
+
+	const everyone = [
+		...new Set([
+			...Object.keys(v1Status),
+			...assigned,
+			...Object.keys(byUser),
+		]),
+	];
+	const rows = everyone.map((uid) => {
+		const v2r = byUser[uid];
+		const v1s = v1Status[uid] ?? "(absent)";
+		const match =
+			(v2r?.status ?? "(missing)") === (v1Status[uid] ?? "pending");
+		return (
+			`| ${memberNames[uid] ?? uid} | \`${v1s}\` | ` +
+			`${assigned.includes(uid) ? "yes" : "no"} | ` +
+			`\`${v2r?.status ?? "(missing)"}\`${v2r?.orphaned ? " _(orphaned)_" : ""} | ` +
+			`${match ? "ok" : "**DIFFERS**"} |`
+		);
+	});
+
+	const v2Event = await getV2(C.events, busiest.id);
+	const counts = v2Event?.responseCounts ?? {};
+	const tally = { confirmed: 0, declined: 0, pending: 0 };
+	for (const r of Object.values(byUser)) tally[r.status] += 1;
+
 	add(
 		`Event with the most responses — \`${busiest.id}\``,
-		`v1 workerStatus had ${Object.keys(busiest.data.workerStatus ?? {}).length} entries ` +
-			`for ${(busiest.data.assignedWorkers ?? []).length} assigned workers. ` +
-			`v2 produced ${responses.size} eventResponses, ${orphaned.length} flagged orphaned. ` +
-			"CHECK: are the orphaned ones really people who were unassigned after responding?",
+		`v1 stored one workerStatus map with ${Object.keys(v1Status).length} entries, ` +
+			`against ${assigned.length} assigned workers — an unassigned upcoming event ` +
+			"collects availability replies BEFORE anyone is assigned, so the map is the " +
+			"real signal there.\n\n" +
+			`v2 wrote ${responses.size} eventResponses documents. Stored counts: ` +
+			`\`${JSON.stringify(counts)}\`. Recomputed from the documents: ` +
+			`\`${JSON.stringify(tally)}\`.\n\n` +
+			"CHECK: does each person's v2 status match what they actually said? " +
+			"Rows marked orphaned are people who responded and were later unassigned — " +
+			"kept deliberately rather than dropped.\n\n" +
+			"| Person | v1 workerStatus | assigned? | v2 status | |\n" +
+			"|---|---|---|---|---|\n" +
+			rows.join("\n"),
 		busiest.data,
-		await getV2(C.events, busiest.id),
+		v2Event,
 		EVENT_FIELDS,
 	);
 }
