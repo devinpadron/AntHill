@@ -888,6 +888,46 @@ describe("v2 — group join codes", () => {
 			}),
 		);
 	});
+
+	test("a manager cannot TAKE OVER another company's code", async () => {
+		// The id is the code, so overwriting a code document steals the code.
+		// Checking the companyId being written rather than the one already
+		// there would have let any manager repoint anyone else's code at their
+		// own group.
+		await env.withSecurityRulesDisabled(async (ctx) => {
+			await setDoc(doc(ctx.firestore(), "groupJoinCodes", "BOTHCODE"), {
+				code: "BOTHCODE",
+				companyId: B,
+				groupId: "gB",
+				visibility: "open",
+			});
+		});
+
+		await assertFails(
+			setDoc(doc(as(ALICE), "groupJoinCodes", "BOTHCODE"), {
+				code: "BOTHCODE",
+				companyId: A,
+				groupId: "g1",
+				visibility: "restricted",
+			}),
+		);
+	});
+
+	test("...nor move their own code to another company", async () => {
+		await assertFails(
+			updateDoc(doc(as(ALICE), "groupJoinCodes", "NEWCODE1"), {
+				companyId: B,
+			}),
+		);
+	});
+
+	test("a manager can still rotate their OWN code", async () => {
+		await assertSucceeds(
+			updateDoc(doc(as(ALICE), "groupJoinCodes", "NEWCODE1"), {
+				visibility: "restricted",
+			}),
+		);
+	});
 });
 
 describe("v2 — groups are manager-owned", () => {

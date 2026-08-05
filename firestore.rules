@@ -332,8 +332,25 @@ service cloud.firestore {
     match /groupJoinCodes/{code} {
       allow get: if isSignedIn();
       allow list: if false;
-      allow create, update, delete: if v2IsManager(request.resource.data.companyId)
-                                       || v2IsManager(resource.data.companyId);
+
+      /*
+       * Create, update and delete are split, and the split is the point.
+       *
+       * Sharing one clause let a manager of company A write a document at an id
+       * already owned by company B: the check passed on the companyId they
+       * were WRITING rather than the one already there, so B's code silently
+       * became A's. Since the id is the code itself, that is a code takeover,
+       * and setGroupJoinCode issues a set() which overwrites.
+       *
+       * Create cannot overwrite — Firestore only evaluates it when the
+       * document does not exist — so a random collision now fails loudly
+       * instead of stealing someone else's code. Update requires owning what
+       * is already there and forbids moving it to another company.
+       */
+      allow create: if v2IsManager(request.resource.data.companyId);
+      allow update: if v2IsManager(resource.data.companyId)
+                    && request.resource.data.companyId == resource.data.companyId;
+      allow delete: if v2IsManager(resource.data.companyId);
     }
 
     // ---- company library -------------------------------------------------
