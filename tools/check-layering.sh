@@ -152,6 +152,56 @@ if [ -n "$badDates" ]; then
 	status=1
 fi
 
+# --- 6. v1 services reached from the v2 tree -------------------------------
+#
+# A v1 service reads PascalCase paths (Companies/{c}/Users, Users/{uid}/...).
+# A v2-only account has NO documents there, so every such read is denied — not
+# empty, denied. That is how the v2 calendar kept logging "Error finding users"
+# for a brand new signup.
+#
+# Rule 5 catches v1 COMPONENTS rendered by v2 that read v1 FIELD names. This is
+# the sibling it missed: v1 SERVICES, reached either directly from a v2 file or
+# through one of those components.
+#
+# Services that never touch Firestore (authService, exportService) are fine and
+# are excluded by construction — the list below is derived, not hand-written,
+# so a service that gains a Firestore import starts being enforced on its own.
+v1DbServices=$(
+	find src/services -maxdepth 1 -name '*.ts' -print0 2>/dev/null \
+		| xargs -0 grep -lE 'from "[^"]*(lib/db|constants/firestore)"' 2>/dev/null \
+		| xargs -n1 basename 2>/dev/null | sed 's/\.ts$//' || true
+)
+
+if [ -n "$v1DbServices" ]; then
+	pattern=$(echo "$v1DbServices" | paste -sd'|' -)
+
+	# Direct: a v2 file importing one of them.
+	direct=$(
+		find src -path '*/v2/*' \( -name '*.ts' -o -name '*.tsx' \) -print0 2>/dev/null \
+			| xargs -0 grep -nE "from \"[^\"]*services/($pattern)\"" 2>/dev/null || true
+	)
+	if [ -n "$direct" ]; then
+		echo "v1 SERVICE REACHED FROM THE v2 TREE (v2 accounts have no v1 documents):"
+		echo "$direct"
+		status=1
+	fi
+
+	# Indirect: through a v1 component that a v2 file renders.
+	for importer in $(find src -path '*/v2/*' \( -name '*.ts' -o -name '*.tsx' \) 2>/dev/null); do
+		dir=$(dirname "$importer")
+		for rel in $(grep -oE 'from "[^"]*/(components|screens)/[^"]*"' "$importer" 2>/dev/null \
+				| sed 's/from "//;s/"//' | grep -v '/v2/'); do
+			target=$(cd "$dir" && realpath -q "$rel.tsx" 2>/dev/null)
+			[ -f "$target" ] || continue
+			if grep -qE "from \"[^\"]*services/($pattern)\"" "$target" 2>/dev/null; then
+				echo "v1 SERVICE REACHED INDIRECTLY: ${target#$PWD/}"
+				echo "    rendered by ${importer}, and it imports a v1 Firestore service"
+				status=1
+			fi
+		done
+	done
+fi
+
 if [ "$status" -eq 0 ]; then
 	echo "Layering OK."
 fi

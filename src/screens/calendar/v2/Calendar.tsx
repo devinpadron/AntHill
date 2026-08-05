@@ -5,7 +5,7 @@ import moment from "moment";
 import { useUser } from "../../../contexts/v2/UserContext";
 import { useCompanyMembers } from "../../../hooks/v2/useCompanyMembers";
 import { useBottomSheetController } from "../../../hooks/useBottomSheetController";
-import { FilterPanel } from "../../../components/calendar/FilterPanel";
+import { FilterPanel } from "../../../components/calendar/v2/FilterPanel";
 import { FloatingActionButtons } from "../../../components/calendar/FloatingActionButtons";
 import Timesheet from "../../../components/calendar/v2/Timesheet";
 import LoadingScreen from "../../LoadingScreen";

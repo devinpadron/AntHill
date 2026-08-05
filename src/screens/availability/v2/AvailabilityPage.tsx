@@ -28,11 +28,8 @@ import {
 	subscribeMyResponses,
 	subscribeMyUpcomingEvents,
 } from "../../../services/v2/eventService";
-import {
-	updateCompanyPreferences,
-	getCompanyPreferences,
-} from "../../../services/companyService";
 import { useCompanyMembers } from "../../../hooks/v2/useCompanyMembers";
+import { useCompany } from "../../../contexts/v2/CompanyContext";
 import { useGroups } from "../../../hooks/v2/useGroups";
 import { FilterType } from "../../../types";
 
@@ -102,6 +99,17 @@ const AvailabilityPage = ({ navigation }) => {
 	 * they were invited to.
 	 */
 	const visibility = membership?.visibility ?? "open";
+
+	/*
+	 * Preferences come from CompanyContext, not a one-shot read.
+	 *
+	 * This screen was still calling the v1 companyService, which reads
+	 * Companies/{c}/Settings/preferences — a path a v2-only account has no
+	 * membership for, so the read is denied. The context already holds these,
+	 * live, and v1 nested the reminder fields flat while v2 groups them under
+	 * `availabilityReminder`.
+	 */
+	const { preferences, updatePreferences } = useCompany();
 
 	// Refresh data every time the screen comes into focus
 	useFocusEffect(
@@ -598,25 +606,12 @@ const AvailabilityPage = ({ navigation }) => {
 		</View>
 	);
 
-	const handleReminderSettings = async () => {
-		try {
-			// Fetch current company preferences
-			const preferences = await getCompanyPreferences(companyId);
-
-			// Set current values
-			const currentHours = preferences?.availabilityReminderHours || 24;
-			const currentMinutes =
-				preferences?.availabilityReminderMinutes || 0;
-			const currentEnabled =
-				preferences?.availabilityReminderEnabled !== false; // Default to true if undefined
-
-			setReminderHours(currentHours.toString());
-			setReminderMinutes(currentMinutes.toString());
-			setRemindersEnabled(currentEnabled);
-			setReminderModalVisible(true);
-		} catch (error) {
-			console.error("Error fetching reminder preferences:", error);
-		}
+	const handleReminderSettings = () => {
+		const reminder = preferences?.availabilityReminder;
+		setReminderHours(String(reminder?.hours ?? 24));
+		setReminderMinutes(String(reminder?.minutes ?? 0));
+		setRemindersEnabled(reminder?.enabled !== false);
+		setReminderModalVisible(true);
 	};
 
 	const saveReminderSettings = async () => {
@@ -624,10 +619,12 @@ const AvailabilityPage = ({ navigation }) => {
 			const hours = parseInt(reminderHours) || 24;
 			const minutes = parseInt(reminderMinutes) || 0;
 
-			await updateCompanyPreferences(companyId, {
-				availabilityReminderHours: hours,
-				availabilityReminderMinutes: minutes,
-				availabilityReminderEnabled: remindersEnabled,
+			await updatePreferences({
+				availabilityReminder: {
+					enabled: remindersEnabled,
+					hours,
+					minutes,
+				},
 			});
 
 			setReminderModalVisible(false);
