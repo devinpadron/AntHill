@@ -694,6 +694,162 @@ const EventSubmit = ({ navigation }) => {
 								)}
 							</View>
 
+							{/* Who gets asked about this event */}
+							{preferences.enableAvailability && (
+								<View style={styles.sectionContainer}>
+									<Text style={styles.sectionTitle}>
+										Who can see this event
+									</Text>
+									<Text style={styles.audienceHint}>
+										{isTargetedAudience
+											? "Only the people below will be asked about it."
+											: "Everyone who can see open jobs. Pick a group or specific people to send it only to them."}
+									</Text>
+
+									<Text style={styles.audienceSectionTitle}>
+										Groups
+									</Text>
+									{groups.length === 0 ? (
+										<Text style={styles.audienceEmpty}>
+											No groups yet — create one under
+											Settings › Worker Groups.
+										</Text>
+									) : (
+										groups.map((group) => {
+											const on =
+												audienceGroupIds.includes(
+													group.id,
+												);
+											return (
+												<TouchableOpacity
+													key={group.id}
+													style={styles.audienceRow}
+													onPress={() =>
+														setAudienceGroupIds(
+															on
+																? audienceGroupIds.filter(
+																		(g) =>
+																			g !==
+																			group.id,
+																	)
+																: [
+																		...audienceGroupIds,
+																		group.id,
+																	],
+														)
+													}
+												>
+													<Ionicons
+														name={
+															on
+																? "checkbox"
+																: "square-outline"
+														}
+														size={22}
+														color={
+															on
+																? "#2078c8"
+																: "#999"
+														}
+													/>
+													<Text
+														style={
+															styles.audienceLabel
+														}
+													>
+														{group.name}
+													</Text>
+												</TouchableOpacity>
+											);
+										})
+									)}
+
+									{/*
+									 * Specific people, for the one-off a group
+									 * cannot express. Selected names are pinned
+									 * above the search so filtering never hides
+									 * someone you already picked.
+									 */}
+									<Text style={styles.audienceSectionTitle}>
+										Specific people
+									</Text>
+
+									{selectedAudienceMembers.map((member) => (
+										<TouchableOpacity
+											key={member.userId}
+											style={styles.audienceRow}
+											onPress={() =>
+												toggleAudienceUser(
+													member.userId,
+												)
+											}
+										>
+											<Ionicons
+												name="checkbox"
+												size={22}
+												color="#2078c8"
+											/>
+											<Text style={styles.audienceLabel}>
+												{member.displayName}
+											</Text>
+										</TouchableOpacity>
+									))}
+
+									{members.length > 8 && (
+										<TextInput
+											style={styles.audienceSearch}
+											value={personSearch}
+											onChangeText={setPersonSearch}
+											placeholder="Search people"
+											placeholderTextColor="#aaa"
+											autoCorrect={false}
+										/>
+									)}
+
+									{unselectedAudienceMembers.length === 0 ? (
+										<Text style={styles.audienceEmpty}>
+											{personSearch.trim()
+												? "Nobody matches that name."
+												: "Everyone is already selected."}
+										</Text>
+									) : (
+										unselectedAudienceMembers.map(
+											(member) => (
+												<TouchableOpacity
+													key={member.userId}
+													style={styles.audienceRow}
+													onPress={() =>
+														toggleAudienceUser(
+															member.userId,
+														)
+													}
+												>
+													<Ionicons
+														name="square-outline"
+														size={22}
+														color="#999"
+													/>
+													<Text
+														style={
+															styles.audienceLabel
+														}
+													>
+														{member.displayName}
+													</Text>
+												</TouchableOpacity>
+											),
+										)
+									)}
+
+									{hiddenPersonCount > 0 && (
+										<Text style={styles.audienceEmpty}>
+											{hiddenPersonCount} more — search to
+											narrow the list.
+										</Text>
+									)}
+								</View>
+							)}
+
 							{/* Assigned Workers Section */}
 							<View style={styles.sectionContainer}>
 								<Text style={styles.sectionTitle}>People</Text>
@@ -1073,167 +1229,6 @@ const EventSubmit = ({ navigation }) => {
 									)}
 								</View>
 							</View>
-
-							{/* Who gets asked about this job */}
-							{preferences.enableAvailability && (
-								<View
-									style={[
-										styles.sectionContainer,
-										{ zIndex: 1 },
-									]}
-								>
-									<Text style={styles.sectionTitle}>
-										Who can see this job
-									</Text>
-									<Text style={styles.audienceHint}>
-										{isTargetedAudience
-											? "Only the people below will be asked about it."
-											: "Everyone who can see open jobs. Pick a group or specific people to send it only to them."}
-									</Text>
-
-									<Text style={styles.audienceSectionTitle}>
-										Groups
-									</Text>
-									{groups.length === 0 ? (
-										<Text style={styles.audienceEmpty}>
-											No groups yet — create one under
-											Settings › Worker Groups.
-										</Text>
-									) : (
-										groups.map((group) => {
-											const on =
-												audienceGroupIds.includes(
-													group.id,
-												);
-											return (
-												<TouchableOpacity
-													key={group.id}
-													style={styles.audienceRow}
-													onPress={() =>
-														setAudienceGroupIds(
-															on
-																? audienceGroupIds.filter(
-																		(g) =>
-																			g !==
-																			group.id,
-																	)
-																: [
-																		...audienceGroupIds,
-																		group.id,
-																	],
-														)
-													}
-												>
-													<Ionicons
-														name={
-															on
-																? "checkbox"
-																: "square-outline"
-														}
-														size={22}
-														color={
-															on
-																? "#2078c8"
-																: "#999"
-														}
-													/>
-													<Text
-														style={
-															styles.audienceLabel
-														}
-													>
-														{group.name}
-													</Text>
-												</TouchableOpacity>
-											);
-										})
-									)}
-
-									{/*
-									 * Specific people, for the one-off a group
-									 * cannot express. Selected names are pinned
-									 * above the search so filtering never hides
-									 * someone you already picked.
-									 */}
-									<Text style={styles.audienceSectionTitle}>
-										Specific people
-									</Text>
-
-									{selectedAudienceMembers.map((member) => (
-										<TouchableOpacity
-											key={member.userId}
-											style={styles.audienceRow}
-											onPress={() =>
-												toggleAudienceUser(
-													member.userId,
-												)
-											}
-										>
-											<Ionicons
-												name="checkbox"
-												size={22}
-												color="#2078c8"
-											/>
-											<Text style={styles.audienceLabel}>
-												{member.displayName}
-											</Text>
-										</TouchableOpacity>
-									))}
-
-									{members.length > 8 && (
-										<TextInput
-											style={styles.audienceSearch}
-											value={personSearch}
-											onChangeText={setPersonSearch}
-											placeholder="Search people"
-											placeholderTextColor="#aaa"
-											autoCorrect={false}
-										/>
-									)}
-
-									{unselectedAudienceMembers.length === 0 ? (
-										<Text style={styles.audienceEmpty}>
-											{personSearch.trim()
-												? "Nobody matches that name."
-												: "Everyone is already selected."}
-										</Text>
-									) : (
-										unselectedAudienceMembers.map(
-											(member) => (
-												<TouchableOpacity
-													key={member.userId}
-													style={styles.audienceRow}
-													onPress={() =>
-														toggleAudienceUser(
-															member.userId,
-														)
-													}
-												>
-													<Ionicons
-														name="square-outline"
-														size={22}
-														color="#999"
-													/>
-													<Text
-														style={
-															styles.audienceLabel
-														}
-													>
-														{member.displayName}
-													</Text>
-												</TouchableOpacity>
-											),
-										)
-									)}
-
-									{hiddenPersonCount > 0 && (
-										<Text style={styles.audienceEmpty}>
-											{hiddenPersonCount} more — search to
-											narrow the list.
-										</Text>
-									)}
-								</View>
-							)}
 
 							{/* Notes Section */}
 							<View
