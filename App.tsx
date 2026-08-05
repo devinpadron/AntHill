@@ -15,6 +15,33 @@ import {
 import { AppGate } from "./src/components/ui/AppGate";
 import { getCurrentAppVersion } from "./src/utils/versionUtils";
 import { recordAppLaunch } from "./src/services/appConfigService";
+import { V2_SMOKE_TEST } from "./src/constants/devFlags";
+import { UserProvider as V2UserProvider } from "./src/contexts/v2/UserContext";
+import { CompanyProvider as V2CompanyProvider } from "./src/contexts/v2/CompanyContext";
+import { UploadManagerProvider as V2UploadManagerProvider } from "./src/contexts/v2/UploadManagerContext";
+import { V2SmokeNavigator } from "./src/navigation/v2/V2SmokeNavigator";
+
+/*
+ * Dev-only harness for the v2 stack.
+ *
+ * Mounts the real v2 contexts against the `test` database, with a navigator
+ * whose route NAMES match production, so ported screens navigate exactly as
+ * they will in the real app. No NotificationProvider — pushes would only add
+ * moving parts to what is a data-path harness.
+ */
+const V2SmokeApp = () => (
+	<GestureHandlerRootView style={{ flex: 1 }}>
+		<SafeAreaProvider>
+			<V2UploadManagerProvider>
+				<V2UserProvider>
+					<V2CompanyProvider>
+						<V2SmokeNavigator />
+					</V2CompanyProvider>
+				</V2UserProvider>
+			</V2UploadManagerProvider>
+		</SafeAreaProvider>
+	</GestureHandlerRootView>
+);
 
 // Component to initialize the company context after user auth
 const CompanyInitializer = () => {
@@ -44,7 +71,7 @@ const LaunchTelemetry = () => {
 	return null;
 };
 
-const App: React.FC = () => {
+const MainApp: React.FC = () => {
 	// Add this effect to check pending navigation periodically
 	useEffect(() => {
 		// Check for pending navigation every 500ms for the first few seconds
@@ -90,5 +117,11 @@ const App: React.FC = () => {
 		</GestureHandlerRootView>
 	);
 };
+
+/*
+ * Picks the tree. No hooks here, so the branch cannot violate the rules of
+ * hooks — MainApp and V2SmokeApp each own their own state.
+ */
+const App: React.FC = () => (V2_SMOKE_TEST ? <V2SmokeApp /> : <MainApp />);
 
 export default App;
