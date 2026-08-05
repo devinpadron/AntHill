@@ -33,6 +33,7 @@ import {
 	getCompanyPreferences,
 } from "../../../services/companyService";
 import { useCompanyMembers } from "../../../hooks/v2/useCompanyMembers";
+import { useGroups } from "../../../hooks/v2/useGroups";
 import { FilterType } from "../../../types";
 
 const { width: screenWidth } = Dimensions.get("window");
@@ -117,6 +118,7 @@ const AvailabilityPage = ({ navigation }) => {
 	 */
 	const [myResponses, setMyResponses] = useState<Record<string, string>>({});
 	const { members } = useCompanyMembers(companyId ?? "");
+	const { namesFor: groupNamesFor } = useGroups(companyId ?? "");
 
 	/*
 	 * The response ids double as the invitation list, and the focus handler
@@ -159,6 +161,7 @@ const AvailabilityPage = ({ navigation }) => {
 				today,
 				visibility,
 				Object.keys(myResponsesRef.current),
+				Boolean(isAdmin),
 			);
 
 			// Days the user is already committed to, for the conflict badge.
@@ -246,6 +249,7 @@ const AvailabilityPage = ({ navigation }) => {
 						title: event.title || "Unnamed Event",
 						status: status,
 						confirmed: confirmed,
+						groupNames: groupNamesFor(event.audienceGroupIds ?? []),
 						rawData: event,
 					};
 				});
@@ -435,6 +439,34 @@ const AvailabilityPage = ({ navigation }) => {
 									{item.location}
 								</Text>
 							</View>
+
+							{/*
+							 * Which group this job went to. Only targeted jobs
+							 * carry one, so the absence of a badge reads as
+							 * "everyone" without needing its own label.
+							 */}
+							{item.groupNames?.length > 0 && (
+								<View style={styles.groupBadgeRow}>
+									{item.groupNames.map((name) => (
+										<View
+											key={name}
+											style={styles.groupBadge}
+										>
+											<Ionicons
+												name="people"
+												size={11}
+												color="#5a3ec8"
+											/>
+											<Text
+												style={styles.groupBadgeText}
+												numberOfLines={1}
+											>
+												{name}
+											</Text>
+										</View>
+									))}
+								</View>
+							)}
 						</View>
 
 						{/* Show status badge on all tabs */}
@@ -1328,6 +1360,29 @@ const styles = StyleSheet.create({
 		fontWeight: "700",
 		color: "#1F2937",
 		marginBottom: 4,
+	},
+	groupBadgeRow: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		marginTop: 6,
+	},
+	groupBadge: {
+		flexDirection: "row",
+		alignItems: "center",
+		backgroundColor: "#efeaff",
+		borderRadius: 10,
+		paddingHorizontal: 8,
+		paddingVertical: 3,
+		marginRight: 6,
+		marginBottom: 4,
+		maxWidth: 160,
+	},
+	groupBadgeText: {
+		fontSize: 11,
+		fontWeight: "600",
+		color: "#5a3ec8",
+		marginLeft: 4,
+		flexShrink: 1,
 	},
 	eventTitle: {
 		fontSize: 18,

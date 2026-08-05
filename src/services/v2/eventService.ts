@@ -583,6 +583,34 @@ export async function getOpenUpcomingEvents(
 	}
 }
 
+/**
+ * Every upcoming event with nobody assigned, targeted or not.
+ *
+ * The manager view. Targeting decides who is ASKED about a job, not who may
+ * oversee it — an owner needs to see every job still collecting availability,
+ * including ones published to a group they are not personally in, or they
+ * cannot tell that a contractor shift has gone unanswered.
+ */
+export async function getAllUnassignedUpcomingEvents(
+	companyId: string,
+	fromDateKey: string,
+): Promise<Event[]> {
+	try {
+		const snapshot = await db
+			.collection(C.events)
+			.where("companyId", "==", companyId)
+			.where("assignedCount", "==", 0)
+			.where("dateKey", ">=", fromDateKey)
+			.orderBy("dateKey")
+			.limit(DEFAULT_LIMIT)
+			.get();
+		return snapshot.docs.map(toEvent);
+	} catch (e) {
+		console.error("Error getting unassigned events", e);
+		return [];
+	}
+}
+
 /** Fetches events by id, chunked to Firestore's 30-value `in` limit. */
 export async function getEventsByIds(
 	companyId: string,
@@ -614,28 +642,37 @@ export async function getEventsByIds(
 }
 
 /**
- * The events a worker may answer availability for.
+ * The events to show on the availability screen.
  *
- * An `open` worker sees every untargeted unassigned event — exactly v1 — plus
- * anything they were specifically invited to. A `restricted` worker sees only
- * their invitations, which is the whole point of the flag: a 1099 contractor
- * is shown the jobs meant for them and nothing else.
+ * Three audiences, in order of breadth:
+ *
+ *   - a MANAGER sees every unassigned upcoming job, targeted or not. Targeting
+ *     decides who is asked, not who may oversee; an owner who could not see a
+ *     contractor shift could not tell it had gone unanswered.
+ *   - an `open` worker sees every untargeted unassigned job — exactly v1 —
+ *     plus anything they were specifically invited to.
+ *   - a `restricted` worker sees only their invitations. That is the whole
+ *     point of the flag: a 1099 contractor is shown the jobs meant for them
+ *     and nothing else.
  *
  * `invitedEventIds` comes from the caller's own eventResponses, which the
- * security rules already scope to the signed-in user. Both branches are then
- * narrowed to `assignedCount === 0`, because availability is about jobs nobody
- * is on yet; once staff are assigned the event belongs to the calendar.
+ * security rules already scope to the signed-in user. Every branch is narrowed
+ * to `assignedCount === 0`, because availability is about jobs nobody is on
+ * yet; once staff are assigned the event belongs to the calendar.
  */
 export async function getAvailabilityEvents(
 	companyId: string,
 	fromDateKey: string,
 	visibility: WorkerVisibility,
 	invitedEventIds: string[],
+	isManager = false,
 ): Promise<Event[]> {
 	const [open, invited] = await Promise.all([
-		visibility === "restricted"
-			? Promise.resolve([] as Event[])
-			: getOpenUpcomingEvents(companyId, fromDateKey),
+		isManager
+			? getAllUnassignedUpcomingEvents(companyId, fromDateKey)
+			: visibility === "restricted"
+				? Promise.resolve([] as Event[])
+				: getOpenUpcomingEvents(companyId, fromDateKey),
 		getEventsByIds(companyId, invitedEventIds),
 	]);
 
