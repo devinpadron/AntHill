@@ -283,13 +283,32 @@ export async function createEvent(
 		schemaVersion: 2,
 	});
 
+	/*
+	 * The event document is already written by this point, so a fan-out failure
+	 * cannot be reported as "creating the event failed" — the caller would
+	 * retry and produce a duplicate.
+	 *
+	 * It also must not be swallowed: an event published to a group with no
+	 * invitations behind it is invisible to exactly the people it was meant
+	 * for, which is the failure this whole feature exists to prevent. So it is
+	 * re-thrown under its own code, and the form tells the manager the event
+	 * was saved but nobody has been asked yet. syncEventAudience is
+	 * re-runnable, so re-saving fixes it.
+	 */
 	if (audienceGroupIds.length) {
-		await syncEventAudience(
-			companyId,
-			ref.id,
-			(input.dateKey as string) ?? "",
-			audienceGroupIds,
-		);
+		try {
+			await syncEventAudience(
+				companyId,
+				ref.id,
+				(input.dateKey as string) ?? "",
+				audienceGroupIds,
+			);
+		} catch {
+			const error: any = new Error("Event saved, invitations not sent");
+			error.code = "event/audience-not-notified";
+			error.eventId = ref.id;
+			throw error;
+		}
 	}
 
 	return ref.id;

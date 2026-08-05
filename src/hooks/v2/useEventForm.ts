@@ -391,6 +391,17 @@ export const useEventForm = (navigation, eventId?: string) => {
 							"One or more selected workers are not available!",
 						);
 						break;
+					/*
+					 * The event IS saved — only the invitations failed. Saying
+					 * "try again" here would produce a duplicate event, and
+					 * saying nothing would leave a job nobody was asked about.
+					 */
+					case "event/audience-not-notified":
+						Alert.alert(
+							"Event saved",
+							"The event was created, but the groups you picked have not been notified yet. Open it and save again to send the invitations.",
+						);
+						return error.eventId ?? null;
 					default:
 						Alert.alert("Error creating event, please try again");
 				}
