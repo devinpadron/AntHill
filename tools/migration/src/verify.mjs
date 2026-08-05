@@ -86,6 +86,7 @@ for (const name of [
 	C.users,
 	C.companies,
 	C.memberships,
+	C.groupJoinCodes,
 	C.events,
 	C.eventResponses,
 	C.eventChecklistStates,
@@ -237,6 +238,42 @@ check(
 	"every event carries isTargeted + both audience lists",
 	missingTargeting === 0,
 	missingTargeting ? `${missingTargeting} events` : "",
+);
+
+/*
+ * Access codes have to be unique, and nothing enforces it.
+ *
+ * `companies.accessCode` is an ordinary field — companies are provisioned by
+ * hand, so two can be given the same code, and findByAccessCode takes the
+ * first match. A duplicate silently drops a new hire into the wrong company.
+ *
+ * Group join codes cannot collide with each other (the code IS the document
+ * id) but CAN collide with a company access code, which resolveJoinCode
+ * resolves company-first — so the group code is shadowed and simply never
+ * works, with nothing anywhere to say why.
+ */
+const codeOwners = {};
+for (const doc of v2[C.companies].docs) {
+	const code = doc.data()?.accessCode;
+	if (!code) continue;
+	(codeOwners[code] = codeOwners[code] ?? []).push(`company/${doc.id}`);
+}
+for (const doc of v2[C.groupJoinCodes].docs) {
+	(codeOwners[doc.id] = codeOwners[doc.id] ?? []).push(
+		`groupCode/${doc.data()?.groupId ?? "?"}`,
+	);
+}
+let duplicateCodes = 0;
+for (const [code, owners] of Object.entries(codeOwners)) {
+	if (owners.length > 1) {
+		duplicateCodes += 1;
+		fail("ACCESS_CODE_COLLISION", { code, owners });
+	}
+}
+check(
+	"every access code resolves to exactly one place",
+	duplicateCodes === 0,
+	duplicateCodes ? `${duplicateCodes} collisions` : "",
 );
 
 let missingVisibility = 0;

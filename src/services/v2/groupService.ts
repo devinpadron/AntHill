@@ -106,8 +106,8 @@ export async function createGroup(
  *                          rotate the code without being able to enumerate the
  *                          collection either.
  *
- * They are written together in a batch. If they ever drifted, the credential
- * document wins — it is the one the rules read.
+ * They are written together in one transaction. If they ever drifted, the
+ * credential document wins — it is the one the rules read.
  */
 
 /** Codes people read off a screen and type on a phone. No 0/O/1/I/5/S. */
@@ -140,44 +140,96 @@ export async function lookupJoinCode(
 }
 
 /**
- * Issues (or rotates) a group's join code.
+ * Issues (or rotates) a group's join code, checking it is actually unused.
+ *
+ * Two ways a generated code can already mean something, and the security rules
+ * only stop one of them:
+ *
+ *   1. Another group already has it. Across companies the rules refuse the
+ *      write, but WITHIN a company they cannot tell a collision from a
+ *      legitimate rotation — the manager owns both documents — so group A's
+ *      code would silently become group B's.
+ *
+ *   2. A COMPANY access code already has it. Nothing collides at the database
+ *      level, because they live in different collections, but resolveJoinCode
+ *      tries the company first — so the group code would be shadowed and
+ *      simply never work, with no error anywhere to explain why.
+ *
+ * The existence check runs inside a transaction so it cannot lose a race with
+ * another manager issuing a code at the same moment. The company check has to
+ * sit outside it — that is a query, and transactions read documents, not
+ * queries — so it is a pre-check with a much wider target than the transaction
+ * guards. Given 30^7 codes that is the right side of the trade.
  *
  * Rotating replaces the credential document rather than editing it, since the
- * id IS the code. The old document is deleted in the same batch so a rotated
- * code stops working immediately — that is the entire point of rotating.
+ * id IS the code. The old one is deleted in the same transaction, so a rotated
+ * code stops working immediately — the entire point of rotating.
  */
+const MAX_CODE_ATTEMPTS = 5;
+
 export async function setGroupJoinCode(
 	companyId: string,
 	groupId: string,
 	visibility: WorkerVisibility,
 	previousCode?: string | null,
 ): Promise<string> {
-	const code = generateJoinCode();
-	const now = firestore.FieldValue.serverTimestamp();
+	for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt += 1) {
+		const code = generateJoinCode();
 
-	try {
-		const batch = db.batch();
-		batch.set(db.collection(C.groupJoinCodes).doc(code), {
-			code,
-			companyId,
-			groupId,
-			visibility,
-			createdAt: now,
-		});
-		if (previousCode && previousCode !== code) {
-			batch.delete(db.collection(C.groupJoinCodes).doc(previousCode));
+		// Would this be shadowed by a company access code? Same lookup order
+		// resolveJoinCode uses, so this asks the question that actually
+		// matters rather than a proxy for it.
+		const shadowed = await db
+			.collection(C.companies)
+			.where("accessCode", "==", code)
+			.limit(1)
+			.get();
+		if (!shadowed.empty) continue;
+
+		try {
+			await db.runTransaction(async (tx) => {
+				const codeRef = db.collection(C.groupJoinCodes).doc(code);
+				const existing = await tx.get(codeRef);
+				if (existing.exists) {
+					// Retried below. Thrown rather than returned so the
+					// transaction commits nothing.
+					throw new Error("CODE_TAKEN");
+				}
+
+				const now = firestore.FieldValue.serverTimestamp();
+				tx.set(codeRef, {
+					code,
+					companyId,
+					groupId,
+					visibility,
+					createdAt: now,
+				});
+				if (previousCode && previousCode !== code) {
+					tx.delete(
+						db.collection(C.groupJoinCodes).doc(previousCode),
+					);
+				}
+				tx.update(db.collection(C.groups).doc(groupId), {
+					joinCode: code,
+					joinVisibility: visibility,
+					updatedAt: now,
+				});
+			});
+
+			return code;
+		} catch (e: any) {
+			if (e?.message === "CODE_TAKEN") continue;
+			console.error("Error setting group join code", e);
+			throw e;
 		}
-		batch.update(db.collection(C.groups).doc(groupId), {
-			joinCode: code,
-			joinVisibility: visibility,
-			updatedAt: now,
-		});
-		await batch.commit();
-		return code;
-	} catch (e) {
-		console.error("Error setting group join code", e);
-		throw e;
 	}
+
+	// Five collisions across 30^7 possibilities is not bad luck, it is a broken
+	// generator or a database that is refusing writes. Either way, say so
+	// rather than handing back a code that was never stored.
+	throw new Error(
+		`Could not generate an unused join code after ${MAX_CODE_ATTEMPTS} attempts.`,
+	);
 }
 
 export async function clearGroupJoinCode(
