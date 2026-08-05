@@ -281,6 +281,14 @@ before(async () => {
 			respondedAt: null,
 		});
 
+		// A join code for the Bartenders group. The document id IS the code.
+		await setDoc(doc(db, "groupJoinCodes", "BARTEND1"), {
+			code: "BARTEND1",
+			companyId: A,
+			groupId: "g1",
+			visibility: "restricted",
+		});
+
 		// No isTargeted field at all — a v2 document written before targeting
 		// existed. Must read as open, not deny.
 		await setDoc(doc(db, "events", "eLegacy"), {
@@ -704,6 +712,179 @@ describe("v2 — a worker cannot widen their own audience", () => {
 				status: "active",
 				visibility: "open",
 				groupIds: ["g1"],
+			}),
+		);
+	});
+});
+
+describe("v2 — group join codes", () => {
+	const JOINER = "joiner";
+
+	test("a code puts the joiner in exactly that group", async () => {
+		await assertSucceeds(
+			setDoc(doc(as(JOINER), "memberships", mid(A, JOINER)), {
+				id: mid(A, JOINER),
+				companyId: A,
+				userId: JOINER,
+				role: "user",
+				status: "active",
+				visibility: "restricted",
+				groupIds: ["g1"],
+				joinedViaCode: "BARTEND1",
+			}),
+		);
+	});
+
+	test("a plain join with no code still works, ungrouped", async () => {
+		await assertSucceeds(
+			setDoc(doc(as("plain"), "memberships", mid(A, "plain")), {
+				id: mid(A, "plain"),
+				companyId: A,
+				userId: "plain",
+				role: "user",
+				status: "active",
+				visibility: "open",
+				groupIds: [],
+			}),
+		);
+	});
+
+	test("naming a group WITHOUT its code is refused", async () => {
+		// The guard that matters. Group ids are readable by any member, so
+		// without this a joiner simply writes the id they want.
+		await assertFails(
+			setDoc(doc(as("sneak1"), "memberships", mid(A, "sneak1")), {
+				id: mid(A, "sneak1"),
+				companyId: A,
+				userId: "sneak1",
+				role: "user",
+				status: "active",
+				visibility: "restricted",
+				groupIds: ["g1"],
+			}),
+		);
+	});
+
+	test("a made-up code is refused", async () => {
+		await assertFails(
+			setDoc(doc(as("sneak2"), "memberships", mid(A, "sneak2")), {
+				id: mid(A, "sneak2"),
+				companyId: A,
+				userId: "sneak2",
+				role: "user",
+				status: "active",
+				visibility: "restricted",
+				groupIds: ["g1"],
+				joinedViaCode: "NOPENOPE",
+			}),
+		);
+	});
+
+	test("a real code cannot be pointed at a DIFFERENT group", async () => {
+		await assertFails(
+			setDoc(doc(as("sneak3"), "memberships", mid(A, "sneak3")), {
+				id: mid(A, "sneak3"),
+				companyId: A,
+				userId: "sneak3",
+				role: "user",
+				status: "active",
+				visibility: "restricted",
+				groupIds: ["g3"],
+				joinedViaCode: "BARTEND1",
+			}),
+		);
+	});
+
+	test("a code cannot be used to claim extra groups", async () => {
+		await assertFails(
+			setDoc(doc(as("sneak4"), "memberships", mid(A, "sneak4")), {
+				id: mid(A, "sneak4"),
+				companyId: A,
+				userId: "sneak4",
+				role: "user",
+				status: "active",
+				visibility: "restricted",
+				groupIds: ["g1", "g3"],
+				joinedViaCode: "BARTEND1",
+			}),
+		);
+	});
+
+	test("a code cannot be used to pick a softer visibility", async () => {
+		// The code decides the visibility, not the joiner. Otherwise a
+		// contractor lands open and sees every job in the company.
+		await assertFails(
+			setDoc(doc(as("sneak5"), "memberships", mid(A, "sneak5")), {
+				id: mid(A, "sneak5"),
+				companyId: A,
+				userId: "sneak5",
+				role: "user",
+				status: "active",
+				visibility: "open",
+				groupIds: ["g1"],
+				joinedViaCode: "BARTEND1",
+			}),
+		);
+	});
+
+	test("a code cannot be replayed against another company", async () => {
+		await assertFails(
+			setDoc(doc(as("sneak6"), "memberships", mid(B, "sneak6")), {
+				id: mid(B, "sneak6"),
+				companyId: B,
+				userId: "sneak6",
+				role: "user",
+				status: "active",
+				visibility: "restricted",
+				groupIds: ["g1"],
+				joinedViaCode: "BARTEND1",
+			}),
+		);
+	});
+
+	test("an EXISTING member cannot re-group themselves with a code", async () => {
+		// The whole design rests on this: create applies only to a document
+		// that does not exist, and removal is a status change rather than a
+		// delete, so no current or former member can ever take the join path
+		// again. Changing your own groups stays manager-only.
+		await assertFails(
+			updateDoc(doc(as(ERIN), "memberships", mid(A, ERIN)), {
+				groupIds: ["g1"],
+				joinedViaCode: "BARTEND1",
+			}),
+		);
+	});
+
+	test("the code collection cannot be enumerated", async () => {
+		// Knowing a code is the credential, so being able to list them would
+		// hand over every group in every company at once.
+		await assertFails(getDocs(collection(as(BOB), "groupJoinCodes")));
+	});
+
+	test("but a code you already know can be read", async () => {
+		await assertSucceeds(
+			getDoc(doc(as(BOB), "groupJoinCodes", "BARTEND1")),
+		);
+	});
+
+	test("a plain member cannot mint a code", async () => {
+		await assertFails(
+			setDoc(doc(as(BOB), "groupJoinCodes", "SNEAKY1"), {
+				code: "SNEAKY1",
+				companyId: A,
+				groupId: "g1",
+				visibility: "restricted",
+			}),
+		);
+	});
+
+	test("a manager can", async () => {
+		await assertSucceeds(
+			setDoc(doc(as(ALICE), "groupJoinCodes", "NEWCODE1"), {
+				code: "NEWCODE1",
+				companyId: A,
+				groupId: "g1",
+				visibility: "open",
 			}),
 		);
 	});

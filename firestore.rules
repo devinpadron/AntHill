@@ -200,6 +200,30 @@ service cloud.firestore {
     }
 
     /*
+     * A join that carries a group assignment, backed by that group's code.
+     *
+     * The joiner writes the code they used onto their own membership, and this
+     * checks it against groupJoinCodes/{code} — which they could only have
+     * addressed by knowing it. So a joiner can land in the group whose code
+     * they were given, and no other.
+     *
+     * This is the ONLY path that may set groupIds or visibility on a create,
+     * and it is safe for existing members because create applies solely to a
+     * document that does not yet exist. Removal is a status change rather than
+     * a delete, so a current or former member can never take this path again;
+     * changing your own groups still requires update, which is manager-only.
+     */
+    function v2JoinedViaValidCode() {
+      let used = request.resource.data.get("joinedViaCode", "");
+      let ref = /databases/$(database)/documents/groupJoinCodes/$(used);
+      return used != ""
+        && exists(ref)
+        && get(ref).data.companyId == request.resource.data.companyId
+        && request.resource.data.get("groupIds", []) == [get(ref).data.groupId]
+        && request.resource.data.get("visibility", "open") == get(ref).data.visibility;
+    }
+
+    /*
      * An event nobody was specifically invited to, i.e. open to the company.
      *
      * Defaults to open when the field is absent: reading a missing map key
@@ -263,16 +287,18 @@ service cloud.firestore {
                     && membershipId == request.resource.data.companyId + "_" + uid()
                     && request.resource.data.role == "user"
                     && request.resource.data.status == "active"
-                    // Joining cannot put you in a group or change what you can
-                    // see. Without this, a restricted worker could rejoin by
-                    // access code and hand themselves an audience.
+                    // Joining may only place you in a group if you presented
+                    // that group's join code. See v2JoinedViaValidCode.
                     //
                     // Read with defaults: a missing key raises an error in
                     // rules, which DENIES rather than falling through, so
                     // reading these directly would reject every join issued by
                     // a client that does not send them.
-                    && request.resource.data.get("visibility", "open") == "open"
-                    && request.resource.data.get("groupIds", []) == [];
+                    && (
+                      (request.resource.data.get("visibility", "open") == "open"
+                       && request.resource.data.get("groupIds", []) == [])
+                      || v2JoinedViaValidCode()
+                    );
       allow update: if v2IsManager(resource.data.companyId)
                     // A member may keep their own denormalized profile fresh,
                     // but never their own role, status, visibility or groups.
@@ -292,6 +318,22 @@ service cloud.firestore {
       allow read: if v2IsMember(resource.data.companyId);
       allow create: if v2IsManager(request.resource.data.companyId);
       allow update, delete: if v2IsManager(resource.data.companyId);
+    }
+
+    /*
+     * Group join codes. THE DOCUMENT ID IS THE CODE.
+     *
+     * `get` is open to any signed-in user because addressing the document
+     * already requires knowing the code — that is the credential. `list` is
+     * denied, so the collection cannot be enumerated and codes cannot be
+     * harvested. This is the same trust model as the company access code,
+     * which is likewise a shared secret that lets a stranger in.
+     */
+    match /groupJoinCodes/{code} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create, update, delete: if v2IsManager(request.resource.data.companyId)
+                                       || v2IsManager(resource.data.companyId);
     }
 
     // ---- company library -------------------------------------------------

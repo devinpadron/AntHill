@@ -86,8 +86,10 @@ export const useProfile = () => {
 			);
 			setIsLoading(false);
 
-			// The service returns { companyId } or null; callers want the id.
-			return success ? success.companyId : false;
+			// The service returns { companyId, groupId? } or null. The group is
+			// passed through so the screen can say which one they landed in —
+			// a code that silently changes what jobs you can see should say so.
+			return success ?? false;
 		} catch (error) {
 			setIsLoading(false);
 			console.error("Error joining company:", error);

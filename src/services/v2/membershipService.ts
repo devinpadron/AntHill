@@ -4,6 +4,7 @@ import db from "../../lib/db";
 import { C, membershipId } from "../../constants/paths";
 import { Membership } from "../../types/v2";
 import { Role } from "../../types";
+import { lookupJoinCode } from "./groupService";
 
 /*
  * Company membership.
@@ -121,7 +122,16 @@ export async function getMembershipsForUser(
 }
 
 /**
- * Joins a company by access code.
+ * Joins a company by code.
+ *
+ * ONE field accepts two kinds of code. A company access code puts you in the
+ * company with no group, exactly as before. A GROUP join code puts you in the
+ * company AND straight into that group, with the visibility the manager chose
+ * for it — which is how a 1099 contractor ends up restricted from their first
+ * launch without anyone having to remember to set it afterwards.
+ *
+ * The company code is tried first, so an existing code can never be shadowed
+ * by a group code that happens to collide.
  *
  * A transaction, so the membership and the user's active company move
  * together. v1 did these as two separate writes, which is the orphan window
@@ -130,7 +140,7 @@ export async function getMembershipsForUser(
 export async function joinCompanyWithAccessCode(
 	userId: string,
 	accessCode: string,
-): Promise<{ companyId: string } | null> {
+): Promise<{ companyId: string; groupId?: string } | null> {
 	try {
 		const matches = await db
 			.collection(C.companies)
@@ -138,10 +148,18 @@ export async function joinCompanyWithAccessCode(
 			.limit(1)
 			.get();
 
-		if (matches.empty) return null;
+		/*
+		 * Falls through to a group code only when the company lookup misses.
+		 * The group code is read by document id — the id IS the code — so a
+		 * wrong code is a miss, not an enumeration.
+		 */
+		const groupCode = matches.empty
+			? await lookupJoinCode(accessCode)
+			: null;
 
-		const company = matches.docs[0];
-		const companyId = company.id;
+		if (matches.empty && !groupCode) return null;
+
+		const companyId = groupCode ? groupCode.companyId : matches.docs[0].id;
 		const id = membershipId(companyId, userId);
 
 		return await db.runTransaction(async (tx) => {
@@ -170,13 +188,20 @@ export async function joinCompanyWithAccessCode(
 				email: profile.email ?? "",
 				phone: profile.phone ?? null,
 				status: "active",
-				// Written explicitly, not left to a default. A membership
-				// without these fields is skipped by every equality and
-				// array-contains filter that uses them, so a new joiner would
-				// be invisible to group resolution — and the rules pin both
-				// values anyway, so a worker cannot join pre-grouped.
-				visibility: "open",
-				groupIds: [],
+				/*
+				 * Written explicitly, not left to a default. A membership
+				 * without these fields is skipped by every equality and
+				 * array-contains filter that uses them, so a new joiner would
+				 * be invisible to group resolution.
+				 *
+				 * `joinedViaCode` is not decoration — the security rules read
+				 * it back to confirm that a join claiming a group really
+				 * presented that group's code. Dropping it here would make
+				 * every group join fail.
+				 */
+				visibility: groupCode ? groupCode.visibility : "open",
+				groupIds: groupCode ? [groupCode.groupId] : [],
+				...(groupCode ? { joinedViaCode: groupCode.code } : {}),
 				joinedAt: now,
 				createdAt: now,
 				updatedAt: now,
@@ -187,7 +212,9 @@ export async function joinCompanyWithAccessCode(
 				updatedAt: now,
 			});
 
-			return { companyId };
+			return groupCode
+				? { companyId, groupId: groupCode.groupId }
+				: { companyId };
 		});
 	} catch (e) {
 		console.error("Error joining company", e);

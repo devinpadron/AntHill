@@ -116,13 +116,15 @@ const ProfilePage = ({ navigation }) => {
 						return;
 					}
 
-					const companyId = await joinCompany(accessCode);
+					const joined = await joinCompany(accessCode);
 
-					if (companyId) {
+					if (joined) {
 						showConfirmation(
 							"Success",
-							"You've successfully joined the company. Would you like to switch to it now?",
-							() => handleCompanyChange(companyId),
+							joined.groupId
+								? "You've joined the company and been added to a work group. Would you like to switch to it now?"
+								: "You've successfully joined the company. Would you like to switch to it now?",
+							() => handleCompanyChange(joined.companyId),
 						);
 					} else {
 						Alert.alert(

@@ -17,6 +17,7 @@ export const C = {
 	companyPreferences: "companyPreferences",
 	memberships: "memberships",
 	groups: "groups",
+	groupJoinCodes: "groupJoinCodes",
 	formSchemas: "formSchemas",
 	events: "events",
 	eventResponses: "eventResponses",

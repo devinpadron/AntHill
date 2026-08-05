@@ -2,7 +2,12 @@ import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
 import firestore from "@react-native-firebase/firestore";
 import db from "../../lib/db";
 import { C, membershipId } from "../../constants/paths";
-import { Group, Membership } from "../../types/v2";
+import {
+	Group,
+	GroupJoinCode,
+	Membership,
+	WorkerVisibility,
+} from "../../types/v2";
 
 /*
  * Worker groups.
@@ -73,6 +78,8 @@ export async function createGroup(
 			id: ref.id,
 			companyId,
 			name: name.trim(),
+			joinCode: null,
+			joinVisibility: "open",
 			createdAt: now,
 			updatedAt: now,
 			schemaVersion: 2,
@@ -80,6 +87,113 @@ export async function createGroup(
 		return ref.id;
 	} catch (e) {
 		console.error("Error creating group", e);
+		throw e;
+	}
+}
+
+/*
+ * Join codes.
+ *
+ * The code lives in TWO places, deliberately:
+ *
+ *   groupJoinCodes/{code}  is the credential. Its id is the code itself, so
+ *                          reading it requires already knowing it, and `list`
+ *                          is denied so it cannot be enumerated. This is what
+ *                          the security rules check when a join tries to place
+ *                          someone in a group.
+ *
+ *   groups/{id}.joinCode   is a convenience copy, so a manager can see and
+ *                          rotate the code without being able to enumerate the
+ *                          collection either.
+ *
+ * They are written together in a batch. If they ever drifted, the credential
+ * document wins — it is the one the rules read.
+ */
+
+/** Codes people read off a screen and type on a phone. No 0/O/1/I/5/S. */
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRTUVWXYZ2346789";
+
+export function generateJoinCode(length = 7): string {
+	let out = "";
+	for (let i = 0; i < length; i += 1) {
+		out += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+	}
+	return out;
+}
+
+export async function lookupJoinCode(
+	code: string,
+): Promise<GroupJoinCode | null> {
+	const trimmed = code.trim().toUpperCase();
+	if (!trimmed) return null;
+
+	try {
+		const doc = await db.collection(C.groupJoinCodes).doc(trimmed).get();
+		return doc.exists ? (doc.data() as GroupJoinCode) : null;
+	} catch (e) {
+		// A miss is the normal case for a company access code, so this is not
+		// worth shouting about — the caller falls through to the company
+		// lookup.
+		console.error("Error looking up join code", e);
+		return null;
+	}
+}
+
+/**
+ * Issues (or rotates) a group's join code.
+ *
+ * Rotating replaces the credential document rather than editing it, since the
+ * id IS the code. The old document is deleted in the same batch so a rotated
+ * code stops working immediately — that is the entire point of rotating.
+ */
+export async function setGroupJoinCode(
+	companyId: string,
+	groupId: string,
+	visibility: WorkerVisibility,
+	previousCode?: string | null,
+): Promise<string> {
+	const code = generateJoinCode();
+	const now = firestore.FieldValue.serverTimestamp();
+
+	try {
+		const batch = db.batch();
+		batch.set(db.collection(C.groupJoinCodes).doc(code), {
+			code,
+			companyId,
+			groupId,
+			visibility,
+			createdAt: now,
+		});
+		if (previousCode && previousCode !== code) {
+			batch.delete(db.collection(C.groupJoinCodes).doc(previousCode));
+		}
+		batch.update(db.collection(C.groups).doc(groupId), {
+			joinCode: code,
+			joinVisibility: visibility,
+			updatedAt: now,
+		});
+		await batch.commit();
+		return code;
+	} catch (e) {
+		console.error("Error setting group join code", e);
+		throw e;
+	}
+}
+
+export async function clearGroupJoinCode(
+	groupId: string,
+	code: string,
+): Promise<void> {
+	try {
+		const batch = db.batch();
+		batch.delete(db.collection(C.groupJoinCodes).doc(code));
+		batch.update(db.collection(C.groups).doc(groupId), {
+			joinCode: null,
+			updatedAt: firestore.FieldValue.serverTimestamp(),
+		});
+		await batch.commit();
+	} catch (e) {
+		console.error("Error clearing group join code", e);
 		throw e;
 	}
 }
@@ -112,6 +226,7 @@ export async function renameGroup(
 export async function deleteGroup(
 	companyId: string,
 	groupId: string,
+	joinCode?: string | null,
 ): Promise<void> {
 	try {
 		const members = await db
@@ -129,6 +244,12 @@ export async function deleteGroup(
 				groupIds: firestore.FieldValue.arrayRemove(groupId),
 				updatedAt: now,
 			});
+		}
+		// Revoke the credential too. A code left behind would keep admitting
+		// people to a group that no longer exists, and since the collection
+		// cannot be listed, nobody would ever find it to clean it up.
+		if (joinCode) {
+			batch.delete(db.collection(C.groupJoinCodes).doc(joinCode));
 		}
 		batch.delete(db.collection(C.groups).doc(groupId));
 

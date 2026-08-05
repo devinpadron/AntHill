@@ -64,6 +64,14 @@ export interface Membership extends BaseDoc, CompanyScoped {
 	visibility: WorkerVisibility;
 	/** Groups this worker belongs to. Managers publish events to groups. */
 	groupIds: string[];
+	/**
+	 * The group join code this membership was created with, if any.
+	 *
+	 * Load-bearing rather than informational: the security rules read it back
+	 * to confirm that a join claiming a group actually presented that group's
+	 * code. See `v2JoinedViaValidCode` in firestore.rules.
+	 */
+	joinedViaCode?: string;
 	joinedAt: Timestamp;
 }
 
@@ -78,6 +86,31 @@ export type WorkerVisibility = "open" | "restricted";
  */
 export interface Group extends BaseDoc, CompanyScoped {
 	name: string;
+	/**
+	 * A join code that drops whoever uses it straight into this group.
+	 *
+	 * Mirrored into `groupJoinCodes/{code}`, which is what the join actually
+	 * validates against. Held here only so a manager can see and rotate it.
+	 */
+	joinCode: string | null;
+	/** What `visibility` a worker joining with that code is given. */
+	joinVisibility: WorkerVisibility;
+}
+
+/**
+ * groupJoinCodes/{code}   — the document id IS the code.
+ *
+ * Addressed by id and never queried, which is the whole point: `list` is
+ * denied, so the collection cannot be enumerated, and you can only read a code
+ * you already know. That is what lets the membership rule accept a group
+ * assignment at join time without letting a joiner name any group they like.
+ */
+export interface GroupJoinCode {
+	code: string;
+	companyId: string;
+	groupId: string;
+	visibility: WorkerVisibility;
+	createdAt: Timestamp;
 }
 
 /** companyPreferences/{companyId} */

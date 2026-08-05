@@ -18,9 +18,11 @@ import { useUser } from "../../../../contexts/v2/UserContext";
 import { useGroups } from "../../../../hooks/v2/useGroups";
 import { useCompanyMembers } from "../../../../hooks/v2/useCompanyMembers";
 import {
+	clearGroupJoinCode,
 	createGroup,
 	deleteGroup,
 	renameGroup,
+	setGroupJoinCode,
 } from "../../../../services/v2/groupService";
 
 /*
@@ -97,6 +99,62 @@ const WorkerGroups = ({ navigation }) => {
 		);
 	};
 
+	/*
+	 * Issues or rotates the group's join code.
+	 *
+	 * Rotating is destructive on purpose — the old code stops working the
+	 * moment the new one exists, which is the only reason to rotate.
+	 */
+	const issueCode = (group, visibility) => {
+		const go = async () => {
+			try {
+				await setGroupJoinCode(
+					companyId ?? "",
+					group.id,
+					visibility,
+					group.joinCode,
+				);
+			} catch {
+				Alert.alert("Could not create code", "Please try again.");
+			}
+		};
+
+		if (!group.joinCode) return go();
+
+		Alert.alert(
+			"Replace this code?",
+			`Anyone still holding ${group.joinCode} will no longer be able to join. People already in the group are unaffected.`,
+			[
+				{ text: "Cancel", style: "cancel" },
+				{ text: "Replace", style: "destructive", onPress: go },
+			],
+		);
+	};
+
+	const revokeCode = (group) => {
+		Alert.alert(
+			"Turn off the join code?",
+			`${group.joinCode} will stop working. People already in the group stay in it.`,
+			[
+				{ text: "Cancel", style: "cancel" },
+				{
+					text: "Turn off",
+					style: "destructive",
+					onPress: async () => {
+						try {
+							await clearGroupJoinCode(group.id, group.joinCode);
+						} catch {
+							Alert.alert(
+								"Could not remove code",
+								"Please try again.",
+							);
+						}
+					},
+				},
+			],
+		);
+	};
+
 	const remove = (group) => {
 		const count = counts[group.id] ?? 0;
 		Alert.alert(
@@ -111,7 +169,11 @@ const WorkerGroups = ({ navigation }) => {
 					style: "destructive",
 					onPress: async () => {
 						try {
-							await deleteGroup(companyId ?? "", group.id);
+							await deleteGroup(
+								companyId ?? "",
+								group.id,
+								group.joinCode,
+							);
 						} catch {
 							Alert.alert(
 								"Could not delete group",
@@ -127,29 +189,103 @@ const WorkerGroups = ({ navigation }) => {
 	const renderItem = ({ item }) => {
 		const count = counts[item.id] ?? 0;
 		return (
-			<View style={styles.row}>
-				<View style={styles.rowMain}>
-					<Text style={styles.rowName}>{item.name}</Text>
-					<Text style={styles.rowMeta}>
-						{count === 0
-							? "No workers yet"
-							: `${count} ${count === 1 ? "worker" : "workers"}`}
-					</Text>
+			<View style={styles.card}>
+				<View style={styles.row}>
+					<View style={styles.rowMain}>
+						<Text style={styles.rowName}>{item.name}</Text>
+						<Text style={styles.rowMeta}>
+							{count === 0
+								? "No workers yet"
+								: `${count} ${count === 1 ? "worker" : "workers"}`}
+						</Text>
+					</View>
+					<TouchableOpacity
+						style={styles.rowAction}
+						onPress={() => rename(item)}
+						accessibilityLabel={`Rename ${item.name}`}
+					>
+						<Ionicons
+							name="pencil-outline"
+							size={18}
+							color="#2078c8"
+						/>
+					</TouchableOpacity>
+					<TouchableOpacity
+						style={styles.rowAction}
+						onPress={() => remove(item)}
+						accessibilityLabel={`Delete ${item.name}`}
+					>
+						<Ionicons
+							name="trash-outline"
+							size={18}
+							color="#d83030"
+						/>
+					</TouchableOpacity>
 				</View>
-				<TouchableOpacity
-					style={styles.rowAction}
-					onPress={() => rename(item)}
-					accessibilityLabel={`Rename ${item.name}`}
-				>
-					<Ionicons name="pencil-outline" size={18} color="#2078c8" />
-				</TouchableOpacity>
-				<TouchableOpacity
-					style={styles.rowAction}
-					onPress={() => remove(item)}
-					accessibilityLabel={`Delete ${item.name}`}
-				>
-					<Ionicons name="trash-outline" size={18} color="#d83030" />
-				</TouchableOpacity>
+
+				{/*
+				 * The join code. Someone who signs up with it lands in this
+				 * group already, so a contractor is restricted from their
+				 * first launch instead of depending on someone remembering to
+				 * set it afterwards.
+				 */}
+				{item.joinCode ? (
+					<View style={styles.codePanel}>
+						<View style={{ flex: 1 }}>
+							<Text style={styles.codeValue}>
+								{item.joinCode}
+							</Text>
+							<Text style={styles.codeMeta}>
+								Joins this group ·{" "}
+								{item.joinVisibility === "restricted"
+									? "invited jobs only"
+									: "sees all open jobs"}
+							</Text>
+						</View>
+						<TouchableOpacity
+							style={styles.codeAction}
+							onPress={() =>
+								issueCode(item, item.joinVisibility ?? "open")
+							}
+						>
+							<Text style={styles.codeActionText}>New code</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={styles.codeAction}
+							onPress={() => revokeCode(item)}
+						>
+							<Text
+								style={[
+									styles.codeActionText,
+									{ color: "#d83030" },
+								]}
+							>
+								Off
+							</Text>
+						</TouchableOpacity>
+					</View>
+				) : (
+					<View style={styles.codePanel}>
+						<Text style={styles.codeHint}>
+							No join code. Create one so new hires land straight
+							in this group.
+						</Text>
+						<TouchableOpacity
+							style={styles.codeAction}
+							onPress={() => issueCode(item, "open")}
+						>
+							<Text style={styles.codeActionText}>Open</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={styles.codeAction}
+							onPress={() => issueCode(item, "restricted")}
+						>
+							<Text style={styles.codeActionText}>
+								Contractor
+							</Text>
+						</TouchableOpacity>
+					</View>
+				)}
 			</View>
 		);
 	};
@@ -287,14 +423,34 @@ const styles = StyleSheet.create({
 		marginLeft: 10,
 	},
 	listContent: { paddingHorizontal: 16, paddingBottom: 32 },
+	card: {
+		backgroundColor: "#fff",
+		borderRadius: 10,
+		marginBottom: 10,
+		overflow: "hidden",
+	},
 	row: {
 		flexDirection: "row",
 		alignItems: "center",
-		backgroundColor: "#fff",
-		borderRadius: 10,
 		padding: 14,
-		marginBottom: 10,
 	},
+	codePanel: {
+		flexDirection: "row",
+		alignItems: "center",
+		backgroundColor: "#f6f7fb",
+		paddingHorizontal: 14,
+		paddingVertical: 10,
+	},
+	codeValue: {
+		fontSize: 17,
+		fontWeight: "700",
+		color: "#2b2b45",
+		letterSpacing: 2,
+	},
+	codeMeta: { fontSize: 11, color: "#888", marginTop: 2 },
+	codeHint: { flex: 1, fontSize: 12, color: "#888", paddingRight: 8 },
+	codeAction: { paddingHorizontal: 8, paddingVertical: 6 },
+	codeActionText: { fontSize: 12, fontWeight: "700", color: "#2078c8" },
 	rowMain: { flex: 1, paddingRight: 8 },
 	rowName: { fontSize: 16, fontWeight: "600", color: "#222" },
 	rowMeta: { fontSize: 13, color: "#888", marginTop: 2 },

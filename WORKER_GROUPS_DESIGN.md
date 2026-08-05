@@ -8,11 +8,15 @@ could confirm or decline it.
 
 ```
 groups/{groupId}
-  { id, companyId, name, createdAt, updatedAt, schemaVersion }
+  { id, companyId, name, joinCode|null, joinVisibility, ... }
+
+groupJoinCodes/{code}          // the document id IS the code
+  { code, companyId, groupId, visibility, createdAt }
 
 memberships/{companyId}_{userId}
   + visibility: "open" | "restricted"     // default "open"
   + groupIds: string[]                    // default []
+  + joinedViaCode?: string                // the code that placed them there
 
 events/{eventId}
   + audienceGroupIds: string[]            // default []
@@ -93,6 +97,49 @@ memberships: companyId · groupIds[]
 groups:      companyId · name
 ```
 
+## Join codes
+
+A group can carry its own join code. Someone who joins with it lands in the
+company _and_ in that group, with the visibility the manager picked — so a 1099
+contractor is restricted from their first launch instead of depending on
+someone remembering to set it afterwards.
+
+One field accepts both kinds of code. The company access code is tried first,
+so an existing code can never be shadowed by a group code that collides.
+
+### Why this does not reintroduce self-assignment
+
+The membership `create` rule pins `groupIds == []` precisely so a joiner cannot
+name any group they like — group ids are readable by every member. A code has
+to beat that guard without weakening it.
+
+`groupJoinCodes/{code}` uses **the code as the document id**. `get` is open to
+any signed-in user because addressing the document already requires knowing the
+code — that is the credential — and `list` is denied, so the collection cannot
+be enumerated. The joiner writes the code onto their own membership, and
+`v2JoinedViaValidCode` checks it resolves to that company, that one group, and
+that visibility.
+
+The design rests on `create` applying **only to a document that does not
+exist**. Removal is a status change rather than a delete, so no current or
+former member can ever take the join path again; changing your own groups still
+requires `update`, which is manager-only. Eight rules tests cover the attacks:
+naming a group with no code, a made-up code, a real code pointed at a different
+group, a code claiming extra groups, a code claiming a softer visibility, a
+code replayed against another company, an existing member re-grouping
+themselves, and enumerating the collection. All eight were confirmed by
+injection.
+
+**Residual, accepted:** `joinedViaCode` persists on the membership, and members
+can read each other's memberships, so a member can learn their company's group
+codes. They cannot use one themselves — there is no create path left for them —
+but they could pass it to an outsider, who would land in that group rather than
+ungrouped. Compare to today: that member can already pass on the company access
+code, so the marginal leak is _which group_, inside a company they could already
+let someone into. Managers rotate codes from the Worker Groups screen. Closing
+it properly means doing the join in a Cloud Function with admin credentials,
+which is the upgrade path if it ever matters.
+
 ## Enforcement
 
 **The create/update split on `eventResponses` is the load-bearing rule.**
@@ -168,6 +215,12 @@ pre-change `test` data they fail on 657 events and 90 memberships.
 
 ## Known gaps
 
+- **Group codes do not work at SIGNUP yet**, only via "Join company" on the
+  profile screen. `src/hooks/useSignUp.ts` still writes the v1 membership
+  (`Companies/{c}/Users/{uid}`) and there is no v2 auth stack at all — that is
+  a pre-existing cutover blocker, not something this feature introduced, but it
+  is the path a new hire actually takes. Porting the auth stack is cutover
+  work.
 - **`Alert.prompt` is iOS-only**, so renaming a group is a no-op on Android.
   Android is out of scope (all users are on iOS), and the call is written
   `Alert.prompt?.()` so it cannot crash — but it would need a modal before any
