@@ -2,7 +2,13 @@ export default {
 	expo: {
 		name: "AntHill",
 		slug: "AntHill",
-		version: "1.0.100",
+		// 1.1.x is the v2-schema line. The minor bump is deliberate: it makes the
+		// v1/v2 boundary legible in a support conversation ("are you on 1.0 or
+		// 1.1?"), which matters during a cutover where the two read different
+		// databases. required_version stays 1.0.100 until the migration window —
+		// raising it now would force everyone onto a build that then gates itself
+		// behind activeVersion 1.
+		version: "1.1.0",
 		orientation: "portrait",
 		userInterfaceStyle: "light",
 		// SDK 54 defaults the New Architecture on. Staying on the legacy
