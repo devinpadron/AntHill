@@ -50,8 +50,6 @@ const TimeEntryDetails = ({ route, navigation }) => {
 	const { entryId, userId: passedUserId } = route.params;
 	const entryIdArray = Array.isArray(entryId) ? entryId : [entryId];
 
-	console.log("Entry IDs:", entryIdArray);
-
 	const insets = useSafeAreaInsets();
 	const { userId: currentUserId, companyId, isAdmin } = useUser();
 	const { byUserId: membersById } = useCompanyMembers(companyId ?? "");
@@ -642,6 +640,10 @@ const TimeEntryDetails = ({ route, navigation }) => {
 						attachmentMap={attachmentMap}
 						connectedEvents={connectedEvents[entry.id] || []}
 						onFieldUpdate={handleFieldUpdate}
+						timeEntrySchema={
+							schemasByEntry[entry.id]?.timeEntrySchema
+						}
+						eventSchema={schemasByEntry[entry.id]?.eventSchema}
 					/>
 				))}
 			</ScrollView>
@@ -652,6 +654,10 @@ const TimeEntryDetails = ({ route, navigation }) => {
 				visible={editModalVisible}
 				snapPoints={editSnapPoints}
 				timeEntry={currentEditEntry}
+				timeEntrySchema={
+					schemasByEntry[currentEditEntry?.id]?.timeEntrySchema
+				}
+				eventSchema={schemasByEntry[currentEditEntry?.id]?.eventSchema}
 				editNotes={editNotes}
 				editChangeSummary={editChangeSummary}
 				setEditNotes={setEditNotes}

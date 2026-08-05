@@ -9,14 +9,60 @@ import { useUser } from "../../contexts/UserContext";
 import { getChecklistsByIds } from "../../services/libraryService";
 import { UploadProgressMap } from "../../contexts/UploadManagerContext";
 import { styles } from "./CustomFormRender.styles";
+import { FormField, FormFieldType } from "../../types";
 
-// Update the props interface to include the missing properties
+/**
+ * A form schema plus the local, editable copy of its fields.
+ *
+ * Not the stored `FormSchema` itself: schema documents are immutable, and this
+ * component mutates `fields` in place while a checklist field resolves its
+ * items. Structural so callers can pass either a loaded schema or one they
+ * assembled.
+ */
+export type RenderableField = FormField & {
+	/** Local dropdown state. UI only — never persisted. */
+	isOpen?: boolean;
+};
+
+export type RenderableForm = {
+	title?: string;
+	description?: string;
+	fields: RenderableField[];
+};
+
+/*
+ * DRAFT response values, deliberately not `FormResponses`.
+ *
+ * While the form is open a media field holds SelectableAttachment[] and a
+ * multiSelect holds string[] — neither of which the persisted
+ * `FormResponseValue` union describes. That union currently has no consumers
+ * anywhere in the app, so it is an unverified model rather than an enforced
+ * one, and narrowing to it here would encode a guess about what actually
+ * reaches Firestore. Left loose until the submit path is typed end to end.
+ */
+type DraftResponses = Record<string, any>;
+
+/**
+ * DropDownPicker's `setOpen` passes either the next value or an updater.
+ * Storing the updater unchanged would leave `isOpen` holding a function, which
+ * is truthy — the dropdown would never close.
+ */
+const resolveOpen = (
+	next: boolean | ((prev: boolean) => boolean),
+	prev: boolean | undefined,
+): boolean => (typeof next === "function" ? next(prev ?? false) : next);
+
 interface CustomFormRenderProps {
-	customForm: any;
-	formResponses: any;
-	formErrors: any;
-	onFieldChange: (fieldId: string, fieldType: string, value: any) => void;
-	setCustomForm: React.Dispatch<React.SetStateAction<any>>;
+	customForm: RenderableForm | null;
+	formResponses: DraftResponses;
+	/** fieldId -> validation message, for fields that failed submit. */
+	formErrors: Record<string, string>;
+	onFieldChange: (
+		fieldId: string,
+		fieldType: FormFieldType,
+		value: any,
+	) => void;
+	setCustomForm: React.Dispatch<React.SetStateAction<RenderableForm | null>>;
 	/* The v2 upload manager's map, which also reports "cancelled". */
 	uploadProgress?: UploadProgressMap;
 	deletionQueue?: string[];
@@ -210,20 +256,27 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 						<DropDownPicker
 							open={field.isOpen}
 							value={formResponses[field.id] || null}
-							items={(field.options || []).map((option) => ({
-								label: option,
-								value: option,
-							}))}
+							items={(field.selectOptions || []).map(
+								(option) => ({
+									label: option,
+									value: option,
+								}),
+							)}
 							setOpen={(open) => {
-								// Close all other dropdowns when opening this one
-								setCustomForm({
-									...customForm,
-									fields: customForm.fields.map((f) =>
-										f.id === field.id
-											? { ...f, isOpen: open }
-											: { ...f, isOpen: false },
-									),
-								});
+								// Close all other dropdowns when opening this one.
+								// DropDownPicker may hand back an updater rather
+								// than a boolean, which would otherwise be stored
+								// as-is and read as permanently open.
+								setCustomForm((prevForm) => ({
+									...prevForm,
+									fields: prevForm.fields.map((f) => ({
+										...f,
+										isOpen:
+											f.id === field.id
+												? resolveOpen(open, f.isOpen)
+												: false,
+									})),
+								}));
 							}}
 							setValue={(callback) => {
 								const value = callback(formResponses[field.id]);
@@ -262,18 +315,22 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 							multiple={true}
 							open={field.isOpen}
 							value={multiSelect}
-							items={(field.options || []).map((option) => ({
-								label: option,
-								value: option,
-							}))}
+							items={(field.selectOptions || []).map(
+								(option) => ({
+									label: option,
+									value: option,
+								}),
+							)}
 							setOpen={(open) => {
 								setCustomForm((prevForm) => ({
 									...prevForm,
-									fields: prevForm.fields.map((f) =>
-										f.id === field.id
-											? { ...f, isOpen: open }
-											: { ...f, isOpen: false },
-									),
+									fields: prevForm.fields.map((f) => ({
+										...f,
+										isOpen:
+											f.id === field.id
+												? resolveOpen(open, f.isOpen)
+												: false,
+									})),
 								}));
 							}}
 							setValue={setMultiSelect}
@@ -300,7 +357,7 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 								paddingHorizontal: 10,
 								paddingBottom: 20,
 							}}
-							searchable={field.options?.length > 8}
+							searchable={field.selectOptions?.length > 8}
 							closeAfterSelecting={false}
 							disableBorderRadius={false}
 							itemSeparator={true}

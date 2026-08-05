@@ -17,6 +17,9 @@ export type FormFieldType =
 	| "currency"
 	| "quantity"
 	| "date"
+	// Offered by the admin editor and rendered everywhere, but omitted from
+	// this union until now, so nothing type-checked a "time" field.
+	| "time"
 	| "checkbox"
 	| "select"
 	| "multiSelect"
@@ -36,8 +39,17 @@ export interface FormField {
 	useMultiplier?: boolean;
 	multiplier?: number;
 
-	/** select / multiSelect */
+	/**
+	 * select / multiSelect.
+	 *
+	 * NOT `options`. The migration writes this name, but the admin editor wrote
+	 * `options` and the renderer read `options`, so every migrated form lost its
+	 * dropdown choices until someone happened to re-save it.
+	 */
 	selectOptions?: string[];
+
+	/** Hint text shown in the empty input. Optional everywhere. */
+	placeholder?: string;
 
 	/**
 	 * checklist — REQUIRED in v2.
@@ -49,6 +61,8 @@ export interface FormField {
 	checklistId?: string;
 	/** Denormalized so validation doesn't have to load the checklist. */
 	checklistItemCount?: number;
+	/** Denormalized for display, so the editor need not load the checklist. */
+	checklistName?: string | null;
 	checklistRequiredMode?: "atLeastOne" | "all";
 }
 

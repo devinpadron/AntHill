@@ -1,7 +1,7 @@
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { V2SmokeScreen } from "../screens/dev/V2SmokeScreen";
+import { DiagnosticsScreen } from "../screens/dev/DiagnosticsScreen";
 import { AppNavigator } from "./AppNavigator";
 import { DiagnosticsBadge } from "../screens/dev/DiagnosticsBadge";
 
@@ -25,7 +25,7 @@ const HomeWithBadge = () => (
 	</>
 );
 
-export const V2SmokeNavigator = () => (
+export const DiagnosticsNavigator = () => (
 	<NavigationContainer>
 		<Stack.Navigator>
 			<Stack.Screen
@@ -35,7 +35,7 @@ export const V2SmokeNavigator = () => (
 			/>
 			<Stack.Screen
 				name="Diagnostics"
-				component={V2SmokeScreen}
+				component={DiagnosticsScreen}
 				options={{ presentation: "modal", title: "v2 diagnostics" }}
 			/>
 		</Stack.Navigator>

@@ -11,6 +11,7 @@ import BottomSheet from "@gorhom/bottom-sheet";
 import { BottomSheetView } from "@gorhom/bottom-sheet";
 import { Checkbox } from "../ui/Checkbox";
 import { Button } from "../ui/Button";
+export type WorkerOption = { label: string; value: string };
 
 type FilterPanelProps = {
 	filterType: FilterType;
@@ -21,8 +22,9 @@ type FilterPanelProps = {
 	snapPoints: string[];
 	selectedUsers: string[];
 	setSelectedUsers: React.Dispatch<React.SetStateAction<string[]>>;
-	availableWorkers: any[];
-	setAvailableWorkers: React.Dispatch<React.SetStateAction<any[]>>;
+	/** Dropdown options, not membership records — {label, value} pairs. */
+	availableWorkers: WorkerOption[];
+	setAvailableWorkers: React.Dispatch<React.SetStateAction<WorkerOption[]>>;
 	openSelect: boolean;
 	checkSelectOpen: () => void;
 	showAllSelectedOnly: boolean;

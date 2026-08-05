@@ -1,17 +1,22 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
+import { FieldTotal } from "../../utils/timeUtils";
 
-const FieldTotalsCard = ({ fieldTotals }) => {
+type FieldTotalsCardProps = {
+	fieldTotals: Record<string, FieldTotal>;
+};
+
+const FieldTotalsCard = ({ fieldTotals }: FieldTotalsCardProps) => {
 	// If no totals, don't render anything
 	if (!fieldTotals || Object.keys(fieldTotals).length === 0) {
 		return null;
 	}
 
 	// Separate time entry totals and event totals
-	const timeEntryTotals = {};
-	const eventTotals = {};
+	const timeEntryTotals: Record<string, FieldTotal> = {};
+	const eventTotals: Record<string, FieldTotal> = {};
 
-	Object.entries(fieldTotals).forEach(([key, data]: any) => {
+	Object.entries(fieldTotals).forEach(([key, data]) => {
 		if (data.source === "event") {
 			eventTotals[key] = data;
 		} else {
@@ -27,33 +32,24 @@ const FieldTotalsCard = ({ fieldTotals }) => {
 			{Object.keys(timeEntryTotals).length > 0 && (
 				<>
 					<Text style={styles.sectionTitle}>Timesheet</Text>
-					{Object.entries(timeEntryTotals).map(
-						([fieldId, data]: any) => (
-							<View key={fieldId} style={styles.totalRow}>
-								<Text style={styles.fieldLabel}>
-									{data.label}:
+					{Object.entries(timeEntryTotals).map(([fieldId, data]) => (
+						<View key={fieldId} style={styles.totalRow}>
+							<Text style={styles.fieldLabel}>{data.label}:</Text>
+							<View style={styles.valueContainer}>
+								<Text style={styles.fieldValue}>
+									{data.total.toFixed(2)} {data.unit}
 								</Text>
-								<View style={styles.valueContainer}>
-									<Text style={styles.fieldValue}>
-										{data.total.toFixed(2)} {data.unit}
-									</Text>
 
-									{data.useMultiplier &&
-										data.multipliedTotal !== undefined && (
-											<Text
-												style={styles.multipliedValue}
-											>
-												(
-												{data.multipliedTotal.toFixed(
-													2,
-												)}{" "}
-												{data.unit})
-											</Text>
-										)}
-								</View>
+								{data.useMultiplier &&
+									data.multipliedTotal !== undefined && (
+										<Text style={styles.multipliedValue}>
+											({data.multipliedTotal.toFixed(2)}{" "}
+											{data.unit})
+										</Text>
+									)}
 							</View>
-						),
-					)}
+						</View>
+					))}
 				</>
 			)}
 
@@ -63,7 +59,7 @@ const FieldTotalsCard = ({ fieldTotals }) => {
 					<Text style={[styles.sectionTitle, { marginTop: 16 }]}>
 						Events
 					</Text>
-					{Object.entries(eventTotals).map(([fieldId, data]: any) => (
+					{Object.entries(eventTotals).map(([fieldId, data]) => (
 						<View key={fieldId} style={styles.totalRow}>
 							<Text style={styles.fieldLabel}>{data.label}:</Text>
 							<View style={styles.valueContainer}>

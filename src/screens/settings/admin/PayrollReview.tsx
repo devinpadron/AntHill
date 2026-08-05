@@ -120,7 +120,7 @@ const PayrollReview = ({ navigation }) => {
 			userId: string;
 			displayName: string;
 			email: string;
-			entries: any[];
+			entries: TimeEntry[];
 		}
 
 		const grouped: Record<string, EmployeeGroup> = {};

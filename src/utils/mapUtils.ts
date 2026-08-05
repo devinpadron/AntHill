@@ -52,7 +52,6 @@ export const openMap = (
 	prefMap: string = "",
 	location: string = "",
 ) => {
-	console.log("location", location);
 	if (!label) {
 		label = "Event";
 	}

@@ -29,18 +29,12 @@ export const pendingNavigation = {
 		if (this.action && navigationRef.isReady()) {
 			const { routeName, params } = this.action;
 
-			console.log(
-				`Attempting navigation to: ${routeName} with params:`,
-				params,
-			);
-
 			try {
 				navigationRef.navigate({
 					name: routeName,
 					params,
 				} as never);
 
-				console.log(`Navigation successful to: ${routeName}`);
 				this.action = null;
 				return true;
 			} catch (error) {
@@ -49,11 +43,7 @@ export const pendingNavigation = {
 			}
 		}
 
-		if (this.action) {
-			console.log(
-				`Navigation not ready yet. Pending route: ${this.action.routeName}`,
-			);
-		}
+		// Not ready yet — App.tsx polls this, so the action stays queued.
 		return false;
 	},
 };

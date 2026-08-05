@@ -416,10 +416,9 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 							// Use checklistRequiredMode for validation
 							const requiredMode =
 								field.checklistRequiredMode || "atLeastOne";
-							const totalItems =
-								typeof field.checklistItemCount === "number"
-									? field.checklistItemCount
-									: field.options?.length || 0;
+							// checklistItemCount is denormalized onto the field so
+							// validation never has to load the checklist.
+							const totalItems = field.checklistItemCount ?? 0;
 							if (requiredMode === "atLeastOne") {
 								if (
 									!Array.isArray(value) ||
@@ -477,10 +476,9 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 					if (field.type === "checklist") {
 						const requiredMode =
 							field.checklistRequiredMode || "atLeastOne";
-						const totalItems =
-							typeof field.checklistItemCount === "number"
-								? field.checklistItemCount
-								: field.options?.length || 0;
+						// checklistItemCount is denormalized onto the field so
+						// validation never has to load the checklist.
+						const totalItems = field.checklistItemCount ?? 0;
 
 						if (requiredMode === "atLeastOne") {
 							if (!Array.isArray(value) || value.length === 0) {
@@ -609,7 +607,6 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 					});
 
 					// Upload the files
-					console.log("Files with IDS: ", filesWithIds);
 					const uploadedFiles = await uploadFiles(
 						companyId,
 						"timeEntry",
@@ -617,7 +614,6 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 						filesWithIds,
 						userId,
 					);
-					console.log("Uploaded Files: ", uploadedFiles);
 
 					// Update form responses with uploaded file references
 					const updatedFormResponsesByEvent = {

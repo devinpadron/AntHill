@@ -15,6 +15,7 @@ import {
 	shareFile,
 } from "../../services/exportService";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import { TimeEntry } from "../../types";
 
 // Export format options
 const EXPORT_FORMAT_CSV = "csv";
@@ -26,8 +27,9 @@ interface ExportSheetProps {
 	snapPoints: string[];
 	onClose: () => void;
 	selectedEntries: string[];
-	timeEntries: any[];
-	employeeUser: any;
+	timeEntries: TimeEntry[];
+	/** Denormalized membership record — only the name is rendered. */
+	employeeUser: { firstName?: string; lastName?: string } | null;
 	companyId: string;
 }
 

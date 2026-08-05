@@ -39,7 +39,6 @@ const LoginPage = ({ navigation }) => {
 			[
 				{
 					text: "Cancel",
-					onPress: () => console.log("Reset password cancelled"),
 					style: "cancel",
 				},
 				{

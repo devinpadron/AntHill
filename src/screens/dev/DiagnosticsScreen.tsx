@@ -32,7 +32,7 @@ import {
  * through the v2 services, so a failure here is a genuine failure of the rules,
  * the indexes, or the query shapes, not of presentation.
  *
- * Enable with V2_SMOKE_TEST in src/constants/devFlags.ts.
+ * Enable with DIAGNOSTICS_MODE in src/constants/devFlags.ts.
  */
 
 const Row = ({
@@ -65,7 +65,7 @@ const Section = ({
 	</View>
 );
 
-export const V2SmokeScreen = ({ navigation }: { navigation: any }) => {
+export const DiagnosticsScreen = ({ navigation }: { navigation: any }) => {
 	const {
 		user,
 		userId,

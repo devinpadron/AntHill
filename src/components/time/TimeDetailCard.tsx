@@ -33,6 +33,8 @@ const TimeDetailCard = ({
 	attachmentMap,
 	connectedEvents,
 	onFieldUpdate,
+	timeEntrySchema = null,
+	eventSchema = null,
 }) => {
 	// Existing state variables
 	const [editingFields, setEditingFields] = useState({});
@@ -41,8 +43,14 @@ const TimeDetailCard = ({
 	const { companyId } = useUser();
 	const { byUserId: membersById } = useCompanyMembers(companyId ?? "");
 	const { preferences } = useCompany();
-	const customForm = entry.generalForm || null;
-	const eventForm = entry.eventForm || null;
+	/*
+	 * Resolved by the parent from entry.formSchemaIds. v1 embedded a full copy
+	 * of both schemas on every entry (`generalForm` / `eventForm`); reading
+	 * those names on a current document yields null, so this card rendered no
+	 * form responses at all.
+	 */
+	const customForm = timeEntrySchema;
+	const eventForm = eventSchema;
 
 	// Add state for event packages
 	const [eventPackages, setEventPackages] = useState({});
@@ -438,11 +446,11 @@ const TimeDetailCard = ({
 				</View>
 
 				{/* Total Pause Duration - only show if there's pause time */}
-				{entry.totalPausedSeconds > 0 && (
+				{entry.pausedSeconds > 0 && (
 					<View style={styles.detailRow}>
 						<Text style={styles.detailLabel}>Paused:</Text>
 						<Text style={styles.pauseValue}>
-							{formatPauseDuration(entry.totalPausedSeconds)}
+							{formatPauseDuration(entry.pausedSeconds)}
 						</Text>
 					</View>
 				)}

@@ -20,12 +20,16 @@ import { useUploadManager } from "../../contexts/UploadManagerContext";
 import { getConnections } from "../../services/timeEntryEditService";
 import type { SelectableAttachment } from "../ui/AttachmentsSelector";
 import { styles } from "./EditSheet.styles";
+import { FormSchema, TimeEntry } from "../../types";
 
 // Update the interface for component props
 interface EditSheetProps {
 	visible: boolean;
 	snapPoints?: string[];
-	timeEntry?: any;
+	timeEntry?: TimeEntry;
+	/** Resolved from timeEntry.formSchemaIds by the parent. */
+	timeEntrySchema?: FormSchema | null;
+	eventSchema?: FormSchema | null;
 	editNotes: string;
 	editChangeSummary: string;
 	setEditNotes: (value: string) => void;
@@ -41,6 +45,8 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 		{
 			snapPoints = ["85%"],
 			timeEntry,
+			timeEntrySchema = null,
+			eventSchema = null,
 			editNotes,
 			editChangeSummary,
 			setEditNotes,
@@ -66,8 +72,14 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 		const [formResponses, setFormResponses] = useState<any>({});
 		const { uploadFiles, deleteAttachments, uploadProgress } =
 			useUploadManager();
-		const customForm = timeEntry?.generalForm || null;
-		const eventForm = timeEntry?.eventForm || null;
+		/*
+		 * Resolved by the parent and passed down. v1 embedded a full copy of
+		 * both schemas on every entry (`generalForm` / `eventForm`); v2 stores
+		 * references, and reading the old names here yielded null, so the edit
+		 * sheet silently rendered no form fields at all.
+		 */
+		const customForm = timeEntrySchema;
+		const eventForm = eventSchema;
 		const { isAdmin } = useUser();
 
 		const [filesToUpload, setFilesToUpload] = useState<{
@@ -129,13 +141,18 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 					setFormResponses({ ...timeEntry.formResponses });
 				}
 
-				// Initialize pause duration
-				if (timeEntry.totalPausedSeconds) {
-					const hours = Math.floor(
-						timeEntry.totalPausedSeconds / 3600,
-					);
+				/*
+				 * Initialize pause duration.
+				 *
+				 * Was `totalPausedSeconds`, a v1 field name that reads
+				 * undefined on a current document — so opening the edit sheet
+				 * always showed 0m paused, and saving wrote that zero back
+				 * over the real value.
+				 */
+				if (timeEntry.pausedSeconds) {
+					const hours = Math.floor(timeEntry.pausedSeconds / 3600);
 					const minutes = Math.floor(
-						(timeEntry.totalPausedSeconds % 3600) / 60,
+						(timeEntry.pausedSeconds % 3600) / 60,
 					);
 					setPauseDurationHours(hours.toString());
 					setPauseDurationMinutes(minutes.toString());
@@ -359,7 +376,6 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 							timeEntry.id,
 							deletionQueue,
 						);
-						console.log(`Deleted ${deletionQueue.length} files`);
 					} catch (deleteError) {
 						console.error("Error deleting files:", deleteError);
 						Alert.alert(

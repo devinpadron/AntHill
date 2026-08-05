@@ -12,7 +12,7 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 
 	const [elapsedSeconds, setElapsedSeconds] = useState(0);
 	const [currentPauseDuration, setCurrentPauseDuration] = useState(
-		timeEntry.totalPausedSeconds || 0,
+		timeEntry.pausedSeconds || 0,
 	);
 	const intervalRef = useRef(null);
 
@@ -40,7 +40,7 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 			const startDate = timeEntry.clockInAt.toDate();
 
 			// Account for any previous pause time (now using totalPausedSeconds directly)
-			const pauseOffset = timeEntry.totalPausedSeconds || 0;
+			const pauseOffset = timeEntry.pausedSeconds || 0;
 
 			const initialElapsed =
 				differenceInSeconds(new Date(), startDate) - pauseOffset;
@@ -59,14 +59,14 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 				const pauseDate = new Date(timeEntry.pauseStartTime);
 
 				// Account for any previous pause time
-				const pauseOffset = timeEntry.totalPausedSeconds || 0;
+				const pauseOffset = timeEntry.pausedSeconds || 0;
 
 				const pausedElapsed =
 					differenceInSeconds(pauseDate, startDate) - pauseOffset;
 				setElapsedSeconds(pausedElapsed);
 
 				// Initialize current pause duration
-				const basePauseDuration = timeEntry.totalPausedSeconds || 0;
+				const basePauseDuration = timeEntry.pausedSeconds || 0;
 
 				// Set up interval to update pause duration in real-time
 				intervalRef.current = setInterval(() => {
@@ -82,7 +82,7 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 			}
 		} else {
 			// For completed or other states, just use the stored totalPausedSeconds
-			setCurrentPauseDuration(timeEntry.totalPausedSeconds || 0);
+			setCurrentPauseDuration(timeEntry.pausedSeconds || 0);
 		}
 
 		return () => {
@@ -94,7 +94,7 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 		timeEntry.status,
 		timeEntry.clockInAt,
 		timeEntry.pauseStartTime,
-		timeEntry.totalPausedSeconds,
+		timeEntry.pausedSeconds,
 	]);
 
 	// Calculate hours and minutes

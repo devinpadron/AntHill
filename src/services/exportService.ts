@@ -615,15 +615,7 @@ export const shareFile = async (filePath: string): Promise<void> => {
 			},
 		);
 
-		if (result.action === Share.sharedAction) {
-			if (result.activityType) {
-				console.log(`Shared via ${result.activityType}`);
-			} else {
-				console.log("Shared successfully");
-			}
-		} else if (result.action === Share.dismissedAction) {
-			console.log("Share was dismissed");
-		}
+		// Sharing and dismissing are both normal outcomes; nothing to report.
 	} catch (error) {
 		console.error("Error sharing file:", error);
 		throw error;

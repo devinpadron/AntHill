@@ -23,6 +23,7 @@ import { RouteProp, useRoute } from "@react-navigation/native";
 import { subscribeChecklists } from "../../../services/libraryService";
 import { getSchema, publishSchema } from "../../../services/formSchemaService";
 import { styles } from "./CompanyCustomForm.styles";
+import { FormField } from "../../../types";
 
 const FIELD_TYPES = [
 	{ label: "Text Input", value: "text" },
@@ -63,7 +64,7 @@ const CompanyCustomForm = ({ navigation }) => {
 		title: string;
 		description: string;
 		isEnabled: boolean;
-		fields: any[];
+		fields: FormField[];
 	}>({ title: "", description: "", isEnabled: false, fields: [] });
 
 	// UI state
@@ -151,7 +152,7 @@ const CompanyCustomForm = ({ navigation }) => {
 
 	// Add a new field
 	const addField = () => {
-		const newField = {
+		const newField: FormField = {
 			id: Date.now().toString(),
 			type: "text",
 			label: "New Field",
@@ -212,7 +213,7 @@ const CompanyCustomForm = ({ navigation }) => {
 	const editField = (field) => {
 		setEditingField(field);
 		setCurrentFieldType(field.type);
-		setCurrentOptions(field.options?.join(", ") || "");
+		setCurrentOptions(field.selectOptions?.join(", ") || "");
 		if (field.type === "checklist") {
 			setSelectedChecklistId(field.checklistId || null);
 		}
@@ -229,7 +230,7 @@ const CompanyCustomForm = ({ navigation }) => {
 
 		// Handle options for select/multiSelect
 		if (["select", "multiSelect"].includes(currentFieldType)) {
-			updatedField.options = currentOptions
+			updatedField.selectOptions = currentOptions
 				.split(",")
 				.map((option) => option.trim())
 				.filter((option) => option);
@@ -249,7 +250,7 @@ const CompanyCustomForm = ({ navigation }) => {
 			updatedField.checklistName =
 				chosen?.name || updatedField.checklistName || null;
 			// Ensure options are not carried over
-			delete updatedField.options;
+			delete updatedField.selectOptions;
 		}
 
 		updateField(editingField.id, updatedField);

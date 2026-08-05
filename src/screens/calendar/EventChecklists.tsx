@@ -39,7 +39,6 @@ const EventChecklists = () => {
 	const route = useRoute<any>();
 	const navigation = useNavigation();
 	const insets = useSafeAreaInsets();
-	console.log("Route params:", route.params);
 	const { checklistIds, eventId } = route.params || {}; // Add eventId from route params
 	const { companyId } = useUser();
 

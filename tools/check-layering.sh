@@ -76,7 +76,13 @@ done
 # side by side. That scoping is why the export path stayed broken for so long:
 # it sits in src/services and src/utils, outside any v2 directory, so nothing
 # ever checked it. It now scans all of src/, with no exceptions.
-OLD_FIELDS='\b(entry|item|timeEntry|event|doc|data|user|userData|snapshot)\??\.(clockInTime|clockOutTime|assignedWorkers|workerStatus|editHistory|connectedEvents|loggedInCompany|userNotes)\b'
+#
+# totalPausedSeconds, generalForm, eventForm and `.options` were added after
+# each was found still being read in shipped code — the edit sheet showed 0m
+# paused and rendered no form fields, and every migrated company lost its
+# dropdown choices because the editor wrote `options` while the migration
+# wrote `selectOptions`.
+OLD_FIELDS='\b(entry|item|timeEntry|event|doc|data|user|userData|snapshot|field)\??\.(clockInTime|clockOutTime|totalPausedSeconds|assignedWorkers|workerStatus|editHistory|connectedEvents|loggedInCompany|userNotes|generalForm|eventForm)\b'
 
 stale=$(
 	find src \( -name '*.ts' -o -name '*.tsx' \) -print0 2>/dev/null \
