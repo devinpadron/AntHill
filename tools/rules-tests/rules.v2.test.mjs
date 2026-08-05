@@ -717,6 +717,43 @@ describe("v2 — a worker cannot widen their own audience", () => {
 	});
 });
 
+describe("v2 — reproducing the signup permission-denied", () => {
+	test("a brand-new user can READ the membership they do not have yet", async () => {
+		// joinCompanyWithAccessCode runs in a transaction that first reads
+		// memberships/{companyId}_{userId} to check for an existing one. On a
+		// first join that document does not exist, and a rule phrased in terms
+		// of resource.data has nothing to evaluate.
+		await assertSucceeds(
+			getDoc(doc(as("brandnew"), "memberships", mid(A, "brandnew"))),
+		);
+	});
+});
+
+describe("v2 — same bug class: reads of documents that may not exist", () => {
+	test("checklist state for an event nobody has ticked yet", async () => {
+		// eventChecklistStates/{eventId} is only written on the first tap, so
+		// opening the checklist screen on a fresh event reads a document that
+		// is not there.
+		await assertSucceeds(
+			getDoc(doc(as(BOB), "eventChecklistStates", "eOpen")),
+		);
+	});
+
+	test("an event that does not exist", async () => {
+		await assertSucceeds(getDoc(doc(as(BOB), "events", "nosuchevent")));
+	});
+
+	test("a time entry that does not exist", async () => {
+		await assertSucceeds(
+			getDoc(doc(as(BOB), "timeEntries", "nosuchentry")),
+		);
+	});
+
+	test("company preferences before any have been saved", async () => {
+		await assertSucceeds(getDoc(doc(as(BOB), "companyPreferences", A)));
+	});
+});
+
 describe("v2 — group join codes", () => {
 	const JOINER = "joiner";
 

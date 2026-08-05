@@ -280,7 +280,25 @@ service cloud.firestore {
        * cross-company query to satisfy a per-company predicate, which Firestore
        * cannot prove and therefore rejects outright.
        */
-      allow read: if isSelf(resource.data.userId)
+      /*
+       * `get` has to tolerate a document that is not there yet.
+       *
+       * joinCompanyWithAccessCode opens a transaction that reads
+       * memberships/{companyId}_{userId} to see whether one already exists. On
+       * a FIRST join it does not, so `resource` is null and a condition
+       * phrased in terms of resource.data has nothing to evaluate — which
+       * denies rather than returning "not found". That failed every first
+       * join, signup included, with permission-denied.
+       *
+       * Reading a document that does not exist reveals only that it does not
+       * exist, and you must already know both the company id and the user id
+       * to ask. `list` keeps the strict form: absent documents never appear in
+       * a query, so it has nothing to tolerate.
+       */
+      allow get: if resource == null
+                 || isSelf(resource.data.userId)
+                 || v2IsMember(resource.data.companyId);
+      allow list: if isSelf(resource.data.userId)
                   || v2IsMember(resource.data.companyId);
       // Joining: only your own membership, only as a plain user, and the id
       // must be the canonical composite so it cannot collide with someone
@@ -406,7 +424,8 @@ service cloud.firestore {
        * own company. The app never shows them; the exposure is via direct API
        * access, not the product.
        */
-      allow get: if v2IsManager(resource.data.companyId)
+      allow get: if resource == null
+                 || v2IsManager(resource.data.companyId)
                  || (v2IsMember(resource.data.companyId)
                      && (resource.data.get("isTargeted", false) != true
                          || uid() in resource.data.get("assignedUserIds", [])
@@ -461,7 +480,17 @@ service cloud.firestore {
     }
 
     match /eventChecklistStates/{eventId} {
-      allow read: if v2IsMember(resource.data.companyId);
+      /*
+       * This document is created by the FIRST tick, so opening the checklist
+       * on a fresh event reads one that is not there. See the note on
+       * memberships: a rule phrased in terms of resource.data has nothing to
+       * evaluate when resource is null, and denies instead of returning "not
+       * found". `list` stays strict — absent documents never appear in a
+       * query.
+       */
+      allow get: if resource == null
+                 || v2IsMember(resource.data.companyId);
+      allow list: if v2IsMember(resource.data.companyId);
       // Any member ticks items; concurrent workers no longer clobber each
       // other because writes are per-item field paths, not whole-map sets.
       allow create: if v2IsMember(request.resource.data.companyId);
@@ -472,7 +501,9 @@ service cloud.firestore {
     // ---- time entries ----------------------------------------------------
 
     match /timeEntries/{entryId} {
-      allow read: if v2IsMember(resource.data.companyId);
+      allow get: if resource == null
+                 || v2IsMember(resource.data.companyId);
+      allow list: if v2IsMember(resource.data.companyId);
       allow create: if v2IsMember(request.resource.data.companyId)
                     && request.resource.data.userId == uid();
       // Owners edit their own entry; managers review anyone's.
