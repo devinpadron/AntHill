@@ -17,8 +17,14 @@ const TimeEntrySummary = ({
 			<View style={styles.summaryRow}>
 				<Text style={styles.summaryLabel}>Employee:</Text>
 				<Text style={styles.summaryValue}>
-					{employeeUser?.firstName + " " + employeeUser?.lastName ||
-						"Unknown"}
+					{/*
+					 * `a?.x + " " + a?.y` yields the STRING "undefined
+					 * undefined" when the object is absent — which is truthy,
+					 * so the `|| "Unknown"` fallback never fired.
+					 */}
+					{[employeeUser?.firstName, employeeUser?.lastName]
+						.filter(Boolean)
+						.join(" ") || "Unknown"}
 				</Text>
 			</View>
 
@@ -59,17 +65,16 @@ const TimeEntrySummary = ({
 				<Text style={styles.summaryValue}>
 					{timeEntries.length > 0
 						? `${format(
-								new Date(timeEntries[0].clockInTime),
+								timeEntries[0].clockInAt.toDate(),
 								"MMM d, yyyy",
 							)}
               ${
 					timeEntries.length > 1
 						? " - " +
 							format(
-								new Date(
-									timeEntries[timeEntries.length - 1]
-										.clockInTime,
-								),
+								timeEntries[
+									timeEntries.length - 1
+								].clockInAt.toDate(),
 								"MMM d, yyyy",
 							)
 						: ""

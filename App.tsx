@@ -9,53 +9,36 @@ import {
 } from "./src/navigation/navigationRef";
 import { AppGate } from "./src/components/ui/AppGate";
 import { getCurrentAppVersion } from "./src/utils/versionUtils";
-import { V2_SMOKE_TEST } from "./src/constants/devFlags";
-import { AppNavigator } from "./src/navigation/v2/AppNavigator";
-import { UserProvider, useUser } from "./src/contexts/v2/UserContext";
-import { CompanyProvider } from "./src/contexts/v2/CompanyContext";
-import { UploadManagerProvider } from "./src/contexts/v2/UploadManagerContext";
-import { NotificationProvider } from "./src/contexts/v2/NotificationContext";
-import { recordAppLaunch } from "./src/services/v2/userService";
-import { UserProvider as V2UserProvider } from "./src/contexts/v2/UserContext";
-import { CompanyProvider as V2CompanyProvider } from "./src/contexts/v2/CompanyContext";
-import { UploadManagerProvider as V2UploadManagerProvider } from "./src/contexts/v2/UploadManagerContext";
-import { V2SmokeNavigator } from "./src/navigation/v2/V2SmokeNavigator";
+import { DIAGNOSTICS_MODE } from "./src/constants/devFlags";
+import { AppNavigator } from "./src/navigation/AppNavigator";
+import { UserProvider, useUser } from "./src/contexts/UserContext";
+import { CompanyProvider } from "./src/contexts/CompanyContext";
+import { UploadManagerProvider } from "./src/contexts/UploadManagerContext";
+import { NotificationProvider } from "./src/contexts/NotificationContext";
+import { recordAppLaunch } from "./src/services/userService";
+import { DiagnosticsNavigator } from "./src/navigation/DiagnosticsNavigator";
 
 /*
- * Dev-only harness for the v2 stack.
+ * Dev-only diagnostics harness.
  *
- * Mounts the real v2 contexts against the `test` database, with a navigator
- * whose route NAMES match production, so ported screens navigate exactly as
- * they will in the real app. No NotificationProvider — pushes would only add
- * moving parts to what is a data-path harness.
+ * Mounts the real contexts against the `test` database, with a navigator whose
+ * route NAMES match production, so screens navigate exactly as they do in the
+ * real app. Deliberately omits AppGate and NotificationProvider: it exists to
+ * inspect the data path, and pushes would only add moving parts.
  */
-const V2SmokeApp = () => (
+const DiagnosticsApp = () => (
 	<GestureHandlerRootView style={{ flex: 1 }}>
 		<SafeAreaProvider>
-			<V2UploadManagerProvider>
-				<V2UserProvider>
-					<V2CompanyProvider>
-						<V2SmokeNavigator />
-					</V2CompanyProvider>
-				</V2UserProvider>
-			</V2UploadManagerProvider>
+			<UploadManagerProvider>
+				<UserProvider>
+					<CompanyProvider>
+						<DiagnosticsNavigator />
+					</CompanyProvider>
+				</UserProvider>
+			</UploadManagerProvider>
 		</SafeAreaProvider>
 	</GestureHandlerRootView>
 );
-
-/*
- * CompanyInitializer is GONE.
- *
- * v1 needed a bridge component to push `user.loggedInCompany` into
- * CompanyContext, because the two contexts did not know about each other. The
- * v2 CompanyProvider subscribes to `useUser().companyId` itself, so the active
- * company follows the user with no wiring in between — and there is no window
- * where the user has loaded but the company has not been told about it.
- *
- * Keeping it would also have been a live bug: it read `user.loggedInCompany`,
- * which does not exist in v2 (it is `loggedInCompanyId`), so it would have
- * silently never fired.
- */
 
 // Records which build this user is on, so update adoption can be measured
 // before a forced cutover. Best-effort and non-blocking.
@@ -74,31 +57,35 @@ const LaunchTelemetry = () => {
 /*
  * The app.
  *
- * Reads and writes the v2 schema. The provider order is unchanged from v1 and
- * still matters: NotificationProvider sits INSIDE NavigationContainer because
- * push handling navigates, and AppGate wraps everything so a forced update or
- * a schema-version mismatch blocks the tree rather than rendering behind it.
+ * Provider order matters in two places. NotificationProvider sits INSIDE
+ * NavigationContainer because push handling navigates. AppGate wraps
+ * everything, so a forced update or a schema-version mismatch blocks the tree
+ * rather than rendering behind it.
  *
- * This build declares SUPPORTED_SCHEMA_VERSIONS = [2]. While the server still
- * says activeVersion 1 it gates ITSELF behind the update screen — which is what
- * lets the release sit in the store, approved and inert, until the migration
- * window actually flips the switch.
+ * CompanyProvider needs no wiring to follow the user: it subscribes to
+ * `useUser().companyId` itself, so there is no window where the user has
+ * loaded but the active company has not been told about it.
  */
 const MainApp: React.FC = () => {
-	// Add this effect to check pending navigation periodically
+	/*
+	 * A push can arrive before the navigator mounts, in which case the route is
+	 * queued rather than lost. NavigationContainer's onReady covers the usual
+	 * case; this polls alongside it to cover a notification that lands during
+	 * the mount itself, then gives up after 5s.
+	 */
 	useEffect(() => {
-		// Check for pending navigation every 500ms for the first few seconds
-		// This handles cases where navigation isn't immediately ready
 		const checkInterval = setInterval(() => {
 			pendingNavigation.executeIfReady();
 		}, 500);
 
-		// Clear interval after 5 seconds
-		setTimeout(() => {
+		const stopPolling = setTimeout(() => {
 			clearInterval(checkInterval);
 		}, 5000);
 
-		return () => clearInterval(checkInterval);
+		return () => {
+			clearInterval(checkInterval);
+			clearTimeout(stopPolling);
+		};
 	}, []);
 
 	return (
@@ -132,8 +119,9 @@ const MainApp: React.FC = () => {
 
 /*
  * Picks the tree. No hooks here, so the branch cannot violate the rules of
- * hooks — MainApp and V2SmokeApp each own their own state.
+ * hooks — MainApp and DiagnosticsApp each own their own state.
  */
-const App: React.FC = () => (V2_SMOKE_TEST ? <V2SmokeApp /> : <MainApp />);
+const App: React.FC = () =>
+	DIAGNOSTICS_MODE ? <DiagnosticsApp /> : <MainApp />;
 
 export default App;

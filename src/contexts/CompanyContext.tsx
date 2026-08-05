@@ -1,209 +1,115 @@
 import React, {
 	createContext,
-	useState,
-	useEffect,
+	ReactNode,
 	useCallback,
 	useContext,
-	ReactNode,
+	useEffect,
+	useState,
 } from "react";
-import db from "../constants/firestore";
 import {
-	getCompanyPreferences,
-	updateCompanyPreferences,
+	defaultPreferences,
+	subscribeCompany,
+	subscribePreferences,
+	updatePreferences as writePreferences,
 } from "../services/companyService";
+import { Company, CompanyPreferences } from "../types";
+import { useUser } from "./UserContext";
 
-export interface CompanyPreferences {
-	workWeekStarts: "sunday" | "monday";
-	allowUserEventEditing: boolean;
-	availabilityReminderEnabled?: boolean;
-	availabilityReminderHours?: number;
-	availabilityReminderMinutes?: number;
-	enableTimeSheet?: boolean;
-	enableAvailability?: boolean;
-	timeEntryForm: any;
-	eventForm: any;
-	canViewEventLabels: boolean;
-}
+/*
+ * The active company and its preferences.
+ *
+ * Both are LIVE subscriptions. v1 read preferences once when the company was
+ * selected (CompanyContext.tsx:93-140), and because HomeTabs feature-flags whole
+ * tabs off `enableAvailability` / `enableTimeSheet`, an admin turning a feature
+ * on did not reach anyone else until they relaunched the app.
+ *
+ * The company is also where `timeZone` comes from, which the time-entry and
+ * calendar code needs to compute local day keys.
+ */
 
-export interface CompanyData {
-	id: string;
-	name: string;
-	accessCode: string;
-}
-
-interface CompanyContextType {
-	companyData: CompanyData | null;
+type CompanyContextType = {
+	company: Company | null;
+	companyId: string | undefined;
 	preferences: CompanyPreferences;
+	timeZone: string;
 	isLoading: boolean;
-	error: Error | null;
-	updatePreferences: (
-		newPreferences:
-			| Partial<CompanyPreferences>
-			| ((prev: CompanyPreferences) => CompanyPreferences),
-	) => Promise<void>;
-	setActiveCompany: (companyId: string) => void;
-}
-
-// Default preferences
-const defaultPreferences: CompanyPreferences = {
-	workWeekStarts: "sunday",
-	allowUserEventEditing: false,
-	enableTimeSheet: true,
-	timeEntryForm: {
-		title: "Time Entry Form",
-		description:
-			"Please complete this form when submitting your time entry",
-		fields: [],
-		isEnabled: true,
-	},
-	eventForm: {
-		title: "Event Form",
-		description: "Please complete this form when submitting your event",
-		fields: [],
-		isEnabled: true,
-	},
-	canViewEventLabels: true,
+	updatePreferences: (patch: Partial<CompanyPreferences>) => Promise<void>;
 };
 
-// Create context with default values
-export const CompanyContext = createContext<CompanyContextType>({
-	companyData: null,
+const FALLBACK_TIME_ZONE = "America/New_York";
+
+const CompanyContext = createContext<CompanyContextType>({
+	company: null,
+	companyId: undefined,
 	preferences: defaultPreferences,
-	isLoading: false,
-	error: null,
+	timeZone: FALLBACK_TIME_ZONE,
+	isLoading: true,
 	updatePreferences: async () => {},
-	setActiveCompany: () => {},
 });
 
-interface CompanyProviderProps {
-	children: ReactNode;
-}
+export const CompanyProvider = ({ children }: { children: ReactNode }) => {
+	// Driven directly by the user's active company, so v1's CompanyInitializer
+	// bridge component is no longer needed.
+	const { companyId } = useUser();
 
-export const CompanyProvider: React.FC<CompanyProviderProps> = ({
-	children,
-}) => {
-	const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
-	const [isLoading, setIsLoading] = useState(false);
-	const [error, setError] = useState<Error | null>(null);
-	const [companyData, setCompanyData] = useState<CompanyData | null>(null);
+	const [company, setCompany] = useState<Company | null>(null);
 	const [preferences, setPreferences] =
 		useState<CompanyPreferences>(defaultPreferences);
+	const [isLoading, setIsLoading] = useState(true);
 
-	// Fetch company data when company ID changes
 	useEffect(() => {
-		const fetchCompanyData = async () => {
-			if (!activeCompanyId) {
-				return;
-			}
+		if (!companyId) {
+			setCompany(null);
+			setPreferences(defaultPreferences);
+			setIsLoading(false);
+			return;
+		}
 
-			setIsLoading(true);
-			setError(null);
+		setIsLoading(true);
+		const unsubscribeCompany = subscribeCompany(companyId, (next) => {
+			setCompany(next);
+			setIsLoading(false);
+		});
+		const unsubscribePreferences = subscribePreferences(
+			companyId,
+			setPreferences,
+		);
 
-			try {
-				// Get company document
-				const companyDoc = await db
-					.collection("Companies")
-					.doc(activeCompanyId)
-					.get();
-
-				if (!companyDoc.exists()) {
-					throw new Error("Company not found");
-				}
-
-				const data = companyDoc.data();
-				setCompanyData({
-					id: activeCompanyId,
-					name: data?.name || "Unknown Company",
-					accessCode: data?.accessCode || "",
-				});
-
-				// Get company preferences
-				const prefs = await getCompanyPreferences(activeCompanyId);
-				if (prefs) {
-					setPreferences({
-						...defaultPreferences, // Keep defaults
-						...prefs, // Override with stored preferences
-					});
-				} else {
-					// Reset to default if no preferences found
-					setPreferences(defaultPreferences);
-				}
-			} catch (err) {
-				console.error("Error fetching company data:", err);
-				setError(err as Error);
-			} finally {
-				setIsLoading(false);
-			}
+		return () => {
+			unsubscribeCompany();
+			unsubscribePreferences();
 		};
+	}, [companyId]);
 
-		fetchCompanyData();
-	}, [activeCompanyId]);
-
-	// Set active company ID
-	const setActiveCompany = useCallback((companyId: string) => {
-		setActiveCompanyId(companyId);
-	}, []);
-
-	// Update preferences
+	/**
+	 * Field-level patch.
+	 *
+	 * v1 spread the entire preferences object from local state into the write,
+	 * so an admin on a stale device could revive superseded values. Callers pass
+	 * only what changed.
+	 */
 	const updatePreferences = useCallback(
-		async (
-			newPreferences:
-				| Partial<CompanyPreferences>
-				| ((prev: CompanyPreferences) => CompanyPreferences),
-		) => {
-			if (!activeCompanyId) return;
-
-			try {
-				setIsLoading(true);
-
-				const updatedPreferences =
-					typeof newPreferences === "function"
-						? newPreferences(preferences)
-						: { ...preferences, ...newPreferences };
-
-				const success = await updateCompanyPreferences(
-					activeCompanyId,
-					updatedPreferences,
-				);
-
-				if (success) {
-					setPreferences(updatedPreferences);
-				} else {
-					throw new Error("Failed to update preferences");
-				}
-			} catch (err) {
-				console.error("Error updating preferences:", err);
-				setError(err as Error);
-			} finally {
-				setIsLoading(false);
-			}
+		async (patch: Partial<CompanyPreferences>) => {
+			if (!companyId) return;
+			await writePreferences(companyId, patch);
 		},
-		[activeCompanyId, preferences],
+		[companyId],
 	);
 
-	const contextValue: CompanyContextType = {
-		companyData,
-		preferences,
-		isLoading,
-		error,
-		updatePreferences,
-		setActiveCompany,
-	};
-
 	return (
-		<CompanyContext.Provider value={contextValue}>
+		<CompanyContext.Provider
+			value={{
+				company,
+				companyId,
+				preferences,
+				timeZone: company?.timeZone || FALLBACK_TIME_ZONE,
+				isLoading,
+				updatePreferences,
+			}}
+		>
 			{children}
 		</CompanyContext.Provider>
 	);
 };
 
-// Custom hook for using company context
-export const useCompany = () => {
-	const context = useContext(CompanyContext);
-
-	if (context === undefined) {
-		throw new Error("useCompany must be used within a CompanyProvider");
-	}
-
-	return context;
-};
+export const useCompany = () => useContext(CompanyContext);

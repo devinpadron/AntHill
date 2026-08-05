@@ -3,7 +3,7 @@
 // It uses a bottom sheet to display options for filtering events based on user selection.
 // It includes options for filtering by specific users, all events, my events, and unassigned events.
 //
-import React, { useEffect } from "react";
+import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import { FilterType } from "../../types/enums/FilterType";
@@ -11,7 +11,7 @@ import BottomSheet from "@gorhom/bottom-sheet";
 import { BottomSheetView } from "@gorhom/bottom-sheet";
 import { Checkbox } from "../ui/Checkbox";
 import { Button } from "../ui/Button";
-import { getAllUsersInCompany } from "../../services/companyService";
+export type WorkerOption = { label: string; value: string };
 
 type FilterPanelProps = {
 	filterType: FilterType;
@@ -22,8 +22,9 @@ type FilterPanelProps = {
 	snapPoints: string[];
 	selectedUsers: string[];
 	setSelectedUsers: React.Dispatch<React.SetStateAction<string[]>>;
-	availableWorkers: any[];
-	setAvailableWorkers: React.Dispatch<React.SetStateAction<any[]>>;
+	/** Dropdown options, not membership records — {label, value} pairs. */
+	availableWorkers: WorkerOption[];
+	setAvailableWorkers: React.Dispatch<React.SetStateAction<WorkerOption[]>>;
 	openSelect: boolean;
 	checkSelectOpen: () => void;
 	showAllSelectedOnly: boolean;
@@ -35,6 +36,18 @@ type FilterPanelProps = {
 	companyId: string;
 };
 
+/*
+ * v2 FilterPanel.
+ *
+ * Identical to v1 except that the worker list arrives as a prop instead of
+ * being fetched here. v1 called getAllUsersInCompany, which reads
+ * Companies/{c}/Users — a path that exists only in the v1 schema, so a
+ * v2-only account has no document there and the read is DENIED rather than
+ * empty. That is what logged "Error finding users" on every calendar mount.
+ *
+ * The v2 calendar already has the list from useCompanyMembers (one query), so
+ * there was never a reason to fetch it twice.
+ */
 export const FilterPanel: React.FC<FilterPanelProps> = ({
 	filterType,
 	handleFilterChange,
@@ -56,53 +69,6 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
 	isAdmin = false,
 	companyId,
 }) => {
-	useEffect(() => {
-		const getWorkers = async () => {
-			try {
-				const workersData = await getAllUsersInCompany(companyId);
-
-				// Safety check and conversion logic
-				let formattedWorkers = [];
-
-				if (workersData) {
-					// Handle if workersData is an array
-					if (Array.isArray(workersData)) {
-						formattedWorkers = workersData.map((worker) => ({
-							label: `${worker.firstName || ""} ${
-								worker.lastName || ""
-							}`.trim(),
-							value: worker.id,
-						}));
-					}
-					// Handle if workersData is an object with user data
-					else if (typeof workersData === "object") {
-						formattedWorkers = Object.keys(workersData).map(
-							(key) => {
-								const worker = workersData[key];
-								return {
-									label: `${worker.firstName || ""} ${
-										worker.lastName || ""
-									}`.trim(),
-									value: worker.id || key,
-								};
-							},
-						);
-					}
-				}
-
-				setAvailableWorkers(formattedWorkers);
-			} catch (error) {
-				console.error("Error fetching workers:", error);
-				// Set empty array to prevent further errors
-				setAvailableWorkers([]);
-			}
-		};
-
-		if (companyId) {
-			getWorkers();
-		}
-	}, [companyId]);
-
 	return (
 		<BottomSheet
 			ref={bottomSheetRef}

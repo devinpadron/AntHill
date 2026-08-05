@@ -2,15 +2,13 @@ import React, { useEffect, useRef, useState } from "react";
 import {
 	View,
 	Text,
-	StyleSheet,
 	TextInput,
 	Animated,
 	TouchableOpacity,
 	StatusBar,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { getPackageDetails } from "../../services/packageService";
-import { RouteProp, useFocusEffect, useRoute } from "@react-navigation/native";
+import { RouteProp, useRoute } from "@react-navigation/native";
 import LoadingScreen from "../LoadingScreen";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import moment from "moment";
@@ -25,8 +23,8 @@ import { EventHeader } from "../../components/eventDetails/EventHeader";
 import { ScrollView } from "react-native-gesture-handler";
 import AttachmentGallery from "../../components/ui/AttachmentGallery";
 import { useUser } from "../../contexts/UserContext";
-import db from "../../constants/firestore";
 import { useCompany } from "../../contexts/CompanyContext";
+import { styles } from "./EventDetails.styles";
 
 // Types
 type RootStackParamList = {
@@ -62,15 +60,15 @@ const EventDetails = ({ navigation }) => {
 		isLoading,
 		saveNotes,
 		hasEditPermission,
-		setRefreshKey,
+		packages,
+		eventLabel,
 	} = useEventDetails(eventId);
 
-	// Add this new effect to refresh data when screen comes into focus
-	useFocusEffect(
-		React.useCallback(() => {
-			setRefreshKey((prevKey) => prevKey + 1);
-		}, [eventId]),
-	);
+	/*
+	 * v1 bumped a refreshKey on focus to re-fetch the event, attachments and
+	 * worker names, because all three were one-shot reads. Every one of them is
+	 * a live subscription now, so the screen is already current on focus.
+	 */
 
 	const handleDoubleTap = () => {
 		const now = Date.now();
@@ -137,65 +135,15 @@ const EventDetails = ({ navigation }) => {
 		navigation.navigate("EditEvent", { uid: eventId });
 	};
 
-	// Add state for packages
-	const [packages, setPackages] = useState([]);
-	const [loadingPackages, setLoadingPackages] = useState(false);
 	const { companyId, isAdmin } = useUser();
 
-	// Add effect to load packages
-	useEffect(() => {
-		if (!event?.packages || !companyId) return;
+	/*
+	 * Packages and the event label used to be fetched here — a getPackageDetails
+	 * per package id, plus a direct Firestore read for the label. Both now come
+	 * from useEventDetails as one batched query each.
+	 */
 
-		const fetchPackages = async () => {
-			setLoadingPackages(true);
-			try {
-				const packagePromises = event.packages.map((packageId) =>
-					getPackageDetails(companyId, packageId),
-				);
-				const packageResults = await Promise.all(packagePromises);
-				setPackages(packageResults.filter((pkg) => pkg !== null));
-			} catch (error) {
-				console.error("Error loading packages:", error);
-			} finally {
-				setLoadingPackages(false);
-			}
-		};
-
-		fetchPackages();
-	}, [event?.packages, companyId]);
-
-	// First, add a state for the label
-	const [eventLabel, setEventLabel] = useState(null);
-
-	// Add this effect to fetch the label data
-	useEffect(() => {
-		if (!event?.labelId || !companyId) return;
-
-		const fetchLabel = async () => {
-			try {
-				const labelRef = db
-					.collection("Companies")
-					.doc(companyId)
-					.collection("EventLabels")
-					.doc(event.labelId);
-
-				const labelDoc = await labelRef.get();
-
-				if (labelDoc.exists()) {
-					setEventLabel({
-						id: labelDoc.id,
-						...labelDoc.data(),
-					});
-				}
-			} catch (error) {
-				console.error("Error fetching label:", error);
-			}
-		};
-
-		fetchLabel();
-	}, [event?.labelId, companyId]);
-
-	if (isLoading || !event || loadingPackages) {
+	if (isLoading || !event) {
 		return <LoadingScreen />;
 	}
 
@@ -249,13 +197,13 @@ const EventDetails = ({ navigation }) => {
 								style={styles.icon}
 							/>
 							<Text style={styles.dateText}>
-								{moment(event.date).format(
+								{moment(event.dateKey).format(
 									"dddd, MMMM D, YYYY",
 								)}
 							</Text>
 						</View>
 
-						{event.startTime && (
+						{event.startAt && (
 							<View style={styles.timeContainer}>
 								<Ionicons
 									name="time-outline"
@@ -265,25 +213,25 @@ const EventDetails = ({ navigation }) => {
 								/>
 								<View style={styles.timeTextContainer}>
 									<Text style={styles.timeText}>
-										{moment(
-											event.startTime,
-											"YYYY-MM-DD HH:mm",
-										).format("h:mm A")}
-										{event.endTime && (
+										{moment(event.startAt).format("h:mm A")}
+										{event.endAt && (
 											<Text style={styles.timeText}>
 												{" - "}
-												{moment(
-													event.endTime,
-													"YYYY-MM-DD HH:mm",
-												).format("h:mm A")}
+												{moment(event.endAt).format(
+													"h:mm A",
+												)}
 											</Text>
 										)}
 									</Text>
-									{event.duration && (
+									{event.durationSeconds ? (
 										<Text style={styles.durationText}>
-											Duration: {event.duration} hours
+											Duration:{" "}
+											{(
+												event.durationSeconds / 3600
+											).toFixed(1)}{" "}
+											hours
 										</Text>
-									)}
+									) : null}
 								</View>
 							</View>
 						)}
@@ -291,9 +239,9 @@ const EventDetails = ({ navigation }) => {
 				</View>
 
 				{/* Workers & Notes Card */}
-				{(event.assignedWorkers?.length > 0 || event.notes) && (
+				{(event.assignedUserIds?.length > 0 || event.adminNotes) && (
 					<View style={styles.card}>
-						{event.assignedWorkers?.length > 0 && (
+						{event.assignedUserIds?.length > 0 && (
 							<View style={styles.section}>
 								<View style={styles.sectionHeaderContainer}>
 									<Ionicons
@@ -310,11 +258,11 @@ const EventDetails = ({ navigation }) => {
 							</View>
 						)}
 
-						{event.notes && (
+						{event.adminNotes && (
 							<View
 								style={[
 									styles.section,
-									event.assignedWorkers?.length > 0 &&
+									event.assignedUserIds?.length > 0 &&
 										styles.sectionDivider,
 								]}
 							>
@@ -329,7 +277,9 @@ const EventDetails = ({ navigation }) => {
 										Event Notes
 									</Text>
 								</View>
-								<Text style={styles.text}>{event.notes}</Text>
+								<Text style={styles.text}>
+									{event.adminNotes}
+								</Text>
 							</View>
 						)}
 					</View>
@@ -381,7 +331,7 @@ const EventDetails = ({ navigation }) => {
 																typeof checklist ===
 																"string"
 																	? checklist
-																	: checklist.checklistId,
+																	: checklist.id,
 														);
 													navigation.navigate(
 														"EventChecklists",
@@ -426,7 +376,7 @@ const EventDetails = ({ navigation }) => {
 															typeof checklist ===
 															"string"
 																? checklist
-																: checklist.checklistId
+																: checklist.id
 														}
 														style={
 															styles.packageChecklistItem
@@ -602,7 +552,7 @@ const EventDetails = ({ navigation }) => {
 													typeof checklist ===
 													"string"
 														? checklist
-														: checklist.checklistId,
+														: checklist.id,
 												)
 											: [],
 									)
@@ -622,234 +572,5 @@ const EventDetails = ({ navigation }) => {
 		</View>
 	);
 };
-
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: "#f8f9fa",
-	},
-	scrollContent: {
-		padding: 16,
-		paddingBottom: 80, // Extra padding for floating button
-	},
-	card: {
-		backgroundColor: "#FFFFFF",
-		borderRadius: 12,
-		padding: 16,
-		marginBottom: 16,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 4,
-		elevation: 3,
-	},
-	dateTimeContainer: {
-		flexDirection: "column",
-	},
-	dateContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-		marginBottom: 12,
-	},
-	timeContainer: {
-		flexDirection: "row",
-		alignItems: "flex-start",
-	},
-	timeTextContainer: {
-		flexDirection: "column",
-	},
-	icon: {
-		marginRight: 8,
-	},
-	dateText: {
-		fontSize: 18,
-		fontWeight: "600",
-		color: "#333",
-	},
-	timeText: {
-		fontSize: 17,
-		fontWeight: "500",
-		color: "#333",
-	},
-	durationText: {
-		fontSize: 14,
-		color: "#666",
-		marginTop: 4,
-	},
-	section: {
-		marginBottom: 8,
-	},
-	sectionDivider: {
-		paddingTop: 16,
-		borderTopWidth: 1,
-		borderTopColor: "#f0f0f0",
-		marginTop: 16,
-	},
-	sectionHeaderContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-		marginBottom: 12,
-	},
-	sectionTitle: {
-		fontSize: 17,
-		fontWeight: "600",
-		color: "#333",
-	},
-	text: {
-		fontSize: 16,
-		lineHeight: 22,
-		color: "#444",
-	},
-	map: {
-		height: 220,
-		borderRadius: 8,
-		overflow: "hidden",
-	},
-	packageCard: {
-		backgroundColor: "#f9f9f9",
-		borderRadius: 10,
-		padding: 14,
-		borderWidth: 1,
-		borderColor: "#eee",
-	},
-	packageCardMargin: {
-		marginBottom: 12,
-	},
-	packageHeader: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		marginBottom: 8,
-	},
-	packageTitle: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#333",
-		flex: 1,
-	},
-	packageDescription: {
-		fontSize: 14,
-		lineHeight: 20,
-		color: "#666",
-		marginBottom: 10,
-	},
-	checklistButton: {
-		flexDirection: "row",
-		alignItems: "center",
-		backgroundColor: "#e6f2ff",
-		paddingVertical: 4,
-		paddingHorizontal: 8,
-		borderRadius: 16,
-	},
-	checklistButtonText: {
-		fontSize: 13,
-		fontWeight: "500",
-		color: "#2089dc",
-		marginLeft: 4,
-	},
-	checklistCount: {
-		fontSize: 15,
-		fontWeight: "400",
-		color: "#666",
-	},
-	packageChecklists: {
-		marginTop: 10,
-		backgroundColor: "#f0f0f0",
-		borderRadius: 8,
-		padding: 10,
-	},
-	packageChecklistItem: {
-		flexDirection: "row",
-		alignItems: "center",
-		marginBottom: 6,
-	},
-	checklistIcon: {
-		marginRight: 8,
-	},
-	packageChecklistTitle: {
-		fontSize: 14,
-		color: "#333",
-	},
-	moreChecklists: {
-		fontSize: 13,
-		color: "#666",
-		marginTop: 4,
-		fontStyle: "italic",
-	},
-	notesContainer: {
-		borderWidth: 1,
-		borderColor: "#eee",
-		borderRadius: 8,
-		backgroundColor: "#fff",
-	},
-	editingNotesContainer: {
-		borderColor: "#2089dc",
-		backgroundColor: "#f0f8ff",
-	},
-	notesInput: {
-		fontSize: 16,
-		lineHeight: 22,
-		padding: 12,
-		minHeight: 120,
-		color: "#444",
-	},
-	editHint: {
-		fontSize: 13,
-		fontStyle: "italic",
-		color: "#888",
-		fontWeight: "400",
-		marginLeft: 6,
-	},
-	floatingChecklistButton: {
-		position: "absolute",
-		bottom: 20,
-		right: 20,
-		flexDirection: "row",
-		alignItems: "center",
-		backgroundColor: "#2089dc",
-		paddingVertical: 12,
-		paddingHorizontal: 16,
-		borderRadius: 30,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.3,
-		shadowRadius: 4,
-		elevation: 6,
-	},
-	floatingButtonText: {
-		color: "#fff",
-		fontWeight: "600",
-		fontSize: 15,
-		marginLeft: 8,
-	},
-	bottomSpace: {
-		height: 40,
-	},
-	labelContainer: {
-		marginBottom: 12,
-		paddingTop: 8,
-		paddingHorizontal: 4,
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	labelBadge: {
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		borderRadius: 16,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 2,
-		elevation: 1,
-	},
-	labelText: {
-		color: "white",
-		fontSize: 14,
-		fontWeight: "500",
-		textShadowColor: "rgba(0, 0, 0, 0.3)",
-		textShadowOffset: { width: 0, height: 1 },
-		textShadowRadius: 2,
-	},
-});
 
 export default EventDetails;

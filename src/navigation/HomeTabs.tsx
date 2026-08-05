@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import CalendarStack from "./CalendarStack";
@@ -7,20 +7,47 @@ import ClockStack from "./ClockStack";
 import AvailabilityStack from "./AvailabilityStack";
 import { useCompany } from "../contexts/CompanyContext";
 
+/*
+ * The bottom tabs, mirroring production.
+ *
+ * Availability and Clock are feature-flagged off company preferences, so a
+ * tab's very existence depends on company config — same as v1.
+ *
+ * Preferences are a LIVE subscription in v2, so toggling a feature flag now
+ * adds or removes a tab without an app relaunch. Under v1 it did not.
+ */
+
 const Tab = createBottomTabNavigator();
+
+const icon =
+	(
+		active: keyof typeof Ionicons.glyphMap,
+		inactive: keyof typeof Ionicons.glyphMap,
+	) =>
+	({
+		focused,
+		color,
+		size,
+	}: {
+		focused: boolean;
+		color: string;
+		size: number;
+	}) => (
+		<Ionicons
+			name={focused ? active : inactive}
+			size={size}
+			color={color}
+		/>
+	);
 
 const HomeTabs = () => {
 	const { preferences } = useCompany();
 
-	useEffect(() => {}, [preferences]);
-
 	return (
 		<Tab.Navigator
 			screenOptions={{
-				tabBarShowLabel: false, // Hide the labels
-				tabBarStyle: {
-					paddingVertical: 5, // Optional: add some padding
-				},
+				tabBarShowLabel: false,
+				tabBarStyle: { paddingVertical: 5 },
 			}}
 		>
 			<Tab.Screen
@@ -28,13 +55,7 @@ const HomeTabs = () => {
 				component={CalendarStack}
 				options={{
 					headerShown: false,
-					tabBarIcon: ({ focused, color, size }) => (
-						<Ionicons
-							name={focused ? "calendar" : "calendar-outline"}
-							size={size}
-							color={color}
-						/>
-					),
+					tabBarIcon: icon("calendar", "calendar-outline"),
 				}}
 			/>
 			{preferences.enableAvailability && (
@@ -43,13 +64,7 @@ const HomeTabs = () => {
 					component={AvailabilityStack}
 					options={{
 						headerShown: false,
-						tabBarIcon: ({ focused, color, size }) => (
-							<Ionicons
-								name={focused ? "people" : "people-outline"}
-								size={size}
-								color={color}
-							/>
-						),
+						tabBarIcon: icon("people", "people-outline"),
 					}}
 				/>
 			)}
@@ -59,13 +74,7 @@ const HomeTabs = () => {
 					component={ClockStack}
 					options={{
 						headerShown: false,
-						tabBarIcon: ({ focused, color, size }) => (
-							<Ionicons
-								name={focused ? "time" : "time-outline"}
-								size={size}
-								color={color}
-							/>
-						),
+						tabBarIcon: icon("time", "time-outline"),
 					}}
 				/>
 			)}
@@ -74,14 +83,7 @@ const HomeTabs = () => {
 				component={SettingStack}
 				options={{
 					headerShown: false,
-					unmountOnBlur: false,
-					tabBarIcon: ({ focused, color, size }) => (
-						<Ionicons
-							name={focused ? "settings" : "settings-outline"}
-							size={size}
-							color={color}
-						/>
-					),
+					tabBarIcon: icon("settings", "settings-outline"),
 				}}
 			/>
 		</Tab.Navigator>

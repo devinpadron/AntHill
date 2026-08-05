@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
 	View,
 	Text,
-	StyleSheet,
 	Alert,
 	ScrollView,
 	TouchableOpacity,
@@ -16,6 +15,7 @@ import { useProfile } from "../../hooks/useProfile";
 import { showPrompt, showConfirmation } from "../../utils/alertUtils";
 import { Button } from "../../components/ui/Button";
 import { useUser } from "../../contexts/UserContext";
+import { styles } from "./ProfilePage.styles";
 
 const ProfilePage = ({ navigation }) => {
 	const insets = useSafeAreaInsets();
@@ -28,8 +28,9 @@ const ProfilePage = ({ navigation }) => {
 		reauthenticate,
 		updateEmail,
 		resetPassword,
-		deleteAccount,
-		updatePhone, // We'll need to add this to the useProfile hook
+		leaveCompany,
+		updatePhone,
+		memberships,
 	} = useProfile();
 
 	const { logout } = useUser();
@@ -115,13 +116,15 @@ const ProfilePage = ({ navigation }) => {
 						return;
 					}
 
-					const companyId = await joinCompany(accessCode);
+					const joined = await joinCompany(accessCode);
 
-					if (companyId) {
+					if (joined) {
 						showConfirmation(
 							"Success",
-							"You've successfully joined the company. Would you like to switch to it now?",
-							() => handleCompanyChange(companyId),
+							joined.groupId
+								? "You've joined the company and been added to a work group. Would you like to switch to it now?"
+								: "You've successfully joined the company. Would you like to switch to it now?",
+							() => handleCompanyChange(joined.companyId),
 						);
 					} else {
 						Alert.alert(
@@ -184,7 +187,7 @@ const ProfilePage = ({ navigation }) => {
 
 	// Handle account deletion
 	const handleDeleteAccount = async () => {
-		const title = `Delete ${userData?.loggedInCompany} Data?`;
+		const title = `Delete ${userData?.loggedInCompanyId} Data?`;
 
 		showConfirmation(
 			title,
@@ -192,7 +195,7 @@ const ProfilePage = ({ navigation }) => {
 			async () => {
 				try {
 					await reauthenticate();
-					await deleteAccount();
+					await leaveCompany();
 				} catch (error) {
 					console.error("Delete account failed:", error);
 					Alert.alert(
@@ -332,11 +335,11 @@ const ProfilePage = ({ navigation }) => {
 						]}
 					>
 						<Dropdown
-							data={userData.companies.map((company) => ({
-								label: company,
-								value: company,
+							data={memberships.map((m) => ({
+								label: m.label,
+								value: m.companyId,
 							}))}
-							value={userData.loggedInCompany}
+							value={userData.loggedInCompanyId}
 							onChange={(item) => handleCompanyChange(item.value)}
 							labelField="label"
 							valueField="value"
@@ -349,7 +352,7 @@ const ProfilePage = ({ navigation }) => {
 								marginTop: 4,
 							}}
 							maxHeight={200} // Maximum height of dropdown list
-							disable={userData.companies.length <= 1}
+							disable={memberships.length <= 1}
 						/>
 
 						<Button
@@ -421,7 +424,7 @@ const ProfilePage = ({ navigation }) => {
 						]}
 					>
 						<Button
-							title={`Delete ${userData?.loggedInCompany} Profile`}
+							title={`Delete ${userData?.loggedInCompanyId} Profile`}
 							onPress={handleDeleteAccount}
 							style={styles.deleteButton}
 							textStyle={styles.deleteButtonText}
@@ -442,209 +445,5 @@ const ProfilePage = ({ navigation }) => {
 		</View>
 	);
 };
-
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: "#f8f9fa",
-	},
-	header: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		backgroundColor: "white",
-		borderBottomWidth: 1,
-		borderBottomColor: "#e1e4e8",
-	},
-	headerTitle: {
-		fontSize: 18,
-		fontWeight: "600",
-		color: "#333",
-		textAlign: "center",
-		flex: 1,
-	},
-	backButton: {
-		padding: 8,
-	},
-	scrollView: {
-		flex: 1,
-	},
-	contentContainer: {
-		padding: 16,
-		paddingBottom: 32,
-	},
-	profileCard: {
-		backgroundColor: "white",
-		borderRadius: 12,
-		marginBottom: 16,
-		overflow: "hidden",
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 3,
-		elevation: 2,
-	},
-	profileHeader: {
-		flexDirection: "row",
-		alignItems: "center",
-		padding: 16,
-	},
-	avatarContainer: {
-		width: 60,
-		height: 60,
-		borderRadius: 30,
-		backgroundColor: "#e6f2ff",
-		alignItems: "center",
-		justifyContent: "center",
-		marginRight: 16,
-	},
-	avatarText: {
-		fontSize: 22,
-		fontWeight: "600",
-		color: "#2089dc",
-	},
-	nameContainer: {
-		flex: 1,
-	},
-	nameText: {
-		fontSize: 18,
-		fontWeight: "600",
-		color: "#333",
-		marginBottom: 4,
-	},
-	editText: {
-		fontSize: 12,
-		color: "#888",
-		fontStyle: "italic",
-	},
-	card: {
-		backgroundColor: "white",
-		borderRadius: 12,
-		marginBottom: 16,
-		overflow: "hidden",
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 3,
-		elevation: 2,
-	},
-	dangerCard: {
-		backgroundColor: "white",
-		borderRadius: 12,
-		marginBottom: 16,
-		overflow: "hidden",
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 3,
-		elevation: 2,
-		borderLeftWidth: 4,
-		borderLeftColor: "#d32f2f",
-	},
-	cardHeader: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingHorizontal: 16,
-		paddingTop: 16,
-		paddingBottom: 12,
-		borderBottomWidth: 1,
-		borderBottomColor: "#f0f0f0",
-	},
-	cardIcon: {
-		marginRight: 10,
-	},
-	cardTitle: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#333",
-	},
-	cardContent: {
-		padding: 16,
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-	},
-	valueText: {
-		fontSize: 15,
-		color: "#444",
-		flex: 1,
-	},
-	actionButton: {
-		paddingHorizontal: 16,
-		paddingVertical: 8,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: "#2089dc",
-		backgroundColor: "transparent",
-	},
-	actionButtonText: {
-		fontSize: 13,
-		fontWeight: "500",
-		color: "#2089dc",
-	},
-	dropdown: {
-		height: 50,
-		width: "100%",
-		borderColor: "#e0e0e0",
-		borderWidth: 1,
-		borderRadius: 8,
-		paddingHorizontal: 16,
-		marginBottom: 16,
-		backgroundColor: "#f9f9f9", // Add background color for better contrast
-	},
-	dropdownPlaceholder: {
-		color: "#999",
-		fontSize: 16,
-	},
-	dropdownSelectedText: {
-		color: "#333",
-		fontSize: 16,
-		fontWeight: "500", // Make selected text more visible
-	},
-	joinButton: {
-		paddingVertical: 12,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: "#2089dc",
-		backgroundColor: "#e6f2ff",
-	},
-	joinButtonText: {
-		fontSize: 14,
-		fontWeight: "500",
-		color: "#2089dc",
-	},
-	resetButton: {
-		paddingVertical: 12,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: "#666",
-		backgroundColor: "#f5f5f5",
-		flexDirection: "row",
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	resetButtonText: {
-		fontSize: 14,
-		fontWeight: "500",
-		color: "#666",
-	},
-	deleteButton: {
-		paddingVertical: 12,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: "#d32f2f",
-		backgroundColor: "#ffebee",
-		flexDirection: "row",
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	deleteButtonText: {
-		fontSize: 14,
-		fontWeight: "500",
-		color: "#d32f2f",
-	},
-});
 
 export default ProfilePage;

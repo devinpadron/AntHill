@@ -1,10 +1,15 @@
 import "react-native-get-random-values";
-import React, { useRef, useEffect, useState } from "react";
+import React, {
+	useRef,
+	useEffect,
+	useState,
+	useMemo,
+	useCallback,
+} from "react";
 import {
 	View,
 	Text,
 	TextInput,
-	StyleSheet,
 	TouchableOpacity,
 	Alert,
 	Platform,
@@ -17,21 +22,24 @@ import { useRoute } from "@react-navigation/native";
 import DatePicker from "react-native-date-picker";
 import DropDownPicker from "react-native-dropdown-picker";
 import moment from "moment";
-import { subscribeAllUsersInCompany } from "../../services/companyService";
-import { getUser } from "../../services/userService";
 import { useEventForm } from "../../hooks/useEventForm";
+import { useCompanyMembers } from "../../hooks/useCompanyMembers";
+import { subscribeEventResponses } from "../../services/eventService";
+import {
+	subscribeEventLabels,
+	subscribePackages,
+} from "../../services/libraryService";
+import { getAttachmentsForParent } from "../../services/attachmentService";
 import { EventFormHeader } from "../../components/eventSubmit/EventFormHeader";
 import { LocationInput } from "../../components/eventSubmit/LocationInput";
 import { useUser } from "../../contexts/UserContext";
 import { Button } from "../../components/ui/Button";
 import AttachmentsSelector from "../../components/ui/AttachmentsSelector";
-import { AttachmentItem } from "../../types";
+import type { SelectableAttachment } from "../../components/ui/AttachmentsSelector";
 import { useUploadManager } from "../../contexts/UploadManagerContext";
-import { getEventAttachments, updateEvent } from "../../services/eventService";
-import { getEventPackages, getPackages } from "../../services/packageService";
-import db from "../../constants/firestore";
-import { getWorkerStatusList } from "../../services/availabilityService";
 import { useCompany } from "../../contexts/CompanyContext";
+import { useGroups } from "../../hooks/useGroups";
+import { styles } from "./EventSubmit.styles";
 
 const EventSubmit = ({ navigation }) => {
 	const insets = useSafeAreaInsets();
@@ -80,12 +88,16 @@ const EventSubmit = ({ navigation }) => {
 		handleSubmitData,
 		handleDelete,
 		hasFormChanged,
+		audienceGroupIds,
+		setAudienceGroupIds,
+		audienceUserIds,
+		setAudienceUserIds,
 	} = useEventForm(navigation, eventId);
 
-	const { companyId: currentCompany } = useUser();
-	const { uploadFiles, deleteFiles, isUploading, uploadProgress } =
+	const { userId, companyId: currentCompany } = useUser();
+	const { uploadFiles, deleteAttachments, isUploading, uploadProgress } =
 		useUploadManager();
-	const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
+	const [attachments, setAttachments] = useState<SelectableAttachment[]>([]);
 	const [attachmentDeletionQueue, setAttachmentDeletionQueue] = useState<
 		string[]
 	>([]);
@@ -102,6 +114,8 @@ const EventSubmit = ({ navigation }) => {
 	const [availableWorkers, setAvailableWorkers] = useState([]);
 
 	const { preferences } = useCompany();
+	const { groups } = useGroups(currentCompany ?? "");
+	const [personSearch, setPersonSearch] = useState("");
 
 	// Add these at the top of your component
 	const isMounted = useRef(true);
@@ -148,145 +162,126 @@ const EventSubmit = ({ navigation }) => {
 		});
 	};
 
-	// Load available workers
-	useEffect(() => {
-		if (!currentCompany) return;
+	/*
+	 * Workers.
+	 *
+	 * v1 subscribed to the member list and then fanned out a getUser() per
+	 * member INSIDE the snapshot callback, so every membership change re-read
+	 * every profile. Names live on the membership document now, and responses
+	 * come from their own subscription.
+	 */
+	const { members } = useCompanyMembers(currentCompany ?? "");
 
-		const subscriber = subscribeAllUsersInCompany(
-			currentCompany,
-			async (snapshot) => {
-				const workers = await Promise.all(
-					snapshot.docs.map(async (doc) => {
-						const userData = await getUser(doc.id);
-						return {
-							label: `${userData.firstName} ${userData.lastName}`,
-							value: doc.id,
-							userData: userData,
-						};
-					}),
-				);
+	/*
+	 * The audience picker.
+	 *
+	 * Rendered as plain rows rather than a DropDownPicker like the assigned-
+	 * workers field: this section sits low in the form, and a dropdown overlay
+	 * here would have to win a zIndex fight with everything below it.
+	 *
+	 * Selected people are pinned above the search box so that typing a name
+	 * cannot hide someone already chosen — otherwise a manager filtering for
+	 * one person appears to have lost the rest.
+	 */
+	const isTargetedAudience =
+		audienceGroupIds.length > 0 || audienceUserIds.length > 0;
 
-				// If editing an event, fetch worker status and enhance labels for ALL workers
-				if (eventId && preferences.enableAvailability == true) {
-					try {
-						const workerStatus = await getWorkerStatusList(
-							currentCompany,
-							eventId,
-						);
+	const toggleAudienceUser = useCallback(
+		(userId: string) =>
+			setAudienceUserIds((prev) =>
+				prev.includes(userId)
+					? prev.filter((id) => id !== userId)
+					: [...prev, userId],
+			),
+		[setAudienceUserIds],
+	);
 
-						// Enhance labels with status indicators for ALL workers
-						const enhancedWorkers = workers.map((worker) => {
-							// Get status - if not in workerStatus map, it's "pending"
-							const status =
-								workerStatus[worker.value] || "pending";
-							const statusEmoji = {
-								confirmed: "✅",
-								pending: "⏳",
-								declined: "❌",
-							};
+	const selectedAudienceMembers = useMemo(
+		() => members.filter((m) => audienceUserIds.includes(m.userId)),
+		[members, audienceUserIds],
+	);
 
-							return {
-								...worker,
-								label: `${statusEmoji[status]} ${worker.userData.firstName} ${worker.userData.lastName}`,
-								status: status, // Add status to the worker object for easier filtering
-							};
-						});
-
-						// Sort all relevant workers by status priority
-						const sortedWorkers = sortWorkersByStatus(
-							enhancedWorkers,
-							workerStatus,
-						);
-
-						setAvailableWorkers(sortedWorkers); // Show all workers in dropdown, but with status indicators
-					} catch (error) {
-						console.error(
-							"Error fetching worker status for sorting:",
-							error,
-						);
-						setAvailableWorkers(workers);
-					}
-				} else {
-					setAvailableWorkers(workers);
-				}
-			},
+	const matchingUnselected = useMemo(() => {
+		const term = personSearch.trim().toLowerCase();
+		return members.filter(
+			(m) =>
+				!audienceUserIds.includes(m.userId) &&
+				(!term || m.displayName.toLowerCase().includes(term)),
 		);
+	}, [members, audienceUserIds, personSearch]);
 
-		return () => subscriber();
-	}, [currentCompany, eventId]); // Remove assignedWorkers from dependencies
+	// Capped so a 65-person company does not render 65 rows inside a form.
+	const PERSON_ROW_CAP = 12;
+	const unselectedAudienceMembers = matchingUnselected.slice(
+		0,
+		PERSON_ROW_CAP,
+	);
+	const hiddenPersonCount = Math.max(
+		0,
+		matchingUnselected.length - PERSON_ROW_CAP,
+	);
 
-	// Load packages
+	const [workerResponses, setWorkerResponses] = useState<
+		Record<string, string>
+	>({});
+
+	useEffect(() => {
+		if (!currentCompany || !eventId) return;
+		return subscribeEventResponses(
+			currentCompany,
+			eventId,
+			setWorkerResponses,
+		);
+	}, [currentCompany, eventId]);
+
+	useEffect(() => {
+		const showStatus = Boolean(eventId && preferences.enableAvailability);
+		const statusEmoji = { confirmed: "✅", pending: "⏳", declined: "❌" };
+
+		const workers = members.map((member) => {
+			const status = workerResponses[member.userId] ?? "pending";
+			return {
+				label: showStatus
+					? `${statusEmoji[status] ?? "⏳"} ${member.displayName}`
+					: member.displayName,
+				value: member.userId,
+				status,
+				userData: {
+					firstName: member.firstName,
+					lastName: member.lastName,
+				},
+			};
+		});
+
+		setAvailableWorkers(
+			showStatus
+				? sortWorkersByStatus(workers, workerResponses)
+				: workers,
+		);
+	}, [members, workerResponses, eventId, preferences.enableAvailability]);
+
+	// Packages: one live query for the catalogue.
 	useEffect(() => {
 		if (!currentCompany) return;
-
-		const fetchPackagesData = async () => {
-			setLoadingPackages(true);
-			try {
-				const packages = await getPackages(currentCompany);
-				setAvailablePackages(packages);
-
-				// If editing an event, load attached packages
-				if (eventId) {
-					const eventPackages = await getEventPackages(
-						currentCompany,
-						eventId,
-					);
-					if (eventPackages && eventPackages.length > 0) {
-						setSelectedPackages(eventPackages);
-						setOgSelectedPackages(eventPackages);
-					}
-				}
-			} catch (error) {
-				console.error("Error loading packages:", error);
-			} finally {
-				setLoadingPackages(false);
-			}
-		};
-
-		fetchPackagesData();
-	}, [currentCompany, eventId]);
+		setLoadingPackages(true);
+		return subscribePackages(currentCompany, (next) => {
+			setAvailablePackages(next);
+			setLoadingPackages(false);
+		});
+	}, [currentCompany]);
 
 	// Add this useEffect after your other useEffects
 	useEffect(() => {
 		if (!currentCompany) return;
 
-		const fetchLabels = async () => {
-			setLoadingLabels(true);
-			try {
-				const labelsRef = db
-					.collection("Companies")
-					.doc(currentCompany)
-					.collection("EventLabels");
-
-				const snapshot = await labelsRef.get();
-				const labelData = snapshot.docs.map((doc) => ({
-					id: doc.id,
-					...doc.data(),
-				}));
-
-				setAvailableLabels(labelData);
-
-				// If editing and event has a label, set it
-				if (eventId) {
-					const eventDoc = await db
-						.collection("Companies")
-						.doc(currentCompany)
-						.collection("Events")
-						.doc(eventId)
-						.get();
-
-					if (eventDoc.exists() && eventDoc.data().labelId) {
-						setSelectedLabelId(eventDoc.data().labelId);
-					}
-				}
-			} catch (error) {
-				console.error("Error fetching labels:", error);
-			} finally {
-				setLoadingLabels(false);
-			}
-		};
-
-		fetchLabels();
+		// Labels come from a subscription; the event's own label arrives with the
+		// event itself rather than a second read of the same document.
+		setLoadingLabels(true);
+		const unsubscribe = subscribeEventLabels(currentCompany, (next) => {
+			setAvailableLabels(next);
+			setLoadingLabels(false);
+		});
+		return unsubscribe;
 	}, [currentCompany, eventId]);
 
 	const formatDate = (date: Date) => moment(date).format("MMM D, YYYY");
@@ -299,12 +294,23 @@ const EventSubmit = ({ navigation }) => {
 	useEffect(() => {
 		if (eventId) {
 			const fetchAttachments = async () => {
-				const attachments = await getEventAttachments(
+				const existing = await getAttachmentsForParent(
 					currentCompany,
+					"event",
 					eventId,
 				);
 
-				setAttachments(attachments);
+				setAttachments(
+					existing.map((a) => ({
+						id: a.id,
+						kind: "persisted" as const,
+						fileName: a.fileName,
+						contentType: a.contentType,
+						sizeBytes: a.sizeBytes,
+						displayUri: a.downloadUrl,
+						thumbnailUri: a.thumbnailDownloadUrl,
+					})),
+				);
 			};
 
 			fetchAttachments();
@@ -349,51 +355,54 @@ const EventSubmit = ({ navigation }) => {
 				return;
 			}
 
-			// Validate attachments before proceeding
-			const validAttachments = attachments.filter((att) =>
-				att.uri
-					? att.uri.startsWith("file://") ||
-						att.uri.startsWith("http")
-					: false,
-			);
+			/*
+			 * Only drafts get uploaded. v1 filtered on a URI prefix to guess
+			 * which files were new; `kind` states it outright.
+			 */
+			const drafts = attachments.filter((att) => att.kind === "draft");
 
-			if (validAttachments.length !== attachments.length) {
+			if (drafts.length !== attachments.length) {
 				console.warn(
 					`Found ${
-						attachments.length - validAttachments.length
+						attachments.length - drafts.length
 					} invalid attachments`,
 				);
 			}
 
 			// First delete any files in the deletion queue
 			if (attachmentDeletionQueue.length > 0) {
-				await deleteFiles(
-					attachmentDeletionQueue,
+				await deleteAttachments(
 					currentCompany,
+					"event",
 					eventId,
-					"Events",
+					attachmentDeletionQueue.map((a: any) =>
+						typeof a === "string" ? a : a.id,
+					),
 				);
 			}
 
 			// Then upload any new files
-			if (validAttachments.length > 0) {
-				const uploadedAttachments = await uploadFiles(
-					validAttachments,
+			if (drafts.length > 0) {
+				await uploadFiles(
 					currentCompany,
+					"event",
 					eventId,
-					"Events",
+					drafts.map((d) => ({
+						id: d.id,
+						uri: d.displayUri,
+						name: d.fileName,
+						type: d.contentType,
+						size: d.sizeBytes,
+						width: d.width,
+						height: d.height,
+						thumbnailUri: d.thumbnailUri,
+					})),
+					userId,
 				);
 
-				// Update state with uploaded attachments (uncomment and fix this)
-				if (uploadedAttachments && uploadedAttachments.length > 0) {
-					const existingAttachments = attachments.filter(
-						(att) => att.isExisting,
-					);
-					setAttachments([
-						...existingAttachments,
-						...uploadedAttachments,
-					]);
-				}
+				// uploadFiles returns ids; the live attachment subscription on
+				// the details screen is what renders them, so there is nothing
+				// to merge into local state here.
 			}
 
 			// Clear deletion queue
@@ -413,14 +422,20 @@ const EventSubmit = ({ navigation }) => {
 	};
 
 	const handleSubmit = async () => {
-		const eventId = await handleSubmitData();
-
-		handleAttachmentSubmit(eventId);
-
-		await updateEvent(currentCompany, eventId, {
-			packages: selectedPackages,
+		/*
+		 * Packages and the label go in with everything else. v1 called
+		 * handleSubmitData and then issued a SECOND updateEvent for these two
+		 * fields — so creating an event was three writes and a reader could
+		 * observe it without its packages.
+		 */
+		const savedId = await handleSubmitData({
+			packageIds: selectedPackages,
 			labelId: selectedLabelId,
+			audienceGroupIds,
+			audienceUserIds,
 		});
+
+		if (savedId) await handleAttachmentSubmit(savedId);
 	};
 
 	// Toggle package selection
@@ -678,6 +693,162 @@ const EventSubmit = ({ navigation }) => {
 									</View>
 								)}
 							</View>
+
+							{/* Who gets asked about this event */}
+							{preferences.enableAvailability && (
+								<View style={styles.sectionContainer}>
+									<Text style={styles.sectionTitle}>
+										Who can see this event
+									</Text>
+									<Text style={styles.audienceHint}>
+										{isTargetedAudience
+											? "Only the people below will be asked about it."
+											: "Everyone who can see open jobs. Pick a group or specific people to send it only to them."}
+									</Text>
+
+									<Text style={styles.audienceSectionTitle}>
+										Groups
+									</Text>
+									{groups.length === 0 ? (
+										<Text style={styles.audienceEmpty}>
+											No groups yet — create one under
+											Settings › Worker Groups.
+										</Text>
+									) : (
+										groups.map((group) => {
+											const on =
+												audienceGroupIds.includes(
+													group.id,
+												);
+											return (
+												<TouchableOpacity
+													key={group.id}
+													style={styles.audienceRow}
+													onPress={() =>
+														setAudienceGroupIds(
+															on
+																? audienceGroupIds.filter(
+																		(g) =>
+																			g !==
+																			group.id,
+																	)
+																: [
+																		...audienceGroupIds,
+																		group.id,
+																	],
+														)
+													}
+												>
+													<Ionicons
+														name={
+															on
+																? "checkbox"
+																: "square-outline"
+														}
+														size={22}
+														color={
+															on
+																? "#2078c8"
+																: "#999"
+														}
+													/>
+													<Text
+														style={
+															styles.audienceLabel
+														}
+													>
+														{group.name}
+													</Text>
+												</TouchableOpacity>
+											);
+										})
+									)}
+
+									{/*
+									 * Specific people, for the one-off a group
+									 * cannot express. Selected names are pinned
+									 * above the search so filtering never hides
+									 * someone you already picked.
+									 */}
+									<Text style={styles.audienceSectionTitle}>
+										Specific people
+									</Text>
+
+									{selectedAudienceMembers.map((member) => (
+										<TouchableOpacity
+											key={member.userId}
+											style={styles.audienceRow}
+											onPress={() =>
+												toggleAudienceUser(
+													member.userId,
+												)
+											}
+										>
+											<Ionicons
+												name="checkbox"
+												size={22}
+												color="#2078c8"
+											/>
+											<Text style={styles.audienceLabel}>
+												{member.displayName}
+											</Text>
+										</TouchableOpacity>
+									))}
+
+									{members.length > 8 && (
+										<TextInput
+											style={styles.audienceSearch}
+											value={personSearch}
+											onChangeText={setPersonSearch}
+											placeholder="Search people"
+											placeholderTextColor="#aaa"
+											autoCorrect={false}
+										/>
+									)}
+
+									{unselectedAudienceMembers.length === 0 ? (
+										<Text style={styles.audienceEmpty}>
+											{personSearch.trim()
+												? "Nobody matches that name."
+												: "Everyone is already selected."}
+										</Text>
+									) : (
+										unselectedAudienceMembers.map(
+											(member) => (
+												<TouchableOpacity
+													key={member.userId}
+													style={styles.audienceRow}
+													onPress={() =>
+														toggleAudienceUser(
+															member.userId,
+														)
+													}
+												>
+													<Ionicons
+														name="square-outline"
+														size={22}
+														color="#999"
+													/>
+													<Text
+														style={
+															styles.audienceLabel
+														}
+													>
+														{member.displayName}
+													</Text>
+												</TouchableOpacity>
+											),
+										)
+									)}
+
+									{hiddenPersonCount > 0 && (
+										<Text style={styles.audienceEmpty}>
+											{hiddenPersonCount} more — search to
+											narrow the list.
+										</Text>
+									)}
+								</View>
+							)}
 
 							{/* Assigned Workers Section */}
 							<View style={styles.sectionContainer}>
@@ -1162,314 +1333,5 @@ const EventSubmit = ({ navigation }) => {
 		</View>
 	);
 };
-
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: "#f8f9fa",
-	},
-	scrollContainer: {
-		padding: 16,
-		paddingBottom: 100,
-	},
-	formCard: {
-		backgroundColor: "white",
-		borderRadius: 12,
-		...Platform.select({
-			ios: {
-				shadowColor: "#000",
-				shadowOffset: { width: 0, height: 1 },
-				shadowOpacity: 0.1,
-				shadowRadius: 3,
-			},
-			android: {
-				elevation: 2,
-			},
-		}),
-		marginBottom: 16,
-		overflow: "hidden",
-	},
-	sectionContainer: {
-		padding: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: "#f0f0f0",
-	},
-	sectionTitle: {
-		fontSize: 18,
-		fontWeight: "700",
-		color: "#333",
-		marginBottom: 16,
-	},
-	inputContainer: {
-		marginBottom: 16,
-	},
-	timeContainer: {
-		flexDirection: "column",
-	},
-	timeField: {
-		flex: 1,
-	},
-	label: {
-		fontSize: 15,
-		marginBottom: 8,
-		color: "#555",
-		fontWeight: "500",
-	},
-	input: {
-		height: 50,
-		borderColor: "#e0e0e0",
-		borderWidth: 1,
-		borderRadius: 8,
-		paddingHorizontal: 15,
-		fontSize: 16,
-		backgroundColor: "white",
-		color: "#333",
-	},
-	dateButton: {
-		backgroundColor: "white",
-		padding: 15,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: "#e0e0e0",
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-	},
-	dateButtonText: {
-		fontSize: 16,
-		color: "#333",
-	},
-	checkboxWrapper: {
-		marginBottom: 16,
-	},
-	checkboxContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-	},
-	checkbox: {
-		marginRight: 8,
-	},
-	checkboxLabel: {
-		fontSize: 15,
-		color: "#333",
-		fontWeight: "500",
-	},
-	dropdown: {
-		borderColor: "#e0e0e0",
-		borderWidth: 1,
-		borderRadius: 8,
-		backgroundColor: "white",
-		minHeight: 50,
-	},
-	dropdownList: {
-		borderColor: "#e0e0e0",
-		borderWidth: 1,
-		borderRadius: 8,
-		backgroundColor: "white",
-		marginTop: 1,
-		position: "relative",
-		top: 0,
-	},
-	dropdownItem: {
-		borderBottomWidth: 1,
-		borderBottomColor: "#f0f0f0",
-		minHeight: 40,
-		justifyContent: "center",
-	},
-	notesInput: {
-		minHeight: 100,
-		borderColor: "#e0e0e0",
-		borderWidth: 1,
-		borderRadius: 8,
-		paddingHorizontal: 15,
-		paddingTop: 12,
-		paddingBottom: 12,
-		fontSize: 16,
-		backgroundColor: "white",
-		color: "#333",
-		textAlignVertical: "top",
-	},
-	attachmentsContainer: {
-		marginTop: 8,
-	},
-	actionButtonsContainer: {
-		marginTop: 8,
-		marginBottom: 24,
-	},
-	submitButton: {
-		backgroundColor: "#3d7eea",
-		padding: 15,
-		borderRadius: 8,
-		alignItems: "center",
-		flexDirection: "row",
-		justifyContent: "center",
-		marginBottom: 12,
-	},
-	submitButtonText: {
-		color: "#fff",
-		fontSize: 17,
-		fontWeight: "600",
-		marginLeft: 8,
-	},
-	deleteButton: {
-		backgroundColor: "#e74c3c",
-		padding: 15,
-		borderRadius: 8,
-		alignItems: "center",
-		flexDirection: "row",
-		justifyContent: "center",
-	},
-	helperText: {
-		fontSize: 14,
-		color: "#666",
-		marginBottom: 12,
-	},
-	emptyPackagesContainer: {
-		padding: 20,
-		backgroundColor: "#f9f9f9",
-		borderRadius: 8,
-		alignItems: "center",
-		justifyContent: "center",
-		borderWidth: 1,
-		borderColor: "#eee",
-		borderStyle: "dashed",
-	},
-	emptyPackagesText: {
-		color: "#999",
-		fontSize: 16,
-	},
-	packagesContainer: {
-		marginTop: 8,
-	},
-	packageItem: {
-		backgroundColor: "#f9f9f9",
-		borderRadius: 8,
-		marginBottom: 12,
-		borderWidth: 1,
-		borderColor: "#eee",
-		overflow: "hidden",
-	},
-	packageItemSelected: {
-		backgroundColor: "#eaf4ff",
-		borderColor: "#3d7eea",
-	},
-	packageItemContent: {
-		padding: 12,
-	},
-	packageItemHeader: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		marginBottom: 8,
-	},
-	packageItemTitle: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#333",
-		flex: 1,
-	},
-	packageItemDescription: {
-		fontSize: 14,
-		color: "#666",
-		marginBottom: 8,
-	},
-	packageItemStats: {
-		fontSize: 14,
-		color: "#888",
-	},
-	selectedPackagesContainer: {
-		marginTop: 16,
-		borderTopWidth: 1,
-		borderTopColor: "#eee",
-		paddingTop: 16,
-	},
-	selectedPackagesTitle: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#333",
-		marginBottom: 12,
-	},
-	removePackageButton: {
-		padding: 4,
-	},
-	emptyLabelsContainer: {
-		padding: 15,
-		backgroundColor: "#f9f9f9",
-		borderRadius: 8,
-		alignItems: "center",
-		justifyContent: "center",
-		borderWidth: 1,
-		borderColor: "#eee",
-		borderStyle: "dashed",
-		marginVertical: 8,
-	},
-	emptyLabelsText: {
-		color: "#999",
-		fontSize: 16,
-	},
-	labelSelectorContainer: {
-		marginTop: 8,
-		marginBottom: 8,
-	},
-	labelsGrid: {
-		flexDirection: "row",
-		flexWrap: "wrap",
-	},
-	labelOption: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingHorizontal: 12,
-		paddingVertical: 8,
-		borderRadius: 16,
-		marginRight: 8,
-		marginBottom: 8,
-		backgroundColor: "#f5f5f5",
-		borderWidth: 1,
-		borderColor: "#e0e0e0",
-		minHeight: 36,
-	},
-	labelOptionSelected: {
-		backgroundColor: "#eaf4ff",
-		borderColor: "#3d7eea",
-	},
-	labelColor: {
-		width: 18,
-		height: 18,
-		borderRadius: 9,
-		marginRight: 8,
-	},
-	labelColorNone: {
-		width: 18,
-		height: 18,
-		borderRadius: 9,
-		marginRight: 8,
-		backgroundColor: "#f0f0f0",
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	labelOptionText: {
-		fontSize: 14,
-		color: "#333",
-	},
-	selectedLabelContainer: {
-		marginTop: 16,
-		paddingTop: 8,
-	},
-	selectedLabel: {
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		borderRadius: 16,
-		alignSelf: "flex-start",
-		marginTop: 4,
-	},
-	selectedLabelText: {
-		color: "white",
-		fontSize: 14,
-		fontWeight: "500",
-		textShadowColor: "rgba(0, 0, 0, 0.3)",
-		textShadowOffset: { width: 0, height: 1 },
-		textShadowRadius: 2,
-	},
-});
 
 export default EventSubmit;

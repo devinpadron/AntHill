@@ -1,226 +1,228 @@
 import React, {
 	createContext,
+	ReactNode,
+	useCallback,
 	useContext,
 	useEffect,
-	useState,
-	ReactNode,
 	useRef,
+	useState,
 } from "react";
 import messaging from "@react-native-firebase/messaging";
-import { useUser } from "./UserContext";
+import { Notifier, NotifierComponents } from "react-native-notifier";
+import { addPushToken, setActiveCompany } from "../services/userService";
 import {
-	requestNotificationPermissions,
-	getFCMToken,
-	saveTokenToUserProfile,
-	setupNotificationListeners,
-} from "../services/notificationService";
-import { swapUserCompany } from "../services/userService";
-import { pendingNavigation } from "../navigation/navigationRef";
+	pendingNavigation,
+	RootStackParamList,
+} from "../navigation/navigationRef";
+import { useUser } from "./UserContext";
+
+/*
+ * Push notifications.
+ *
+ * The payload contract is UNCHANGED from v1, deliberately: the senders live in
+ * a separate repo (AH_Functions) and are updated for v2 collection paths
+ * separately. Changing the `data.type` vocabulary here as well would couple two
+ * deployments that already have to be coordinated.
+ *
+ * v1 defect fixed: the onTokenRefresh subscription's return value was discarded
+ * (NotificationContext.tsx:171), leaking a listener on every (userId, loggedIn)
+ * change.
+ */
 
 type NotificationContextType = {
-	lastNotification: any | null;
-	handleNotificationNavigation: (data: any) => void;
+	lastNotification: Record<string, unknown> | null;
+	handleNotificationNavigation: (data: Record<string, string>) => void;
 };
 
-// Create the context with default values
+type RouteName = keyof RootStackParamList;
+
 const NotificationContext = createContext<NotificationContextType>({
 	lastNotification: null,
 	handleNotificationNavigation: () => {},
 });
 
-const parseIdsToArray = (idString: string): string[] => {
-	// If the string contains commas, split it into an array
-	if (idString && idString.includes(",")) {
-		return idString.split(",").map((id) => id.trim());
-	}
-	// Otherwise return it as a single-item array
-	return [idString];
-};
+/**
+ * Batch notifications pack several ids into one comma-delimited string, because
+ * FCM data payloads are string-only.
+ */
+const parseIds = (value: string): string[] =>
+	value?.includes(",") ? value.split(",").map((id) => id.trim()) : [value];
+
+/*
+ * `screenName` arrives from a push payload sent by a separate repo, so it is
+ * untrusted input rather than a value TypeScript can vouch for. Validated
+ * against the real route table instead of cast — a sender typo should be a
+ * logged no-op, not a navigation crash.
+ */
+const ROUTES: RouteName[] = ["Details", "TimeEntryDetails", "EmployeeList"];
+
+const asRoute = (value: string | undefined): RouteName | null =>
+	value && (ROUTES as string[]).includes(value) ? (value as RouteName) : null;
 
 export const NotificationProvider = ({ children }: { children: ReactNode }) => {
-	const { userId, loggedIn, user, companyId } = useUser();
-	const [lastNotification, setLastNotification] = useState<any | null>(null);
+	const { userId, loggedIn } = useUser();
+	const [lastNotification, setLastNotification] = useState<Record<
+		string,
+		unknown
+	> | null>(null);
 
-	// Add a ref to store initial notification data
-	const initialNotificationRef = useRef<any>(null);
-	const initialNotificationChecked = useRef(false);
+	// A push can arrive before the navigator (or auth) is ready, so it is
+	// stashed and replayed once both are.
+	const pendingRef = useRef<Record<string, string> | null>(null);
+	const checkedInitial = useRef(false);
 
-	// Updated navigation handler function
-	const handleNotificationNavigation = async (data: any) => {
-		console.log("Handling notification navigation:", data);
+	const handleNotificationNavigation = useCallback(
+		async (data: Record<string, string>) => {
+			if (!data?.type) return;
+			setLastNotification(data);
 
-		if (!data) {
-			console.log("Cannot navigate: missing data");
-			return;
-		}
-
-		// Store the last notification data
-		setLastNotification(data);
-
-		try {
-			// Navigate based on notification type
-			switch (data.type) {
-				case "user_left":
-				case "new_user_joined":
-					if (data.screenName && data.companyId) {
-						await swapUserCompany(userId, data.companyId);
-						// Use pendingNavigation.setAction instead of direct navigation
-						pendingNavigation.setAction(data.screenName);
-					}
-					break;
-
-				case "update":
-				case "assignment":
-					if (data.screenName && data.eventId && data.companyId) {
-						await swapUserCompany(userId, data.companyId);
-						pendingNavigation.setAction(data.screenName, {
-							eventId: data.eventId,
-						});
-					}
-					break;
-
-				case "timesheet_approval":
-				case "timesheet_rejection":
-					if (data.screenName && data.timesheetId && data.companyId) {
-						await swapUserCompany(userId, data.companyId);
-						pendingNavigation.setAction(data.screenName, {
-							entryId: data.timesheetId,
-							userId: data.userId,
-						});
-					}
-					break;
-
-				case "timesheet_approval_batch":
-				case "timesheet_rejection_batch":
-					if (data.screenName && data.timesheetId && data.companyId) {
-						await swapUserCompany(userId, data.companyId);
-						pendingNavigation.setAction(data.screenName, {
-							entryId: parseIdsToArray(data.timesheetId),
-							userId: data.userId,
-						});
-					}
-					break;
-			}
-		} catch (error) {
-			console.error("Navigation error:", error);
-		}
-	};
-
-	// First effect - check for initial notification immediately on mount
-	// This runs before auth is ready but captures the notification
-	useEffect(() => {
-		// Only check once
-		if (initialNotificationChecked.current) return;
-
-		initialNotificationChecked.current = true;
-
-		// Check if app was opened from a notification (app was closed)
-		messaging()
-			.getInitialNotification()
-			.then((remoteMessage) => {
-				if (remoteMessage) {
-					console.log(
-						"Captured initial notification from quit state:",
-						remoteMessage,
-					);
-
-					// Store notification data in ref for later processing
-					initialNotificationRef.current = remoteMessage.data || {};
-				}
-			});
-	}, []); // Empty dependency array - run only once on mount
-
-	// Second effect - process initial notification when auth is ready
-	useEffect(() => {
-		// Wait until user is authenticated
-		if (!userId || !loggedIn) return;
-
-		// Process stored initial notification if we have one
-		if (initialNotificationRef.current) {
-			console.log(
-				"Processing stored initial notification now that auth is ready:",
-				initialNotificationRef.current,
-			);
-
-			handleNotificationNavigation(initialNotificationRef.current);
-			initialNotificationRef.current = null; // Clear after processing
-		}
-	}, [userId, loggedIn]); // Run when auth state changes
-
-	// Setup FCM token and listeners
-	useEffect(() => {
-		if (!userId || !loggedIn) {
-			return;
-		}
-
-		const setupNotifications = async () => {
 			try {
-				const enabled = await requestNotificationPermissions();
+				// A notification may target a company the user is not currently
+				// in, so the active company moves first.
+				if (data.companyId && userId) {
+					await setActiveCompany(userId, data.companyId);
+				}
 
-				if (!enabled) {
-					console.log("User notification permissions denied");
+				const screen = asRoute(data.screenName);
+				if (!screen) {
+					console.warn("Unknown push screenName:", data.screenName);
 					return;
 				}
 
-				const token = await getFCMToken();
+				switch (data.type) {
+					case "user_left":
+					case "new_user_joined":
+						pendingNavigation.setAction(screen);
+						break;
 
-				if (userId) {
-					await saveTokenToUserProfile(token, userId);
+					case "update":
+					case "assignment":
+						if (data.eventId) {
+							pendingNavigation.setAction(screen, {
+								eventId: data.eventId,
+							});
+						}
+						break;
+
+					case "timesheet_approval":
+					case "timesheet_rejection":
+						if (data.timesheetId) {
+							pendingNavigation.setAction(screen, {
+								entryId: data.timesheetId,
+								userId: data.userId,
+							});
+						}
+						break;
+
+					case "timesheet_approval_batch":
+					case "timesheet_rejection_batch":
+						if (data.timesheetId) {
+							pendingNavigation.setAction(screen, {
+								entryId: parseIds(data.timesheetId),
+								userId: data.userId,
+							});
+						}
+						break;
+
+					default:
+						console.warn("Unhandled notification type:", data.type);
 				}
-
-				messaging().onTokenRefresh(async (newToken) => {
-					if (userId) {
-						await saveTokenToUserProfile(newToken, userId);
-					}
-				});
-			} catch (error) {
-				console.error("Error setting up notifications:", error);
+			} catch (e) {
+				console.error("Notification navigation error", e);
 			}
-		};
+		},
+		[userId],
+	);
 
-		setupNotifications();
-	}, [userId, loggedIn]);
-
-	// Handle notification clicks for background/foreground states
+	/* Cold start: capture the launching notification before auth resolves. */
 	useEffect(() => {
-		// Background notification handler
-		const unsubscribeFromBackgroundNotifications =
-			messaging().onNotificationOpenedApp((remoteMessage) => {
-				console.log(
-					"Notification caused app to open from background state:",
-					remoteMessage,
+		if (checkedInitial.current) return;
+		checkedInitial.current = true;
+
+		messaging()
+			.getInitialNotification()
+			.then((message) => {
+				if (message?.data)
+					pendingRef.current = message.data as Record<string, string>;
+			})
+			.catch((e) =>
+				console.error("Error reading initial notification", e),
+			);
+	}, []);
+
+	/* Replay once auth is ready. */
+	useEffect(() => {
+		if (!loggedIn || !userId || !pendingRef.current) return;
+		const data = pendingRef.current;
+		pendingRef.current = null;
+		handleNotificationNavigation(data);
+	}, [loggedIn, userId, handleNotificationNavigation]);
+
+	/* Background tap. */
+	useEffect(() => {
+		return messaging().onNotificationOpenedApp((message) => {
+			if (message?.data) {
+				handleNotificationNavigation(
+					message.data as Record<string, string>,
 				);
+			}
+		});
+	}, [handleNotificationNavigation]);
 
-				// Extract and process notification data
-				const notificationData: any = remoteMessage.data || {};
-				handleNotificationNavigation(notificationData);
+	/* Foreground banner. */
+	useEffect(() => {
+		return messaging().onMessage((message) => {
+			const { title, body } = message.notification ?? {};
+			if (!title && !body) return;
+
+			Notifier.showNotification({
+				title: title ?? "",
+				description: body ?? "",
+				Component: NotifierComponents.Notification,
+				onPress: () =>
+					handleNotificationNavigation(
+						(message.data ?? {}) as Record<string, string>,
+					),
 			});
+		});
+	}, [handleNotificationNavigation]);
 
-		// Foreground notification handler
-		const unsubscribeFromForegroundNotifications =
-			setupNotificationListeners((remoteMessage) => {
-				// This callback will be triggered when a user taps on the in-app notification
-				const notificationData: any = remoteMessage.data || {};
-				handleNotificationNavigation(notificationData);
-			});
+	/* Token registration and refresh. */
+	useEffect(() => {
+		if (!loggedIn || !userId) return;
 
-		// Clean up listeners on unmount
+		let cancelled = false;
+
+		(async () => {
+			try {
+				const authorized = await messaging().requestPermission();
+				if (!authorized) return;
+				const token = await messaging().getToken();
+				if (token && !cancelled) await addPushToken({ userId, token });
+			} catch (e) {
+				console.error("Error registering push token", e);
+			}
+		})();
+
+		// v1 discarded this return value, leaking a listener each time userId or
+		// loggedIn changed.
+		const unsubscribe = messaging().onTokenRefresh((token) => {
+			addPushToken({ userId, token });
+		});
+
 		return () => {
-			unsubscribeFromBackgroundNotifications();
-			unsubscribeFromForegroundNotifications();
+			cancelled = true;
+			unsubscribe();
 		};
 	}, [loggedIn, userId]);
 
-	const value = {
-		lastNotification,
-		handleNotificationNavigation,
-	};
-
 	return (
-		<NotificationContext.Provider value={value}>
+		<NotificationContext.Provider
+			value={{ lastNotification, handleNotificationNavigation }}
+		>
 			{children}
 		</NotificationContext.Provider>
 	);
 };
 
-export const useNotification = () => useContext(NotificationContext);
+export const useNotifications = () => useContext(NotificationContext);

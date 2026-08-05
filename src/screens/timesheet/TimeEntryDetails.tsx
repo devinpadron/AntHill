@@ -1,8 +1,13 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, {
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import {
 	View,
 	Text,
-	StyleSheet,
 	ScrollView,
 	TouchableOpacity,
 	ActivityIndicator,
@@ -11,13 +16,22 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { useUser } from "../../contexts/UserContext";
+import { useCompanyMembers } from "../../hooks/useCompanyMembers";
 import {
-	getTimeEntry,
-	updateTimeEntry,
-	getTimeEntryAttachments,
+	approveEntries,
 	deleteTimeEntry,
+	getTimeEntry,
+	rejectEntries,
+	updateTimeEntry,
 } from "../../services/timeEntryService";
-import { getUser } from "../../services/userService";
+import {
+	appendEdit,
+	getConnections,
+	setConnections,
+	updateConnectionResponses,
+} from "../../services/timeEntryEditService";
+import { getAttachmentsForParent } from "../../services/attachmentService";
+import { getSchema } from "../../services/formSchemaService";
 import {
 	getStatusBadgeColor,
 	getStatusBadgeText,
@@ -29,28 +43,40 @@ import ManagerActions from "../../components/time/ManagerActions";
 import EditSheet from "../../components/time/EditSheet";
 import ExportSheet from "../../components/time/ExportSheet";
 import FieldTotalsCard from "../../components/time/FieldTotalsCard";
+import { styles } from "./TimeEntryDetails.styles";
 
 const TimeEntryDetails = ({ route, navigation }) => {
 	// Extract params - handle both single ID and array of IDs
 	const { entryId, userId: passedUserId } = route.params;
 	const entryIdArray = Array.isArray(entryId) ? entryId : [entryId];
 
-	console.log("Entry IDs:", entryIdArray);
-
 	const insets = useSafeAreaInsets();
 	const { userId: currentUserId, companyId, isAdmin } = useUser();
+	const { byUserId: membersById } = useCompanyMembers(companyId ?? "");
 
 	// Core state
 	const [isLoading, setIsLoading] = useState(true);
 	const [timeEntries, setTimeEntries] = useState([]);
-	const [employeeUser, setEmployeeUser] = useState(null);
+	/*
+	 * DERIVED, not stored.
+	 *
+	 * This used to be state written during loadTimeEntries — which runs before
+	 * the membership subscription resolves, so it captured an empty map and
+	 * never recomputed. The name rendered as "Unknown" forever. Deriving it
+	 * means it fills in as soon as members arrive.
+	 */
+	const employeeUser = useMemo(() => {
+		const entryUserId = timeEntries[0]?.userId || passedUserId;
+		return entryUserId ? (membersById[entryUserId] ?? null) : null;
+	}, [timeEntries, passedUserId, membersById]);
 	const [connectedEvents, setConnectedEvents] = useState({});
+	// entryId -> { timeEntrySchema, eventSchema }, resolved from formSchemaIds.
+	const [schemasByEntry, setSchemasByEntry] = useState({});
 	const [attachmentMap, setAttachmentsMap] = useState({});
 
 	// Calculations
 	const [totalDurationSeconds, setTotalDurationSeconds] = useState(0);
 	const [totalDurationDecimal, setTotalDurationDecimal] = useState(0);
-	const [fieldTotals, setFieldTotals] = useState({});
 
 	// UI state
 	const [selectedEntries, setSelectedEntries] = useState({});
@@ -99,7 +125,7 @@ const TimeEntryDetails = ({ route, navigation }) => {
 		try {
 			// Fetch entries and filter out nulls
 			const entries = await Promise.all(
-				entryIdArray.map((id) => getTimeEntry(companyId, id)),
+				entryIdArray.map((id) => getTimeEntry(id)),
 			);
 			const validEntries = entries.filter((entry) => entry);
 			setTimeEntries(validEntries);
@@ -109,8 +135,9 @@ const TimeEntryDetails = ({ route, navigation }) => {
 			await Promise.all(
 				validEntries.map(async (entry) => {
 					try {
-						const entryAttachments = await getTimeEntryAttachments(
+						const entryAttachments = await getAttachmentsForParent(
 							companyId,
+							"timeEntry",
 							entry.id,
 						);
 						attachments[entry.id] = entryAttachments;
@@ -127,7 +154,7 @@ const TimeEntryDetails = ({ route, navigation }) => {
 
 			// Calculate totals
 			const totalSeconds = validEntries.reduce(
-				(sum, entry) => sum + (entry.duration || 0),
+				(sum, entry) => sum + (entry.workedSeconds || 0),
 				0,
 			);
 			setTotalDurationSeconds(totalSeconds);
@@ -140,37 +167,54 @@ const TimeEntryDetails = ({ route, navigation }) => {
 			});
 			setSelectedEntries(initialSelection);
 
-			// Get employee info
-			const userId = validEntries[0]?.userId || passedUserId;
-			if (userId) {
-				const user = await getUser(userId);
-				setEmployeeUser(user);
-			}
+			/*
+			 * Connections are their own documents now (a `connections`
+			 * subcollection per entry) rather than v1's embedded
+			 * `connectedEvents` array, so they need a read per entry.
+			 *
+			 * This branch used to be `if (false)`, leaving every entry with an
+			 * empty list — connected events never rendered at all.
+			 */
+			const connectionLists = await Promise.all(
+				validEntries.map((entry) => getConnections(entry.id)),
+			);
 
-			const totals = calculateFieldTotals(validEntries);
-			setFieldTotals(totals);
-
-			// Get connected events
 			const entryConnectionMap = {};
-
-			// Just organize the connections by entry, don't try to fetch actual events
-			validEntries.forEach((entry) => {
-				if (entry.connectedEvents && entry.connectedEvents.length > 0) {
-					// Initialize the array for this entry with the connection data we already have
-					entryConnectionMap[entry.id] = entry.connectedEvents.map(
-						(connection: any) => ({
-							...connection,
-							// Include minimal default properties to avoid UI errors
-							title: connection.eventTitle || "Connected Event",
-							formResponses: connection.formResponses || {},
-						}),
-					);
-				} else {
-					entryConnectionMap[entry.id] = [];
-				}
+			validEntries.forEach((entry, i) => {
+				entryConnectionMap[entry.id] = connectionLists[i].map(
+					(connection) => ({
+						...connection,
+						title:
+							connection.customTitle ||
+							connection.eventTitleSnapshot ||
+							"Connected Event",
+						formResponses: connection.formResponses || {},
+					}),
+				);
 			});
 
 			setConnectedEvents(entryConnectionMap);
+
+			/*
+			 * Form schemas are references now, not the two full copies v1
+			 * embedded on every entry, so the totals need them resolved.
+			 * getSchema memoizes, so entries sharing a schema cost one read.
+			 */
+			const schemaMap = {};
+			await Promise.all(
+				validEntries.map(async (entry) => {
+					const [timeEntrySchema, eventSchema] = await Promise.all([
+						entry.formSchemaIds?.timeEntry
+							? getSchema(entry.formSchemaIds.timeEntry)
+							: null,
+						entry.formSchemaIds?.event
+							? getSchema(entry.formSchemaIds.event)
+							: null,
+					]);
+					schemaMap[entry.id] = { timeEntrySchema, eventSchema };
+				}),
+			);
+			setSchemasByEntry(schemaMap);
 		} catch (error) {
 			console.error("Error loading time entry details:", error);
 			Alert.alert("Error", "Failed to load time entry details");
@@ -221,13 +265,23 @@ const TimeEntryDetails = ({ route, navigation }) => {
 		setExportModalVisible(false);
 	}, []);
 
-	// Add this useEffect
-	useEffect(() => {
-		if (timeEntries.length > 0) {
-			const totals = calculateFieldTotals(timeEntries);
-			setFieldTotals(totals);
-		}
-	}, [timeEntries]);
+	/*
+	 * Derived, not stored. This used to be computed twice — once inside
+	 * loadTimeEntries and again in an effect on `timeEntries` that overwrote
+	 * it — so the first result was always discarded.
+	 */
+	const fieldTotals = useMemo(
+		() =>
+			calculateFieldTotals(
+				timeEntries.map((entry) => ({
+					formResponses: entry.formResponses,
+					timeEntrySchema: schemasByEntry[entry.id]?.timeEntrySchema,
+					eventSchema: schemasByEntry[entry.id]?.eventSchema,
+					connections: connectedEvents[entry.id],
+				})),
+			),
+		[timeEntries, schemasByEntry, connectedEvents],
+	);
 
 	// If still loading, show loading indicator
 	if (isLoading) {
@@ -253,14 +307,15 @@ const TimeEntryDetails = ({ route, navigation }) => {
 		try {
 			setIsApproving(true);
 
-			// Process each entry sequentially
-			for (const entryId of entryIds) {
-				await updateTimeEntry(entryId, companyId, {
-					status: "approved",
-					rejectedAt: new Date().toISOString(),
-					rejectedBy: currentUserId,
-				});
-			}
+			/*
+			 * v1 wrote { status: "approved", rejectedAt, rejectedBy } here.
+			 * approvedBy/approvedAt were never written by any code path, which
+			 * is why 2,104 of 2,116 approved entries carry a corrupt approver.
+			 *
+			 * Recording the decision now lives in the service, batched, and
+			 * stamps review.provenance = "trusted".
+			 */
+			await approveEntries(entryIds, currentUserId);
 
 			// Reload the time entries to reflect the changes
 			await loadTimeEntries();
@@ -316,15 +371,7 @@ const TimeEntryDetails = ({ route, navigation }) => {
 						try {
 							setIsApproving(true); // Reuse loading state for rejection
 
-							// Process each entry sequentially
-							for (const entryId of entryIds) {
-								// Update the time entry status to "rejected"
-								await updateTimeEntry(entryId, companyId, {
-									status: "rejected",
-									rejectedAt: new Date().toISOString(),
-									rejectedBy: currentUserId,
-								});
-							}
+							await rejectEntries(entryIds, currentUserId, "");
 
 							// Reload the time entries to reflect the changes
 							await loadTimeEntries();
@@ -362,35 +409,35 @@ const TimeEntryDetails = ({ route, navigation }) => {
 		);
 	};
 
-	// Function to save edited time entry
+	/*
+	 * Applies an edit from the sheet.
+	 *
+	 * Three separate concerns, three separate writes: the entry patch, its
+	 * connections, and ONE audit record. v1 merged all three into a single
+	 * whole-document write that also appended to an unbounded array.
+	 */
 	const saveEditedEntry = async (updates: any) => {
 		if (!currentEditEntry) return;
 
 		try {
-			// Prepare updated data
-			const updatedData = {
-				...updates,
-				editHistory: [
-					...(currentEditEntry.editHistory || []),
-					{
-						timestamp: new Date().toISOString(),
-						userId: currentUserId,
-						changeSummary:
-							editChangeSummary || "Updated time entry",
-					},
-				],
-			};
+			await updateTimeEntry(currentEditEntry.id, {
+				...updates.patch,
+				status: "edited",
+			});
 
-			// Update the time entry
-			await updateTimeEntry(currentEditEntry.id, companyId, updatedData);
+			if (updates.connections?.length) {
+				await setConnections(
+					companyId,
+					currentEditEntry.id,
+					updates.connections,
+				);
+			}
 
-			// Close the edit modal
+			await appendEdit(companyId, currentEditEntry.id, updates.edit);
+
 			setEditModalVisible(false);
-
-			// Reload time entries to reflect changes
 			await loadTimeEntries();
 
-			// Show success message
 			Alert.alert("Success", "Time entry updated successfully");
 		} catch (error) {
 			console.error("Error updating time entry:", error);
@@ -470,62 +517,50 @@ const TimeEntryDetails = ({ route, navigation }) => {
 				};
 
 				// Update the time entry with just the form responses
-				await updateTimeEntry(entryId, companyId, {
+				await updateTimeEntry(entryId, {
 					formResponses: updatedFormResponses,
-					editHistory: [
-						...(entry.editHistory || []),
-						{
-							timestamp: new Date().toISOString(),
-							userId: currentUserId,
-							changeSummary: `Updated field: ${
-								entry.generalForm?.fields.find(
-									(f) => f.id === fieldId,
-								)?.label || fieldId
-							}`,
-						},
-					],
+				});
+
+				/*
+				 * The audit record is its own document now. v1 appended to an
+				 * `editHistory` array — a read-modify-write that lost entries
+				 * under concurrency, in one of THREE shapes, none of which the
+				 * renderer actually read.
+				 */
+				await appendEdit(companyId, entryId, {
+					summary: `Updated field: ${fieldId}`,
+					actorUserId: currentUserId,
+					actorDisplayName:
+						membersById[currentUserId]?.displayName ?? "",
 				});
 			}
 			// For connected event fields
 			else {
-				const [eventId, eventFieldId] = fieldId.split("_");
+				const [connectionId, eventFieldId] = fieldId.split("_");
 
-				// Find the right entry and connected event
-				const entry = timeEntries.find((e) => e.id === entryId);
-				if (!entry || !entry.connectedEvents)
-					throw new Error("Entry or connected events not found");
-
-				// Update the connected event's form responses
-				const updatedConnectedEvents = entry.connectedEvents.map(
-					(event) => {
-						if (event.eventId === eventId) {
-							return {
-								...event,
-								formResponses: {
-									...(event.formResponses || {}),
-									[eventFieldId]: value,
-								},
-							};
-						}
-						return event;
-					},
+				/*
+				 * Connections are their own documents now, so one field change
+				 * is one targeted write. v1 rebuilt the entire connectedEvents
+				 * array on the parent entry.
+				 */
+				const connections = await getConnections(entryId);
+				const connection = connections.find(
+					(c) => c.id === connectionId,
 				);
+				if (!connection) {
+					throw new Error("Connected event not found");
+				}
 
-				// Update the time entry with just the connected events
-				await updateTimeEntry(entryId, companyId, {
-					connectedEvents: updatedConnectedEvents,
-					editHistory: [
-						...(entry.editHistory || []),
-						{
-							timestamp: new Date().toISOString(),
-							userId: currentUserId,
-							changeSummary: `Updated event field: ${
-								entry.eventForm?.fields.find(
-									(f) => f.id === eventFieldId,
-								)?.label || eventFieldId
-							}`,
-						},
-					],
+				await updateConnectionResponses(entryId, connectionId, {
+					...(connection.formResponses ?? {}),
+					[eventFieldId]: value,
+				});
+
+				await appendEdit(companyId, entryId, {
+					summary: `Updated event field: ${eventFieldId}`,
+					actorUserId: currentUserId,
+					actorDisplayName:
+						membersById[currentUserId]?.displayName ?? "",
 				});
 			}
 
@@ -605,6 +640,10 @@ const TimeEntryDetails = ({ route, navigation }) => {
 						attachmentMap={attachmentMap}
 						connectedEvents={connectedEvents[entry.id] || []}
 						onFieldUpdate={handleFieldUpdate}
+						timeEntrySchema={
+							schemasByEntry[entry.id]?.timeEntrySchema
+						}
+						eventSchema={schemasByEntry[entry.id]?.eventSchema}
 					/>
 				))}
 			</ScrollView>
@@ -615,6 +654,10 @@ const TimeEntryDetails = ({ route, navigation }) => {
 				visible={editModalVisible}
 				snapPoints={editSnapPoints}
 				timeEntry={currentEditEntry}
+				timeEntrySchema={
+					schemasByEntry[currentEditEntry?.id]?.timeEntrySchema
+				}
+				eventSchema={schemasByEntry[currentEditEntry?.id]?.eventSchema}
 				editNotes={editNotes}
 				editChangeSummary={editChangeSummary}
 				setEditNotes={setEditNotes}
@@ -638,489 +681,5 @@ const TimeEntryDetails = ({ route, navigation }) => {
 		</View>
 	);
 };
-
-// Keep just the styles needed for the main component
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: "#f7f7f7",
-	},
-	loadingContainer: {
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	loadingText: {
-		marginTop: 16,
-		fontSize: 16,
-		color: "#666",
-	},
-	header: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		backgroundColor: "#fff",
-		borderBottomWidth: 1,
-		borderBottomColor: "#e1e4e8",
-	},
-	backButton: {
-		padding: 4,
-	},
-	headerTitle: {
-		fontSize: 18,
-		fontWeight: "600",
-		flex: 1,
-		textAlign: "center",
-	},
-	scrollContainer: {
-		flex: 1,
-	},
-	// Bottom sheet styles
-	sheetBackground: {
-		backgroundColor: "white",
-	},
-	sheetIndicator: {
-		backgroundColor: "#ccc",
-		width: 40,
-		height: 4,
-	},
-	sheetHeader: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		paddingHorizontal: 20,
-		paddingVertical: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: "#eaeaea",
-	},
-	sheetContent: {
-		padding: 20,
-		paddingBottom: 40,
-	},
-	summaryCard: {
-		margin: 16,
-		padding: 16,
-		backgroundColor: "#fff",
-		borderRadius: 12,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 4,
-		elevation: 2,
-	},
-	summaryRow: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		marginBottom: 12,
-		alignItems: "center",
-	},
-	totalSummaryRow: {
-		marginTop: 8,
-	},
-	summaryLabel: {
-		fontSize: 16,
-		color: "#666",
-		fontWeight: "500",
-	},
-	summaryValue: {
-		fontSize: 14,
-		color: "#333",
-		fontWeight: "500",
-		textAlign: "right",
-		flex: 1,
-	},
-	totalValue: {
-		fontWeight: "600",
-		color: "#007AFF",
-	},
-	statusContainer: {
-		flexDirection: "row",
-		justifyContent: "flex-end",
-	},
-	statusBadge: {
-		paddingHorizontal: 8,
-		paddingVertical: 3,
-		borderRadius: 12,
-		backgroundColor: "#e0e0e0",
-	},
-	statusText: {
-		fontSize: 12,
-		fontWeight: "600",
-		color: "#555",
-	},
-	managerActionsCard: {
-		margin: 16,
-		marginTop: 0,
-		padding: 16,
-		backgroundColor: "#fff",
-		borderRadius: 12,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 4,
-		elevation: 2,
-	},
-	selectAllRow: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		marginBottom: 16,
-	},
-	selectAllButton: {
-		flexDirection: "row",
-		alignItems: "center",
-	},
-	selectAllText: {
-		marginLeft: 8,
-		fontSize: 16,
-		color: "#007AFF",
-		fontWeight: "500",
-	},
-	selectedCountText: {
-		fontSize: 14,
-		color: "#666",
-	},
-	managerButtonRow: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		gap: 10,
-	},
-	managerActionButton: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-		paddingVertical: 12,
-		paddingHorizontal: 16,
-		borderRadius: 8,
-		flex: 1,
-	},
-	approveButton: {
-		backgroundColor: "#34C759",
-	},
-	emailButton: {
-		backgroundColor: "#007AFF",
-	},
-	rejectButton: {
-		backgroundColor: "#FF3B30",
-	},
-	disabledButton: {
-		opacity: 0.5,
-	},
-	buttonText: {
-		color: "#fff",
-		fontWeight: "600",
-		marginLeft: 8,
-	},
-	timeEntryCard: {
-		marginHorizontal: 16,
-		marginBottom: 16,
-		backgroundColor: "#fff",
-		borderRadius: 12,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 2,
-		elevation: 2,
-		overflow: "hidden",
-	},
-	timeEntryHeader: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		padding: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: "#f0f0f0",
-	},
-	headerLeftSection: {
-		flexDirection: "row",
-		alignItems: "center",
-		flex: 1,
-	},
-	selectionCheckbox: {
-		marginRight: 12,
-	},
-	dateTimeText: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#333",
-	},
-	timeEntryDetails: {
-		padding: 16,
-	},
-	detailRow: {
-		flexDirection: "row",
-		marginBottom: 8,
-	},
-	detailLabel: {
-		fontSize: 15,
-		color: "#666",
-		width: 80,
-	},
-	detailValue: {
-		fontSize: 15,
-		color: "#333",
-		flex: 1,
-	},
-	connectedEventsSection: {
-		marginTop: 16,
-	},
-	sectionTitle: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#333",
-		marginBottom: 8,
-	},
-	connectedEventContainer: {
-		marginBottom: 16,
-		borderWidth: 1,
-		borderColor: "#f0f0f0",
-		borderRadius: 8,
-		overflow: "hidden",
-	},
-	connectedEventItem: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingVertical: 10,
-		paddingHorizontal: 12,
-		backgroundColor: "#f7f9fc",
-		borderBottomColor: "#f0f0f0",
-	},
-	eventFormResponsesSection: {
-		padding: 12,
-		backgroundColor: "#ffffff",
-	},
-	eventFormTitle: {
-		fontSize: 14,
-		fontWeight: "500",
-		color: "#666",
-		marginBottom: 8,
-	},
-	notesSection: {
-		marginTop: 16,
-	},
-	notesText: {
-		fontSize: 15,
-		color: "#333",
-		lineHeight: 22,
-	},
-	formResponsesSection: {
-		marginTop: 16,
-		borderTopWidth: 1,
-		borderTopColor: "#f0f0f0",
-		paddingTop: 16,
-	},
-	formResponseItem: {
-		marginBottom: 12,
-	},
-	formFieldLabel: {
-		fontSize: 14,
-		color: "#666",
-		marginBottom: 4,
-	},
-	formFieldValue: {
-		fontSize: 15,
-		color: "#333",
-	},
-	multiplierValue: {
-		fontSize: 14,
-		color: "#007AFF",
-	},
-	editHistorySection: {
-		marginTop: 16,
-		paddingTop: 12,
-		borderTopWidth: 1,
-		borderTopColor: "#f0f0f0",
-	},
-	editHistoryItem: {
-		marginBottom: 12,
-		padding: 10,
-		backgroundColor: "#f0f7ff",
-		borderRadius: 6,
-	},
-	editTimestamp: {
-		fontSize: 13,
-		color: "#666",
-		marginBottom: 4,
-	},
-	editSummary: {
-		fontSize: 14,
-		color: "#333",
-		fontWeight: "500",
-	},
-	entryActions: {
-		marginTop: 16,
-		flexDirection: "row",
-		justifyContent: "flex-end",
-	},
-	editButton: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingVertical: 8,
-		paddingHorizontal: 12,
-		borderRadius: 6,
-		backgroundColor: "#f0f7ff",
-	},
-	editButtonText: {
-		marginLeft: 6,
-		fontSize: 14,
-		fontWeight: "500",
-		color: "#007AFF",
-	},
-	modal: {
-		margin: 0,
-		justifyContent: "flex-end",
-	},
-	modalContent: {
-		backgroundColor: "#fff",
-		borderTopLeftRadius: 12,
-		borderTopRightRadius: 12,
-		padding: 20,
-	},
-	modalTitle: {
-		fontSize: 18,
-		fontWeight: "600",
-		color: "#333",
-		marginBottom: 4,
-		textAlign: "center",
-	},
-	modalForm: {
-		marginBottom: 20,
-	},
-	modalLabel: {
-		fontSize: 15,
-		fontWeight: "500",
-		color: "#333",
-		marginBottom: 8,
-	},
-	modalInput: {
-		height: 44,
-		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		fontSize: 16,
-		marginBottom: 16,
-	},
-	modalTextArea: {
-		height: 100,
-		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		paddingTop: 12,
-		paddingBottom: 12,
-		fontSize: 16,
-		marginBottom: 16,
-		textAlignVertical: "top",
-	},
-	modalButtons: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-	},
-	modalButton: {
-		paddingVertical: 12,
-		borderRadius: 8,
-		alignItems: "center",
-		justifyContent: "center",
-		flex: 1,
-	},
-	modalCancelButton: {
-		backgroundColor: "#f2f2f2",
-		marginRight: 8,
-	},
-	modalSaveButton: {
-		backgroundColor: "#007AFF",
-		marginLeft: 8,
-	},
-	modalCancelButtonText: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#666",
-	},
-	modalSaveButtonText: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#fff",
-	},
-	exportOptionRow: {
-		marginBottom: 20,
-	},
-	exportOptions: {
-		flexDirection: "row",
-		marginTop: 8,
-	},
-	exportOption: {
-		flex: 1,
-		paddingVertical: 10,
-		alignItems: "center",
-		borderWidth: 1,
-		borderColor: "#ddd",
-		marginHorizontal: 4,
-		borderRadius: 6,
-	},
-	selectedExportOption: {
-		borderColor: "#007AFF",
-		backgroundColor: "#f0f7ff",
-	},
-	exportOptionText: {
-		fontSize: 15,
-		color: "#666",
-	},
-	selectedExportOptionText: {
-		color: "#007AFF",
-		fontWeight: "500",
-	},
-	fileResponseGrid: {
-		flexDirection: "row",
-		flexWrap: "wrap",
-		gap: 10,
-		marginTop: 8,
-	},
-	fileResponseItem: {
-		width: 80,
-		height: 80,
-		borderRadius: 8,
-		overflow: "hidden",
-		borderWidth: 1,
-		borderColor: "#eee",
-	},
-	fileResponseImage: {
-		width: "100%",
-		height: "100%",
-		resizeMode: "cover",
-	},
-	videoOverlay: {
-		...StyleSheet.absoluteFillObject,
-		backgroundColor: "rgba(0,0,0,0.3)",
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	fileResponseDoc: {
-		width: "100%",
-		height: "100%",
-		justifyContent: "center",
-		alignItems: "center",
-		backgroundColor: "#f5f5f5",
-	},
-	fileResponseVideo: {
-		width: "100%",
-		height: "100%",
-		position: "relative",
-	},
-	fileResponseName: {
-		fontSize: 10,
-		color: "#666",
-		textAlign: "center",
-		paddingHorizontal: 4,
-		marginTop: 4,
-	},
-	eventTitle: {
-		fontSize: 15,
-		fontWeight: "500",
-		color: "#333",
-		marginLeft: 8,
-	},
-});
 
 export default TimeEntryDetails;

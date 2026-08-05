@@ -15,6 +15,7 @@ import {
 	shareFile,
 } from "../../services/exportService";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import { TimeEntry } from "../../types";
 
 // Export format options
 const EXPORT_FORMAT_CSV = "csv";
@@ -26,8 +27,9 @@ interface ExportSheetProps {
 	snapPoints: string[];
 	onClose: () => void;
 	selectedEntries: string[];
-	timeEntries: any[];
-	employeeUser: any;
+	timeEntries: TimeEntry[];
+	/** Denormalized membership record — only the name is rendered. */
+	employeeUser: { firstName?: string; lastName?: string } | null;
 	companyId: string;
 }
 
@@ -59,7 +61,7 @@ const ExportSheet = forwardRef<BottomSheet, ExportSheetProps>((props, ref) => {
 	const totalHours = useMemo(() => {
 		return (
 			selectedTimeEntries.reduce(
-				(sum, entry) => sum + (entry.duration || 0),
+				(sum, entry) => sum + (entry.workedSeconds || 0),
 				0,
 			) / 3600
 		);
@@ -148,20 +150,18 @@ const ExportSheet = forwardRef<BottomSheet, ExportSheetProps>((props, ref) => {
 					{selectedTimeEntries.length > 0 && (
 						<Text style={styles.dateRangeText}>
 							{format(
-								new Date(selectedTimeEntries[0].clockInTime),
+								selectedTimeEntries[0].clockInAt.toDate(),
 								"MMM d, yyyy",
 							)}
 							{selectedTimeEntries.length > 1 &&
-								selectedTimeEntries[0].clockInTime !==
+								selectedTimeEntries[0].clockInAt !==
 									selectedTimeEntries[
 										selectedTimeEntries.length - 1
-									].clockInTime &&
+									].clockInAt &&
 								` - ${format(
-									new Date(
-										selectedTimeEntries[
-											selectedTimeEntries.length - 1
-										].clockInTime,
-									),
+									selectedTimeEntries[
+										selectedTimeEntries.length - 1
+									].clockInAt.toDate(),
 									"MMM d, yyyy",
 								)}`}
 						</Text>

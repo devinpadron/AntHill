@@ -1,3 +1,5 @@
+import { FormField, FormFieldType, FormResponses, FormSchema } from "../types";
+
 export const formatDuration = (seconds: number): string => {
 	if (!seconds) return "0h 0m";
 
@@ -61,116 +63,113 @@ export const getStatusBadgeText = (status: string): string => {
 	}
 };
 
-export const calculateFieldTotals = (entries) => {
-	// Initialize an empty totals object
-	const totals = {};
+export type FieldTotal = {
+	label: string;
+	total: number;
+	rawTotal: number;
+	unit: string;
+	useMultiplier: boolean;
+	multiplier: number;
+	multipliedTotal?: number;
+	type: FormFieldType;
+	source: "timeEntry" | "event";
+};
 
-	if (!entries || entries.length === 0) {
-		return totals;
-	}
+/**
+ * One entry with everything needed to total it.
+ *
+ * Schemas and connections are passed in already resolved rather than read off
+ * the entry. v1 embedded a full copy of both form schemas on every submitted
+ * entry and kept connections in an inline `connectedEvents` array; v2 stores
+ * schema REFERENCES (`formSchemaIds`) and connections as their own documents,
+ * so only the caller — which has a service layer to reach — can supply them.
+ *
+ * Keeping this function pure is the point: it stays trivially testable, and the
+ * screen decides how to batch the reads.
+ */
+export type EntryTotalsInput = {
+	formResponses?: FormResponses;
+	timeEntrySchema?: FormSchema | null;
+	eventSchema?: FormSchema | null;
+	connections?: { formResponses?: FormResponses }[];
+};
 
-	// Process each time entry using its own form structure
-	entries.forEach((entry) => {
-		// Use the form structure attached to the entry
-		const entryForm = entry.generalForm || null;
+const TOTALLED_TYPES: FormFieldType[] = ["number", "currency", "quantity"];
 
-		if (entryForm && entryForm.fields) {
-			// Find fields that have showTotal enabled
-			const fieldsToTotal = entryForm.fields.filter(
-				(field) =>
-					field.showTotal === true &&
-					(field.type === "number" ||
-						field.type === "currency" ||
-						field.type === "quantity"),
-			);
+const totalledFields = (schema?: FormSchema | null): FormField[] =>
+	(schema?.fields ?? []).filter(
+		(field) =>
+			field.showTotal === true && TOTALLED_TYPES.includes(field.type),
+	);
 
-			// Process fields for this entry
-			fieldsToTotal.forEach((field) => {
-				// Initialize field in totals if not already there
-				if (!totals[`te_${field.id}`]) {
-					totals[`te_${field.id}`] = {
-						label: field.label,
-						total: 0,
-						unit: field.unit || "",
-						useMultiplier: field.useMultiplier || false,
-						multiplier: field.multiplier || 1,
-						type: field.type,
-						source: "timeEntry",
-					};
-				}
+/**
+ * Folds one set of responses into the running totals.
+ *
+ * The time-entry and connected-event passes were near-identical copies of this
+ * before; they differ only in key prefix, label, and source tag.
+ */
+const accumulate = (
+	totals: Record<string, FieldTotal>,
+	fields: FormField[],
+	responses: FormResponses | undefined,
+	source: FieldTotal["source"],
+) => {
+	const prefix = source === "event" ? "ev" : "te";
 
-				// Add this entry's value to the total
-				const value = entry.formResponses?.[field.id];
-				if (value !== undefined && value !== null) {
-					const numValue = parseFloat(value);
-					if (!isNaN(numValue)) {
-						totals[`te_${field.id}`].total += numValue;
+	fields.forEach((field) => {
+		const key = `${prefix}_${field.id}`;
 
-						// Store the raw total before multiplier is applied
-						totals[`te_${field.id}`].rawTotal =
-							totals[`te_${field.id}`].total;
-
-						// Calculate multiplied value if needed
-						if (field.useMultiplier && field.multiplier) {
-							totals[`te_${field.id}`].multipliedTotal =
-								totals[`te_${field.id}`].total *
-								field.multiplier;
-						}
-					}
-				}
-			});
+		if (!totals[key]) {
+			totals[key] = {
+				label:
+					source === "event"
+						? `${field.label} (Events)`
+						: field.label,
+				total: 0,
+				rawTotal: 0,
+				unit: field.unit || "",
+				useMultiplier: field.useMultiplier || false,
+				multiplier: field.multiplier || 1,
+				type: field.type,
+				source,
+			};
 		}
 
-		// Process connected events using their own form structures
-		if (entry.connectedEvents && entry.connectedEvents.length > 0) {
-			entry.connectedEvents.forEach((connection) => {
-				// Use the form structure attached to the event connection
-				const eventForm = entry.eventForm || null;
+		const value = responses?.[field.id];
+		if (value === undefined || value === null) return;
 
-				if (eventForm && eventForm.fields) {
-					const eventFieldsToTotal = eventForm.fields.filter(
-						(field) =>
-							field.showTotal === true &&
-							(field.type === "number" ||
-								field.type === "currency" ||
-								field.type === "quantity"),
-					);
+		const numValue = parseFloat(value as string);
+		if (isNaN(numValue)) return;
 
-					eventFieldsToTotal.forEach((field) => {
-						// Initialize field in totals if not already there
-						const fieldKey = `ev_${field.id}`;
-						if (!totals[fieldKey]) {
-							totals[fieldKey] = {
-								label: `${field.label} (Events)`,
-								total: 0,
-								unit: field.unit || "",
-								useMultiplier: field.useMultiplier || false,
-								multiplier: field.multiplier || 1,
-								type: field.type,
-								source: "event",
-							};
-						}
+		const running = totals[key];
+		running.total += numValue;
+		// The pre-multiplier figure, kept so the UI can show both.
+		running.rawTotal = running.total;
 
-						// Add this event's value to the total
-						const value = connection.formResponses?.[field.id];
-						if (value !== undefined && value !== null) {
-							const numValue = parseFloat(value);
-							if (!isNaN(numValue)) {
-								totals[fieldKey].total += numValue;
-								totals[fieldKey].rawTotal =
-									totals[fieldKey].total;
-
-								if (field.useMultiplier && field.multiplier) {
-									totals[fieldKey].multipliedTotal =
-										totals[fieldKey].total *
-										field.multiplier;
-								}
-							}
-						}
-					});
-				}
-			});
+		if (field.useMultiplier && field.multiplier) {
+			running.multipliedTotal = running.total * field.multiplier;
 		}
+	});
+};
+
+/** Sums every `showTotal` numeric field across the given entries. */
+export const calculateFieldTotals = (
+	entries: EntryTotalsInput[],
+): Record<string, FieldTotal> => {
+	const totals: Record<string, FieldTotal> = {};
+
+	entries?.forEach((entry) => {
+		accumulate(
+			totals,
+			totalledFields(entry.timeEntrySchema),
+			entry.formResponses,
+			"timeEntry",
+		);
+
+		const eventFields = totalledFields(entry.eventSchema);
+		entry.connections?.forEach((connection) => {
+			accumulate(totals, eventFields, connection.formResponses, "event");
+		});
 	});
 
 	return totals;

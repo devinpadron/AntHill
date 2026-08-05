@@ -6,18 +6,18 @@ import { getStatusBadgeColor } from "../../utils/timeUtils";
 
 const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 	// Format date and times
-	const entryDate = new Date(timeEntry.clockInTime);
+	const entryDate = timeEntry.clockInAt.toDate();
 	const formattedDate = format(entryDate, "EEEE, MMMM d");
 	const clockInTime = format(entryDate, "h:mm a");
 
 	const [elapsedSeconds, setElapsedSeconds] = useState(0);
 	const [currentPauseDuration, setCurrentPauseDuration] = useState(
-		timeEntry.totalPausedSeconds || 0,
+		timeEntry.pausedSeconds || 0,
 	);
 	const intervalRef = useRef(null);
 
-	const clockOutTime = timeEntry.clockOutTime
-		? format(new Date(timeEntry.clockOutTime), "h:mm a")
+	const clockOutTime = timeEntry.clockOutAt
+		? format(timeEntry.clockOutAt.toDate(), "h:mm a")
 		: timeEntry.status === "paused"
 			? "Paused"
 			: "Active";
@@ -37,10 +37,10 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 
 		if (timeEntry.status === "active") {
 			// Calculate initial elapsed time in seconds
-			const startDate = new Date(timeEntry.clockInTime);
+			const startDate = timeEntry.clockInAt.toDate();
 
-			// Account for any previous pause time (now using totalPausedSeconds directly)
-			const pauseOffset = timeEntry.totalPausedSeconds || 0;
+			// Account for any previous pause time
+			const pauseOffset = timeEntry.pausedSeconds || 0;
 
 			const initialElapsed =
 				differenceInSeconds(new Date(), startDate) - pauseOffset;
@@ -55,18 +55,18 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 		} else if (timeEntry.status === "paused") {
 			// For paused entries, calculate the elapsed time up until the pause
 			if (timeEntry.pauseStartTime) {
-				const startDate = new Date(timeEntry.clockInTime);
+				const startDate = timeEntry.clockInAt.toDate();
 				const pauseDate = new Date(timeEntry.pauseStartTime);
 
 				// Account for any previous pause time
-				const pauseOffset = timeEntry.totalPausedSeconds || 0;
+				const pauseOffset = timeEntry.pausedSeconds || 0;
 
 				const pausedElapsed =
 					differenceInSeconds(pauseDate, startDate) - pauseOffset;
 				setElapsedSeconds(pausedElapsed);
 
 				// Initialize current pause duration
-				const basePauseDuration = timeEntry.totalPausedSeconds || 0;
+				const basePauseDuration = timeEntry.pausedSeconds || 0;
 
 				// Set up interval to update pause duration in real-time
 				intervalRef.current = setInterval(() => {
@@ -81,8 +81,8 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 				}, 1000);
 			}
 		} else {
-			// For completed or other states, just use the stored totalPausedSeconds
-			setCurrentPauseDuration(timeEntry.totalPausedSeconds || 0);
+			// For completed or other states, use the stored total
+			setCurrentPauseDuration(timeEntry.pausedSeconds || 0);
 		}
 
 		return () => {
@@ -92,9 +92,9 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 		};
 	}, [
 		timeEntry.status,
-		timeEntry.clockInTime,
+		timeEntry.clockInAt,
 		timeEntry.pauseStartTime,
-		timeEntry.totalPausedSeconds,
+		timeEntry.pausedSeconds,
 	]);
 
 	// Calculate hours and minutes
@@ -110,7 +110,7 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 	const duration =
 		timeEntry.status === "active" || timeEntry.status === "paused"
 			? getDurationValues(Math.max(0, elapsedSeconds))
-			: getDurationValues(timeEntry.duration || 0);
+			: getDurationValues(timeEntry.workedSeconds || 0);
 
 	// Format duration string with seconds for active entries
 	const formatDurationString = (h, m, s, isActive, isPaused) => {
@@ -211,7 +211,7 @@ const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
 				<View style={styles.timeBlock}>
 					<Icon
 						name={
-							timeEntry.clockOutTime
+							timeEntry.clockOutAt
 								? "clock-time-nine-outline"
 								: "clock-outline"
 						}

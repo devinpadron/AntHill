@@ -21,14 +21,14 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as MediaLibrary from "expo-media-library";
 import * as Sharing from "expo-sharing";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { AttachmentItem } from "../../types";
+import { Attachment } from "../../types";
 import { useEvent } from "expo";
 import WebView from "react-native-webview";
 import { ImageZoom } from "@likashefqet/react-native-image-zoom";
 import { PanGestureHandler, State } from "react-native-gesture-handler";
 
 interface AttachmentGalleryProps {
-	attachments: AttachmentItem[];
+	attachments: Attachment[];
 }
 
 const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
@@ -40,8 +40,9 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 	const [sharingMedia, setSharingMedia] = useState(false);
 	const [currentVideoUrl, setCurrentVideoUrl] = useState<string | null>(null);
 	const [documentViewerVisible, setDocumentViewerVisible] = useState(false);
-	const [selectedDocument, setSelectedDocument] =
-		useState<AttachmentItem | null>(null);
+	const [selectedDocument, setSelectedDocument] = useState<Attachment | null>(
+		null,
+	);
 	const [documentLoading, setDocumentLoading] = useState(true);
 	const windowWidth = Dimensions.get("window").width;
 	const itemWidth = (windowWidth - 80) / 3;
@@ -60,22 +61,22 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 	// Separate attachments into media and documents
 	const mediaAttachments = attachments.filter(
 		(item) =>
-			item.type.startsWith("image/") || item.type.startsWith("video/"),
+			item.contentType.startsWith("image/") ||
+			item.contentType.startsWith("video/"),
 	);
 
 	const documentAttachments = attachments.filter(
 		(item) =>
-			!item.type.startsWith("image/") && !item.type.startsWith("video/"),
+			!item.contentType.startsWith("image/") &&
+			!item.contentType.startsWith("video/"),
 	);
 
 	// Update video URL when selected media changes
 	useEffect(() => {
 		if (modalVisible && mediaAttachments.length > 0) {
 			const selectedMedia = mediaAttachments[selectedMediaIndex];
-			if (selectedMedia.type.startsWith("video/")) {
-				setCurrentVideoUrl(
-					selectedMedia.downloadUrl || selectedMedia.uri,
-				);
+			if (selectedMedia.contentType.startsWith("video/")) {
+				setCurrentVideoUrl(selectedMedia.downloadUrl);
 			} else {
 				// Stop video if switching to an image
 				setCurrentVideoUrl(null);
@@ -123,7 +124,7 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 	};
 
 	// Save media to device
-	const saveMedia = async (mediaItem: AttachmentItem) => {
+	const saveMedia = async (mediaItem: Attachment) => {
 		try {
 			setSavingMedia(true);
 
@@ -138,9 +139,9 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 			}
 
 			// Download the file if it's a remote URL
-			let localUri = mediaItem.downloadUrl || mediaItem.uri;
+			let localUri = mediaItem.downloadUrl;
 			if (localUri.startsWith("http")) {
-				const fileExt = mediaItem.type.split("/")[1];
+				const fileExt = mediaItem.contentType.split("/")[1];
 				const downloadResult = await FileSystem.downloadAsync(
 					localUri,
 					FileSystem.documentDirectory + `${mediaItem.id}.${fileExt}`,
@@ -162,7 +163,7 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 	};
 
 	// Share media
-	const shareMedia = async (mediaItem: AttachmentItem) => {
+	const shareMedia = async (mediaItem: Attachment) => {
 		try {
 			setSharingMedia(true);
 
@@ -174,9 +175,9 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 			}
 
 			// Download the file if it's a remote URL
-			let localUri = mediaItem.downloadUrl || mediaItem.uri;
+			let localUri = mediaItem.downloadUrl;
 			if (localUri.startsWith("http")) {
-				const fileExt = mediaItem.type.split("/")[1];
+				const fileExt = mediaItem.contentType.split("/")[1];
 				const downloadResult = await FileSystem.downloadAsync(
 					localUri,
 					FileSystem.documentDirectory + `${mediaItem.id}.${fileExt}`,
@@ -186,8 +187,8 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 
 			// Share the file
 			await Sharing.shareAsync(localUri, {
-				mimeType: mediaItem.type,
-				dialogTitle: "Share " + mediaItem.name,
+				mimeType: mediaItem.contentType,
+				dialogTitle: "Share " + mediaItem.fileName,
 			});
 		} catch (error) {
 			console.error("Error sharing media:", error);
@@ -198,7 +199,7 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 	};
 
 	// Handle document tap
-	const handleDocumentTap = (document: AttachmentItem) => {
+	const handleDocumentTap = (document: Attachment) => {
 		setSelectedDocument(document);
 		setDocumentLoading(true);
 		setDocumentViewerVisible(true);
@@ -228,7 +229,7 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 	};
 
 	// Render a document item
-	const renderDocumentItem = (item: AttachmentItem, index: number) => (
+	const renderDocumentItem = (item: Attachment, index: number) => (
 		<TouchableOpacity
 			key={item.id}
 			style={[
@@ -240,26 +241,28 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 			<View
 				style={[
 					styles.documentPreview,
-					{ backgroundColor: `${getFileColor(item.type)}20` },
+					{ backgroundColor: `${getFileColor(item.contentType)}20` },
 				]}
 			>
 				<Ionicons
-					name={getFileIcon(item.type)}
+					name={getFileIcon(item.contentType)}
 					size={40}
-					color={getFileColor(item.type)}
+					color={getFileColor(item.contentType)}
 				/>
 			</View>
 			<View style={styles.itemDetails}>
 				<Text style={styles.itemName} numberOfLines={2}>
-					{item.name}
+					{item.fileName}
 				</Text>
-				<Text style={styles.itemSize}>{formatFileSize(item.size)}</Text>
+				<Text style={styles.itemSize}>
+					{formatFileSize(item.sizeBytes)}
+				</Text>
 			</View>
 		</TouchableOpacity>
 	);
 
 	// Render a media item (image or video)
-	const renderMediaItem = (item: AttachmentItem, index: number) => (
+	const renderMediaItem = (item: Attachment, index: number) => (
 		<TouchableOpacity
 			key={item.id}
 			style={[
@@ -271,14 +274,15 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 			<Image
 				source={{
 					uri:
-						item.type.startsWith("video/") && item.thumbnailUrl
-							? item.thumbnailUrl
-							: item.downloadUrl || item.uri,
+						item.contentType.startsWith("video/") &&
+						item.thumbnailDownloadUrl
+							? item.thumbnailDownloadUrl
+							: item.downloadUrl,
 				}}
 				style={styles.mediaPreview}
 				resizeMode="cover"
 			/>
-			{item.type.startsWith("video/") && (
+			{item.contentType.startsWith("video/") && (
 				<View style={styles.videoIndicator}>
 					<Ionicons name="play-circle" size={28} color="#FFFFFF" />
 				</View>
@@ -308,7 +312,7 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 
 		// Render a single carousel item
 		const renderCarouselItem = ({ item, index }) => {
-			const isVideo = item.type.startsWith("video/");
+			const isVideo = item.contentType.startsWith("video/");
 
 			// Only show the video player for the current item to prevent performance issues
 			const shouldRenderVideo = isVideo && index === selectedMediaIndex;
@@ -329,9 +333,8 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 							<Image
 								source={{
 									uri:
-										item.thumbnailUrl ||
-										item.downloadUrl ||
-										item.uri,
+										item.thumbnailDownloadUrl ||
+										item.downloadUrl,
 								}}
 								style={styles.videoThumbnail}
 								resizeMode="contain"
@@ -347,7 +350,7 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 					) : (
 						// Show image
 						<ImageZoom
-							uri={item.downloadUrl || item.uri}
+							uri={item.downloadUrl}
 							style={styles.fullImage}
 							isDoubleTapEnabled={true}
 						/>
@@ -422,7 +425,7 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 							<Ionicons name="close" size={28} color="#FFFFFF" />
 						</TouchableOpacity>
 						<Text style={styles.carouselTitle} numberOfLines={1}>
-							{mediaAttachments[selectedMediaIndex]?.name}
+							{mediaAttachments[selectedMediaIndex]?.fileName}
 						</Text>
 						<View style={styles.carouselActions}>
 							<TouchableOpacity
@@ -570,8 +573,7 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 	const renderDocumentViewer = () => {
 		if (!selectedDocument) return null;
 
-		const documentUrl =
-			selectedDocument.downloadUrl || selectedDocument.uri;
+		const documentUrl = selectedDocument.downloadUrl;
 
 		return (
 			<Modal
@@ -592,7 +594,7 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 							style={styles.documentViewerTitle}
 							numberOfLines={1}
 						>
-							{selectedDocument.name}
+							{selectedDocument.fileName}
 						</Text>
 						<TouchableOpacity
 							onPress={() => shareMedia(selectedDocument)}

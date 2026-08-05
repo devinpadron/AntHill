@@ -62,6 +62,12 @@ const Settings = ({ navigation }: any) => {
 						title="Employee List"
 						onPress={() => navigation.push("EmployeeList")}
 					/>
+					{preferences.enableAvailability && (
+						<SettingsItem
+							title="Worker Groups"
+							onPress={() => navigation.push("WorkerGroups")}
+						/>
+					)}
 					{preferences.enableTimeSheet && (
 						<SettingsItem
 							title="Payroll Review"

@@ -16,16 +16,18 @@ const API_KEY = __DEV__
 	? GOOGLE_PLACES_API_KEY
 	: Constants.expoConfig?.extra?.GOOGLE_PLACES_API_KEY || "";
 
-// Debug: Log if API key is missing (remove this after testing)
+/*
+ * Address autocomplete silently returns nothing without a key, so say so
+ * loudly. The key itself is never logged — this used to print it at module
+ * scope on every launch, in release builds too.
+ */
 if (!API_KEY || API_KEY === "undefined") {
-	console.warn("⚠️ Google Places API Key is missing or undefined!");
-	console.log("Running in __DEV__ mode:", __DEV__);
-	if (!__DEV__) {
-		console.log("Available extra config:", Constants.expoConfig?.extra);
-	}
-} else {
-	console.log("✅ Google Places API Key loaded successfully");
-	console.log("Source:", __DEV__ ? ".env file" : "EAS environment variables");
+	console.warn(
+		"Google Places API key missing — address autocomplete is disabled. " +
+			(__DEV__
+				? "Set GOOGLE_PLACES_API_KEY in .env."
+				: "Check the EAS environment variables."),
+	);
 }
 
 type Location = {
@@ -47,8 +49,6 @@ type LocationInputProps = {
 	setLabelText: (text: string) => void;
 	googlePlacesRef: React.RefObject<any>;
 };
-
-console.log("API_KEY:", API_KEY);
 
 const LocationInputComponent = ({
 	locations,

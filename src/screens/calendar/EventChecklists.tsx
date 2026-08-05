@@ -3,7 +3,6 @@ import {
 	View,
 	Text,
 	TouchableOpacity,
-	StyleSheet,
 	ScrollView,
 	ActivityIndicator,
 	Dimensions,
@@ -16,11 +15,12 @@ import { useRoute, useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useUser } from "../../contexts/UserContext";
-import db from "../../constants/firestore";
+import { getChecklistsByIds } from "../../services/libraryService";
 import {
-	updateEventChecklist,
-	subscribeEventChecklist,
-} from "../../services/eventService";
+	setItemState as writeItemState,
+	subscribeChecklistState,
+} from "../../services/eventChecklistService";
+import { styles } from "./EventChecklists.styles";
 
 // Enable LayoutAnimation for Android
 if (Platform.OS === "android") {
@@ -39,7 +39,6 @@ const EventChecklists = () => {
 	const route = useRoute<any>();
 	const navigation = useNavigation();
 	const insets = useSafeAreaInsets();
-	console.log("Route params:", route.params);
 	const { checklistIds, eventId } = route.params || {}; // Add eventId from route params
 	const { companyId } = useUser();
 
@@ -64,22 +63,12 @@ const EventChecklists = () => {
 			}
 
 			try {
-				// Get all checklist details directly from the provided IDs
-				const checklistPromises = checklistIds.map((checklistId) =>
-					db
-						.collection("Companies")
-						.doc(companyId)
-						.collection("Checklists")
-						.doc(checklistId)
-						.get(),
-				);
+				// ONE batched query. v1 issued a read per checklist id.
+				const byId = await getChecklistsByIds(companyId, checklistIds);
+				const checklistItems = checklistIds
+					.map((id) => byId[id])
+					.filter(Boolean);
 
-				const checklistDocs = await Promise.all(checklistPromises);
-				const checklistItems = checklistDocs
-					.filter((doc) => doc.exists())
-					.map((doc) => ({ id: doc.id, ...doc.data() }) as any);
-
-				// Initialize item states for all checklist items
 				const initialItemStates = {};
 				checklistItems.forEach((checklist) => {
 					initialItemStates[checklist.id] = {};
@@ -130,16 +119,16 @@ const EventChecklists = () => {
 			if (!eventId || !companyId) return;
 
 			try {
-				// Subscribe to changes in the event's checklist collection
-				unsubscribeFunction = await subscribeEventChecklist(
-					companyId,
+				/*
+				 * ONE document per event holds every checklist's state, rather
+				 * than a document per checklist. Synchronous unsubscribe —
+				 * the v1 helper was `async`, so this variable held a Promise
+				 * and the listener was never actually torn down.
+				 */
+				unsubscribeFunction = subscribeChecklistState(
 					eventId,
-					(snapshot) => {
-						const savedStates = {};
-
-						snapshot.forEach((doc) => {
-							savedStates[doc.id] = doc.data();
-						});
+					(doc) => {
+						const savedStates = doc?.state ?? {};
 
 						setSavedState(savedStates);
 
@@ -194,16 +183,23 @@ const EventChecklists = () => {
 		};
 	}, [checklists, companyId, eventId, animationsEnabled]); // Add animationsEnabled dependency
 
-	// Add function to save checklist state to Firestore
-	const saveChecklistState = async (checklistId, newState) => {
+	/*
+	 * Writes ONE item, as a dotted field path.
+	 *
+	 * v1 sent the whole checklist map through a `.set()` without merge, so two
+	 * workers ticking different items on the same event overwrote each other —
+	 * whoever wrote second wiped the other's ticks.
+	 */
+	const saveItemState = async (checklistId, itemId, state) => {
 		if (!eventId || !companyId) return;
 
 		try {
-			await updateEventChecklist(
+			await writeItemState(
 				companyId,
 				eventId,
 				checklistId,
-				newState,
+				itemId,
+				state,
 			);
 		} catch (error) {
 			console.error("Error saving checklist state:", error);
@@ -238,8 +234,8 @@ const EventChecklists = () => {
 				[itemId]: newState,
 			};
 
-			// Save the updated state to Firestore
-			saveChecklistState(checklistId, updatedChecklistState);
+			// Only the item that changed is written.
+			saveItemState(checklistId, itemId, newState);
 
 			return {
 				...prevStates,
@@ -521,182 +517,5 @@ const EventChecklists = () => {
 		</View>
 	);
 };
-
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: "#f8f9fa",
-	},
-	header: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		borderBottomWidth: 1,
-		borderBottomColor: "#e1e4e8",
-		backgroundColor: "white",
-	},
-	backButton: {
-		padding: 8,
-	},
-	headerTitle: {
-		fontSize: 18,
-		fontWeight: "600",
-		color: "#333",
-	},
-	loadingContainer: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	loadingText: {
-		marginTop: 16,
-		fontSize: 16,
-		color: "#666",
-	},
-	emptyContainer: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-		padding: 20,
-	},
-	emptyTitle: {
-		fontSize: 20,
-		fontWeight: "bold",
-		color: "#333",
-		marginTop: 16,
-		marginBottom: 8,
-	},
-	emptyText: {
-		fontSize: 16,
-		color: "#666",
-		textAlign: "center",
-	},
-	checklistHeader: {
-		backgroundColor: "white",
-		padding: 16,
-		borderRadius: 8,
-		marginBottom: 16,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 2,
-		elevation: 2,
-	},
-	titleContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-	},
-	checklistTitle: {
-		fontSize: 20,
-		fontWeight: "bold",
-		color: "#333",
-		flex: 1,
-	},
-	completedTitle: {
-		color: "#4CAF50",
-	},
-	completedIcon: {
-		marginLeft: 8,
-	},
-	progressContainer: {
-		marginTop: 12,
-		flexDirection: "row",
-		alignItems: "center",
-	},
-	progressBar: {
-		flex: 1,
-		height: 8,
-		backgroundColor: "#e0e0e0",
-		borderRadius: 4,
-		overflow: "hidden",
-		marginRight: 8,
-	},
-	progressFill: {
-		height: "100%",
-		backgroundColor: "#4CAF50",
-		borderRadius: 4,
-	},
-	progressText: {
-		fontSize: 14,
-		color: "#666",
-		width: 40,
-		textAlign: "right",
-	},
-	itemsContainer: {
-		flex: 1,
-	},
-	checklistItem: {
-		backgroundColor: "white",
-		borderBottomWidth: 1,
-		borderBottomColor: "#f0f0f0",
-		padding: 16,
-	},
-	firstItem: {
-		borderTopLeftRadius: 8,
-		borderTopRightRadius: 8,
-	},
-	lastItem: {
-		borderBottomLeftRadius: 8,
-		borderBottomRightRadius: 8,
-		borderBottomWidth: 0,
-	},
-	itemContent: {
-		flexDirection: "row",
-		alignItems: "center",
-	},
-	checkboxContainer: {
-		width: 30,
-		height: 30,
-		alignItems: "center",
-		justifyContent: "center",
-		marginRight: 12,
-	},
-	uncheckedBox: {
-		width: 22,
-		height: 22,
-		borderWidth: 2,
-		borderColor: "#bdbdbd",
-		borderRadius: 22,
-	},
-	itemText: {
-		fontSize: 16,
-		color: "#333",
-		flex: 1,
-	},
-	checkedText: {
-		color: "#4CAF50",
-	},
-	strikethroughText: {
-		color: "#9E9E9E",
-		textDecorationLine: "line-through",
-	},
-	scrollContainer: {
-		flex: 1,
-	},
-	contentContainer: {
-		padding: 16,
-		paddingBottom: 24, // Extra padding at bottom
-	},
-	checklistSection: {
-		marginBottom: 24,
-	},
-	itemsList: {
-		backgroundColor: "white",
-		borderRadius: 8,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 2,
-		elevation: 2,
-	},
-	emptyItemsContainer: {
-		padding: 16,
-		alignItems: "center",
-		justifyContent: "center",
-	},
-});
 
 export default EventChecklists;

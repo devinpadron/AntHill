@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
 	View,
 	Text,
-	StyleSheet,
 	ScrollView,
 	TouchableOpacity,
 	TextInput,
@@ -11,18 +10,16 @@ import {
 	ActivityIndicator,
 	Platform,
 } from "react-native";
-import { useUser } from "../../../contexts/UserContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import DropDownPicker from "react-native-dropdown-picker";
 import DraggableFlatList from "react-native-draggable-flatlist";
-import { useCompany } from "../../../contexts/CompanyContext";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { RouteProp, useRoute } from "@react-navigation/native";
-import { collection, getDocs } from "firebase/firestore";
-import db from "../../../constants/firestore";
+import { useFormSchemaEditor } from "../../../hooks/useFormSchemaEditor";
+import { styles } from "./CompanyCustomForm.styles";
+import { FormFieldType } from "../../../types";
 
-// Form field types
 const FIELD_TYPES = [
 	{ label: "Text Input", value: "text" },
 	{ label: "Number Input", value: "number" },
@@ -49,102 +46,40 @@ const CompanyCustomForm = ({ navigation }) => {
 	const route = useRoute<CompanyCustomFormRouteProp>();
 	const isEventForm = route.params?.isEventForm || false;
 	const insets = useSafeAreaInsets();
-	const { companyId } = useUser();
-	const { preferences, updatePreferences, isLoading } = useCompany();
 
-	// Form state
-	const [isSaving, setIsSaving] = useState(false);
-	const [customForm, setCustomForm] = useState(
-		isEventForm ? preferences.eventForm : preferences.timeEntryForm,
-	);
+	const {
+		draft: customForm,
+		setMeta,
+		isLoading,
+		isSaving,
+		save: saveForm,
+		checklists,
+		addField: appendField,
+		updateField,
+		removeField,
+		reorderFields,
+		toggleEnabled: toggleFormEnabled,
+		resolveFieldEdit,
+	} = useFormSchemaEditor(isEventForm);
 
-	// UI state
+	// Editor UI state. Which field is open, and the type-specific inputs that
+	// live outside the field until the edit is applied.
 	const [editingField, setEditingField] = useState(null);
 	const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
-	const [currentFieldType, setCurrentFieldType] = useState("text");
+	const [currentFieldType, setCurrentFieldType] =
+		useState<FormFieldType>("text");
 	const [currentOptions, setCurrentOptions] = useState("");
 	const [showPreview, setShowPreview] = useState(false);
-
-	// Company Checklists state (for checklist field type)
-	const [checklists, setChecklists] = useState<
-		Array<{ id: string; name: string }>
-	>([]);
 	const [checklistDropdownOpen, setChecklistDropdownOpen] = useState(false);
 	const [selectedChecklistId, setSelectedChecklistId] = useState<
 		string | null
 	>(null);
 
-	// Load existing form configuration
-	useEffect(() => {
-		const loadPreferences = async () => {
-			if (!companyId) return;
+	// Kept so the JSX can go on calling setCustomForm({...customForm, x}).
+	const setCustomForm = setMeta;
 
-			try {
-				if (isEventForm) {
-					if (preferences?.eventForm) {
-						setCustomForm(preferences.eventForm);
-					}
-				} else {
-					if (preferences?.timeEntryForm) {
-						setCustomForm(preferences.timeEntryForm);
-					}
-				}
-			} catch (error) {
-				console.error("Failed to load company preferences:", error);
-				Alert.alert("Error", "Failed to load company preferences");
-			}
-		};
-		loadPreferences();
-	}, [companyId]);
+	const addField = () => setEditingField(appendField());
 
-	// Save form configuration
-	const saveForm = async () => {
-		if (!companyId) return;
-
-		try {
-			setIsSaving(true);
-			if (isEventForm) {
-				updatePreferences({
-					...preferences,
-					eventForm: customForm,
-				});
-			} else {
-				updatePreferences({
-					...preferences,
-					timeEntryForm: customForm,
-				});
-			}
-			Alert.alert(
-				"Success",
-				"Time entry form settings saved successfully",
-			);
-		} catch (error) {
-			console.error("Failed to save form:", error);
-			Alert.alert("Error", "Failed to save time entry form");
-		} finally {
-			setIsSaving(false);
-		}
-	};
-
-	// Add a new field
-	const addField = () => {
-		const newField = {
-			id: Date.now().toString(),
-			type: "text",
-			label: "New Field",
-			placeholder: "",
-			required: false,
-		};
-
-		setCustomForm({
-			...customForm,
-			fields: [...customForm.fields, newField],
-		});
-
-		setEditingField(newField);
-	};
-
-	// Delete a field
 	const deleteField = (fieldId) => {
 		Alert.alert(
 			"Delete Field",
@@ -155,117 +90,38 @@ const CompanyCustomForm = ({ navigation }) => {
 					text: "Delete",
 					style: "destructive",
 					onPress: () => {
-						setCustomForm({
-							...customForm,
-							fields: customForm.fields.filter(
-								(field) => field.id !== fieldId,
-							),
-						});
-
-						if (editingField?.id === fieldId) {
-							setEditingField(null);
-						}
+						removeField(fieldId);
+						if (editingField?.id === fieldId) setEditingField(null);
 					},
 				},
 			],
 		);
 	};
 
-	// Update field props
-	const updateField = (fieldId, updates) => {
-		setCustomForm({
-			...customForm,
-			fields: customForm.fields.map((field) =>
-				field.id === fieldId ? { ...field, ...updates } : field,
-			),
-		});
-
-		if (editingField?.id === fieldId) {
-			setEditingField({ ...editingField, ...updates });
-		}
-	};
-
-	// Edit field
 	const editField = (field) => {
 		setEditingField(field);
 		setCurrentFieldType(field.type);
-		setCurrentOptions(field.options?.join(", ") || "");
+		setCurrentOptions(field.selectOptions?.join(", ") || "");
 		if (field.type === "checklist") {
 			setSelectedChecklistId(field.checklistId || null);
 		}
 	};
 
-	// Save field changes
 	const saveFieldChanges = () => {
 		if (!editingField) return;
-
-		const updatedField = {
-			...editingField,
-			type: currentFieldType,
-		};
-
-		// Handle options for select/multiSelect
-		if (["select", "multiSelect"].includes(currentFieldType)) {
-			updatedField.options = currentOptions
-				.split(",")
-				.map((option) => option.trim())
-				.filter((option) => option);
-		}
-
-		// Checklist-specific data
-		if (currentFieldType === "checklist") {
-			updatedField.checklistRequiredMode =
-				editingField.checklistRequiredMode || "atLeastOne";
-			updatedField.checklistId = selectedChecklistId || null;
-			// Store name for convenience in UI
-			const chosen = checklists.find(
-				(c) =>
-					c.id === selectedChecklistId ||
-					c.id === editingField.checklistId,
-			);
-			updatedField.checklistName =
-				chosen?.name || updatedField.checklistName || null;
-			// Ensure options are not carried over
-			delete updatedField.options;
-		}
-
-		updateField(editingField.id, updatedField);
+		updateField(
+			editingField.id,
+			resolveFieldEdit(
+				editingField,
+				currentFieldType,
+				currentOptions,
+				selectedChecklistId,
+			),
+		);
 		setEditingField(null);
 	};
 
-	// Handle field reordering
-	const onDragEnd = ({ data }) => {
-		setCustomForm({ ...customForm, fields: data });
-	};
-
-	// Load company checklists once companyId is available
-	useEffect(() => {
-		const loadChecklists = async () => {
-			if (!companyId) return;
-			try {
-				const colRef = db.collection(
-					`Companies/${companyId}/Checklists`,
-				);
-				const snap = await colRef.get();
-				const list: Array<{ id: string; name: string }> = [];
-				snap.forEach((doc) => {
-					const data = doc.data() as any;
-					// Assume checklist has 'name' or 'title'
-					const name = data?.name || data?.title || doc.id;
-					list.push({ id: doc.id, name });
-				});
-				setChecklists(list);
-			} catch (e) {
-				console.error("Failed to load checklists", e);
-			}
-		};
-		loadChecklists();
-	}, [companyId]);
-
-	// Toggle form enabled state
-	const toggleFormEnabled = () => {
-		setCustomForm({ ...customForm, isEnabled: !customForm.isEnabled });
-	};
+	const onDragEnd = ({ data }) => reorderFields(data);
 
 	const calculateMultiplied = (value, multiplier) => {
 		if (!multiplier) return value;
@@ -1144,414 +1000,5 @@ const CompanyCustomForm = ({ navigation }) => {
 		</View>
 	);
 };
-
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: "white",
-	},
-	centered: {
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	header: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		padding: 16,
-		backgroundColor: "white",
-		borderBottomWidth: 1,
-		borderBottomColor: "#e1e4e8",
-	},
-	headerTitle: {
-		fontSize: 18,
-		fontWeight: "600",
-		color: "#333",
-	},
-	saveButton: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#007AFF",
-	},
-	content: {
-		flex: 1,
-		padding: 16,
-	},
-	formControl: {
-		marginBottom: 20,
-	},
-	label: {
-		fontSize: 16,
-		fontWeight: "500",
-		marginBottom: 8,
-		color: "#333",
-	},
-	input: {
-		height: 48,
-		borderWidth: 1,
-		borderColor: "#ccc",
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		fontSize: 16,
-		backgroundColor: "white",
-	},
-	textArea: {
-		minHeight: 80,
-		borderWidth: 1,
-		borderColor: "#ccc",
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		paddingTop: 12,
-		fontSize: 16,
-		backgroundColor: "white",
-		textAlignVertical: "top",
-	},
-	switchRow: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		marginBottom: 8,
-	},
-	helperText: {
-		fontSize: 14,
-		color: "#666",
-		marginTop: 4,
-	},
-	formSection: {
-		marginTop: 10,
-		marginBottom: 24,
-	},
-	sectionTitle: {
-		fontSize: 18,
-		fontWeight: "600",
-		marginBottom: 16,
-		color: "#333",
-	},
-	emptyState: {
-		alignItems: "center",
-		justifyContent: "center",
-		padding: 30,
-		backgroundColor: "white",
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: "#e1e4e8",
-		borderStyle: "dashed",
-	},
-	emptyStateText: {
-		marginTop: 10,
-		fontSize: 15,
-		color: "#666",
-		textAlign: "center",
-	},
-	fieldItem: {
-		backgroundColor: "white",
-		padding: 16,
-		borderRadius: 8,
-		marginBottom: 10,
-		borderWidth: 1,
-		borderColor: "#e1e4e8",
-	},
-	selectedField: {
-		borderColor: "#007AFF",
-		backgroundColor: "#f0f7ff",
-	},
-	draggingField: {
-		opacity: 0.7,
-		transform: [{ scale: 1.05 }],
-		elevation: 5,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.2,
-		shadowRadius: 4,
-	},
-	fieldContent: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "flex-start",
-	},
-	fieldInfo: {
-		flexDirection: "row",
-		alignItems: "flex-start",
-		flex: 1,
-		flexWrap: "wrap",
-		paddingRight: 10,
-	},
-	fieldType: {
-		fontSize: 12,
-		backgroundColor: "#e1e4e8",
-		paddingHorizontal: 8,
-		paddingVertical: 3,
-		borderRadius: 4,
-		color: "#555",
-		marginRight: 8,
-		marginTop: 2,
-	},
-	fieldLabel: {
-		fontSize: 16,
-		color: "#333",
-		flex: 1,
-		flexShrink: 1,
-	},
-	expandableInput: {
-		minHeight: 48,
-		borderWidth: 1,
-		borderColor: "#ccc",
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		paddingVertical: 8,
-		fontSize: 16,
-		backgroundColor: "white",
-		textAlignVertical: "center",
-	},
-	fieldActions: {
-		flexDirection: "row",
-		alignItems: "center",
-		width: 70,
-		justifyContent: "space-between",
-		marginLeft: 8,
-		flexShrink: 0,
-	},
-	requiredBadge: {
-		backgroundColor: "#ff9500",
-		marginLeft: 8,
-		paddingHorizontal: 6,
-		paddingVertical: 2,
-		borderRadius: 4,
-		marginTop: 2,
-		flexShrink: 0,
-	},
-	requiredText: {
-		fontSize: 10,
-		color: "white",
-		fontWeight: "600",
-	},
-	addButton: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-		padding: 12,
-		backgroundColor: "white",
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: "#007AFF",
-		marginTop: 10,
-	},
-	addButtonText: {
-		marginLeft: 8,
-		color: "#007AFF",
-		fontWeight: "500",
-		fontSize: 16,
-	},
-	charCount: {
-		fontSize: 12,
-		color: "#666",
-		textAlign: "right",
-		marginTop: 4,
-	},
-	fieldEditor: {
-		backgroundColor: "white",
-		padding: 16,
-		borderRadius: 8,
-		marginVertical: 16,
-		borderWidth: 1,
-		borderColor: "#e1e4e8",
-		// These are important for proper dropdown rendering
-		zIndex: 1000,
-		elevation: Platform.OS === "android" ? 3 : 0,
-		position: "relative",
-	},
-	editorHeader: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		marginBottom: 16,
-		paddingBottom: 12,
-		borderBottomWidth: 1,
-		borderBottomColor: "#e1e4e8",
-	},
-	editorTitle: {
-		fontSize: 18,
-		fontWeight: "600",
-		color: "#333",
-	},
-	dropdown: {
-		borderColor: "#ccc",
-		height: 48,
-		backgroundColor: "white",
-	},
-	dropdownList: {
-		borderColor: "#ccc",
-		backgroundColor: "white",
-		elevation: 5,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 4,
-	},
-	saveFieldButton: {
-		backgroundColor: "#007AFF",
-		borderRadius: 8,
-		paddingVertical: 12,
-		alignItems: "center",
-		marginTop: 16,
-	},
-	saveFieldText: {
-		color: "white",
-		fontSize: 16,
-		fontWeight: "600",
-	},
-	previewButton: {
-		backgroundColor: "#5856d6",
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-		padding: 12,
-		borderRadius: 8,
-		marginVertical: 16,
-	},
-	previewButtonText: {
-		color: "white",
-		marginLeft: 8,
-		fontSize: 16,
-		fontWeight: "500",
-	},
-	preview: {
-		backgroundColor: "#f0f0f0",
-		borderRadius: 8,
-		padding: 16,
-		marginBottom: 24,
-	},
-	previewTitle: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#333",
-		marginBottom: 12,
-	},
-	previewForm: {
-		backgroundColor: "white",
-		borderRadius: 8,
-		padding: 16,
-		borderWidth: 1,
-		borderColor: "#ddd",
-	},
-	previewFormTitle: {
-		fontSize: 18,
-		fontWeight: "600",
-		color: "#333",
-		marginBottom: 8,
-	},
-	previewDescription: {
-		fontSize: 14,
-		color: "#666",
-		marginBottom: 16,
-	},
-	previewField: {
-		marginBottom: 16,
-	},
-	previewLabel: {
-		fontSize: 15,
-		fontWeight: "500",
-		marginBottom: 6,
-		color: "#333",
-	},
-	required: {
-		color: "red",
-	},
-	previewInput: {
-		height: 42,
-		borderWidth: 1,
-		borderColor: "#ccc",
-		borderRadius: 6,
-		paddingHorizontal: 10,
-	},
-	previewTotal: {
-		fontSize: 14,
-		color: "#666",
-		marginTop: 4,
-	},
-	checkboxPreview: {
-		flexDirection: "row",
-		alignItems: "center",
-	},
-	checkboxPreviewLabel: {
-		marginLeft: 8,
-		fontSize: 15,
-		color: "#333",
-	},
-	previewSelect: {
-		height: 42,
-		borderWidth: 1,
-		borderColor: "#ccc",
-		borderRadius: 6,
-		paddingHorizontal: 12,
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-	},
-	previewSelectText: {
-		fontSize: 15,
-		color: "#999",
-	},
-	previewDate: {
-		height: 42,
-		borderWidth: 1,
-		borderColor: "#ccc",
-		borderRadius: 6,
-		paddingHorizontal: 12,
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-	},
-	previewDateText: {
-		fontSize: 15,
-		color: "#999",
-	},
-	labelWithHelp: {
-		flexDirection: "row",
-		alignItems: "center",
-	},
-	multiplierContainer: {
-		marginTop: 16,
-	},
-	previewMultiplier: {
-		marginTop: 4,
-	},
-	previewMultiplierText: {
-		fontSize: 14,
-		color: "#666",
-	},
-	previewFileUpload: {
-		height: 100,
-		borderWidth: 1,
-		borderColor: "#ccc",
-		borderStyle: "dashed",
-		borderRadius: 8,
-		justifyContent: "center",
-		alignItems: "center",
-		backgroundColor: "#f9f9f9",
-	},
-	previewUploadText: {
-		marginTop: 8,
-		color: "#666",
-		fontSize: 14,
-	},
-	checklistPreview: {
-		gap: 10,
-	},
-	quickEditBadge: {
-		backgroundColor: "#34c759",
-		marginLeft: 8,
-		paddingHorizontal: 6,
-		paddingVertical: 2,
-		borderRadius: 4,
-		marginTop: 2,
-		flexShrink: 0,
-	},
-	quickEditText: {
-		fontSize: 10,
-		color: "white",
-		fontWeight: "600",
-	},
-});
 
 export default CompanyCustomForm;

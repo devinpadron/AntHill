@@ -1,307 +1,372 @@
-import React, { useCallback, useMemo, useState, useEffect } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
-	View,
-	Text,
-	StyleSheet,
-	TouchableOpacity,
 	FlatList,
-	StatusBar,
 	RefreshControl,
+	StatusBar,
+	StyleSheet,
+	Text,
+	TouchableOpacity,
+	View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useUser } from "../../contexts/UserContext";
 import moment from "moment";
-import { usePullEvents } from "../../hooks/usePullEvents";
-import { FilterType } from "../../types";
 import { CalendarList } from "react-native-calendars";
-import { Dimensions } from "react-native";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
-import LoadingScreen from "../../screens/LoadingScreen";
+import { useUser } from "../../contexts/UserContext";
 import { useCompany } from "../../contexts/CompanyContext";
+import { useCalendarEvents } from "../../hooks/useCalendarEvents";
+import { FilterType } from "../../types";
+import LoadingScreen from "../../screens/LoadingScreen";
 
-export default function Timesheet(
-	props: {
-		filterType: FilterType;
-		selectedUsers: string[];
-		showAllSelectedOnly: boolean;
-		showExactSelectedOnly: boolean;
-		navigation: any;
-		onCalOpen: () => void;
-		onCalClose: () => void;
-		selectedDate: string;
-		setSelectedDate: (date: string) => void;
-		locked?: boolean;
-	} = {
-		filterType: FilterType.MY,
-		selectedUsers: [],
-		showAllSelectedOnly: false,
-		showExactSelectedOnly: false,
-		navigation: null,
-		onCalOpen: () => {},
-		onCalClose: () => {},
-		selectedDate: null,
-		setSelectedDate: () => {},
-		locked: false,
-	},
-) {
+/*
+ * The schedule list.
+ *
+ * Data comes from useCalendarEvents, which queries a bounded date window
+ * server-side. v1 pulled the whole Events collection and filtered in JS.
+ *
+ * Presentation is deliberately unchanged — same layout, same styles — so that
+ * anything that looks different is a data bug, not a restyle.
+ */
+
+type Props = {
+	filterType: FilterType;
+	selectedUsers: string[];
+	showAllSelectedOnly: boolean;
+	showExactSelectedOnly: boolean;
+	navigation: any;
+	onCalOpen: () => void;
+	onCalClose: () => void;
+	selectedDate: string | null;
+	setSelectedDate: (date: string | null) => void;
+	locked?: boolean;
+};
+
+type Entry = {
+	id: string;
+	title: string;
+	hours: number;
+	description: string;
+	date: string;
+	label: string | null;
+	isAllDay: boolean;
+	startValue: number | null;
+};
+
+/* A STRING discriminant, not a boolean. This repo's tsconfig is non-strict,
+   where narrowing a union by a boolean literal is unreliable — TypeScript
+   widens `true`/`false` back to `boolean` and the union stops discriminating. */
+type Row =
+	| { kind: "year"; year: number; date: string }
+	| { kind: "day"; date: string; entries: Entry[] };
+
+export default function Timesheet(props: Props) {
 	const { userId, companyId, user } = useUser();
-	const { companyData } = useCompany();
+	const { company } = useCompany();
+
+	// A selected date anchors the window, so picking a month far away loads
+	// that month rather than returning nothing.
+	const focusedMonth = useMemo(
+		() => (props.selectedDate ? new Date(props.selectedDate) : undefined),
+		[props.selectedDate],
+	);
+
 	const {
 		agendaItems,
 		markedDates,
-		includePastEvents,
-		loadPastEvents,
-		togglePastEvents,
+		labels,
 		isLoading,
-		labelMap,
-	} = usePullEvents(
-		companyId,
+		error,
+		loadPastEvents,
+		hasLoadedPast,
+	} = useCalendarEvents({
+		companyId: companyId ?? "",
 		userId,
-		props.filterType,
-		props.selectedUsers,
-		props.showAllSelectedOnly,
-		props.showExactSelectedOnly,
-		props.selectedDate,
-	);
+		filterType: props.filterType,
+		selectedUsers: props.selectedUsers,
+		showAllSelectedOnly: props.showAllSelectedOnly,
+		showExactSelectedOnly: props.showExactSelectedOnly,
+		focusedMonth,
+	});
 
 	const [refreshing, setRefreshing] = useState(false);
 	const onRefresh = useCallback(() => {
 		setRefreshing(true);
-
-		// Load past events
 		loadPastEvents();
-
 		setRefreshing(false);
 	}, [loadPastEvents]);
 
-	const timesheetData = useMemo(() => {
-		const formattedEntries = [];
-		let currentYear = null;
+	const rows = useMemo<Row[]>(() => {
+		const out: Row[] = [];
+		let currentYear: number | null = null;
 
-		// Get all dates from agendaItems and sort them
-		const sortedDates = Object.keys(agendaItems).sort((a, b) =>
-			moment(a).diff(moment(b)),
-		);
+		const days = Object.keys(agendaItems)
+			.filter((day) => !props.selectedDate || day === props.selectedDate)
+			.sort();
 
-		// Process each date
-		sortedDates.forEach((dateString) => {
-			const events = agendaItems[dateString] || [];
-			if (events.length === 0) return;
+		for (const day of days) {
+			const events = agendaItems[day] ?? [];
+			if (!events.length) continue;
 
-			// Check for year transition
-			const momentDate = moment(dateString);
-			const year = momentDate.year();
-
-			// If this is the first date or a new year, add a year header
+			const date = moment(day, "YYYY-MM-DD");
+			const year = date.year();
 			if (currentYear === null || year !== currentYear) {
-				formattedEntries.push({
-					isYearHeader: true,
-					year: year,
-					date: `${year}`,
-				});
+				out.push({ kind: "year", year, date: String(year) });
 				currentYear = year;
 			}
 
-			const entries = events.map((event) => {
-				// Calculate hours from duration or time difference
-				let hours = 0;
-				let description = "";
-				let startTimeValue = null;
-				let isAllDay = !event.startTime;
+			const entries: Entry[] = events.map((event) => ({
+				id: event.uid,
+				title: event.title,
+				// durationSeconds is an integer; v1 stored hours as a string and
+				// parsed it with parseFloat on every render.
+				hours: event.durationSeconds
+					? Number((event.durationSeconds / 3600).toFixed(1))
+					: 0,
+				// startAt is already a Date. v1 re-parsed an offset-ISO string
+				// with the format "YYYY-MM-DD HH:mm", which moment accepted
+				// leniently and resolved to the wrong time.
+				description: event.startAt
+					? moment(event.startAt).format("h:mm A")
+					: "",
+				date: day,
+				label: event.labelId ? (labels[event.labelId] ?? null) : null,
+				isAllDay: event.isAllDay,
+				startValue: event.startAt ? event.startAt.getTime() : null,
+			}));
 
-				if (event.duration) {
-					hours = parseFloat(event.duration);
-				} else {
-					hours = 0; // Default for all-day events
-				}
-
-				if (event.startTime) {
-					const startTime = moment(
-						event.startTime,
-						"YYYY-MM-DD HH:mm",
-					);
-					description = startTime.format("h:mm A");
-					startTimeValue = startTime.valueOf(); // Get timestamp for sorting
-				}
-
-				// Map label ID to color
-				const labelColor = event.labelId
-					? labelMap[event.labelId]
-					: null;
-
-				return {
-					id: event.uid,
-					title: event.title,
-					hours: parseFloat(hours.toFixed(1)),
-					description: description,
-					date: dateString,
-					label: labelColor,
-					isAllDay: isAllDay,
-					startTimeValue: startTimeValue,
-				};
-			});
-
-			// Sort entries: all-day events first, then by start time
 			entries.sort((a, b) => {
-				// All-day events come first
-				if (a.isAllDay && !b.isAllDay) return -1;
-				if (!a.isAllDay && b.isAllDay) return 1;
-
-				// Both are all-day or both have times, sort by time
-				if (a.startTimeValue && b.startTimeValue) {
-					return a.startTimeValue - b.startTimeValue;
-				}
-
-				// Default sorting (by title if neither has time)
+				if (a.isAllDay !== b.isAllDay) return a.isAllDay ? -1 : 1;
+				if (a.startValue && b.startValue)
+					return a.startValue - b.startValue;
 				return a.title.localeCompare(b.title);
 			});
 
-			// Format the date display
-			let displayDate;
-			displayDate = momentDate.format("MMMM D, YYYY");
-
-			formattedEntries.push({
-				date: displayDate,
-				entries: entries,
+			out.push({
+				kind: "day",
+				date: date.format("MMMM D, YYYY"),
+				entries,
 			});
-		});
+		}
 
-		return formattedEntries;
-	}, [agendaItems, labelMap]); // Add labelMap as a dependency
+		return out;
+	}, [agendaItems, labels, props.selectedDate]);
 
-	const renderSectionHeader = ({ date }) => {
-		const dateObj =
-			date === "Today" ? moment() : moment(date, "MMMM D, YYYY");
+	const totalEvents = useMemo(
+		() =>
+			rows.reduce(
+				(n, row) => (row.kind === "year" ? n : n + row.entries.length),
+				0,
+			),
+		[rows],
+	);
 
-		const dayNumber = dateObj.format("D");
-		const dayName = dateObj.format("ddd");
-		const monthName = dateObj.format("MMM");
+	const [calOpen, setCalOpen] = useState(false);
+	const [calIndex, setCalIndex] = useState(-1);
 
+	const toggleCalendar = (close?: number) => {
+		if (props.locked) return;
+		if (calOpen || close === 0) {
+			setCalOpen(false);
+			setCalIndex(-1);
+			props.onCalClose();
+		} else {
+			setCalIndex(1);
+			setCalOpen(true);
+			props.onCalOpen();
+		}
+	};
+
+	const renderDateColumn = (dateLabel: string) => {
+		const date = moment(dateLabel, "MMMM D, YYYY");
 		return (
 			<View
 				style={[
 					styles.sectionHeader,
-					moment(dateObj).isBefore(moment().startOf("day")) && {
-						opacity: 0.5,
-					},
+					date.isBefore(moment().startOf("day")) && { opacity: 0.5 },
 				]}
 			>
 				<View style={styles.dateNumberContainer}>
 					<View style={styles.dateTextContainer}>
-						<Text style={styles.dateMonth}>{monthName}</Text>
+						<Text style={styles.dateMonth}>
+							{date.format("MMM")}
+						</Text>
 					</View>
-					<Text style={styles.dateNumber}>{dayNumber}</Text>
+					<Text style={styles.dateNumber}>{date.format("D")}</Text>
 					<View style={styles.dateTextContainer}>
-						<Text style={styles.dateDay}>{dayName}</Text>
+						<Text style={styles.dateDay}>{date.format("ddd")}</Text>
 					</View>
 				</View>
-
-				{/* Add a spacer here to ensure proper alignment */}
 				<View style={styles.headerSpacer} />
 			</View>
 		);
 	};
 
-	// Render timesheet entry
-	const renderEntry = (entry) => {
-		const pushDetails = () => {
-			props.navigation.navigate("Details", {
-				eventId: entry.id,
-			});
-		};
-
-		return (
-			<TouchableOpacity onPress={pushDetails}>
-				<View
-					style={[
-						styles.entryCard,
-						moment(entry.date).isBefore(
-							moment().startOf("day"),
-						) && {
-							opacity: 0.5,
-						},
-					]}
-				>
-					{/* Add label indicator if we have a color */}
-					{entry.label && (
-						<View
-							style={[
-								styles.labelIndicator,
-								{ backgroundColor: entry.label },
-							]}
-						/>
-					)}
-
-					<View style={styles.entryContent}>
-						<Text
-							style={styles.projectName}
-							numberOfLines={2}
-							ellipsizeMode="tail"
-						>
-							{entry.title}
+	const renderEntry = (entry: Entry) => (
+		<TouchableOpacity
+			onPress={() =>
+				props.navigation.navigate("Details", { eventId: entry.id })
+			}
+		>
+			<View
+				style={[
+					styles.entryCard,
+					moment(entry.date).isBefore(moment().startOf("day")) && {
+						opacity: 0.5,
+					},
+				]}
+			>
+				{entry.label && (
+					<View
+						style={[
+							styles.labelIndicator,
+							{ backgroundColor: entry.label },
+						]}
+					/>
+				)}
+				<View style={styles.entryContent}>
+					<Text
+						style={styles.projectName}
+						numberOfLines={2}
+						ellipsizeMode="tail"
+					>
+						{entry.title}
+					</Text>
+					{entry.description ? (
+						<Text style={styles.entryDescription}>
+							{entry.description}
 						</Text>
-
-						{entry.description ? (
-							<Text style={styles.entryDescription}>
-								{entry.description}
-							</Text>
-						) : null}
-
-						{entry.hours > 0 && (
-							<Text style={styles.hoursValue}>
-								{entry.hours} hrs
-							</Text>
-						)}
-					</View>
+					) : null}
+					{entry.hours > 0 && (
+						<Text style={styles.hoursValue}>{entry.hours} hrs</Text>
+					)}
 				</View>
-			</TouchableOpacity>
-		);
-	};
+			</View>
+		</TouchableOpacity>
+	);
 
-	const [calIsOpen, setCalIsOpen] = useState(false);
-	const [calIndex, setCalIndex] = useState(-1);
-	const toggleCalendar = (set?: number) => {
-		if (props.locked) {
-			return;
-		}
-		if (calIsOpen || set === 0) {
-			setCalIsOpen(false);
-			setCalIndex(-1);
-			props.onCalClose();
-		} else {
-			setCalIndex(1);
-			setCalIsOpen(true);
-			props.onCalOpen();
-		}
-	};
+	if (isLoading && !rows.length) return <LoadingScreen />;
 
-	// Calculate total events (add this in the component before the return statement)
-	const totalEvents = useMemo(() => {
-		return timesheetData.reduce((count, item) => {
-			// Skip year headers
-			if (item.isYearHeader) return count;
-			// Add the number of entries in this section
-			return count + item.entries.length;
-		}, 0);
-	}, [timesheetData]);
+	const firstName = user?.firstName ?? "";
+	const possessive = firstName.endsWith("s") ? "'" : "'s";
 
-	const CalendarModal = () => {
-		return (
+	return (
+		<View style={styles.container}>
+			<StatusBar barStyle="dark-content" />
+
+			<View style={styles.header}>
+				<View>
+					<Text style={styles.headerTitle}>
+						{company?.name || "Company"}
+					</Text>
+					<Text style={styles.headerTitle}>
+						{firstName}
+						{possessive} Schedule
+					</Text>
+					{totalEvents > 0 && (
+						<View style={styles.eventCountContainer}>
+							<Text style={styles.eventCountText}>
+								{totalEvents}{" "}
+								{totalEvents === 1 ? "event" : "events"}
+							</Text>
+						</View>
+					)}
+				</View>
+				<TouchableOpacity
+					style={styles.headerButton}
+					onPress={() => toggleCalendar()}
+				>
+					<Ionicons name="calendar" size={24} color="#007AFF" />
+				</TouchableOpacity>
+			</View>
+
+			{/* A failed query is shown rather than swallowed. v1 returned [] on
+			    error, so a missing index looked like an empty schedule. */}
+			{error && (
+				<View style={styles.errorBanner}>
+					<Text style={styles.errorText}>
+						Could not load events: {error.message}
+					</Text>
+				</View>
+			)}
+
+			{hasLoadedPast && (
+				<View style={styles.pastEventsIndicator}>
+					<Text style={styles.pastEventsText}>
+						Showing past events
+					</Text>
+				</View>
+			)}
+
+			{!error && rows.length === 0 && (
+				<View style={styles.pastEventsIndicator}>
+					<Text style={styles.pastEventsText}>
+						No scheduled events
+					</Text>
+				</View>
+			)}
+
+			<FlatList
+				data={rows}
+				keyExtractor={(item, index) => item.date + index}
+				refreshControl={
+					props.selectedDate === null ? (
+						<RefreshControl
+							refreshing={refreshing}
+							onRefresh={onRefresh}
+							title="Pull to load earlier events"
+							tintColor="#007AFF"
+						/>
+					) : undefined
+				}
+				renderItem={({ item, index }) => {
+					if (item.kind === "year") {
+						return (
+							<View style={styles.yearHeader}>
+								<View style={styles.yearLine} />
+								<Text style={styles.yearText}>{item.year}</Text>
+								<View style={styles.yearLine} />
+							</View>
+						);
+					}
+
+					const next =
+						index < rows.length - 1 ? rows[index + 1] : null;
+
+					return (
+						<View style={styles.section}>
+							<View style={styles.dateRow}>
+								{renderDateColumn(item.date)}
+								<View style={styles.entriesContainer}>
+									{item.entries.map((entry) => (
+										<View key={entry.id}>
+											{renderEntry(entry)}
+										</View>
+									))}
+								</View>
+							</View>
+							{next?.kind !== "year" && (
+								<View style={styles.sectionDivider} />
+							)}
+						</View>
+					);
+				}}
+				contentContainerStyle={styles.listContent}
+			/>
+
 			<BottomSheet
 				snapPoints={["50%", "90%"]}
-				enablePanDownToClose={true}
+				enablePanDownToClose
 				index={calIndex}
 				onClose={() => toggleCalendar(0)}
 			>
 				<BottomSheetView style={styles.modalContainer}>
 					<CalendarList
 						markedDates={markedDates}
-						date={props.selectedDate}
+						date={props.selectedDate ?? undefined}
 						pastScrollRange={50}
 						futureScrollRange={50}
-						scrollEnabled={true}
+						scrollEnabled
 						onDayPress={(day) => {
-							// Handle day selection here if needed
 							toggleCalendar();
 							props.setSelectedDate(day.dateString);
 						}}
@@ -325,172 +390,12 @@ export default function Timesheet(
 					/>
 				</BottomSheetView>
 			</BottomSheet>
-		);
-	};
-
-	if (isLoading) {
-		return <LoadingScreen />;
-	}
-
-	return (
-		<View style={styles.container}>
-			<StatusBar barStyle="dark-content" />
-
-			{/* Header */}
-			<View style={styles.header}>
-				<View>
-					<Text style={styles.headerTitle}>
-						{companyData?.name || "Company"}
-					</Text>
-					<Text style={styles.headerTitle}>
-						{user.firstName.substr(user.firstName.length - 1) == "s"
-							? user.firstName + "' Schedule"
-							: user.firstName + "'s Schedule"}
-					</Text>
-					{totalEvents > 0 && (
-						<View style={styles.eventCountContainer}>
-							<Text style={styles.eventCountText}>
-								{totalEvents}{" "}
-								{totalEvents === 1 ? "event" : "events"}
-							</Text>
-						</View>
-					)}
-				</View>
-				<TouchableOpacity
-					style={styles.headerButton}
-					onPress={() => toggleCalendar()}
-				>
-					<Ionicons name="calendar" size={24} color="#007AFF" />
-				</TouchableOpacity>
-			</View>
-			{includePastEvents && (
-				<View style={styles.pastEventsIndicator}>
-					<Text style={styles.pastEventsText}>
-						Showing past events
-					</Text>
-					<TouchableOpacity
-						onPress={() => togglePastEvents()}
-						style={styles.resetButton}
-					>
-						<Text style={styles.resetButtonText}>Reset</Text>
-					</TouchableOpacity>
-				</View>
-			)}
-			{timesheetData.length === 0 && (
-				<View style={styles.pastEventsIndicator}>
-					<Text style={styles.pastEventsText}>
-						No scheduled events
-					</Text>
-				</View>
-			)}
-			<FlatList
-				data={timesheetData}
-				refreshControl={
-					props.selectedDate === null ? (
-						<RefreshControl
-							refreshing={refreshing}
-							onRefresh={onRefresh}
-							title={
-								includePastEvents
-									? "Including past events"
-									: "Pull to see past events"
-							}
-							tintColor="#007AFF"
-						/>
-					) : null
-				}
-				keyExtractor={(item, index) => item.date + index}
-				renderItem={({ item, index }) => {
-					// Render year header
-					if (item.isYearHeader) {
-						return (
-							<View style={styles.yearHeader}>
-								<View style={styles.yearLine} />
-								<Text style={styles.yearText}>{item.year}</Text>
-								<View style={styles.yearLine} />
-							</View>
-						);
-					}
-
-					// Check if the next item is a year header
-					const nextItem =
-						index < timesheetData.length - 1
-							? timesheetData[index + 1]
-							: null;
-					const isNextItemYearHeader =
-						nextItem && nextItem.isYearHeader;
-
-					// Render regular date section
-					return (
-						<View style={styles.section}>
-							<View style={styles.dateRow}>
-								{renderSectionHeader(item)}
-
-								<View style={styles.entriesContainer}>
-									{item.entries.map((entry) => (
-										<View key={entry.id}>
-											{renderEntry(entry)}
-										</View>
-									))}
-								</View>
-							</View>
-
-							{/* Only render divider if next item isn't a year header */}
-							{!isNextItemYearHeader && (
-								<View style={styles.sectionDivider} />
-							)}
-						</View>
-					);
-				}}
-				contentContainerStyle={styles.listContent}
-			/>
-
-			<CalendarModal />
 		</View>
 	);
 }
 
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: "#F7F7F9",
-	},
-	weekSelector: {
-		flexDirection: "row",
-		justifyContent: "space-around",
-		paddingVertical: 10,
-		backgroundColor: "white",
-	},
-	weekDay: {
-		alignItems: "center",
-	},
-	weekDayText: {
-		fontSize: 14,
-		color: "#8E8E93",
-		marginBottom: 5,
-	},
-	weekDateCircle: {
-		width: 36,
-		height: 36,
-		borderRadius: 18,
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	weekDateCircleActive: {
-		backgroundColor: "#007AFF",
-	},
-	weekDateText: {
-		fontSize: 16,
-		fontWeight: "500",
-		color: "#333",
-	},
-	weekDateTextActive: {
-		color: "white",
-	},
-	divider: {
-		height: 1,
-		backgroundColor: "#E0E0E0",
-	},
+	container: { flex: 1, backgroundColor: "#F7F7F9" },
 	header: {
 		flexDirection: "row",
 		justifyContent: "space-between",
@@ -499,44 +404,10 @@ const styles = StyleSheet.create({
 		paddingVertical: 12,
 		backgroundColor: "#F7F7F9",
 	},
-	headerTitle: {
-		fontSize: 18,
-		fontWeight: "bold",
-		color: "#333",
-	},
-	headerButton: {
-		padding: 8,
-	},
-	summaryCard: {
-		margin: 16,
-		padding: 16,
-		backgroundColor: "white",
-		borderRadius: 10,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.2,
-		shadowRadius: 3,
-		elevation: 2,
-	},
-	listContent: {
-		paddingBottom: 20,
-	},
-	summaryRow: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-	},
-	summaryLabel: {
-		fontSize: 16,
-		color: "#666",
-	},
-	summaryValue: {
-		fontSize: 16,
-		fontWeight: "bold",
-		color: "#333",
-	},
-	section: {
-		marginVertical: 4,
-	},
+	headerTitle: { fontSize: 18, fontWeight: "bold", color: "#333" },
+	headerButton: { padding: 8 },
+	listContent: { paddingBottom: 20 },
+	section: { marginVertical: 4 },
 	sectionHeader: {
 		flexDirection: "row",
 		alignItems: "center",
@@ -558,8 +429,8 @@ const styles = StyleSheet.create({
 		shadowOpacity: 0.1,
 		shadowRadius: 2,
 		elevation: 2,
-		flexDirection: "row", // Change to row layout to position label indicator
-		overflow: "hidden", // This ensures the indicator doesn't overflow
+		flexDirection: "row",
+		overflow: "hidden",
 	},
 	dateNumberContainer: {
 		width: 50,
@@ -572,36 +443,14 @@ const styles = StyleSheet.create({
 		color: "#333",
 		marginBottom: 2,
 	},
-	dateTextContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-	},
-	dateDay: {
-		fontSize: 14,
-		color: "#666",
-		marginRight: 4,
-	},
-	dateMonth: {
-		fontSize: 14,
-		color: "#666",
-		fontWeight: "500",
-	},
-	sectionLine: {
-		flex: 1,
-		height: 1,
-		backgroundColor: "#E0E0E0",
-		marginLeft: 10,
-	},
+	dateTextContainer: { flexDirection: "row", alignItems: "center" },
+	dateDay: { fontSize: 14, color: "#666", marginRight: 4 },
+	dateMonth: { fontSize: 14, color: "#666", fontWeight: "500" },
 	projectName: {
 		fontSize: 16,
 		fontWeight: "500",
 		color: "#333",
 		marginBottom: 0,
-	},
-	allDayText: {
-		fontSize: 14,
-		color: "#666",
-		fontStyle: "italic",
 	},
 	entryDescription: {
 		fontSize: 14,
@@ -623,46 +472,12 @@ const styles = StyleSheet.create({
 		marginTop: 8,
 		marginBottom: 12,
 	},
-	headerSpacer: {
-		flex: 1,
-	},
-	dateRow: {
-		flexDirection: "row",
-	},
+	headerSpacer: { flex: 1 },
+	dateRow: { flexDirection: "row" },
 	modalContainer: {
 		flex: 1,
 		backgroundColor: "rgba(0,0,0,0.5)",
 		justifyContent: "flex-end",
-	},
-	calendarContainer: {
-		backgroundColor: "white",
-		borderTopLeftRadius: 20,
-		borderTopRightRadius: 20,
-		height: Dimensions.get("window").height * 0.9, // 80% of screen height
-		shadowColor: "#000",
-		shadowOffset: {
-			width: 0,
-			height: -3,
-		},
-		shadowOpacity: 0.27,
-		shadowRadius: 4.65,
-		elevation: 6,
-	},
-	calendarHeader: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		padding: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: "#f0f0f0",
-	},
-	calendarTitle: {
-		fontSize: 18,
-		fontWeight: "600",
-		color: "#333",
-	},
-	closeButton: {
-		padding: 4,
 	},
 	pastEventsIndicator: {
 		backgroundColor: "#FFFBE5",
@@ -674,40 +489,24 @@ const styles = StyleSheet.create({
 		margin: 16,
 		marginBottom: 0,
 	},
-	pastEventsText: {
-		fontSize: 14,
-		color: "#987B30",
+	pastEventsText: { fontSize: 14, color: "#987B30" },
+	errorBanner: {
+		backgroundColor: "#FDECEA",
+		padding: 10,
+		borderRadius: 8,
+		margin: 16,
+		marginBottom: 0,
 	},
-	resetButton: {
-		backgroundColor: "#F0E7C2",
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		borderRadius: 4,
-	},
-	resetButtonText: {
-		fontSize: 14,
-		color: "#987B30",
-		fontWeight: "500",
-	},
-	labelIndicator: {
-		width: 5,
-		height: "100%", // Full height of card
-	},
-	entryContent: {
-		flex: 1,
-		padding: 12,
-	},
+	errorText: { fontSize: 13, color: "#B3261E" },
+	labelIndicator: { width: 5, height: "100%" },
+	entryContent: { flex: 1, padding: 12 },
 	yearHeader: {
 		flexDirection: "row",
 		alignItems: "center",
 		paddingHorizontal: 20,
 		marginVertical: 16,
 	},
-	yearLine: {
-		flex: 1,
-		height: 1,
-		backgroundColor: "#C7C7CC",
-	},
+	yearLine: { flex: 1, height: 1, backgroundColor: "#C7C7CC" },
 	yearText: {
 		fontSize: 18,
 		fontWeight: "600",
@@ -722,9 +521,5 @@ const styles = StyleSheet.create({
 		alignSelf: "flex-start",
 		marginTop: 4,
 	},
-	eventCountText: {
-		fontSize: 12,
-		color: "#007AFF",
-		fontWeight: "500",
-	},
+	eventCountText: { fontSize: 12, color: "#007AFF", fontWeight: "500" },
 });

@@ -2,13 +2,16 @@ import { useState, useEffect, useCallback } from "react";
 import { Alert } from "react-native";
 import moment from "moment";
 import {
-	addEvent,
+	createEvent,
+	EventWriteInput,
 	deleteEvent,
 	subscribeEvent,
+	syncEventAudience,
 	updateEvent,
 } from "../services/eventService";
-import { Event } from "../types";
+
 import { useUser } from "../contexts/UserContext";
+import { useCompany } from "../contexts/CompanyContext";
 
 export type Location = {
 	[address: string]: {
@@ -28,6 +31,16 @@ export const useEventForm = (navigation, eventId?: string) => {
 	const [endTime, setEndTime] = useState(new Date());
 	const [locations, setLocations] = useState<Location | null>(null);
 	const [assignedWorkers, setAssignedWorkers] = useState<string[]>([]);
+	/*
+	 * Which groups this event was published to.
+	 *
+	 * Seeded from the loaded event, NOT left empty. An unseeded picker would
+	 * submit [] on any edit, flipping the event back to open and withdrawing
+	 * every invitation nobody had answered yet.
+	 */
+	const [audienceGroupIds, setAudienceGroupIds] = useState<string[]>([]);
+	/** Individually invited workers, seeded for the same reason as the groups. */
+	const [audienceUserIds, setAudienceUserIds] = useState<string[]>([]);
 	const [notes, setNotes] = useState("");
 	const [originalValues, setOriginalValues] = useState({
 		title: "",
@@ -54,52 +67,49 @@ export const useEventForm = (navigation, eventId?: string) => {
 	const [labelText, setLabelText] = useState("");
 
 	// Load user data
-	const { user, companyId: currentCompany } = useUser();
+	const { user, userId, companyId: currentCompany } = useUser();
+	const { timeZone } = useCompany();
 
 	// Load event data if editing
 	useEffect(() => {
 		if (!isEditing || !currentCompany || !editID) return;
 
 		setIsLoading(true);
-		const subscriber = subscribeEvent(currentCompany, editID, (event) => {
-			if (event.exists()) {
-				const data = event.data();
+		const subscriber = subscribeEvent(editID, (data) => {
+			if (data) {
 				setTitle(data.title);
-				setDate(moment(data.date).toDate());
-				setAllDay(!data.startTime);
+				setDate(moment(data.dateKey, "YYYY-MM-DD").toDate());
+				setAllDay(data.isAllDay);
 
-				if (data.startTime) {
-					setStartTime(
-						moment(data.startTime, "YYYY-MM-DD HH:mm").toDate(),
-					);
-				}
+				/*
+				 * startAt/endAt are Timestamps. v1 stored offset-ISO strings and
+				 * re-parsed them here with the format "YYYY-MM-DD HH:mm", which
+				 * moment accepted leniently and resolved to the WRONG TIME —
+				 * this is why edit-mode times drifted.
+				 */
+				const start = data.startAt ? data.startAt.toDate() : null;
+				const end = data.endAt ? data.endAt.toDate() : null;
 
-				setHasEndTime(!!data.endTime);
-
-				if (data.endTime) {
-					setEndTime(
-						moment(data.endTime, "YYYY-MM-DD HH:mm").toDate(),
-					);
-				}
+				if (start) setStartTime(start);
+				setHasEndTime(Boolean(end));
+				if (end) setEndTime(end);
 
 				setLocations(data.locations);
-				setAssignedWorkers(data.assignedWorkers || []);
-				setNotes(data.notes || "");
+				setAssignedWorkers(data.assignedUserIds || []);
+				setAudienceGroupIds(data.audienceGroupIds || []);
+				setAudienceUserIds(data.audienceUserIds || []);
+				setNotes(data.adminNotes || "");
 
 				setOriginalValues({
 					title: data.title,
-					date: moment(data.date).toDate(),
-					allDay: !data.startTime,
-					startTime: data.startTime
-						? moment(data.startTime, "YYYY-MM-DD HH:mm").toDate()
-						: new Date(),
-					hasEndTime: !!data.endTime,
-					endTime: data.endTime
-						? moment(data.endTime, "YYYY-MM-DD HH:mm").toDate()
-						: new Date(),
+					date: moment(data.dateKey, "YYYY-MM-DD").toDate(),
+					allDay: data.isAllDay,
+					startTime: start ?? new Date(),
+					hasEndTime: Boolean(end),
+					endTime: end ?? new Date(),
 					locations: data.locations || {},
-					assignedWorkers: data.assignedWorkers || [],
-					notes: data.notes || "",
+					assignedWorkers: data.assignedUserIds || [],
+					notes: data.adminNotes || "",
 				});
 			}
 			setIsLoading(false);
@@ -260,84 +270,173 @@ export const useEventForm = (navigation, eventId?: string) => {
 	}, [date, startTime, allDay]);
 
 	// Handle event submission
-	const handleSubmitData = useCallback(async () => {
-		if (!validateFields()) return;
+	/*
+	 * `extra` carries packages and label. v1's EventSubmit called this, then
+	 * issued a SECOND updateEvent for those two fields — so creating an event
+	 * was three writes (add, update id, update packages/label). Passing them in
+	 * makes it one.
+	 */
+	const handleSubmitData = useCallback(
+		async (extra?: {
+			packageIds?: string[];
+			labelId?: string | null;
+			audienceGroupIds?: string[];
+			audienceUserIds?: string[];
+		}) => {
+			if (!validateFields()) return;
 
-		try {
-			setIsLoading(true);
+			try {
+				setIsLoading(true);
 
-			const validatedLocations = locations
-				? Object.entries(locations).reduce(
-						(acc: Location, [key, value]) => {
-							if (value.latitude && value.longitude) {
-								acc[key] = value;
-							}
-							return acc;
-						},
-						{},
-					)
-				: null;
+				const validatedLocations = locations
+					? Object.entries(locations).reduce(
+							(acc: Location, [key, value]) => {
+								if (value.latitude && value.longitude) {
+									acc[key] = value;
+								}
+								return acc;
+							},
+							{},
+						)
+					: null;
 
-			const eventData: Event = {
-				id: editID || "",
-				title,
-				date: moment(date).format("YYYY-MM-DD"),
-				startTime: !allDay
-					? moment(date)
+				const dateKey = moment(date).format("YYYY-MM-DD");
+
+				/*
+				 * Instants, not strings. v1 wrote offset-ISO for start/end, a
+				 * "YYYY-MM-DD" string for the date, and the duration as a STRING of
+				 * hours — three representations for what is really one moment plus
+				 * a length.
+				 */
+				const startAt = allDay
+					? null
+					: moment(date)
 							.hours(startTime.getHours())
 							.minutes(startTime.getMinutes())
-							.toISOString(true)
-					: null,
-				endTime: hasEndTime ? moment(endTime).toISOString(true) : null,
-				locations: validatedLocations,
-				duration: calculateDuration(),
-				notes,
-				assignedWorkers,
-				packages: [],
-			};
+							.seconds(0)
+							.toDate();
 
-			let eventId;
+				const endAt =
+					!allDay && hasEndTime
+						? moment(date)
+								.hours(endTime.getHours())
+								.minutes(endTime.getMinutes())
+								.seconds(0)
+								.toDate()
+						: null;
 
-			if (isEditing && editID) {
-				await updateEvent(currentCompany, editID, eventData);
-				eventId = editID;
-			} else {
-				eventId = await addEvent(currentCompany, eventData);
-			}
-			return eventId;
-		} catch (error) {
-			console.error("Error submitting event:", error);
+				const durationSeconds =
+					startAt && endAt
+						? Math.max(
+								0,
+								Math.round(
+									(endAt.getTime() - startAt.getTime()) /
+										1000,
+								),
+							)
+						: null;
 
-			switch (error.code) {
-				case "event/invalid-workers":
-					Alert.alert(
-						"One or more selected workers are not available!",
+				const eventData: EventWriteInput = {
+					title,
+					dateKey,
+					isAllDay: allDay,
+					startAt,
+					endAt,
+					durationSeconds,
+					adminNotes: notes,
+					locations: validatedLocations ?? {},
+					assignedUserIds: assignedWorkers,
+					...(extra?.packageIds
+						? { packageIds: extra.packageIds }
+						: {}),
+					...(extra?.labelId !== undefined
+						? { labelId: extra.labelId }
+						: {}),
+					...(extra?.audienceGroupIds
+						? { audienceGroupIds: extra.audienceGroupIds }
+						: {}),
+					...(extra?.audienceUserIds
+						? { audienceUserIds: extra.audienceUserIds }
+						: {}),
+				};
+
+				let eventId;
+
+				if (isEditing && editID) {
+					// A patch, not a whole-document write.
+					await updateEvent(editID, eventData, userId);
+					eventId = editID;
+					/*
+					 * Re-publishing an edited event. createEvent does this
+					 * itself, but an edit has to be reconciled: workers added
+					 * to a group get an invitation, and invitations nobody
+					 * answered are withdrawn if their group was removed.
+					 */
+					if (extra?.audienceGroupIds || extra?.audienceUserIds) {
+						await syncEventAudience(
+							currentCompany,
+							editID,
+							dateKey,
+							extra.audienceGroupIds ?? [],
+							extra.audienceUserIds ?? [],
+						);
+					}
+				} else {
+					// ONE write. v1 did add() then update({id}).
+					eventId = await createEvent(
+						currentCompany,
+						eventData,
+						userId,
 					);
-					break;
-				default:
-					Alert.alert("Error creating event, please try again");
+				}
+				return eventId;
+			} catch (error) {
+				console.error("Error submitting event:", error);
+
+				switch (error.code) {
+					case "event/invalid-workers":
+						Alert.alert(
+							"One or more selected workers are not available!",
+						);
+						break;
+					/*
+					 * The event IS saved — only the invitations failed. Saying
+					 * "try again" here would produce a duplicate event, and
+					 * saying nothing would leave a job nobody was asked about.
+					 */
+					case "event/audience-not-notified":
+						Alert.alert(
+							"Event saved",
+							"The event was created, but the groups you picked have not been notified yet. Open it and save again to send the invitations.",
+						);
+						return error.eventId ?? null;
+					default:
+						Alert.alert("Error creating event, please try again");
+				}
+				return null;
+			} finally {
+				setIsLoading(false);
 			}
-			return null;
-		} finally {
-			setIsLoading(false);
-		}
-	}, [
-		title,
-		date,
-		allDay,
-		startTime,
-		hasEndTime,
-		endTime,
-		locations,
-		notes,
-		assignedWorkers,
-		isEditing,
-		editID,
-		calculateDuration,
-		validateFields,
-		currentCompany,
-		navigation,
-	]);
+		},
+		[
+			title,
+			date,
+			allDay,
+			startTime,
+			hasEndTime,
+			endTime,
+			locations,
+			notes,
+			assignedWorkers,
+			isEditing,
+			editID,
+			calculateDuration,
+			validateFields,
+			currentCompany,
+			navigation,
+			userId,
+		],
+	);
 
 	// Handle event deletion
 	const handleDelete = useCallback(async () => {
@@ -345,7 +444,7 @@ export const useEventForm = (navigation, eventId?: string) => {
 
 		try {
 			setIsLoading(true);
-			await deleteEvent(editID, currentCompany);
+			await deleteEvent(currentCompany, editID);
 			navigation.pop(2);
 		} catch (error) {
 			Alert.alert("Error deleting event, please try again");
@@ -452,6 +551,10 @@ export const useEventForm = (navigation, eventId?: string) => {
 		locations,
 		assignedWorkers,
 		setAssignedWorkers,
+		audienceGroupIds,
+		setAudienceGroupIds,
+		audienceUserIds,
+		setAudienceUserIds,
 		notes,
 		setNotes,
 		originalValues,

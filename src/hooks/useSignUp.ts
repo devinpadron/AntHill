@@ -1,19 +1,40 @@
 import { useState } from "react";
-import auth from "@react-native-firebase/auth";
-import { addUser } from "../services/userService";
-import {
-	addUserToCompany,
-	compareAccessCode,
-} from "../services/companyService";
-import {
-	validateSignupFields,
-	formatUserData,
-	handleAuthError,
-} from "../utils/authUtils";
 import { Alert } from "react-native";
+import auth from "@react-native-firebase/auth";
 import { capitalize } from "lodash";
-import { Role } from "../types";
+import { createUser } from "../services/userService";
+import {
+	joinCompanyWithAccessCode,
+	resolveJoinCode,
+} from "../services/membershipService";
+import { validateSignupFields, handleAuthError } from "../utils/authUtils";
+import { beginSignup, endSignup } from "../contexts/signupInProgress";
 
+/*
+ * Signup, against the v2 schema.
+ *
+ * v1 wrote `Users/{uid}` with an embedded `companies[]` and a second document
+ * at `Companies/{c}/Users/{uid}`. v2 writes `users/{uid}` and one
+ * `memberships/{companyId}_{userId}`, through the same service the join flow
+ * uses — so a new account and an existing user joining a second company
+ * produce byte-identical membership records.
+ *
+ * The code field accepts a company access code OR a group join code. A group
+ * code lands the new hire in that group with the visibility the manager chose,
+ * which is the whole point: a contractor is restricted from their very first
+ * launch rather than depending on someone setting it afterwards.
+ *
+ * ORDER IS LOAD-BEARING, twice over:
+ *
+ *   1. The account is created BEFORE any Firestore read, because the companies
+ *      collection requires authentication (see firestore.rules).
+ *   2. The code is resolved BEFORE the user document is written, because
+ *      `users/{uid}` cannot be deleted by its owner — the rules say
+ *      `allow delete: if false`. A signup that wrote the profile first and
+ *      then found a bad code would strand a document it has no way to remove.
+ *      Only the auth account can be rolled back, so nothing else may exist
+ *      before the code is known to be good.
+ */
 export const useSignUp = (navigation: any) => {
 	const [firstName, setFirstName] = useState("");
 	const [lastName, setLastName] = useState("");
@@ -24,7 +45,6 @@ export const useSignUp = (navigation: any) => {
 	const [isLoading, setIsLoading] = useState(false);
 
 	const handleSignUp = async () => {
-		// Validate all fields
 		if (
 			!validateSignupFields(
 				firstName,
@@ -39,22 +59,21 @@ export const useSignUp = (navigation: any) => {
 		}
 
 		setIsLoading(true);
+		// Silences UserContext's verification alert until this knows how it
+		// ended — see signupInProgress.
+		beginSignup();
 
 		try {
-			// Create the account BEFORE looking up the access code. Reading the
-			// Companies collection requires authentication, so this order is
-			// load-bearing — see firestore.rules.
 			const userCredential = await auth().createUserWithEmailAndPassword(
 				email,
 				password,
 			);
 			const user = userCredential.user;
 
-			// Check company code
-			const company = await compareAccessCode(accessCode);
-			if (!company) {
-				// Roll the account back so an invalid code doesn't strand a
-				// half-created user with no profile document.
+			const resolved = await resolveJoinCode(accessCode);
+			if (!resolved) {
+				// Roll the account back so a bad code does not strand a
+				// half-created user with no profile and no membership.
 				try {
 					await user.delete();
 				} catch (deleteError) {
@@ -67,35 +86,77 @@ export const useSignUp = (navigation: any) => {
 				return;
 			}
 
-			// Update display name
 			await user.updateProfile({
 				displayName: `${capitalize(firstName)} ${capitalize(lastName)}`,
 			});
 
-			// Prepare user data based on account type
-			const companyId = company;
-			const role = Role.USER;
-			const userData = formatUserData(
-				firstName,
-				lastName,
-				email,
-				companyId,
-				user.uid,
+			await createUser(user.uid, {
+				firstName: capitalize(firstName),
+				lastName: capitalize(lastName),
+				email: email.trim(),
+			});
+
+			/*
+			 * One transaction writes the membership and points the user at the
+			 * company. Passing `resolved` avoids repeating the lookup.
+			 *
+			 * If this throws the account and profile survive with no
+			 * membership — recoverable, because the profile screen's "Join
+			 * company" runs exactly this call. The reverse order would not be:
+			 * a membership with no user document breaks every member list.
+			 */
+			await joinCompanyWithAccessCode(user.uid, accessCode, resolved);
+
+			await user.sendEmailVerification();
+
+			/*
+			 * Reported here rather than left to UserContext, which is muted for
+			 * the duration. One message, and it can say the account was
+			 * actually created — the generic one cannot, because it fires for
+			 * failed signups too.
+			 */
+			Alert.alert(
+				"Account created",
+				"Check your email to verify your address, then sign in.",
 			);
 
-			// Save user data
-			await addUser(userData, user.uid);
-			await addUserToCompany(companyId, user.uid, role);
-
-			// Send verification email
-			await user.sendEmailVerification();
-			console.log("User account created & signed in!");
-
-			// Navigate back
 			navigation.pop();
 		} catch (error) {
 			handleAuthError(error);
 		} finally {
+			/*
+			 * Sign out before leaving. THIS IS LOAD-BEARING, and not obvious.
+			 *
+			 * createUserWithEmailAndPassword leaves the new account SIGNED IN,
+			 * unverified. UserContext used to end that itself: it showed the
+			 * "verify your email" alert, whose buttons signed you out. Muting
+			 * that alert during signup — so a failed signup would not nag about
+			 * an account it was deleting — quietly removed the sign-out too.
+			 *
+			 * The consequence stayed invisible until the user came back and
+			 * tapped Login. signInWithEmailAndPassword for a uid that is
+			 * ALREADY signed in is not an auth state change, so
+			 * onAuthStateChanged never fired, the context never re-read
+			 * emailVerified, and nothing navigated. Relaunching the app ran the
+			 * listener from scratch and looked like a fix.
+			 *
+			 * Signing out here restores the invariant the alert used to carry:
+			 * you are not signed in until you have verified. Login is then a
+			 * real transition and the listener fires.
+			 *
+			 * Covers every exit. On a bad code the account was already deleted,
+			 * so currentUser is null and this is a no-op; on an unexpected
+			 * error it clears a half-built session rather than leaving someone
+			 * signed in as an account with no membership.
+			 */
+			const current = auth().currentUser;
+			if (current && !current.emailVerified) {
+				await auth()
+					.signOut()
+					.catch(() => {});
+			}
+
+			endSignup();
 			setIsLoading(false);
 		}
 	};

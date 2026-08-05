@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import {
 	View,
 	Text,
-	StyleSheet,
 	TouchableOpacity,
 	TextInput,
 	FlatList,
@@ -13,7 +12,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialIcons";
-import db from "../../../constants/firestore";
 import { useUser } from "../../../contexts/UserContext";
 
 // Define types for our package data
@@ -23,17 +21,29 @@ type Checklist = {
 	items: any[];
 };
 
+import {
+	deletePackage as removePackage,
+	savePackage as writePackage,
+	subscribeChecklists,
+	subscribePackages,
+} from "../../../services/libraryService";
+import type { Package as PackageDoc } from "../../../types";
+import { styles } from "./PackageCreator.styles";
+
 type PackageChecklist = {
 	checklistId: string;
 };
 
+/*
+ * The editor's working shape. v2 persists `checklistIds: string[]`; this keeps
+ * the object form the UI already manipulates and converts on load and save,
+ * rather than rewriting the picker.
+ */
 type Package = {
 	id: string;
 	title: string;
 	description: string;
 	checklists: PackageChecklist[];
-	createdAt: number;
-	updatedAt: number;
 };
 
 const PackageCreator = ({ navigation }) => {
@@ -55,78 +65,39 @@ const PackageCreator = ({ navigation }) => {
 	const [loadingChecklists, setLoadingChecklists] = useState(false);
 
 	// Fetch packages on component mount
-	useEffect(() => {
-		fetchPackages();
-		fetchChecklists();
-	}, [companyId]);
+	useEffect(() => {}, [companyId]);
 
 	// Fetch packages from Firestore
-	const fetchPackages = async () => {
+	// Live subscriptions replace the manual fetch-and-refetch cycle.
+	useEffect(() => {
 		if (!companyId) return;
-
-		try {
-			setLoading(true);
-
-			const packagesSnapshot = await db
-				.collection("Companies")
-				.doc(companyId)
-				.collection("Packages")
-				.orderBy("updatedAt", "desc")
-				.get();
-
-			const fetchedPackages = packagesSnapshot.docs.map((doc) => ({
-				id: doc.id,
-				...doc.data(),
-			})) as Package[];
-
-			setPackages(fetchedPackages);
-		} catch (error) {
-			console.error("Error fetching packages:", error);
-			Alert.alert("Error", "Failed to load packages");
-		} finally {
+		return subscribePackages(companyId, (next: PackageDoc[]) => {
+			setPackages(
+				next.map((pkg) => ({
+					id: pkg.id,
+					title: pkg.title,
+					description: pkg.description,
+					checklists: (pkg.checklistIds ?? []).map((checklistId) => ({
+						checklistId,
+					})),
+				})),
+			);
 			setLoading(false);
-		}
-	};
+		});
+	}, [companyId]);
 
-	// Fetch available checklists
-	const fetchChecklists = async () => {
+	useEffect(() => {
 		if (!companyId) return;
+		return subscribeChecklists(companyId, setAvailableChecklists);
+	}, [companyId]);
 
-		try {
-			setLoadingChecklists(true);
-
-			const checklistsSnapshot = await db
-				.collection("Companies")
-				.doc(companyId)
-				.collection("Checklists")
-				.orderBy("title")
-				.get();
-
-			const fetchedChecklists = checklistsSnapshot.docs.map((doc) => ({
-				id: doc.id,
-				...doc.data(),
-			})) as Checklist[];
-
-			setAvailableChecklists(fetchedChecklists);
-		} catch (error) {
-			console.error("Error fetching checklists:", error);
-			Alert.alert("Error", "Failed to load checklists");
-		} finally {
-			setLoadingChecklists(false);
-		}
-	};
-
-	// Create new empty package
-	const createNewPackage = async () => {
-		await fetchChecklists();
-
+	// Create a new package
+	const createNewPackage = () => {
 		const newPackage: Package = {
 			id: "", // Will be assigned by Firestore
 			title: "",
 			description: "",
 			checklists: [],
-			createdAt: Date.now(),
-			updatedAt: Date.now(),
 		};
 
 		setCurrentPackage(newPackage);
@@ -136,8 +107,6 @@ const PackageCreator = ({ navigation }) => {
 
 	// Edit existing package
 	const editPackage = async (pkg: Package) => {
-		await fetchChecklists();
-
 		setCurrentPackage(pkg);
 
 		// Set up selected checklists based on package
@@ -152,15 +121,11 @@ const PackageCreator = ({ navigation }) => {
 
 	// Duplicate package
 	const duplicatePackage = async (pkg: Package) => {
-		await fetchChecklists();
-
 		const duplicatedPackage: Package = {
 			id: "", // Will be assigned by Firestore
 			title: `${pkg.title} (Copy)`,
 			description: pkg.description,
 			checklists: [...pkg.checklists],
-			createdAt: Date.now(),
-			updatedAt: Date.now(),
 		};
 
 		setCurrentPackage(duplicatedPackage);
@@ -201,12 +166,7 @@ const PackageCreator = ({ navigation }) => {
 		try {
 			setSaving(true);
 
-			await db
-				.collection("Companies")
-				.doc(companyId)
-				.collection("Packages")
-				.doc(packageId)
-				.delete();
+			await removePackage(packageId);
 
 			// Update local state
 			setPackages(packages.filter((pkg) => pkg.id !== packageId));
@@ -237,7 +197,6 @@ const PackageCreator = ({ navigation }) => {
 				checklists: currentPackage.checklists.filter(
 					(cl) => cl.checklistId !== checklistId,
 				),
-				updatedAt: Date.now(),
 			});
 		} else {
 			// Add checklist
@@ -249,7 +208,6 @@ const PackageCreator = ({ navigation }) => {
 						checklistId: checklistId,
 					},
 				],
-				updatedAt: Date.now(),
 			});
 		}
 	};
@@ -267,37 +225,16 @@ const PackageCreator = ({ navigation }) => {
 		try {
 			setSaving(true);
 
-			const packageData = {
+			const packageId = await writePackage(companyId, {
+				id: currentPackage.id || undefined,
 				title: currentPackage.title,
 				description: currentPackage.description,
-				checklists: currentPackage.checklists,
-				createdAt: currentPackage.createdAt,
-				updatedAt: Date.now(),
-			};
-
-			let packageId = currentPackage.id;
-
-			if (packageId) {
-				// Update existing package
-				await db
-					.collection("Companies")
-					.doc(companyId)
-					.collection("Packages")
-					.doc(packageId)
-					.update(packageData);
-			} else {
-				// Create new package
-				const docRef = await db
-					.collection("Companies")
-					.doc(companyId)
-					.collection("Packages")
-					.add(packageData);
-
-				packageId = docRef.id;
-			}
+				checklistIds: currentPackage.checklists.map(
+					(entry) => entry.checklistId,
+				),
+			});
 
 			// Refresh package list
-			await fetchPackages();
 
 			Alert.alert("Success", "Package saved successfully");
 			setIsEditing(false);
@@ -453,7 +390,6 @@ const PackageCreator = ({ navigation }) => {
 									setCurrentPackage({
 										...currentPackage!,
 										title: text,
-										updatedAt: Date.now(),
 									})
 								}
 								placeholder="Enter package title"
@@ -471,7 +407,6 @@ const PackageCreator = ({ navigation }) => {
 									setCurrentPackage({
 										...currentPackage!,
 										description: text,
-										updatedAt: Date.now(),
 									})
 								}
 								placeholder="Enter package description"
@@ -707,316 +642,5 @@ const PackageCreator = ({ navigation }) => {
 		</View>
 	);
 };
-
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: "#f5f5f5",
-	},
-	header: {
-		padding: 15,
-		backgroundColor: "#fff",
-		borderBottomWidth: 1,
-		borderBottomColor: "#e0e0e0",
-	},
-	headerRow: {
-		flexDirection: "row",
-		alignItems: "center",
-	},
-	backButton: {
-		padding: 5,
-		marginRight: 10,
-	},
-	headerTextContainer: {
-		flex: 1,
-	},
-	headerTitle: {
-		fontSize: 24,
-		fontWeight: "bold",
-		color: "#333",
-	},
-	headerSubtitle: {
-		fontSize: 16,
-		color: "#666",
-		marginTop: 5,
-	},
-	loadingContainer: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	loadingText: {
-		marginTop: 10,
-		fontSize: 16,
-		color: "#666",
-	},
-	listContainer: {
-		flex: 1,
-	},
-	listContent: {
-		padding: 15,
-	},
-	emptyContainer: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-		paddingBottom: 100,
-	},
-	emptyText: {
-		fontSize: 18,
-		color: "#666",
-		marginTop: 10,
-	},
-	emptySubtext: {
-		fontSize: 14,
-		color: "#999",
-		marginTop: 5,
-		textAlign: "center",
-	},
-	packageCard: {
-		backgroundColor: "#fff",
-		borderRadius: 8,
-		padding: 15,
-		marginBottom: 15,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 3,
-		elevation: 2,
-	},
-	packageHeader: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		marginBottom: 10,
-	},
-	packageTitle: {
-		fontSize: 18,
-		fontWeight: "bold",
-		color: "#333",
-		flex: 1,
-	},
-	checklistCount: {
-		fontSize: 14,
-		color: "#666",
-		backgroundColor: "#f0f0f0",
-		paddingHorizontal: 8,
-		paddingVertical: 4,
-		borderRadius: 12,
-	},
-	packageDescription: {
-		fontSize: 14,
-		color: "#666",
-		marginBottom: 15,
-	},
-	packageChecklists: {
-		marginBottom: 15,
-	},
-	packageChecklistItem: {
-		flexDirection: "row",
-		alignItems: "center",
-		marginBottom: 5,
-	},
-	checklistIcon: {
-		marginRight: 8,
-	},
-	packageChecklistTitle: {
-		fontSize: 14,
-		color: "#333",
-	},
-	moreChecklists: {
-		fontSize: 14,
-		color: "#888",
-		marginTop: 5,
-		fontStyle: "italic",
-	},
-	packageActions: {
-		flexDirection: "row",
-		borderTopWidth: 1,
-		borderTopColor: "#f0f0f0",
-		paddingTop: 10,
-		marginTop: 5,
-	},
-	actionButton: {
-		flex: 1,
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-		padding: 8,
-	},
-	actionText: {
-		marginLeft: 5,
-		fontSize: 14,
-		color: "#333",
-	},
-	footer: {
-		padding: 15,
-		backgroundColor: "#fff",
-		borderTopWidth: 1,
-		borderTopColor: "#e0e0e0",
-	},
-	editorFooter: {
-		padding: 15,
-		backgroundColor: "#fff",
-		borderTopWidth: 1,
-		borderTopColor: "#e0e0e0",
-		flexDirection: "row",
-	},
-	createButton: {
-		backgroundColor: "#4CAF50",
-		borderRadius: 8,
-		padding: 15,
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	createButtonText: {
-		color: "#fff",
-		fontSize: 16,
-		fontWeight: "bold",
-		marginLeft: 8,
-	},
-	editorContainer: {
-		flex: 1,
-	},
-	formGroup: {
-		margin: 15,
-		marginBottom: 20,
-	},
-	label: {
-		fontSize: 16,
-		fontWeight: "bold",
-		color: "#333",
-		marginBottom: 8,
-	},
-	sectionDescription: {
-		fontSize: 14,
-		color: "#666",
-		marginBottom: 15,
-	},
-	input: {
-		backgroundColor: "#fff",
-		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 8,
-		padding: 12,
-		fontSize: 16,
-	},
-	textArea: {
-		minHeight: 100,
-		textAlignVertical: "top",
-	},
-	checklistSelectionContainer: {
-		backgroundColor: "#fff",
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: "#ddd",
-		overflow: "hidden",
-	},
-	checklistSelectionItem: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		padding: 15,
-		borderBottomWidth: 1,
-		borderBottomColor: "#eee",
-		backgroundColor: "#fff",
-	},
-	checklistSelectionContent: {
-		flex: 1,
-	},
-	checklistSelectionTitle: {
-		fontSize: 16,
-		color: "#333",
-		marginBottom: 4,
-	},
-	checklistSelectionCount: {
-		fontSize: 14,
-		color: "#666",
-	},
-	noChecklistsContainer: {
-		alignItems: "center",
-		justifyContent: "center",
-		padding: 30,
-		backgroundColor: "#f9f9f9",
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: "#ddd",
-		borderStyle: "dashed",
-	},
-	noChecklistsText: {
-		fontSize: 16,
-		color: "#666",
-		marginVertical: 10,
-		textAlign: "center",
-	},
-	createChecklistButton: {
-		backgroundColor: "#2196F3",
-		paddingHorizontal: 15,
-		paddingVertical: 10,
-		borderRadius: 4,
-		marginTop: 10,
-	},
-	createChecklistButtonText: {
-		color: "#fff",
-		fontWeight: "bold",
-	},
-	selectedChecklistsContainer: {
-		margin: 15,
-		marginTop: 0,
-		padding: 15,
-		backgroundColor: "#f0f7f0",
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: "#c8e6c9",
-	},
-	selectedChecklistsTitle: {
-		fontSize: 16,
-		fontWeight: "bold",
-		color: "#2E7D32",
-		marginBottom: 10,
-	},
-	selectedChecklistItem: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingVertical: 8,
-		borderBottomWidth: 1,
-		borderBottomColor: "#c8e6c9",
-	},
-	selectedChecklistTitle: {
-		marginLeft: 10,
-		fontSize: 15,
-		color: "#333",
-	},
-	saveButton: {
-		flex: 2,
-		backgroundColor: "#2196F3",
-		borderRadius: 8,
-		padding: 15,
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	saveButtonText: {
-		color: "#fff",
-		fontSize: 16,
-		fontWeight: "bold",
-	},
-	cancelButton: {
-		flex: 1,
-		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 8,
-		padding: 15,
-		alignItems: "center",
-		justifyContent: "center",
-		marginRight: 10,
-		backgroundColor: "#f5f5f5",
-	},
-	cancelButtonText: {
-		color: "#333",
-		fontSize: 16,
-		fontWeight: "500",
-	},
-});
 
 export default PackageCreator;

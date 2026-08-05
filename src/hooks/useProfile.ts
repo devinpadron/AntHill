@@ -1,23 +1,30 @@
-import { useState, useEffect } from "react";
-import {
-	subscribeCurrentUser,
-	updateUser,
-	swapUserCompany,
-	deleteUser,
-} from "../services/userService";
-import {
-	joinCompanyWithAccessCode,
-	removeUserFromCompany,
-} from "../services/companyService";
+import { useEffect, useState } from "react";
 import { Alert } from "react-native";
-import { showPrompt } from "../utils/alertUtils";
 import auth from "@react-native-firebase/auth";
+import { showPrompt } from "../utils/alertUtils";
 import { reAuth, sendResetPassword } from "../services/authService";
 import { useUser } from "../contexts/UserContext";
-import db from "../constants/firestore";
+import { setActiveCompany, updateProfile } from "../services/userService";
+import {
+	getMembershipsForUser,
+	joinCompanyWithAccessCode,
+	removeMember,
+} from "../services/membershipService";
 
 export const useProfile = () => {
 	const [isLoading, setIsLoading] = useState(false);
+
+	/*
+	 * The companies this user belongs to.
+	 *
+	 * v1 read `user.companies[]` — an array kept in sync with the membership
+	 * documents by two non-atomic writes, which is the orphan class the audit
+	 * found. Memberships are the only source now, and they carry the company
+	 * NAME, so the switcher can show something readable instead of a raw id.
+	 */
+	const [memberships, setMemberships] = useState<
+		{ companyId: string; label: string }[]
+	>([]);
 
 	const {
 		user: userData,
@@ -26,14 +33,34 @@ export const useProfile = () => {
 		companyId,
 	} = useUser();
 
+	useEffect(() => {
+		if (!userId) return;
+		let cancelled = false;
+
+		getMembershipsForUser(userId).then((rows) => {
+			if (cancelled) return;
+			setMemberships(
+				rows.map((m) => ({
+					companyId: m.companyId,
+					label: m.companyId,
+				})),
+			);
+		});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [userId, companyId]);
+
 	// Update user name
 	const updateName = async (firstName: string, lastName: string) => {
 		try {
-			await updateUser(userId, {
-				...userData,
-				firstName,
-				lastName,
-			});
+			/*
+			 * A patch. v1 spread the whole user document back, and separately
+			 * had to keep membership copies in sync by hand — updateProfile
+			 * does both in one place now.
+			 */
+			await updateProfile(userId, { firstName, lastName });
 			Alert.alert("Success", "Your name has been updated successfully.");
 		} catch (error) {
 			console.error("Error updating name:", error);
@@ -46,7 +73,7 @@ export const useProfile = () => {
 
 	// Handle company change
 	const handleCompanyChange = async (selectedCompany: string) => {
-		await swapUserCompany(userId, selectedCompany);
+		await setActiveCompany(userId, selectedCompany);
 	};
 
 	// Join a company
@@ -59,10 +86,10 @@ export const useProfile = () => {
 			);
 			setIsLoading(false);
 
-			if (success) {
-				return success; // Return company ID for handling
-			}
-			return false;
+			// The service returns { companyId, groupId? } or null. The group is
+			// passed through so the screen can say which one they landed in —
+			// a code that silently changes what jobs you can see should say so.
+			return success ?? false;
 		} catch (error) {
 			setIsLoading(false);
 			console.error("Error joining company:", error);
@@ -139,50 +166,37 @@ export const useProfile = () => {
 		return false;
 	};
 
-	// Delete account
-	const deleteAccount = async () => {
+	/*
+	 * Leaves the active company.
+	 *
+	 * v1 deleted the USER DOCUMENT when this was their last company, while
+	 * leaving the Auth account behind — so the next sign-in read `.email` off
+	 * null and crashed, unrecoverably. removeMember marks the membership
+	 * removed and clears the active company; the profile survives.
+	 */
+	const leaveCompany = async () => {
+		if (!companyId) return false;
 		try {
-			await removeUserFromCompany(userData.loggedInCompany, userId);
+			await removeMember(companyId, userId);
 			return true;
 		} catch (error) {
-			console.error("Error deleting account:", error);
+			console.error("Error leaving company:", error);
 			return false;
 		}
 	};
 
-	// Update phone number
+	/*
+	 * ONE write. v1 wrote this field three times: directly to the user
+	 * document, again to a dead Companies/{c}/Employees record, and once more
+	 * through updateUser.
+	 */
 	const updatePhone = async (phone: string): Promise<boolean> => {
-		if (!userId || !companyId) return false;
-
+		if (!userId) return false;
 		try {
-			// Update in user document
-			await db.collection("Users").doc(userId).update({
-				phone: phone,
-			});
-
-			// Update in company employee record if exists
-			const employeeRef = db
-				.collection("Companies")
-				.doc(companyId)
-				.collection("Employees")
-				.doc(userId);
-
-			const employeeDoc = await employeeRef.get();
-
-			if (employeeDoc.exists()) {
-				await employeeRef.update({
-					phone: phone,
-				});
-			}
-
-			// Update local state
-			updateUser(userId, {
-				phone: phone,
-			});
-
+			await updateProfile(userId, { phone });
 			return true;
 		} catch (error) {
-			console.error("Error updating phone number:", error);
+			console.error("Error updating phone:", error);
 			return false;
 		}
 	};
@@ -191,13 +205,14 @@ export const useProfile = () => {
 		isLoading,
 		userData,
 		userId,
+		memberships,
 		updateName,
 		handleCompanyChange,
 		joinCompany,
 		reauthenticate,
 		updateEmail,
 		resetPassword,
-		deleteAccount,
+		leaveCompany,
 		updatePhone,
 	};
 };

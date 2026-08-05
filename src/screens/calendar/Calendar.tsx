@@ -1,58 +1,49 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import moment from "moment";
 import { useUser } from "../../contexts/UserContext";
+import { useCompanyMembers } from "../../hooks/useCompanyMembers";
 import { useBottomSheetController } from "../../hooks/useBottomSheetController";
 import { FilterPanel } from "../../components/calendar/FilterPanel";
 import { FloatingActionButtons } from "../../components/calendar/FloatingActionButtons";
+import Timesheet from "../../components/calendar/Timesheet";
 import LoadingScreen from "../LoadingScreen";
 import { FilterType } from "../../types";
-import Timesheet from "../../components/calendar/Timesheet";
-import { set } from "lodash";
-import { Filter } from "react-native-feather";
+
+/*
+ * Calendar container.
+ *
+ * Structure is unchanged from v1 — same FilterPanel, same floating buttons,
+ * same bottom sheet. What changed underneath is that the worker list comes from
+ * useCompanyMembers (one query) rather than the panel fetching profiles itself,
+ * and the schedule comes from the windowed v2 Timesheet.
+ */
 
 const today = moment().format("YYYY-MM-DD");
 
 const CalendarScreen = ({ navigation }: { navigation: any }) => {
-	// User State
-	const { user, isAdmin, isLoading, settings } = useUser();
+	const { user, isAdmin, isLoading, settings, companyId } = useUser();
+	const { members } = useCompanyMembers(companyId ?? "");
 
-	// Date Selection
-	const [selectedDate, setSelectedDate] = useState<string>(null);
-
-	// Filter Options
+	const [selectedDate, setSelectedDate] = useState<string | null>(null);
 	const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-	const [availableWorkers, setAvailableWorkers] = useState([]);
 	const [openSelect, setOpenSelect] = useState(false);
 	const [showAllSelectedOnly, setShowAllSelectedOnly] = useState(false);
 	const [showExactSelectedOnly, setShowExactSelectedOnly] = useState(false);
 	const [calendarOpen, setCalendarOpen] = useState(false);
 	const [filterType, setFilterType] = useState<FilterType>(FilterType.MY);
 
+	// Non-admins only ever see their own schedule.
 	useEffect(() => {
-		if (isAdmin) {
-			setFilterType(
-				settings?.defaultCalendarFilter
-					? settings.defaultCalendarFilter
-					: FilterType.ALL,
-			);
-		} else {
-			setFilterType(FilterType.MY);
-		}
-	}, [isLoading, isAdmin]);
+		setFilterType(
+			isAdmin
+				? ((settings?.defaultCalendarFilter as FilterType) ??
+						FilterType.ALL)
+				: FilterType.MY,
+		);
+	}, [isAdmin, settings?.defaultCalendarFilter]);
 
-	const handleFilterChange = (type: FilterType) => {
-		if (!isAdmin) return;
-
-		setFilterType(type);
-		if (type === FilterType.SPECIFIC && !selectedUsers.length) {
-			return;
-		}
-		closeBottomSheet();
-	};
-
-	// Bottom Sheet
 	const snapPoints = useMemo(() => ["65%", "90%"], []);
 	const {
 		bottomSheetRef,
@@ -63,27 +54,31 @@ const CalendarScreen = ({ navigation }: { navigation: any }) => {
 		closeBottomSheet,
 	} = useBottomSheetController(snapPoints);
 
+	const handleFilterChange = (type: FilterType) => {
+		if (!isAdmin) return;
+		setFilterType(type);
+		if (type === FilterType.SPECIFIC && !selectedUsers.length) return;
+		closeBottomSheet();
+	};
+
 	const checkSelectOpen = () => {
 		setOpenSelect(!openSelect);
-		if (!openSelect) {
-			bottomSheetRef.current?.snapToIndex(1);
-		}
+		if (!openSelect) bottomSheetRef.current?.snapToIndex(1);
 	};
+
+	// The panel expects {label, value} options. In v1 it had to build these by
+	// fanning out a profile read per member.
+	const availableWorkers = useMemo(
+		() => members.map((m) => ({ label: m.displayName, value: m.userId })),
+		[members],
+	);
 
 	const insets = useSafeAreaInsets();
 
-	if (isLoading || isAdmin === null) {
-		return <LoadingScreen />;
-	}
+	if (isLoading || isAdmin === null) return <LoadingScreen />;
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				paddingTop: insets.top,
-				backgroundColor: "#f2f7f7",
-			}}
-		>
+		<View style={[styles.root, { paddingTop: insets.top }]}>
 			<View style={styles.container}>
 				{user ? (
 					<Timesheet
@@ -112,7 +107,7 @@ const CalendarScreen = ({ navigation }: { navigation: any }) => {
 					selectedUsers={selectedUsers}
 					setSelectedUsers={setSelectedUsers}
 					availableWorkers={availableWorkers}
-					setAvailableWorkers={setAvailableWorkers}
+					setAvailableWorkers={() => {}}
 					openSelect={openSelect}
 					checkSelectOpen={checkSelectOpen}
 					showAllSelectedOnly={showAllSelectedOnly}
@@ -121,7 +116,7 @@ const CalendarScreen = ({ navigation }: { navigation: any }) => {
 					setShowExactSelectedOnly={setShowExactSelectedOnly}
 					setFilterType={setFilterType}
 					isAdmin={isAdmin}
-					companyId={user?.loggedInCompany}
+					companyId={companyId}
 				/>
 			</View>
 
@@ -141,18 +136,8 @@ const CalendarScreen = ({ navigation }: { navigation: any }) => {
 };
 
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-	},
-	calendar: {
-		paddingLeft: 20,
-		paddingRight: 20,
-	},
-	section: {
-		backgroundColor: "#f2f7f7",
-		color: "grey",
-		textTransform: "capitalize",
-	},
+	root: { flex: 1, backgroundColor: "#f2f7f7" },
+	container: { flex: 1 },
 });
 
 export default CalendarScreen;

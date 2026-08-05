@@ -5,14 +5,7 @@ import React, {
 	useState,
 	useRef,
 } from "react";
-import {
-	View,
-	Text,
-	TextInput,
-	TouchableOpacity,
-	StyleSheet,
-	Alert,
-} from "react-native";
+import { View, Text, TextInput, TouchableOpacity, Alert } from "react-native";
 import BottomSheet, {
 	BottomSheetScrollView,
 	BottomSheetTextInput,
@@ -24,13 +17,19 @@ import { format, differenceInSeconds } from "date-fns";
 import { useUser } from "../../contexts/UserContext";
 import CustomFormRender from "./CustomFormRender";
 import { useUploadManager } from "../../contexts/UploadManagerContext";
-import { AttachmentItem } from "../../types";
+import { getConnections } from "../../services/timeEntryEditService";
+import type { SelectableAttachment } from "../ui/AttachmentsSelector";
+import { styles } from "./EditSheet.styles";
+import { FormSchema, TimeEntry } from "../../types";
 
 // Update the interface for component props
 interface EditSheetProps {
 	visible: boolean;
 	snapPoints?: string[];
-	timeEntry?: any;
+	timeEntry?: TimeEntry;
+	/** Resolved from timeEntry.formSchemaIds by the parent. */
+	timeEntrySchema?: FormSchema | null;
+	eventSchema?: FormSchema | null;
 	editNotes: string;
 	editChangeSummary: string;
 	setEditNotes: (value: string) => void;
@@ -46,6 +45,8 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 		{
 			snapPoints = ["85%"],
 			timeEntry,
+			timeEntrySchema = null,
+			eventSchema = null,
 			editNotes,
 			editChangeSummary,
 			setEditNotes,
@@ -69,13 +70,20 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 		const [showInPicker, setShowInPicker] = useState(false);
 		const [showOutPicker, setShowOutPicker] = useState(false);
 		const [formResponses, setFormResponses] = useState<any>({});
-		const { uploadFiles, deleteFiles, uploadProgress } = useUploadManager();
-		const customForm = timeEntry?.generalForm || null;
-		const eventForm = timeEntry?.eventForm || null;
+		const { uploadFiles, deleteAttachments, uploadProgress } =
+			useUploadManager();
+		/*
+		 * Resolved by the parent and passed down. v1 embedded a full copy of
+		 * both schemas on every entry (`generalForm` / `eventForm`); v2 stores
+		 * references, and reading the old names here yielded null, so the edit
+		 * sheet silently rendered no form fields at all.
+		 */
+		const customForm = timeEntrySchema;
+		const eventForm = eventSchema;
 		const { isAdmin } = useUser();
 
 		const [filesToUpload, setFilesToUpload] = useState<{
-			[fieldId: string]: AttachmentItem[];
+			[fieldId: string]: SelectableAttachment[];
 		}>({});
 		const [deletionQueue, setDeletionQueue] = useState<string[]>([]);
 
@@ -103,7 +111,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 			[],
 		);
 
-		const { userId, user } = useUser();
+		const { userId, user, companyId } = useUser();
 
 		// Calculate duration based on clock in/out times
 		const calculateDuration = (): number => {
@@ -121,10 +129,10 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 		useEffect(() => {
 			if (timeEntry) {
 				// Set clock times
-				setClockInDate(new Date(timeEntry.clockInTime));
+				setClockInDate(timeEntry.clockInAt.toDate());
 				setClockOutDate(
-					timeEntry.clockOutTime
-						? new Date(timeEntry.clockOutTime)
+					timeEntry.clockOutAt
+						? timeEntry.clockOutAt.toDate()
 						: new Date(),
 				);
 
@@ -133,33 +141,18 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 					setFormResponses({ ...timeEntry.formResponses });
 				}
 
-				// Initialize local connected events
-				if (
-					timeEntry.connectedEvents &&
-					timeEntry.connectedEvents.length > 0
-				) {
-					setLocalConnectedEvents([...timeEntry.connectedEvents]);
-
-					const eventResponses = {};
-					timeEntry.connectedEvents.forEach((event) => {
-						if (event.formResponses) {
-							eventResponses[event.eventId] = {
-								...event.formResponses,
-							};
-						}
-					});
-					setConnectedEventResponses(eventResponses);
-				} else {
-					setLocalConnectedEvents([]);
-				}
-
-				// Initialize pause duration
-				if (timeEntry.totalPausedSeconds) {
-					const hours = Math.floor(
-						timeEntry.totalPausedSeconds / 3600,
-					);
+				/*
+				 * Initialize pause duration.
+				 *
+				 * Was `totalPausedSeconds`, a v1 field name that reads
+				 * undefined on a current document — so opening the edit sheet
+				 * always showed 0m paused, and saving wrote that zero back
+				 * over the real value.
+				 */
+				if (timeEntry.pausedSeconds) {
+					const hours = Math.floor(timeEntry.pausedSeconds / 3600);
 					const minutes = Math.floor(
-						(timeEntry.totalPausedSeconds % 3600) / 60,
+						(timeEntry.pausedSeconds % 3600) / 60,
 					);
 					setPauseDurationHours(hours.toString());
 					setPauseDurationMinutes(minutes.toString());
@@ -169,6 +162,38 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 				}
 			}
 		}, [timeEntry]);
+
+		/*
+		 * Connections come from a subcollection.
+		 *
+		 * v1 read `timeEntry.connectedEvents`, which is undefined on a v2
+		 * document — so the sheet opened with no connected events and silently
+		 * discarded them on save.
+		 */
+		useEffect(() => {
+			if (!timeEntry?.id) return;
+			let cancelled = false;
+
+			getConnections(timeEntry.id).then((loaded) => {
+				if (cancelled || !loaded.length) return;
+
+				setLocalConnectedEvents(loaded);
+
+				const eventResponses = {};
+				loaded.forEach((event) => {
+					if (event.formResponses) {
+						eventResponses[event.eventId] = {
+							...event.formResponses,
+						};
+					}
+				});
+				setConnectedEventResponses(eventResponses);
+			});
+
+			return () => {
+				cancelled = true;
+			};
+		}, [timeEntry?.id]);
 
 		// Initialize form state when customForm changes
 		useEffect(() => {
@@ -220,8 +245,8 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 			const errors: Record<string, Record<string, string>> = {};
 			let isValid = true;
 
-			if (timeEntry?.connectedEvents && eventForm && eventForm.fields) {
-				timeEntry.connectedEvents.forEach((event) => {
+			if (localConnectedEvents.length && eventForm && eventForm.fields) {
+				localConnectedEvents.forEach((event) => {
 					const eventId = event.eventId;
 					const eventErrors: Record<string, string> = {};
 
@@ -345,13 +370,12 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 				// First process deletions if there are any files in the deletion queue
 				if (deletionQueue.length > 0) {
 					try {
-						await deleteFiles(
-							deletionQueue,
-							user.loggedInCompany,
+						await deleteAttachments(
+							companyId,
+							"timeEntry",
 							timeEntry.id,
-							"TimeEntries",
+							deletionQueue,
 						);
-						console.log(`Deleted ${deletionQueue.length} files`);
 					} catch (deleteError) {
 						console.error("Error deleting files:", deleteError);
 						Alert.alert(
@@ -379,10 +403,20 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 
 						// Upload the files
 						const uploadedFiles = await uploadFiles(
-							filesWithIds,
-							user.loggedInCompany,
+							companyId,
+							"timeEntry",
 							timeEntry.id,
-							"TimeEntries",
+							filesWithIds.map((f) => ({
+								id: f.id,
+								uri: f.displayUri,
+								name: f.fileName,
+								type: f.contentType,
+								size: f.sizeBytes,
+								width: f.width,
+								height: f.height,
+								thumbnailUri: f.thumbnailUri,
+							})),
+							userId,
 						);
 
 						// Update form responses with uploaded file references
@@ -391,16 +425,10 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 								...(formResponses[fieldId] || []),
 							];
 
-							// Replace local files with uploaded versions
-							const updatedFiles = fieldFiles.map((file) => {
-								// Check if this is a file that was just uploaded
-								const uploadedFile = uploadedFiles.find(
-									(u) =>
-										file.uri === u.uri ||
-										(file.id && file.id === u.id),
-								);
-								return uploadedFile || file;
-							});
+							// Answers hold attachment ids, not file objects.
+							const updatedFiles = fieldFiles
+								.map((file) => file.id)
+								.filter((id) => uploadedFiles.includes(id));
 
 							updatedFormResponses[fieldId] = updatedFiles;
 						});
@@ -450,62 +478,46 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 					});
 				}
 
+				/*
+				 * A PATCH plus a separate audit record.
+				 *
+				 * v1 spread `...timeEntry` from client state and appended to an
+				 * `editHistory` array inline — a read-modify-write over an
+				 * unbounded array, in one of three competing shapes, none of
+				 * which the renderer actually read. The `before` snapshot below
+				 * is the shape the edits subcollection stores.
+				 */
 				const updates = {
-					...timeEntry,
-					notes: editNotes,
-					clockInTime: clockInDate.toISOString(),
-					clockOutTime: clockOutDate.toISOString(),
-					duration: duration - pauseDuration,
-					totalPausedSeconds: pauseDuration, // Add this line
-					formResponses: updatedFormResponses,
-					connectedEvents: localConnectedEvents.map((event) => ({
-						...event,
+					patch: {
+						notes: editNotes,
+						clockInAt: clockInDate,
+						clockOutAt: clockOutDate,
+						workedSeconds: duration - pauseDuration,
+						pausedSeconds: pauseDuration,
+						formResponses: updatedFormResponses,
+					},
+					connections: localConnectedEvents.map((event) => ({
+						eventId: event.eventId,
+						title:
+							event.eventTitleSnapshot ?? event.customTitle ?? "",
+						userId: timeEntry.userId,
 						formResponses:
 							connectedEventResponses[event.eventId] || {},
 					})),
-					status: "edited",
-					editHistory: timeEntry.editHistory
-						? [
-								...timeEntry.editHistory,
-								{
-									timestamp: new Date().toISOString(),
-									editor: {
-										userId: userId,
-										displayName:
-											user.firstName +
-											" " +
-											user.lastName,
-									},
-									summary: editChangeSummary,
-									previousClockInTime: timeEntry.clockInTime,
-									previousClockOutTime:
-										timeEntry.clockOutTime,
-									previousDuration: timeEntry.duration,
-									previousNotes: timeEntry.notes,
-									previousFormResponses:
-										timeEntry.formResponses,
-								},
-							]
-						: [
-								{
-									timestamp: new Date().toISOString(),
-									editor: {
-										userId: userId,
-										displayName:
-											user.firstName +
-											" " +
-											user.lastName,
-									},
-									summary: editChangeSummary,
-									previousClockInTime: timeEntry.clockInTime,
-									previousClockOutTime:
-										timeEntry.clockOutTime,
-									previousDuration: timeEntry.duration,
-									previousNotes: timeEntry.notes,
-									previousFormResponses:
-										timeEntry.formResponses,
-								},
-							],
+					edit: {
+						summary: editChangeSummary,
+						actorUserId: userId,
+						actorDisplayName: `${user?.firstName ?? ""} ${
+							user?.lastName ?? ""
+						}`.trim(),
+						before: {
+							clockInAt: timeEntry.clockInAt ?? null,
+							clockOutAt: timeEntry.clockOutAt ?? null,
+							workedSeconds: timeEntry.workedSeconds ?? null,
+							notes: timeEntry.notes ?? null,
+							formResponses: timeEntry.formResponses ?? null,
+						},
+					},
 				};
 
 				// Reset tracking states
@@ -986,319 +998,5 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 
 // Don't forget to add displayName for better debugging
 EditSheet.displayName = "EditSheet";
-
-const styles = StyleSheet.create({
-	sheetBackground: {
-		backgroundColor: "white",
-	},
-	sheetIndicator: {
-		backgroundColor: "#ccc",
-		width: 40,
-		height: 4,
-	},
-	sheetHeader: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		paddingHorizontal: 20,
-		paddingVertical: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: "#eaeaea",
-	},
-	sheetContent: {
-		padding: 20,
-		paddingBottom: 40,
-	},
-	modalTitle: {
-		fontSize: 18,
-		fontWeight: "600",
-		color: "#333",
-		flex: 1,
-		textAlign: "center",
-	},
-	modalForm: {
-		marginBottom: 20,
-	},
-	sectionTitle: {
-		fontSize: 17,
-		fontWeight: "600",
-		color: "#333",
-		marginBottom: 12,
-	},
-	timeSection: {
-		marginBottom: 24,
-		backgroundColor: "#f9f9f9",
-		padding: 16,
-		borderRadius: 12,
-	},
-	notesSection: {
-		marginBottom: 24,
-	},
-	formSection: {
-		marginBottom: 24,
-		backgroundColor: "#f9f9f9",
-		padding: 16,
-		borderRadius: 12,
-	},
-	connectedEventsSection: {
-		marginBottom: 24,
-	},
-	connectedEventCard: {
-		marginBottom: 16,
-		backgroundColor: "#f9f9f9",
-		padding: 16,
-		borderRadius: 12,
-		borderLeftWidth: 3,
-		borderLeftColor: "#007AFF",
-	},
-	connectedEventHeader: {
-		flexDirection: "row",
-		alignItems: "center",
-		marginBottom: 12,
-		paddingBottom: 8,
-		borderBottomWidth: 1,
-		borderBottomColor: "#eee",
-	},
-	connectedEventTitle: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#333",
-		marginLeft: 8,
-	},
-	summarySection: {
-		marginBottom: 16,
-	},
-	summarySubtitle: {
-		fontSize: 14,
-		color: "#666",
-		marginBottom: 8,
-	},
-	timeRow: {
-		marginBottom: 16,
-	},
-	durationRow: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		marginTop: 8,
-		paddingTop: 12,
-		borderTopWidth: 1,
-		borderTopColor: "#eee",
-	},
-	durationText: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#333",
-	},
-	modalLabel: {
-		fontSize: 15,
-		fontWeight: "500",
-		color: "#333",
-		marginBottom: 8,
-	},
-	timePickerButton: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		height: 44,
-		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		backgroundColor: "#fff",
-	},
-	timePickerText: {
-		fontSize: 16,
-		color: "#333",
-	},
-	datePickerButton: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		height: 44,
-		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		backgroundColor: "#fff",
-	},
-	datePickerText: {
-		fontSize: 16,
-		color: "#333",
-	},
-	modalInput: {
-		height: 44,
-		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		fontSize: 16,
-		marginBottom: 16,
-		backgroundColor: "#fff",
-	},
-	modalTextArea: {
-		minHeight: 100,
-		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		paddingTop: 12,
-		paddingBottom: 12,
-		fontSize: 16,
-		textAlignVertical: "top",
-		backgroundColor: "#fff",
-	},
-	formField: {
-		marginBottom: 16,
-	},
-	fieldLabel: {
-		fontSize: 15,
-		fontWeight: "500",
-		color: "#333",
-		marginBottom: 8,
-	},
-	formInput: {
-		height: 44,
-		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		fontSize: 16,
-		backgroundColor: "#fff",
-	},
-	dropdownContainer: {
-		zIndex: 1000,
-		marginBottom: 16,
-	},
-	dropdown: {
-		borderColor: "#ddd",
-		backgroundColor: "#fff",
-	},
-	dropdownList: {
-		borderColor: "#ddd",
-	},
-	requiredMark: {
-		color: "#FF3B30",
-		fontWeight: "bold",
-	},
-	modalButtons: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-	},
-	modalButton: {
-		paddingVertical: 12,
-		borderRadius: 8,
-		alignItems: "center",
-		justifyContent: "center",
-		flex: 1,
-	},
-	modalCancelButton: {
-		backgroundColor: "#f2f2f2",
-		marginRight: 8,
-	},
-	modalSaveButton: {
-		backgroundColor: "#007AFF",
-		marginLeft: 8,
-	},
-	modalCancelButtonText: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#666",
-	},
-	modalSaveButtonText: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#fff",
-	},
-	deleteButtonContainer: {
-		marginTop: 16,
-		alignItems: "center",
-	},
-	deleteButton: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-		backgroundColor: "#FF3B30",
-		paddingVertical: 12,
-		paddingHorizontal: 20,
-		borderRadius: 8,
-	},
-	deleteButtonText: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#fff",
-		marginLeft: 8,
-	},
-	fieldAttachmentContainer: {
-		marginTop: 8,
-		marginBottom: 16,
-		borderWidth: 1,
-		borderColor: "#eee",
-		borderRadius: 8,
-		padding: 12,
-		backgroundColor: "#fff",
-	},
-	eventTitleContainer: {
-		flex: 1,
-		marginLeft: 8,
-	},
-	eventTitleInput: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#333",
-		padding: 0,
-	},
-	deleteEventButton: {
-		padding: 4,
-	},
-	addEventButton: {
-		flexDirection: "row",
-		alignItems: "center",
-		backgroundColor: "#f0f8ff",
-		padding: 12,
-		borderRadius: 8,
-		justifyContent: "center",
-		marginTop: 8,
-	},
-	addEventButtonText: {
-		color: "#007AFF",
-		fontWeight: "600",
-		fontSize: 15,
-		marginLeft: 8,
-	},
-	pauseDurationRow: {
-		marginTop: 12,
-		borderTopWidth: 1,
-		borderTopColor: "#eee",
-		paddingTop: 12,
-	},
-	pauseDurationInputContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-		marginTop: 8,
-	},
-	pauseDurationInputWrapper: {
-		flexDirection: "row",
-		alignItems: "center",
-		marginRight: 16,
-	},
-	pauseDurationInput: {
-		width: 50,
-		height: 44,
-		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		fontSize: 16,
-		backgroundColor: "#fff",
-		textAlign: "center",
-	},
-	pauseDurationUnit: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#333",
-		marginLeft: 8,
-	},
-});
 
 export default EditSheet;

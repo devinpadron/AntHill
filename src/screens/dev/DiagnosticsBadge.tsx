@@ -14,7 +14,7 @@ import { DATABASE_LABEL, IS_PRODUCTION_DB } from "../../constants/database";
  * PROD is deliberately loud. TEST is muted, because that is the safe case and
  * the badge is on screen constantly.
  *
- * DEV-ONLY, ENFORCED HERE. Today it can only render inside the V2_SMOKE_TEST
+ * DEV-ONLY, ENFORCED HERE. Today it can only render inside the DIAGNOSTICS_MODE
  * harness, which is itself `__DEV__ &&` gated — but that is safety by position,
  * and position changes. At cutover the v2 tree moves into the real
  * AppNavigator, and this returning null on its own is what stops it travelling

@@ -10,12 +10,12 @@ import {
 	ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { AttachmentItem } from "../../types";
+import type { SelectableAttachment } from "./AttachmentsSelector";
 import { UploadProgressMap } from "../../contexts/UploadManagerContext";
 
 interface ThumbnailGalleryProps {
-	files: AttachmentItem[];
-	media: AttachmentItem[];
+	files: SelectableAttachment[];
+	media: SelectableAttachment[];
 	deletionQueue: string[];
 	uploadProgress?: UploadProgressMap;
 	onDelete: (id: string, isExisting: boolean) => void;
@@ -125,28 +125,28 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 								isDeleting && styles.deletedItem,
 							]}
 						>
-							{item.type.includes("video") && (
+							{item.contentType.includes("video") && (
 								<Image
 									source={{
 										uri: item.thumbnailUri
 											? item.thumbnailUri
-											: item.thumbnailUrl,
+											: item.thumbnailUri,
 									}}
 									style={styles.mediaThumbnail}
 								/>
 							)}
-							{item.type.includes("image") && (
+							{item.contentType.includes("image") && (
 								<Image
 									source={{
-										uri: item.uri
-											? item.uri
-											: item.downloadUrl,
+										uri: item.displayUri
+											? item.displayUri
+											: item.displayUri,
 									}}
 									style={styles.mediaThumbnail}
 								/>
 							)}
 
-							{item.type.includes("video") && (
+							{item.contentType.includes("video") && (
 								<View style={styles.videoIndicator}>
 									<Ionicons
 										name="play-circle"
@@ -168,7 +168,10 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 								onPress={() =>
 									isDeleting
 										? onRestore(item.id)
-										: onDelete(item.id, item.isExisting)
+										: onDelete(
+												item.id,
+												item.kind === "persisted",
+											)
 								}
 								disabled={!!uploadProgress[item.id]}
 							>
@@ -187,7 +190,7 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 								numberOfLines={1}
 								style={styles.thumbnailName}
 							>
-								{item.name}
+								{item.fileName}
 							</Text>
 						</View>
 					);
@@ -208,7 +211,7 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 						>
 							<View style={styles.fileThumbnail}>
 								<Ionicons
-									name={getFileIcon(item.type)}
+									name={getFileIcon(item.contentType)}
 									size={40}
 									color="#3d7eea"
 								/>
@@ -226,7 +229,10 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 								onPress={() =>
 									isDeleting
 										? onRestore(item.id)
-										: onDelete(item.id, item.isExisting)
+										: onDelete(
+												item.id,
+												item.kind === "persisted",
+											)
 								}
 								disabled={!!uploadProgress[item.id]}
 							>
@@ -245,7 +251,7 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 								numberOfLines={1}
 								style={styles.thumbnailName}
 							>
-								{item.name}
+								{item.fileName}
 							</Text>
 						</View>
 					);

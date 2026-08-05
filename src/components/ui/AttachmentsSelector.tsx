@@ -12,7 +12,28 @@ import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import ThumbnailGallery from "./ThumbnailGallery";
-import { AttachmentItem } from "../../types";
+/*
+ * The picker holds a MIX: files already persisted and files just chosen.
+ *
+ * v1 used one `SelectableAttachment` with an `isExisting` flag, which is why every
+ * consumer needed `downloadUrl || uri` fallbacks. Here `kind` states which it
+ * is, while the display fields are uniform — so rendering never has to ask,
+ * but upload and delete can.
+ */
+import { UploadProgressMap } from "../../contexts/UploadManagerContext";
+
+export type SelectableAttachment = {
+	id: string;
+	kind: "persisted" | "draft";
+	fileName: string;
+	contentType: string;
+	sizeBytes: number;
+	/** downloadUrl for persisted files, local uri for drafts. */
+	displayUri: string;
+	thumbnailUri?: string | null;
+	width?: number;
+	height?: number;
+};
 
 interface AttachmentsSelectorProps {
 	// Content configuration
@@ -20,19 +41,13 @@ interface AttachmentsSelectorProps {
 	showMedia?: boolean;
 
 	// Combined state management
-	attachments: AttachmentItem[];
-	setAttachments: (attachments: AttachmentItem[]) => void;
+	attachments: SelectableAttachment[];
+	setAttachments: (attachments: SelectableAttachment[]) => void;
 
 	// Deletion queue for existing attachments
 	deletionQueue: string[];
 	setDeletionQueue: (ids: string[]) => void;
-	uploadProgress?: {
-		[fileId: string]: {
-			progress: number;
-			status: "pending" | "uploading" | "complete" | "error";
-			error?: string;
-		};
-	};
+	uploadProgress?: UploadProgressMap;
 }
 
 const AttachmentsSelector: React.FC<AttachmentsSelectorProps> = ({
@@ -51,12 +66,14 @@ const AttachmentsSelector: React.FC<AttachmentsSelectorProps> = ({
 	// Filter attachments by type
 	const fileAttachments = attachments.filter(
 		(item) =>
-			!item.type.startsWith("image/") && !item.type.startsWith("video/"),
+			!item.contentType.startsWith("image/") &&
+			!item.contentType.startsWith("video/"),
 	);
 
 	const mediaAttachments = attachments.filter(
 		(item) =>
-			item.type.startsWith("image/") || item.type.startsWith("video/"),
+			item.contentType.startsWith("image/") ||
+			item.contentType.startsWith("video/"),
 	);
 
 	// Request permissions for camera and media library
@@ -106,16 +123,18 @@ const AttachmentsSelector: React.FC<AttachmentsSelectorProps> = ({
 				return;
 			}
 
-			const newFiles = result.assets.map((asset) => ({
-				id: `file-${Date.now()}-${Math.random()
-					.toString(36)
-					.substring(2, 9)}`,
-				uri: asset.uri,
-				name: asset.name || "Unnamed document",
-				type: asset.mimeType || "application/octet-stream",
-				size: asset.size || 0,
-				isExisting: false,
-			}));
+			const newFiles: SelectableAttachment[] = result.assets.map(
+				(asset) => ({
+					id: `file-${Date.now()}-${Math.random()
+						.toString(36)
+						.substring(2, 9)}`,
+					kind: "draft",
+					displayUri: asset.uri,
+					fileName: asset.name || "Unnamed document",
+					contentType: asset.mimeType || "application/octet-stream",
+					sizeBytes: asset.size || 0,
+				}),
+			);
 
 			setAttachments([...attachments, ...newFiles]);
 		} catch (error) {
@@ -159,19 +178,20 @@ const AttachmentsSelector: React.FC<AttachmentsSelectorProps> = ({
 					thumbnailUri = await generateVideoThumbnail(asset.uri);
 				}
 
-				return {
+				const media: SelectableAttachment = {
 					id: `media-${Date.now()}-${Math.random()
 						.toString(36)
 						.substring(2, 9)}`,
-					uri: asset.uri,
-					name: asset.fileName || "Unnamed media",
-					type: isVideo ? "video/mp4" : "image/jpeg",
-					size: asset.fileSize || 0,
+					kind: "draft",
+					displayUri: asset.uri,
+					fileName: asset.fileName || "Unnamed media",
+					contentType: isVideo ? "video/mp4" : "image/jpeg",
+					sizeBytes: asset.fileSize || 0,
 					width: asset.width,
 					height: asset.height,
-					isExisting: false,
-					thumbnailUri: thumbnailUri, // Add the thumbnail URI
+					thumbnailUri,
 				};
+				return media;
 			});
 
 			// Wait for all assets to be processed

@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react"; // Add useRef import
 import {
 	View,
 	Text,
-	StyleSheet,
 	TouchableOpacity,
 	TextInput,
 	FlatList,
@@ -14,31 +13,36 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialIcons";
-import db from "../../../constants/firestore";
 import { useUser } from "../../../contexts/UserContext";
 
 // Define types for our checklist data
-type ChecklistItem = {
-	id: string;
-	text: string;
-};
+/*
+ * The screen used to declare its own Checklist with epoch-millis timestamps.
+ * The shared v2 model uses Timestamps and the service stamps them, so local
+ * createdAt/updatedAt bookkeeping is gone.
+ */
+import type { Checklist, ChecklistItem } from "../../../types";
+import {
+	deleteChecklist as removeChecklist,
+	saveChecklist as writeChecklist,
+	subscribeChecklists,
+} from "../../../services/libraryService";
+import { styles } from "./ChecklistCreator.styles";
 
-type Checklist = {
-	id: string;
-	title: string;
-	items: ChecklistItem[];
-	createdAt: number;
-	updatedAt: number;
-};
+/*
+ * What the editor holds. A draft has no companyId, timestamps or schemaVersion
+ * — those are the service's to set, and a half-built checklist should not be
+ * typed as a persisted one.
+ */
+type ChecklistDraft = Pick<Checklist, "id" | "title" | "items">;
 
 const ChecklistCreator = ({ navigation }) => {
 	const { companyId } = useUser();
 
 	// States for the component
 	const [checklists, setChecklists] = useState<Checklist[]>([]);
-	const [currentChecklist, setCurrentChecklist] = useState<Checklist | null>(
-		null,
-	);
+	const [currentChecklist, setCurrentChecklist] =
+		useState<ChecklistDraft | null>(null);
 	const [newItemText, setNewItemText] = useState("");
 	const [itemInputHeight, setItemInputHeight] = useState(44);
 	const [titleInputHeight, setTitleInputHeight] = useState(44);
@@ -49,47 +53,29 @@ const ChecklistCreator = ({ navigation }) => {
 	// Add ref for the TextInput
 	const itemInputRef = useRef(null);
 
-	// Fetch checklists on component mount
+	/*
+	 * Live subscription. The screen used to re-fetch the whole list after every
+	 * save and delete; the subscription keeps it current on its own, including
+	 * when another admin edits on a different device.
+	 */
 	useEffect(() => {
-		fetchChecklists();
-	}, [companyId]);
-
-	// Fetch checklists from Firestore
-	const fetchChecklists = async () => {
-		if (!companyId) return;
-
-		try {
-			setLoading(true);
-
-			const checklistsSnapshot = await db
-				.collection("Companies")
-				.doc(companyId)
-				.collection("Checklists")
-				.orderBy("updatedAt", "desc")
-				.get();
-
-			const fetchedChecklists = checklistsSnapshot.docs.map((doc) => ({
-				id: doc.id,
-				...doc.data(),
-			})) as Checklist[];
-
-			setChecklists(fetchedChecklists);
-		} catch (error) {
-			console.error("Error fetching checklists:", error);
-			Alert.alert("Error", "Failed to load checklists");
-		} finally {
+		if (!companyId) {
 			setLoading(false);
+			return;
 		}
-	};
+
+		return subscribeChecklists(companyId, (next) => {
+			setChecklists(next);
+			setLoading(false);
+		});
+	}, [companyId]);
 
 	// Create new empty checklist
 	const createNewChecklist = () => {
-		const newChecklist: Checklist = {
+		const newChecklist: ChecklistDraft = {
 			id: "", // Will be assigned by Firestore
 			title: "",
 			items: [],
-			createdAt: Date.now(),
-			updatedAt: Date.now(),
 		};
 
 		setCurrentChecklist(newChecklist);
@@ -104,12 +90,10 @@ const ChecklistCreator = ({ navigation }) => {
 
 	// Duplicate checklist
 	const duplicateChecklist = (checklist: Checklist) => {
-		const duplicatedChecklist: Checklist = {
+		const duplicatedChecklist: ChecklistDraft = {
 			id: "", // Will be assigned by Firestore
 			title: `${checklist.title} (Copy)`,
 			items: [...checklist.items],
-			createdAt: Date.now(),
-			updatedAt: Date.now(),
 		};
 
 		setCurrentChecklist(duplicatedChecklist);
@@ -142,12 +126,7 @@ const ChecklistCreator = ({ navigation }) => {
 		try {
 			setSaving(true);
 
-			await db
-				.collection("Companies")
-				.doc(companyId)
-				.collection("Checklists")
-				.doc(checklistId)
-				.delete();
+			await removeChecklist(checklistId);
 
 			// Update local state
 			setChecklists(
@@ -174,7 +153,6 @@ const ChecklistCreator = ({ navigation }) => {
 		setCurrentChecklist({
 			...currentChecklist,
 			items: [...currentChecklist.items, newItem],
-			updatedAt: Date.now(),
 		});
 
 		setNewItemText("");
@@ -195,7 +173,6 @@ const ChecklistCreator = ({ navigation }) => {
 		setCurrentChecklist({
 			...currentChecklist,
 			items: currentChecklist.items.filter((item) => item.id !== itemId),
-			updatedAt: Date.now(),
 		});
 	};
 
@@ -223,33 +200,23 @@ const ChecklistCreator = ({ navigation }) => {
 			const checklistData = {
 				title: currentChecklist.title,
 				items: currentChecklist.items,
-				createdAt: currentChecklist.createdAt,
-				updatedAt: Date.now(),
 			};
 
 			let checklistId = currentChecklist.id;
 
 			if (checklistId) {
 				// Update existing checklist
-				await db
-					.collection("Companies")
-					.doc(companyId)
-					.collection("Checklists")
-					.doc(checklistId)
-					.update(checklistData);
+				await writeChecklist(companyId, {
+					...checklistData,
+					id: checklistId,
+				});
 			} else {
 				// Create new checklist
-				const docRef = await db
-					.collection("Companies")
-					.doc(companyId)
-					.collection("Checklists")
-					.add(checklistData);
-
-				checklistId = docRef.id;
+				checklistId = await writeChecklist(companyId, checklistData);
 			}
 
 			// Refresh checklist list
-			await fetchChecklists();
+			// list refreshes via the subscription
 
 			Alert.alert("Success", "Checklist saved successfully");
 			setIsEditing(false);
@@ -390,7 +357,6 @@ const ChecklistCreator = ({ navigation }) => {
 									setCurrentChecklist({
 										...currentChecklist!,
 										title: text,
-										updatedAt: Date.now(),
 									})
 								}
 								placeholder="Enter checklist title"
@@ -567,242 +533,5 @@ const ChecklistCreator = ({ navigation }) => {
 		</View>
 	);
 };
-
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: "#f5f5f5",
-	},
-	header: {
-		padding: 15,
-		backgroundColor: "#fff",
-		borderBottomWidth: 1,
-		borderBottomColor: "#e0e0e0",
-	},
-	headerRow: {
-		flexDirection: "row",
-		alignItems: "center",
-	},
-	backButton: {
-		padding: 5,
-		marginRight: 10,
-	},
-	headerTextContainer: {
-		flex: 1,
-	},
-	headerTitle: {
-		fontSize: 24,
-		fontWeight: "bold",
-		color: "#333",
-	},
-	headerSubtitle: {
-		fontSize: 16,
-		color: "#666",
-		marginTop: 5,
-	},
-	loadingContainer: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	loadingText: {
-		marginTop: 10,
-		fontSize: 16,
-		color: "#666",
-	},
-	listContainer: {
-		flex: 1,
-	},
-	listContent: {
-		padding: 15,
-	},
-	emptyContainer: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-		paddingBottom: 100,
-	},
-	emptyText: {
-		fontSize: 18,
-		color: "#666",
-		marginTop: 10,
-	},
-	emptySubtext: {
-		fontSize: 14,
-		color: "#999",
-		marginTop: 5,
-		textAlign: "center",
-	},
-	checklistCard: {
-		backgroundColor: "#fff",
-		borderRadius: 8,
-		padding: 15,
-		marginBottom: 15,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 3,
-		elevation: 2,
-	},
-	checklistHeader: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "flex-start",
-		marginBottom: 10,
-	},
-	checklistTitle: {
-		fontSize: 18,
-		fontWeight: "bold",
-		color: "#333",
-		flex: 1,
-		flexWrap: "wrap",
-	},
-	itemCount: {
-		fontSize: 14,
-		color: "#666",
-		backgroundColor: "#f0f0f0",
-		paddingHorizontal: 8,
-		paddingVertical: 4,
-		borderRadius: 12,
-	},
-	checklistActions: {
-		flexDirection: "row",
-		borderTopWidth: 1,
-		borderTopColor: "#f0f0f0",
-		paddingTop: 10,
-		marginTop: 5,
-	},
-	actionButton: {
-		flex: 1,
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-		padding: 8,
-	},
-	actionText: {
-		marginLeft: 5,
-		fontSize: 14,
-		color: "#333",
-	},
-	footer: {
-		padding: 15,
-		backgroundColor: "#fff",
-		borderTopWidth: 1,
-		borderTopColor: "#e0e0e0",
-	},
-	editorFooter: {
-		padding: 15,
-		backgroundColor: "#fff",
-		borderTopWidth: 1,
-		borderTopColor: "#e0e0e0",
-		flexDirection: "row", // Added to ensure buttons align horizontally
-	},
-	createButton: {
-		backgroundColor: "#4CAF50",
-		borderRadius: 8,
-		padding: 15,
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	createButtonText: {
-		color: "#fff",
-		fontSize: 16,
-		fontWeight: "bold",
-		marginLeft: 8,
-	},
-	editorContainer: {
-		flex: 1,
-		padding: 15,
-	},
-	formGroup: {
-		marginBottom: 20,
-	},
-	label: {
-		fontSize: 16,
-		fontWeight: "bold",
-		color: "#333",
-		marginBottom: 8,
-	},
-	input: {
-		backgroundColor: "#fff",
-		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 8,
-		padding: 12,
-		fontSize: 16,
-		minHeight: 44,
-	},
-	itemInputContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-	},
-	itemInput: {
-		flex: 1,
-		backgroundColor: "#fff",
-		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 8,
-		padding: 12,
-		fontSize: 16,
-		minHeight: 44,
-	},
-	addButton: {
-		padding: 8,
-		marginLeft: 8,
-	},
-	itemsList: {
-		marginTop: 10,
-		marginBottom: 20,
-	},
-	itemContainer: {
-		backgroundColor: "#fff",
-		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 8,
-		padding: 12,
-		marginBottom: 10,
-		flexDirection: "row",
-		alignItems: "center",
-	},
-	itemText: {
-		flex: 1,
-		fontSize: 16,
-		color: "#333",
-		flexWrap: "wrap",
-	},
-	removeButton: {
-		padding: 5,
-	},
-	saveButton: {
-		flex: 2,
-		backgroundColor: "#2196F3",
-		borderRadius: 8,
-		padding: 15,
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	saveButtonText: {
-		color: "#fff",
-		fontSize: 16,
-		fontWeight: "bold",
-	},
-	cancelButton: {
-		flex: 1,
-		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 8,
-		padding: 15,
-		alignItems: "center",
-		justifyContent: "center",
-		marginRight: 10,
-		backgroundColor: "#f5f5f5", // Added for better visibility
-	},
-	cancelButtonText: {
-		color: "#333", // Darkened for better contrast
-		fontSize: 16,
-		fontWeight: "500", // Added for better visibility
-	},
-});
 
 export default ChecklistCreator;

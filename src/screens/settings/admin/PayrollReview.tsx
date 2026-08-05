@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from "react";
 import {
 	View,
 	Text,
-	StyleSheet,
 	FlatList,
 	SafeAreaView,
 	ActivityIndicator,
@@ -20,12 +19,13 @@ import {
 } from "date-fns";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { useUser } from "../../../contexts/UserContext";
-import { subscribeAllTimeEntries } from "../../../services/timeEntryService";
-import { getUser } from "../../../services/userService";
+import { subscribeTimeEntries } from "../../../services/timeEntryService";
+import { useCompanyMembers } from "../../../hooks/useCompanyMembers";
 import DatePicker from "react-native-date-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useCompany } from "../../../contexts/CompanyContext";
 import { TimeEntry } from "../../../types";
+import { styles } from "./PayrollReview.styles";
 
 const PayrollReview = ({ navigation }) => {
 	// UI state
@@ -51,81 +51,68 @@ const PayrollReview = ({ navigation }) => {
 		return endOfWeek(new Date(), { weekStartsOn });
 	});
 
-	// Fetch time entries when screen comes into focus
+	// Names come off the membership records, in one query.
+	const { byUserId: membersById } = useCompanyMembers(companyId ?? "");
+
+	/*
+	 * Live, bounded, server-filtered.
+	 *
+	 * v1 subscribed with an `await` on a helper that returned a Promise rather
+	 * than an unsubscribe function, so the listener was never torn down — a new
+	 * one leaked on every date-range change. It then fanned out a getUser() per
+	 * distinct employee in the period.
+	 */
 	useEffect(() => {
-		setIsLoading(true);
-		// This will execute when the screen comes into focus
-		const subData = async () => {
-			await subscribeAllTimeEntries(
-				null, // No specific userId, get all employees
-				companyId,
-				(snapshot) => {
-					const entries: any = snapshot.docs.map((doc) => ({
-						id: doc.id,
-						...doc.data(),
-					}));
-					fetchTimeEntries(entries);
-				},
-				startDate.toISOString(),
-				endDate.toISOString(),
-			);
-		};
-		subData();
-		return () => {
-			// Optional cleanup function
-		};
-	}, [startDate, endDate, companyId]);
-
-	// Fetch time entries for the selected date range
-	const fetchTimeEntries = async (entries: TimeEntry[]) => {
 		if (!companyId) return;
+		setIsLoading(true);
 
-		try {
-			// Get user details for each unique userId
-			const userIds = Array.from(
-				new Set(entries.map((entry) => entry.userId)),
-			);
-			const userPromises = userIds.map((id) => getUser(id));
-			const users = await Promise.all(userPromises);
-
-			// Create userId -> userDetails map
-			const userMap = {};
-			users.forEach((user) => {
-				if (user) userMap[user.id] = user;
-			});
-
-			// Enrich entries with user details
-			const enrichedEntries = entries.map((entry) => ({
-				...entry,
-				userDetails: userMap[entry.userId] || {
-					firstName: "Unknown",
-					lastName: "Employee",
-					email: "",
-					id: entry.userId,
-					companies: [],
-					loggedInCompany: "",
-				},
-			}));
-
-			setTimeEntries(enrichedEntries);
-
-			// Auto-expand sections if there are only a few employees
-			const uniqueEmployees = Array.from(
-				new Set(enrichedEntries.map((entry) => entry.userId)),
-			);
-			if (uniqueEmployees.length <= 3) {
-				const expanded = {};
-				uniqueEmployees.forEach((id) => {
-					expanded[id] = true;
+		return subscribeTimeEntries(
+			companyId,
+			{
+				from: format(startDate, "yyyy-MM-dd"),
+				to: format(endDate, "yyyy-MM-dd"),
+				limit: 500,
+			},
+			(entries) => {
+				const enriched = entries.map((entry) => {
+					const member = membersById[entry.userId];
+					return {
+						...entry,
+						userDetails: member
+							? {
+									id: member.userId,
+									firstName: member.firstName,
+									lastName: member.lastName,
+									email: member.email,
+								}
+							: {
+									id: entry.userId,
+									// A removed member still has entries in the
+									// period; naming them honestly beats
+									// "Unknown Employee".
+									firstName: "Former",
+									lastName: "member",
+									email: "",
+								},
+					};
 				});
-				setExpandedEmployees(expanded);
-			}
-		} catch (error) {
-			console.error("Error fetching time entries:", error);
-		} finally {
-			setIsLoading(false);
-		}
-	};
+
+				setTimeEntries(enriched);
+
+				const employeeIds = Array.from(
+					new Set(enriched.map((e) => e.userId)),
+				);
+				if (employeeIds.length <= 3) {
+					const expanded = {};
+					employeeIds.forEach((id) => {
+						expanded[id] = true;
+					});
+					setExpandedEmployees(expanded);
+				}
+				setIsLoading(false);
+			},
+		);
+	}, [startDate, endDate, companyId, membersById]);
 
 	// Group time entries by employee
 	const entriesByEmployee = useMemo(() => {
@@ -133,7 +120,7 @@ const PayrollReview = ({ navigation }) => {
 			userId: string;
 			displayName: string;
 			email: string;
-			entries: any[];
+			entries: TimeEntry[];
 		}
 
 		const grouped: Record<string, EmployeeGroup> = {};
@@ -226,7 +213,7 @@ const PayrollReview = ({ navigation }) => {
 	// Calculate total hours for an employee
 	const getTotalHours = (entries) => {
 		const totalSeconds = entries.reduce((sum, entry) => {
-			return sum + (entry.duration || 0);
+			return sum + (entry.workedSeconds || 0);
 		}, 0);
 
 		const hours = Math.floor(totalSeconds / 3600);
@@ -237,7 +224,7 @@ const PayrollReview = ({ navigation }) => {
 	// Calculate grand total for all displayed entries
 	const grandTotal = useMemo(() => {
 		const totalSeconds = timeEntries.reduce((sum, entry) => {
-			return sum + (entry.duration || 0);
+			return sum + (entry.workedSeconds || 0);
 		}, 0);
 
 		const hours = Math.floor(totalSeconds / 3600);
@@ -258,7 +245,7 @@ const PayrollReview = ({ navigation }) => {
 
 	// Render individual time entry item
 	const renderTimeEntryItem = ({ item }) => {
-		const entryDate = parseISO(item.clockInTime);
+		const entryDate = item.clockInAt.toDate();
 
 		return (
 			<TouchableOpacity
@@ -270,7 +257,7 @@ const PayrollReview = ({ navigation }) => {
 						{format(entryDate, "EEE, MMM d")}
 					</Text>
 					<Text style={styles.timeEntryDuration}>
-						{formatDuration(item.duration)}
+						{formatDuration(item.workedSeconds)}
 					</Text>
 				</View>
 
@@ -292,8 +279,8 @@ const PayrollReview = ({ navigation }) => {
 					<View style={styles.timeColumn}>
 						<Text style={styles.timeLabel}>Clock Out</Text>
 						<Text style={styles.timeValue}>
-							{item.clockOutTime
-								? format(parseISO(item.clockOutTime), "h:mm a")
+							{item.clockOutAt
+								? format(item.clockOutAt.toDate(), "h:mm a")
 								: "--:--"}
 						</Text>
 					</View>
@@ -598,291 +585,5 @@ const PayrollReview = ({ navigation }) => {
 		</SafeAreaView>
 	);
 };
-
-const styles = StyleSheet.create({
-	backButton: {
-		position: "absolute",
-		left: 20,
-		zIndex: 1,
-	},
-	container: {
-		flex: 1,
-		backgroundColor: "white",
-	},
-	header: {
-		paddingHorizontal: 16,
-		paddingVertical: 16,
-		backgroundColor: "white",
-		borderBottomWidth: 1,
-		borderBottomColor: "#eaeaea",
-		//flexDirection: "row",
-		justifyContent: "center",
-	},
-	headerTitle: {
-		fontSize: 20,
-		fontWeight: "600",
-		color: "#333",
-		textAlign: "center",
-	},
-	dateSelector: {
-		backgroundColor: "white",
-		paddingHorizontal: 16,
-		paddingBottom: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: "#eaeaea",
-	},
-	dateControls: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		paddingVertical: 8,
-	},
-	dateNavButton: {
-		padding: 8,
-	},
-	currentWeekButton: {
-		paddingVertical: 6,
-		paddingHorizontal: 12,
-		backgroundColor: "#f0f7ff",
-		borderRadius: 16,
-	},
-	currentWeekText: {
-		color: "#007AFF",
-		fontWeight: "500",
-	},
-	dateRange: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-		marginTop: 8,
-	},
-	dateButton: {
-		flexDirection: "row",
-		alignItems: "center",
-		padding: 8,
-		backgroundColor: "#f2f2f2",
-		borderRadius: 8,
-	},
-	calendarIcon: {
-		marginRight: 6,
-	},
-	dateText: {
-		fontSize: 14,
-		color: "#333",
-	},
-	dateRangeSeparator: {
-		marginHorizontal: 8,
-		color: "#666",
-	},
-	totalCard: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		backgroundColor: "white",
-		padding: 16,
-		marginVertical: 8,
-		marginHorizontal: 16,
-		borderRadius: 8,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 2,
-		elevation: 2,
-	},
-	totalLabel: {
-		fontSize: 16,
-		fontWeight: "500",
-		color: "#333",
-	},
-	totalHours: {
-		fontSize: 18,
-		fontWeight: "700",
-		color: "#007AFF",
-	},
-	content: {
-		flex: 1,
-		padding: 16,
-	},
-	loadingContainer: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	loadingText: {
-		marginTop: 12,
-		fontSize: 16,
-		color: "#666",
-	},
-	emptyContainer: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-		paddingTop: 60,
-	},
-	emptyText: {
-		marginTop: 12,
-		fontSize: 16,
-		color: "#666",
-		textAlign: "center",
-	},
-	employeeSection: {
-		backgroundColor: "white",
-		borderRadius: 8,
-		marginBottom: 16,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 2,
-		elevation: 2,
-		overflow: "hidden",
-	},
-	employeeHeader: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		padding: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: "#eaeaea",
-	},
-	employeeHeaderMain: {
-		flex: 1,
-		flexDirection: "row",
-		alignItems: "center", // Center items vertically
-	},
-	employeeInfo: {
-		flexDirection: "row",
-		alignItems: "center",
-		flex: 1, // Add flex to make it take available space
-		marginRight: 8, // Add margin to prevent overlap
-	},
-	collapseButton: {
-		paddingLeft: 16,
-		alignItems: "center",
-		justifyContent: "center",
-		flexShrink: 0, // Prevent button from shrinking
-	},
-	employeeAvatar: {
-		width: 40,
-		height: 40,
-		borderRadius: 20,
-		backgroundColor: "#007AFF",
-		justifyContent: "center",
-		alignItems: "center",
-		marginRight: 12,
-		flexShrink: 0, // Prevent avatar from shrinking
-	},
-	avatarText: {
-		color: "white",
-		fontWeight: "600",
-		fontSize: 18,
-	},
-	avatarImage: {
-		width: 40,
-		height: 40,
-		borderRadius: 20,
-	},
-	employeeTextContainer: {
-		flex: 1,
-		marginRight: 8,
-		justifyContent: "center",
-		// Add these debugging styles to see container boundaries
-		// backgroundColor: '#f0f0f0', // Uncomment to debug layout
-		minWidth: 10, // Ensure container has minimum width
-	},
-	employeeName: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#333", // Make sure color contrasts with background
-		marginBottom: 2,
-		marginRight: 0,
-		opacity: 1,
-		includeFontPadding: false, // Fix Android text rendering
-	},
-	employeeEmail: {
-		fontSize: 12,
-		color: "#666",
-		// Add these to ensure text is visible
-		opacity: 1,
-		includeFontPadding: false, // Fix Android text rendering
-	},
-	employeeHeaderRight: {
-		flexDirection: "row",
-		alignItems: "center",
-	},
-	employeeHours: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#007AFF",
-		marginLeft: 8,
-		flexShrink: 0, // Prevent hours from shrinking
-	},
-	approvedBadge: {
-		width: 24,
-		height: 24,
-		borderRadius: 12,
-		backgroundColor: "#4CAF50",
-		justifyContent: "center",
-		alignItems: "center",
-		marginLeft: 8,
-	},
-	entriesContainer: {
-		paddingHorizontal: 12,
-		paddingVertical: 8,
-	},
-	timeEntryItem: {
-		padding: 12,
-		borderBottomWidth: 1,
-		borderBottomColor: "#eaeaea",
-	},
-	timeEntryHeader: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		marginBottom: 8,
-	},
-	timeEntryDate: {
-		fontSize: 14,
-		fontWeight: "500",
-		color: "#333",
-	},
-	timeEntryDuration: {
-		fontSize: 14,
-		fontWeight: "600",
-		color: "#007AFF",
-	},
-	timeEntryDetails: {
-		flexDirection: "row",
-		alignItems: "center",
-		flexWrap: "nowrap", // Ensure row doesn't wrap
-		width: "100%", // Ensure it takes full width
-	},
-	timeColumn: {
-		marginRight: 12,
-		flexShrink: 0, // Prevent time columns from shrinking
-	},
-	timeLabel: {
-		fontSize: 12,
-		color: "#666",
-	},
-	timeValue: {
-		fontSize: 14,
-		color: "#333",
-	},
-	arrow: {
-		marginHorizontal: 4,
-		flexShrink: 0, // Prevent arrow from shrinking
-	},
-	statusBadge: {
-		paddingVertical: 4,
-		paddingHorizontal: 8,
-		borderRadius: 12,
-		// Removed marginLeft: "auto" and replaced with flex layout
-		flexShrink: 0, // Prevent badge from shrinking
-	},
-	statusText: {
-		fontSize: 12,
-		fontWeight: "500",
-		color: "white",
-	},
-});
 
 export default PayrollReview;

@@ -4,8 +4,8 @@ import { format } from "date-fns";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import AttachmentGallery from "../ui/AttachmentGallery";
 import { calculateMultipliedValue } from "../../utils/timeUtils";
-import db from "../../constants/firestore";
 import { useUser } from "../../contexts/UserContext";
+import { getChecklistsByIds } from "../../services/libraryService";
 
 const FormFieldValue = ({ field, response, attachments = [] }) => {
 	const { companyId } = useUser();
@@ -14,39 +14,26 @@ const FormFieldValue = ({ field, response, attachments = [] }) => {
 	useEffect(() => {
 		const loadChecklistItems = async () => {
 			if (field?.type !== "checklist") return;
-			// Prefer field.options if present (legacy), else fetch from Firestore using checklistId
-			if (Array.isArray(field?.options) && field.options.length > 0) {
-				setChecklistItems(field.options);
-				return;
-			}
 			if (!companyId || !field?.checklistId) return;
-			try {
-				const snap = await db
-					.collection("Companies")
-					.doc(companyId)
-					.collection("Checklists")
-					.doc(field.checklistId)
-					.get();
-				const data =
-					typeof snap?.data === "function" ? snap.data() : undefined;
-				const rawItems = Array.isArray(data?.items)
-					? (data.items as any[])
-					: [];
-				const items = rawItems
-					.map((it: any) => (typeof it === "string" ? it : it?.text))
-					.filter(
-						(t: any) =>
-							typeof t === "string" && t.trim().length > 0,
-					);
-				setChecklistItems(items);
-			} catch (e) {
-				setChecklistItems([]);
-				console.warn(
-					"Failed to load checklist items for details view:",
-					e,
-				);
-			}
+
+			/*
+			 * v1 preferred a legacy inline `field.options` and fell back to a
+			 * Firestore read. v2 has no inline options — the migration turned
+			 * every one into a real checklist document and rewrote the field to
+			 * a checklistId — so there is a single path here.
+			 */
+			const byId = await getChecklistsByIds(companyId, [
+				field.checklistId,
+			]);
+			const checklist = byId[field.checklistId];
+
+			setChecklistItems(
+				(checklist?.items ?? [])
+					.map((item) => item.text)
+					.filter((text) => text && text.trim().length > 0),
+			);
 		};
+
 		loadChecklistItems();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [companyId, field?.checklistId]);

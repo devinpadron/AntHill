@@ -2,18 +2,95 @@ import RNFS from "react-native-fs";
 import { Share, Platform } from "react-native";
 import { format } from "date-fns";
 import RNHTMLtoPDF from "react-native-html-to-pdf";
-import { getCompanyById } from "./companyService";
+import { getCompany } from "./companyService";
+import { getConnections } from "./timeEntryEditService";
+import { getSchema } from "./formSchemaService";
 import { formatDuration } from "../utils/timeUtils";
+import { FormField, FormResponses, TimeEntry } from "../types";
+
+/*
+ * A time entry flattened into everything an export row needs.
+ *
+ * This file renders v1's denormalized shape: entries that carried their clock
+ * times as ISO strings, a `duration` in seconds, an inline `connectedEvents`
+ * array, and a full embedded copy of both form schemas. v2 stores none of that
+ * on the entry — times are Timestamps, `duration` is `workedSeconds`,
+ * connections are their own subcollection, and schemas are references.
+ *
+ * Normalizing once here, rather than reworking ~400 lines of CSV and HTML
+ * templating, keeps the schema knowledge in a single function and the output
+ * byte-identical.
+ */
+type ExportConnection = {
+	id: string;
+	title: string;
+	formResponses: FormResponses;
+};
+
+type ExportRow = {
+	clockInAt: Date;
+	clockOutAt: Date | null;
+	workedSeconds: number;
+	status: string;
+	notes: string;
+	formResponses: FormResponses;
+	timeEntryFields: FormField[];
+	eventFields: FormField[];
+	connections: ExportConnection[];
+};
+
+/**
+ * Resolves the connections and form schemas each entry references.
+ *
+ * getSchema memoizes, so entries sharing a schema — the normal case, since a
+ * schema is only republished when someone edits the form — cost one read.
+ */
+const buildExportRows = async (entries: TimeEntry[]): Promise<ExportRow[]> =>
+	Promise.all(
+		(entries ?? []).map(async (entry) => {
+			const [connections, timeEntrySchema, eventSchema] =
+				await Promise.all([
+					getConnections(entry.id),
+					entry.formSchemaIds?.timeEntry
+						? getSchema(entry.formSchemaIds.timeEntry)
+						: null,
+					entry.formSchemaIds?.event
+						? getSchema(entry.formSchemaIds.event)
+						: null,
+				]);
+
+			return {
+				clockInAt: entry.clockInAt.toDate(),
+				clockOutAt: entry.clockOutAt?.toDate() ?? null,
+				workedSeconds: entry.workedSeconds ?? 0,
+				status: entry.status || "N/A",
+				notes: entry.notes || "",
+				formResponses: entry.formResponses ?? {},
+				timeEntryFields: timeEntrySchema?.fields ?? [],
+				eventFields: eventSchema?.fields ?? [],
+				connections: connections.map((connection) => ({
+					id: connection.id,
+					title:
+						connection.customTitle ||
+						connection.eventTitleSnapshot ||
+						"Event",
+					formResponses: connection.formResponses ?? {},
+				})),
+			};
+		}),
+	);
 
 /**
  * Export time entries to CSV format
  */
 export const exportTimeEntriesToCSV = async (
-	timeEntries: any[],
+	timeEntries: TimeEntry[],
 	fileName: string,
 	isExcel = false,
 ): Promise<string> => {
 	try {
+		const rows = await buildExportRows(timeEntries);
+
 		// Create headers for main time entry
 		let headers = [
 			"Date",
@@ -30,31 +107,21 @@ export const exportTimeEntriesToCSV = async (
 		const eventFormFields = new Map();
 
 		// Process all entries to collect unique form fields
-		timeEntries.forEach((entry) => {
-			// Process main entry form fields
-			if (entry.generalForm && entry.generalForm.fields) {
-				entry.generalForm.fields.forEach((field) => {
-					mainFormFields.set(field.id, field);
-				});
-			}
+		rows.forEach((entry) => {
+			entry.timeEntryFields.forEach((field) => {
+				mainFormFields.set(field.id, field);
+			});
 
-			// Process connected events form fields
-			if (entry.connectedEvents && entry.connectedEvents.length > 0) {
-				entry.connectedEvents.forEach((connEvent) => {
-					if (entry.eventForm && entry.eventForm.fields) {
-						entry.eventForm.fields.forEach((field) => {
-							eventFormFields.set(
-								`${connEvent.eventId}_${field.id}`,
-								{
-									...field,
-									eventId: connEvent.eventId,
-									eventTitle: connEvent.eventTitle || "Event",
-								},
-							);
-						});
-					}
+			// One column per (connection, field) pair, as before.
+			entry.connections.forEach((connection) => {
+				entry.eventFields.forEach((field) => {
+					eventFormFields.set(`${connection.id}_${field.id}`, {
+						...field,
+						connectionId: connection.id,
+						eventTitle: connection.title,
+					});
 				});
-			}
+			});
 		});
 
 		// Add main form field headers
@@ -71,20 +138,14 @@ export const exportTimeEntriesToCSV = async (
 		let csvContent = headers.join(",") + "\n";
 
 		// Add data rows
-		timeEntries.forEach((entry) => {
-			const clockInDate = format(
-				new Date(entry.clockInTime),
-				"yyyy-MM-dd",
-			);
-			const clockInTime = format(new Date(entry.clockInTime), "HH:mm:ss");
-			const clockOutTime = entry.clockOutTime
-				? format(new Date(entry.clockOutTime), "HH:mm:ss")
+		rows.forEach((entry) => {
+			const clockInDate = format(entry.clockInAt, "yyyy-MM-dd");
+			const clockInTime = format(entry.clockInAt, "HH:mm:ss");
+			const clockOutTime = entry.clockOutAt
+				? format(entry.clockOutAt, "HH:mm:ss")
 				: "N/A";
-			const duration = formatDuration(entry.duration || 0);
-			const durationHrs = entry.duration
-				? (entry.duration / 3600).toFixed(2)
-				: "0.00";
-			const status = entry.status || "N/A";
+			const duration = formatDuration(entry.workedSeconds);
+			const durationHrs = (entry.workedSeconds / 3600).toFixed(2);
 			const notes = (entry.notes || "N/A")
 				.replace(/,/g, ";")
 				.replace(/\n/g, " "); // Escape commas and newlines
@@ -96,48 +157,39 @@ export const exportTimeEntriesToCSV = async (
 				clockOutTime,
 				duration,
 				durationHrs,
-				status,
+				entry.status,
 				notes,
 			];
 
 			// Add main form responses
 			Array.from(mainFormFields.values()).forEach((field) => {
-				let value = "N/A";
-
-				if (
-					entry.formResponses &&
-					entry.formResponses[field.id] !== undefined
-				) {
-					const response = entry.formResponses[field.id];
-					value = formatFieldValue(response, field.type);
-				}
-
-				row.push(value);
+				const response = entry.formResponses[field.id];
+				row.push(
+					response === undefined
+						? "N/A"
+						: formatFieldValue(response, field.type),
+				);
 			});
 
 			// Add connected event form responses
 			Array.from(eventFormFields.values()).forEach((field) => {
-				let value = "N/A";
-
-				// Find the matching connected event
-				if (entry.connectedEvents && entry.connectedEvents.length > 0) {
-					const connEvent = entry.connectedEvents.find(
-						(e) => e.eventId === field.eventId,
-					);
-
-					if (
-						connEvent &&
-						connEvent.formResponses &&
-						connEvent.formResponses[field.id.split("_")[1]] !==
-							undefined
-					) {
-						const response =
-							connEvent.formResponses[field.id.split("_")[1]];
-						value = formatFieldValue(response, field.type);
-					}
-				}
-
-				row.push(value);
+				const connection = entry.connections.find(
+					(c) => c.id === field.connectionId,
+				);
+				/*
+				 * Keyed on the plain field id. This used to read
+				 * `formResponses[field.id.split("_")[1]]`, but the map VALUE
+				 * spreads the original field, so `field.id` was never the
+				 * composite key — for any field id without an underscore the
+				 * lookup was `formResponses[undefined]`, and every connected
+				 * event column exported "N/A".
+				 */
+				const response = connection?.formResponses[field.id];
+				row.push(
+					response === undefined
+						? "N/A"
+						: formatFieldValue(response, field.type),
+				);
 			});
 
 			// Add row to CSV content
@@ -189,14 +241,17 @@ const formatFieldValue = (response, fieldType) => {
  * Export time entries to PDF format
  */
 export const exportTimeEntriesToPDF = async (
-	timeEntries: any[],
+	timeEntries: TimeEntry[],
 	employeeUser: any,
 	companyId: string,
 	fileName: string,
 ): Promise<string> => {
 	try {
-		// Get company information for header
-		const company = await getCompanyById(companyId);
+		const rows = await buildExportRows(timeEntries);
+
+		// Header company name. Null when the company is unreadable, which the
+		// template below falls back on rather than failing the whole export.
+		const company = await getCompany(companyId);
 
 		// Start building HTML content with styles (keep existing styles)
 		let htmlContent = `
@@ -332,33 +387,25 @@ export const exportTimeEntriesToPDF = async (
             </div>
             <div class="summary-row">
               <span class="summary-label">Total Entries:</span>
-              <span>${timeEntries.length}</span>
+              <span>${rows.length}</span>
             </div>
             <div class="summary-row">
               <span class="summary-label">Total Hours:</span>
               <span>${(
-					timeEntries.reduce(
-						(sum, entry) => sum + (entry.duration || 0),
-						0,
-					) / 3600
+					rows.reduce((sum, entry) => sum + entry.workedSeconds, 0) /
+					3600
 				).toFixed(2)}</span>
             </div>
             <div class="summary-row">
               <span class="summary-label">Date Range:</span>
               <span>
                 ${
-					timeEntries.length > 0
-						? format(
-								new Date(timeEntries[0].clockInTime),
-								"MMM d, yyyy",
-							) +
-							(timeEntries.length > 1
+					rows.length > 0
+						? format(rows[0].clockInAt, "MMM d, yyyy") +
+							(rows.length > 1
 								? " to " +
 									format(
-										new Date(
-											timeEntries[timeEntries.length - 1]
-												.clockInTime,
-										),
+										rows[rows.length - 1].clockInAt,
 										"MMM d, yyyy",
 									)
 								: "")
@@ -372,20 +419,15 @@ export const exportTimeEntriesToPDF = async (
 		// Add time entry details
 		htmlContent += `<h3>Time Entry Details</h3>`;
 
-		timeEntries.forEach((entry) => {
-			const clockInDate = format(
-				new Date(entry.clockInTime),
-				"EEE, MMM d, yyyy",
-			);
-			const clockInTime = format(new Date(entry.clockInTime), "h:mm a");
-			const clockOutTime = entry.clockOutTime
-				? format(new Date(entry.clockOutTime), "h:mm a")
+		rows.forEach((entry) => {
+			const clockInDate = format(entry.clockInAt, "EEE, MMM d, yyyy");
+			const clockInTime = format(entry.clockInAt, "h:mm a");
+			const clockOutTime = entry.clockOutAt
+				? format(entry.clockOutAt, "h:mm a")
 				: "N/A";
-			const duration = formatDuration(entry.duration || 0);
-			const durationHrs = entry.duration
-				? (entry.duration / 3600).toFixed(2)
-				: "0.00";
-			const status = entry.status || "N/A";
+			const duration = formatDuration(entry.workedSeconds);
+			const durationHrs = (entry.workedSeconds / 3600).toFixed(2);
+			const status = entry.status;
 
 			htmlContent += `
         <div class="entry-card">
@@ -423,14 +465,10 @@ export const exportTimeEntriesToPDF = async (
 			}
 
 			// Add form responses if available
-			if (
-				entry.generalForm &&
-				entry.generalForm.fields &&
-				entry.formResponses
-			) {
+			if (entry.timeEntryFields.length > 0) {
 				htmlContent += `<div class="responses-section"><h4>Time Entry Form Responses</h4>`;
 
-				entry.generalForm.fields.forEach((field) => {
+				entry.timeEntryFields.forEach((field) => {
 					if (entry.formResponses[field.id] !== undefined) {
 						const response = entry.formResponses[field.id];
 						let displayValue = formatPDFFieldValue(response, field);
@@ -448,27 +486,23 @@ export const exportTimeEntriesToPDF = async (
 			}
 
 			// Add connected events if available
-			if (entry.connectedEvents && entry.connectedEvents.length > 0) {
+			if (entry.connections.length > 0) {
 				htmlContent += `<div class="connected-events"><h4>Connected Events</h4>`;
 
-				entry.connectedEvents.forEach((connEvent) => {
+				entry.connections.forEach((connection) => {
 					htmlContent += `
-            <div class="event-title">${connEvent.eventTitle || "Event"}</div>
+            <div class="event-title">${connection.title}</div>
             <div class="event-details">
           `;
 
 					// Add event form responses if available
-					if (
-						entry.eventForm &&
-						entry.eventForm.fields &&
-						connEvent.formResponses
-					) {
-						entry.eventForm.fields.forEach((field) => {
+					if (entry.eventFields.length > 0) {
+						entry.eventFields.forEach((field) => {
 							if (
-								connEvent.formResponses[field.id] !== undefined
+								connection.formResponses[field.id] !== undefined
 							) {
 								const response =
-									connEvent.formResponses[field.id];
+									connection.formResponses[field.id];
 								let displayValue = formatPDFFieldValue(
 									response,
 									field,
@@ -581,15 +615,7 @@ export const shareFile = async (filePath: string): Promise<void> => {
 			},
 		);
 
-		if (result.action === Share.sharedAction) {
-			if (result.activityType) {
-				console.log(`Shared via ${result.activityType}`);
-			} else {
-				console.log("Shared successfully");
-			}
-		} else if (result.action === Share.dismissedAction) {
-			console.log("Share was dismissed");
-		}
+		// Sharing and dismissing are both normal outcomes; nothing to report.
 	} catch (error) {
 		console.error("Error sharing file:", error);
 		throw error;

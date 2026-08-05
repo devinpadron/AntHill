@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
 	View,
 	Text,
-	StyleSheet,
 	FlatList,
 	TouchableOpacity,
 	SafeAreaView,
@@ -17,23 +16,9 @@ import {
 	Switch,
 	Dimensions,
 } from "react-native";
-import { useUser } from "../../contexts/UserContext";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
-import {
-	confirmEvent,
-	declineEvent,
-	fetchUnassignedUpcomingEvents,
-	undeclineEvent,
-	getWorkerStatusList,
-} from "../../services/availabilityService";
-import {
-	updateCompanyPreferences,
-	getCompanyPreferences,
-} from "../../services/companyService";
-import { fetchUpcomingEventsForUser } from "../../services/availabilityService"; // Add this import
-import { getAllUsersInCompany } from "../../services/companyService"; // Import the new service
-import { User } from "../../types";
+import { useAvailability } from "../../hooks/useAvailability";
+import { styles } from "./AvailabilityPage.styles";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -75,188 +60,29 @@ const TabIndicator = ({ activeTab }) => {
 };
 
 const AvailabilityPage = ({ navigation }) => {
-	const [activeTab, setActiveTab] = useState("unconfirmed");
-	const [events, setEvents] = useState([]);
-	const [loading, setLoading] = useState(true);
+	const {
+		isAdmin,
+		activeTab,
+		setActiveTab,
+		events,
+		filteredEvents,
+		loading,
+		respondToEvent,
+		reminder,
+		saveReminderSettings: persistReminderSettings,
+		workerBuckets: eventWorkerDetails,
+		loadingWorkers: loadingWorkerDetails,
+		loadWorkerBuckets,
+		setWorkerResponse,
+	} = useAvailability();
+
+	// Modal state stays here — it is presentation, not data.
 	const [reminderModalVisible, setReminderModalVisible] = useState(false);
 	const [reminderHours, setReminderHours] = useState("24");
 	const [reminderMinutes, setReminderMinutes] = useState("0");
 	const [remindersEnabled, setRemindersEnabled] = useState(true);
 	const [adminModalVisible, setAdminModalVisible] = useState(false);
 	const [selectedEventForAdmin, setSelectedEventForAdmin] = useState(null);
-	const [eventWorkerDetails, setEventWorkerDetails] = useState({
-		confirmed: [],
-		declined: [],
-		unconfirmed: [],
-	});
-	const [loadingWorkerDetails, setLoadingWorkerDetails] = useState(false);
-	const { userId, companyId, isAdmin } = useUser();
-
-	// Refresh data every time the screen comes into focus
-	useFocusEffect(
-		React.useCallback(() => {
-			fetchEventsFromFirebase();
-		}, [userId, companyId]),
-	);
-
-	useEffect(() => {
-		fetchEventsFromFirebase();
-	}, [userId]);
-
-	const fetchEventsFromFirebase = async () => {
-		setLoading(true);
-
-		try {
-			// Get unassigned events from your service
-			const fetchedEvents: any =
-				await fetchUnassignedUpcomingEvents(companyId);
-
-			// Get assigned events for the current user to check for conflicts
-			const assignedEvents: any = await fetchUpcomingEventsForUser(
-				companyId,
-				userId,
-			);
-
-			if (fetchedEvents && fetchedEvents.length > 0) {
-				// Create a set of dates where the user already has assigned events
-				const assignedEventDates = new Set(
-					assignedEvents?.map((event) => {
-						return event.date; // Use the date string directly for comparison
-					}) || [],
-				);
-
-				// Transform the fetched events to match the UI requirements
-				const formattedEvents = fetchedEvents.map((event) => {
-					// Use the date string directly from Firebase (YYYY-MM-DD format)
-					const eventDateString = event.date;
-
-					// Parse the date string correctly to avoid timezone issues
-					const [year, month, day] = event.date.split("-");
-					const eventDate = new Date(
-						parseInt(year),
-						parseInt(month) - 1,
-						parseInt(day),
-					);
-
-					// Format date to a user-friendly string - UPDATE THIS PART:
-					const formattedDate = eventDate.toLocaleDateString(
-						"en-US",
-						{
-							weekday: "short", // Mon, Tue, Wed, etc.
-							month: "short", // Jan, Feb, Mar, etc.
-							day: "numeric", // 1, 2, 3, etc.
-							year: "numeric", // 2024, 2025, etc.
-						},
-					);
-
-					// Set location based on event.locations map (address -> {lat, lng})
-					let location = "Location TBD";
-					if (event.locations) {
-						const locationKeys = Object.keys(event.locations);
-						if (locationKeys.length === 1) {
-							location = locationKeys[0]; // Use the address (the key) as location
-						} else if (locationKeys.length > 1) {
-							location = "Multiple locations";
-						}
-					}
-
-					// Check if user is in workerStatus map
-					let status = "available";
-					let confirmed = false;
-
-					if (event.workerStatus && event.workerStatus[userId]) {
-						const userStatus = event.workerStatus[userId];
-						if (userStatus === "confirmed") {
-							status = "on_potential_event";
-							confirmed = true;
-						} else if (userStatus === "declined") {
-							status = "on_potential_event";
-							confirmed = false;
-						}
-					}
-
-					// Check if user is already assigned to another event on the same day
-					// Only override status if user hasn't responded to this event yet
-					if (
-						assignedEventDates.has(eventDateString) &&
-						status === "available"
-					) {
-						status = "already_on_event";
-						// Don't change confirmed status - keep it false so it shows in unconfirmed tab
-					}
-
-					return {
-						id: event.id,
-						date: formattedDate,
-						location: location,
-						title: event.title || "Unnamed Event",
-						status: status,
-						confirmed: confirmed,
-						rawData: event,
-					};
-				});
-
-				setEvents(formattedEvents);
-			} else {
-				// No events found
-				setEvents([]);
-			}
-		} catch (error) {
-			console.error("Error fetching events:", error);
-			// Set fallback empty state
-			setEvents([]);
-		} finally {
-			setLoading(false);
-		}
-	};
-
-	const updateEventStatus = async (eventId, confirmed) => {
-		// Firebase update will go here
-
-		if (confirmed) {
-			await confirmEvent(companyId, eventId, userId);
-		} else {
-			await declineEvent(companyId, eventId, userId);
-		}
-
-		// Mock update for now
-		setEvents((prevEvents) =>
-			prevEvents.map((event) =>
-				event.id === eventId
-					? {
-							...event,
-							confirmed,
-							status: confirmed
-								? "already_on_event"
-								: "on_potential_event",
-						}
-					: event,
-			),
-		);
-	};
-
-	const getFilteredEvents = () => {
-		switch (activeTab) {
-			case "unconfirmed":
-				// Show available events and already_on_event events that haven't been responded to
-				return events.filter(
-					(event) =>
-						(event.status === "available" ||
-							event.status === "already_on_event") &&
-						!event.confirmed,
-				);
-			case "confirmed":
-				return events.filter((event) => event.confirmed === true);
-			case "declined":
-				return events.filter(
-					(event) =>
-						event.confirmed === false &&
-						event.status === "on_potential_event",
-				);
-			default:
-				return events;
-		}
-	};
 
 	const renderEventCard = ({ item }) => {
 		const getStatusColor = () => {
@@ -311,26 +137,10 @@ const AvailabilityPage = ({ navigation }) => {
 			}
 		};
 
-		const handleConfirm = () => {
-			updateEventStatus(item.id, true);
-		};
-
-		const handleDecline = () => {
-			updateEventStatus(item.id, false);
-		};
-
-		const handleUndecline = () => {
-			// Change status from declined/on_potential_event back to available
-			undeclineEvent(companyId, item.id, userId);
-
-			setEvents((prevEvents) =>
-				prevEvents.map((event) =>
-					event.id === item.id
-						? { ...event, status: "available", confirmed: false }
-						: event,
-				),
-			);
-		};
+		const handleConfirm = () => respondToEvent(item, "confirmed");
+		const handleDecline = () => respondToEvent(item, "declined");
+		// Back to unanswered, from either the confirmed or declined tab.
+		const handleUndecline = () => respondToEvent(item, "pending");
 
 		// Show status badge on all tabs
 		const showStatusBadge = true;
@@ -363,6 +173,69 @@ const AvailabilityPage = ({ navigation }) => {
 									{item.location}
 								</Text>
 							</View>
+
+							{/*
+							 * Who this job went to. Only targeted jobs carry
+							 * any badge, so the absence of one reads as
+							 * "everyone" without needing its own label.
+							 */}
+							{(item.groupNames?.length > 0 ||
+								item.personNames?.length > 0) && (
+								<View style={styles.groupBadgeRow}>
+									{item.groupNames.map((name) => (
+										<View
+											key={`g-${name}`}
+											style={styles.groupBadge}
+										>
+											<Ionicons
+												name="people"
+												size={11}
+												color="#5a3ec8"
+											/>
+											<Text
+												style={styles.groupBadgeText}
+												numberOfLines={1}
+											>
+												{name}
+											</Text>
+										</View>
+									))}
+									{/*
+									 * Individually invited people, capped — a
+									 * job sent to a dozen names should not push
+									 * the date and location off the card.
+									 */}
+									{item.personNames
+										.slice(0, 2)
+										.map((name) => (
+											<View
+												key={`p-${name}`}
+												style={styles.groupBadge}
+											>
+												<Ionicons
+													name="person"
+													size={11}
+													color="#5a3ec8"
+												/>
+												<Text
+													style={
+														styles.groupBadgeText
+													}
+													numberOfLines={1}
+												>
+													{name}
+												</Text>
+											</View>
+										))}
+									{item.personNames.length > 2 && (
+										<View style={styles.groupBadge}>
+											<Text style={styles.groupBadgeText}>
+												+{item.personNames.length - 2}
+											</Text>
+										</View>
+									)}
+								</View>
+							)}
 						</View>
 
 						{/* Show status badge on all tabs */}
@@ -454,121 +327,35 @@ const AvailabilityPage = ({ navigation }) => {
 		</View>
 	);
 
-	const handleReminderSettings = async () => {
-		try {
-			// Fetch current company preferences
-			const preferences = await getCompanyPreferences(companyId);
-
-			// Set current values
-			const currentHours = preferences?.availabilityReminderHours || 24;
-			const currentMinutes =
-				preferences?.availabilityReminderMinutes || 0;
-			const currentEnabled =
-				preferences?.availabilityReminderEnabled !== false; // Default to true if undefined
-
-			setReminderHours(currentHours.toString());
-			setReminderMinutes(currentMinutes.toString());
-			setRemindersEnabled(currentEnabled);
-			setReminderModalVisible(true);
-		} catch (error) {
-			console.error("Error fetching reminder preferences:", error);
-		}
+	const handleReminderSettings = () => {
+		setReminderHours(String(reminder?.hours ?? 24));
+		setReminderMinutes(String(reminder?.minutes ?? 0));
+		setRemindersEnabled(reminder?.enabled !== false);
+		setReminderModalVisible(true);
 	};
 
 	const saveReminderSettings = async () => {
-		try {
-			const hours = parseInt(reminderHours) || 24;
-			const minutes = parseInt(reminderMinutes) || 0;
-
-			await updateCompanyPreferences(companyId, {
-				availabilityReminderHours: hours,
-				availabilityReminderMinutes: minutes,
-				availabilityReminderEnabled: remindersEnabled,
-			});
-
-			setReminderModalVisible(false);
-			Alert.alert("Success", "Reminder settings updated successfully!");
-		} catch (error) {
-			console.error("Error saving reminder preferences:", error);
-			Alert.alert("Error", "Failed to save reminder settings");
-		}
+		const saved = await persistReminderSettings({
+			enabled: remindersEnabled,
+			hours: reminderHours,
+			minutes: reminderMinutes,
+		});
+		if (saved) setReminderModalVisible(false);
 	};
 
-	// Add this function before your return statement
-	const fetchEventWorkerDetails = async (event) => {
-		setLoadingWorkerDetails(true);
-		try {
-			// Get all users in the company (returns a map)
-			const usersMap = await getAllUsersInCompany(companyId);
-
-			// Convert the map to an array of users
-			const allUsers = Object.values(usersMap);
-
-			// Fetch fresh worker status from Firebase instead of using stale local data
-			const workerStatus = await getWorkerStatusList(companyId, event.id);
-
-			// Categorize users based on their status in the workerStatus map
-			const categorizedUsers = {
-				confirmed: [],
-				declined: [],
-				unconfirmed: [],
-			};
-
-			allUsers.forEach((user: User) => {
-				const userStatus = workerStatus[user.id];
-
-				const userWithStatus = {
-					...user,
-					status: userStatus || "available", // No status means they're available
-				};
-
-				if (userStatus === "confirmed") {
-					categorizedUsers.confirmed.push(userWithStatus);
-				} else if (userStatus === "declined") {
-					categorizedUsers.declined.push(userWithStatus);
-				} else if (userStatus === "pending") {
-					// User has been notified but hasn't responded
-					categorizedUsers.unconfirmed.push({
-						...userWithStatus,
-						status: "pending",
-					});
-				} else {
-					// User has no status in the map - they're available
-					categorizedUsers.unconfirmed.push({
-						...userWithStatus,
-						status: "pending",
-					});
-				}
-			});
-
-			setEventWorkerDetails(categorizedUsers);
-		} catch (error) {
-			console.error("Error fetching worker details:", error);
-		} finally {
-			setLoadingWorkerDetails(false);
-		}
-	};
-
-	const handleAdminStatusChange = async (targetUserId, newStatus) => {
+	const handleAdminStatusChange = (targetUserId, newStatus) => {
 		if (!selectedEventForAdmin) return;
-		const eventId = selectedEventForAdmin.id;
-
-		if (newStatus === "confirmed") {
-			await confirmEvent(companyId, eventId, targetUserId);
-		} else if (newStatus === "declined") {
-			await declineEvent(companyId, eventId, targetUserId);
-		}
-
-		// Refresh worker details in the modal
-		fetchEventWorkerDetails(selectedEventForAdmin);
-		// Refresh the main event list
-		fetchEventsFromFirebase();
+		return setWorkerResponse(
+			selectedEventForAdmin,
+			targetUserId,
+			newStatus,
+		);
 	};
 
 	const handleAdminEventPress = (event) => {
 		setSelectedEventForAdmin(event);
 		setAdminModalVisible(true);
-		fetchEventWorkerDetails(event);
+		loadWorkerBuckets(event.id);
 	};
 
 	// Update the header to include admin button
@@ -663,7 +450,7 @@ const AvailabilityPage = ({ navigation }) => {
 				</View>
 			) : (
 				<FlatList
-					data={getFilteredEvents()}
+					data={filteredEvents}
 					renderItem={renderEventCard}
 					keyExtractor={(item) => item.id}
 					contentContainerStyle={styles.eventList}
@@ -1148,573 +935,5 @@ const AvailabilityPage = ({ navigation }) => {
 		</SafeAreaView>
 	);
 };
-
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: "#F9FAFB",
-	},
-	header: {
-		padding: 16,
-		paddingTop: 12,
-		paddingBottom: 8,
-		alignItems: "center",
-		backgroundColor: "#fff",
-		...Platform.select({
-			ios: {
-				shadowColor: "#000",
-				shadowOffset: { width: 0, height: 1 },
-				shadowOpacity: 0.1,
-				shadowRadius: 2,
-			},
-			android: {
-				elevation: 2,
-			},
-		}),
-	},
-	title: {
-		fontSize: 20,
-		fontWeight: "700",
-		color: "#1F2937",
-		letterSpacing: 0.5,
-	},
-	tabOuterContainer: {
-		backgroundColor: "#fff",
-		paddingHorizontal: 16,
-		marginBottom: 16,
-		...Platform.select({
-			ios: {
-				shadowColor: "#000",
-				shadowOffset: { width: 0, height: 1 },
-				shadowOpacity: 0.05,
-				shadowRadius: 1,
-			},
-			android: {
-				elevation: 1,
-			},
-		}),
-	},
-	tabContainer: {
-		flexDirection: "row",
-		position: "relative",
-		height: 48,
-	},
-	tab: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	activeTab: {},
-	tabText: {
-		fontSize: 14,
-		fontWeight: "600",
-		color: "#6B7280",
-	},
-	activeTabText: {
-		color: "#4A90E2",
-		fontWeight: "700",
-	},
-	tabIndicator: {
-		position: "absolute",
-		bottom: 0,
-		height: 3,
-		backgroundColor: "#4A90E2",
-		borderRadius: 3,
-	},
-	eventList: {
-		paddingHorizontal: 16,
-		paddingBottom: 20,
-	},
-	eventCard: {
-		backgroundColor: "#FFFFFF",
-		borderRadius: 12,
-		padding: 16,
-		marginBottom: 12,
-		...Platform.select({
-			ios: {
-				shadowColor: "#000",
-				shadowOffset: { width: 0, height: 2 },
-				shadowOpacity: 0.06,
-				shadowRadius: 4,
-			},
-			android: {
-				elevation: 2,
-			},
-		}),
-	},
-	eventHeader: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "flex-start",
-	},
-	dateLocationContainer: {
-		flex: 1,
-	},
-	eventDate: {
-		fontSize: 16,
-		fontWeight: "700",
-		color: "#1F2937",
-		marginBottom: 4,
-	},
-	eventTitle: {
-		fontSize: 18,
-		fontWeight: "700",
-		color: "#1F2937",
-		marginBottom: 4,
-	},
-	eventTime: {
-		fontSize: 14,
-		color: "#4B5563",
-		marginBottom: 4,
-	},
-	locationContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-	},
-	eventLocation: {
-		fontSize: 14,
-		color: "#6B7280",
-		marginLeft: 4,
-	},
-	statusBadge: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingHorizontal: 8,
-		paddingVertical: 4,
-		borderRadius: 12,
-		marginLeft: 8,
-	},
-	statusIcon: {
-		marginRight: 4,
-	},
-	statusBadgeText: {
-		fontSize: 12,
-		fontWeight: "600",
-		color: "#FFFFFF",
-	},
-	buttonContainer: {
-		flexDirection: "row",
-		marginTop: 16,
-		justifyContent: "flex-end",
-	},
-	confirmButton: {
-		backgroundColor: "#4ADE80",
-		flexDirection: "row",
-		alignItems: "center",
-		paddingVertical: 8,
-		paddingHorizontal: 16,
-		borderRadius: 8,
-		marginLeft: 12,
-	},
-	declineButton: {
-		backgroundColor: "#EF4444",
-		flexDirection: "row",
-		alignItems: "center",
-		paddingVertical: 8,
-		paddingHorizontal: 16,
-		borderRadius: 8,
-	},
-	undeclineButton: {
-		backgroundColor: "#6366F1", // Indigo color
-		flexDirection: "row",
-		alignItems: "center",
-		paddingVertical: 8,
-		paddingHorizontal: 16,
-		borderRadius: 8,
-	},
-	buttonText: {
-		color: "#FFFFFF",
-		fontWeight: "600",
-		fontSize: 14,
-		marginLeft: 6,
-	},
-	loadingContainer: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	loadingText: {
-		marginTop: 12,
-		fontSize: 16,
-		color: "#6B7280",
-	},
-	emptyStateContainer: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-		paddingHorizontal: 32,
-		paddingVertical: 64,
-	},
-	emptyStateTitle: {
-		fontSize: 18,
-		fontWeight: "700",
-		color: "#374151",
-		marginTop: 16,
-	},
-	emptyStateDescription: {
-		fontSize: 14,
-		color: "#6B7280",
-		textAlign: "center",
-		marginTop: 8,
-	},
-	adminButton: {
-		position: "absolute",
-		right: 16,
-		top: 12,
-		flexDirection: "row",
-		alignItems: "center",
-		backgroundColor: "#F3F4F6",
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		borderRadius: 20,
-	},
-	adminButtonText: {
-		fontSize: 12,
-		fontWeight: "600",
-		color: "#4A90E2",
-		marginLeft: 4,
-	},
-	modalOverlay: {
-		flex: 1,
-		backgroundColor: "rgba(0, 0, 0, 0.5)",
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	modalContent: {
-		backgroundColor: "#FFFFFF",
-		borderRadius: 16,
-		width: "90%",
-		maxHeight: "80%",
-		overflow: "hidden",
-	},
-	modalHeader: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		padding: 20,
-		borderBottomWidth: 1,
-		borderBottomColor: "#E5E7EB",
-	},
-	modalTitle: {
-		fontSize: 18,
-		fontWeight: "700",
-		color: "#1F2937",
-	},
-	closeButton: {
-		padding: 4,
-	},
-	modalBody: {
-		padding: 20,
-	},
-	modalDescription: {
-		fontSize: 14,
-		color: "#6B7280",
-		marginBottom: 20,
-		lineHeight: 20,
-	},
-	timeInputContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-		marginBottom: 20,
-	},
-	inputGroup: {
-		alignItems: "center",
-	},
-	inputLabel: {
-		fontSize: 12,
-		fontWeight: "600",
-		color: "#6B7280",
-		marginBottom: 8,
-	},
-	timeInput: {
-		borderWidth: 2,
-		borderColor: "#E5E7EB",
-		borderRadius: 8,
-		padding: 12,
-		fontSize: 18,
-		fontWeight: "600",
-		textAlign: "center",
-		width: 80,
-		backgroundColor: "#F9FAFB",
-	},
-	timeSeparator: {
-		fontSize: 24,
-		fontWeight: "bold",
-		color: "#6B7280",
-		marginHorizontal: 16,
-	},
-	previewText: {
-		fontSize: 13,
-		color: "#4B5563",
-		textAlign: "center",
-		backgroundColor: "#F3F4F6",
-		padding: 12,
-		borderRadius: 8,
-	},
-	modalFooter: {
-		flexDirection: "row",
-		padding: 20,
-		borderTopWidth: 1,
-		borderTopColor: "#E5E7EB",
-	},
-	cancelButton: {
-		flex: 1,
-		paddingVertical: 12,
-		marginRight: 8,
-		backgroundColor: "#F3F4F6",
-		borderRadius: 8,
-		alignItems: "center",
-	},
-	cancelButtonText: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#6B7280",
-	},
-	saveButton: {
-		flex: 1,
-		paddingVertical: 12,
-		marginLeft: 8,
-		backgroundColor: "#4A90E2",
-		borderRadius: 8,
-		alignItems: "center",
-	},
-	saveButtonText: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#FFFFFF",
-	},
-	toggleContainer: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		paddingVertical: 16,
-		paddingHorizontal: 16,
-		backgroundColor: "#F9FAFB",
-		borderRadius: 12,
-		marginBottom: 24,
-	},
-	toggleLabelContainer: {
-		flex: 1,
-		marginRight: 16,
-	},
-	toggleLabel: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#1F2937",
-		marginBottom: 2,
-	},
-	toggleSubLabel: {
-		fontSize: 13,
-		color: "#6B7280",
-	},
-	sectionLabel: {
-		fontSize: 14,
-		fontWeight: "600",
-		color: "#374151",
-		marginBottom: 12,
-	},
-	disabledText: {
-		fontSize: 14,
-		color: "#6B7280",
-		textAlign: "center",
-		backgroundColor: "#FEF3C7",
-		padding: 16,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: "#F59E0B",
-		marginTop: 16,
-	},
-	// New styles for admin event details modal
-	eventDetailsContainer: {
-		marginBottom: 24,
-	},
-	eventDetailsTitle: {
-		fontSize: 18,
-		fontWeight: "700",
-		color: "#1F2937",
-		marginBottom: 8,
-	},
-	eventDetailsDate: {
-		fontSize: 14,
-		color: "#6B7280",
-		marginBottom: 4,
-	},
-	eventDetailsLocation: {
-		fontSize: 14,
-		color: "#6B7280",
-		marginBottom: 16,
-	},
-	workerDetailsContainer: {
-		backgroundColor: "#F9FAFB",
-		borderRadius: 12,
-		padding: 16,
-	},
-	workerDetailsTitle: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#374151",
-		marginBottom: 12,
-	},
-	workerGroup: {
-		marginBottom: 16,
-	},
-	workerGroupTitle: {
-		fontSize: 14,
-		fontWeight: "600",
-		color: "#1F2937",
-		marginBottom: 8,
-	},
-	workerCard: {
-		backgroundColor: "#FFFFFF",
-		borderRadius: 8,
-		padding: 12,
-		marginBottom: 8,
-		...Platform.select({
-			ios: {
-				shadowColor: "#000",
-				shadowOffset: { width: 0, height: 2 },
-				shadowOpacity: 0.05,
-				shadowRadius: 4,
-			},
-			android: {
-				elevation: 2,
-			},
-		}),
-	},
-	workerName: {
-		fontSize: 14,
-		fontWeight: "500",
-		color: "#374151",
-		flex: 1,
-	},
-	workerStatus: {
-		fontSize: 13,
-		color: "#6B7280",
-		marginTop: 4,
-	},
-	adminModalContent: {
-		backgroundColor: "#FFFFFF",
-		borderRadius: 16,
-		width: "95%",
-		maxHeight: "90%",
-		overflow: "hidden",
-	},
-	adminModalBody: {
-		maxHeight: 400,
-	},
-	eventInfoHeader: {
-		padding: 20,
-		backgroundColor: "#F9FAFB",
-		borderBottomWidth: 1,
-		borderBottomColor: "#E5E7EB",
-	},
-	eventInfoTitle: {
-		fontSize: 18,
-		fontWeight: "700",
-		color: "#1F2937",
-		marginBottom: 4,
-	},
-	eventInfoDate: {
-		fontSize: 14,
-		color: "#6B7280",
-		marginBottom: 2,
-	},
-	eventInfoLocation: {
-		fontSize: 14,
-		color: "#6B7280",
-	},
-	workerSection: {
-		paddingHorizontal: 20,
-		paddingVertical: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: "#F3F4F6",
-	},
-	sectionHeaderRow: {
-		flexDirection: "row",
-		alignItems: "center",
-		marginBottom: 12,
-	},
-	sectionTitle: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#374151",
-		marginLeft: 8,
-	},
-	workerItem: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		paddingVertical: 8,
-		paddingHorizontal: 12,
-		backgroundColor: "#F9FAFB",
-		borderRadius: 8,
-		marginBottom: 8,
-	},
-	workerItemActions: {
-		flexDirection: "row",
-		gap: 8,
-	},
-	adminConfirmBtn: {
-		flexDirection: "row",
-		alignItems: "center",
-		backgroundColor: "#4ADE80",
-		paddingVertical: 4,
-		paddingHorizontal: 10,
-		borderRadius: 6,
-	},
-	adminDeclineBtn: {
-		flexDirection: "row",
-		alignItems: "center",
-		backgroundColor: "#EF4444",
-		paddingVertical: 4,
-		paddingHorizontal: 10,
-		borderRadius: 6,
-	},
-	adminBtnText: {
-		color: "#FFFFFF",
-		fontSize: 12,
-		fontWeight: "600",
-		marginLeft: 4,
-	},
-	emptyText: {
-		fontSize: 14,
-		color: "#9CA3AF",
-		fontStyle: "italic",
-		textAlign: "center",
-		paddingVertical: 12,
-	},
-	adminModalFooter: {
-		flexDirection: "row",
-		padding: 20,
-		borderTopWidth: 1,
-		borderTopColor: "#E5E7EB",
-		gap: 12, // Add spacing between buttons
-	},
-	closeModalButton: {
-		flex: 1,
-		paddingVertical: 12,
-		backgroundColor: "#6B7280",
-		borderRadius: 8,
-		alignItems: "center",
-	},
-	closeModalButtonText: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#FFFFFF",
-	},
-	openEventButton: {
-		flex: 1,
-		paddingVertical: 12,
-		backgroundColor: "#4A90E2",
-		borderRadius: 8,
-		alignItems: "center",
-	},
-	openEventButtonText: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#FFFFFF",
-	},
-});
 
 export default AvailabilityPage;

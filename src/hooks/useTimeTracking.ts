@@ -1,187 +1,184 @@
-import { useEffect, useState, useCallback } from "react";
-import { useUser } from "../contexts/UserContext";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	clockIn,
 	clockOut,
-	pauseTimeEntry,
-	resumeTimeEntry,
+	dateKeyFor,
 	getTimeEntries,
-	subscribeToActiveTimeEntry,
+	pauseEntry,
+	resumeEntry,
+	subscribeActiveEntry,
 } from "../services/timeEntryService";
 import { TimeEntry } from "../types";
-import { useCompany } from "../contexts/CompanyContext";
 
-// Define interface for parameters
-interface TimeTrackingParams {
-	startDate?: Date;
-	endDate?: Date;
-}
+/*
+ * Clock in / out and the entry list.
+ *
+ * The active entry is a live subscription; the list is paginated. v1 fetched
+ * every matching entry with no bound, and kept `isPaused` in the fetch effect's
+ * dependency array, so every pause and resume triggered a full refetch.
+ */
 
-export const useTimeTracking = ({
-	startDate,
-	endDate,
-}: TimeTrackingParams = {}) => {
-	const { userId, companyId } = useUser();
-	const [activeTimeEntry, setActiveTimeEntry] = useState<TimeEntry | null>(
-		null,
-	);
-	const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
+const PAGE_SIZE = 50;
+
+export function useTimeTracking(
+	companyId: string,
+	userId: string,
+	timeZone: string,
+	/** Optional "YYYY-MM-DD" window, for the week the screen is showing. */
+	range?: { from: string; to: string },
+) {
+	const [activeEntry, setActiveEntry] = useState<TimeEntry | null>(null);
+	const [entries, setEntries] = useState<TimeEntry[]>([]);
+	/*
+	 * The paging cursor lives in a ref, not state.
+	 *
+	 * As state it was both a dependency of loadPage AND set by it, so every
+	 * page load produced a new loadPage — and therefore a new `refresh` — which
+	 * the screen's useFocusEffect depended on. Focus effect fires, sets state,
+	 * re-renders, new identity, fires again: an infinite render loop.
+	 */
+	const cursorRef = useRef<unknown>(null);
+	const [hasMore, setHasMore] = useState(false);
 	const [isLoading, setIsLoading] = useState(true);
-	const [isPaused, setIsPaused] = useState(false);
-	const [isPausingOrResuming, setIsPausingOrResuming] = useState(false);
+	const [isBusy, setIsBusy] = useState(false);
 
-	const { preferences } = useCompany();
-
-	// Get all time entries for this user
-	const fetchTimeEntries = useCallback(async () => {
-		if (!userId || !companyId) return;
-
-		try {
-			setIsLoading(true);
-			// Use the provided date range if available, otherwise use defaults
-
-			const entries = await getTimeEntries(
-				userId,
-				companyId,
-				startDate,
-				endDate,
-			);
-			setTimeEntries(entries);
-		} catch (error) {
-			console.error("Error fetching time entries:", error);
-		} finally {
-			setIsLoading(false);
-		}
-	}, [userId, companyId, startDate, endDate, isPaused]);
-
-	// Check for existing active time entry on load and set up listeners
+	// Live, so a clock-out on another device is reflected here. Deliberately
+	// NOT dependent on the paused state.
 	useEffect(() => {
-		if (!userId || !companyId) return;
+		if (!companyId || !userId) {
+			setActiveEntry(null);
+			return;
+		}
+		return subscribeActiveEntry(companyId, userId, setActiveEntry);
+	}, [companyId, userId]);
 
-		// Initial fetch
-		fetchTimeEntries();
+	const loadPage = useCallback(
+		async (reset: boolean) => {
+			if (!companyId || !userId) return;
+			setIsLoading(true);
 
-		// Set up subscription using the service function
-		const unsubscribe = subscribeToActiveTimeEntry(
-			userId,
-			companyId,
-			(active) => {
-				// Update active entry state
-				setActiveTimeEntry(active);
-				setIsPaused(active?.status === "paused" || false);
+			const result = await getTimeEntries(companyId, {
+				userId,
+				from: range?.from,
+				to: range?.to,
+				limit: PAGE_SIZE,
+				startAfter: reset ? undefined : (cursorRef.current as never),
+			});
 
-				// If active status changed, refresh the list
-				if (
-					(active && !activeTimeEntry) ||
-					(!active && activeTimeEntry)
-				) {
-					fetchTimeEntries();
-				}
-			},
+			setEntries((prev) =>
+				reset ? result.entries : [...prev, ...result.entries],
+			);
+			cursorRef.current = result.cursor;
+			setHasMore(result.cursor !== null);
+			setIsLoading(false);
+		},
+		[companyId, userId, range?.from, range?.to],
+	);
+
+	useEffect(() => {
+		loadPage(true);
+		// Keyed on identity and the window; paging state must not retrigger.
+	}, [companyId, userId, range?.from, range?.to]);
+
+	/** Serializes clock actions so a double tap cannot open two entries. */
+	const guard = useCallback(
+		async (action: () => Promise<unknown>) => {
+			if (isBusy) return;
+			setIsBusy(true);
+			try {
+				await action();
+			} catch (e) {
+				console.error("Time tracking action failed", e);
+				throw e;
+			} finally {
+				setIsBusy(false);
+			}
+		},
+		[isBusy],
+	);
+
+	const actions = useMemo(
+		() => ({
+			clockIn: () => guard(() => clockIn(companyId, userId, timeZone)),
+			clockOut: () =>
+				guard(async () => {
+					if (activeEntry) await clockOut(activeEntry.id);
+					await loadPage(true);
+				}),
+			pause: () =>
+				guard(() =>
+					activeEntry
+						? pauseEntry(activeEntry.id)
+						: Promise.resolve(),
+				),
+			resume: () =>
+				guard(() =>
+					activeEntry
+						? resumeEntry(activeEntry.id)
+						: Promise.resolve(),
+				),
+		}),
+		[guard, companyId, userId, timeZone, activeEntry, loadPage],
+	);
+
+	const isPaused = activeEntry?.status === "paused";
+	const isActive = activeEntry?.status === "active";
+
+	/** Seconds worked so far on the open entry, excluding pauses. */
+	const elapsedSeconds = useMemo(() => {
+		if (!activeEntry?.clockInAt) return 0;
+		const since = Math.round(
+			(Date.now() - activeEntry.clockInAt.toMillis()) / 1000,
 		);
+		const openPause = activeEntry.pauseStartedAt
+			? Math.round(
+					(Date.now() - activeEntry.pauseStartedAt.toMillis()) / 1000,
+				)
+			: 0;
+		return Math.max(
+			0,
+			since - (activeEntry.pausedSeconds ?? 0) - openPause,
+		);
+	}, [activeEntry]);
 
-		// Clean up subscription on unmount
-		return () => unsubscribe();
-	}, [userId, companyId, fetchTimeEntries]);
-
-	// Calculate weekly stats
-	const getWeeklyStats = useCallback(() => {
-		if (!timeEntries.length)
-			return { hours: 0, minutes: 0, seconds: 0, count: 0 };
-
-		const thisWeekEntries = timeEntries.filter((entry) => {
-			const entryDate = new Date(entry.clockInTime);
-			return entryDate >= startDate && entryDate <= endDate;
-		});
-
-		// Total seconds across all entries
-		const totalSeconds = thisWeekEntries.reduce(
-			(sum, entry) => sum + (entry.duration || 0),
+	/*
+	 * Totals for the loaded window.
+	 *
+	 * The query is already bounded to the range, so this sums what was fetched
+	 * rather than re-filtering by date the way v1 did.
+	 */
+	const weeklyStats = useMemo(() => {
+		const totalSeconds = entries.reduce(
+			(sum, entry) => sum + (entry.workedSeconds || 0),
 			0,
 		);
+		return {
+			hours: Math.floor(totalSeconds / 3600),
+			minutes: Math.floor((totalSeconds % 3600) / 60),
+			seconds: totalSeconds % 60,
+			count: entries.length,
+		};
+	}, [entries]);
 
-		// Convert total seconds to hours, minutes, seconds
-		const hours = Math.floor(totalSeconds / 3600);
-		const minutes = Math.floor((totalSeconds % 3600) / 60);
-		const seconds = totalSeconds % 60;
+	// Stable identities: screens put these in effect dependency arrays.
+	const refresh = useCallback(() => loadPage(true), [loadPage]);
+	const loadMore = useCallback(() => loadPage(false), [loadPage]);
 
-		return { hours, minutes, seconds, count: thisWeekEntries.length };
-	}, [timeEntries]);
-
-	// Clock in function
-	const handleClockIn = async () => {
-		try {
-			const timeEntry = await clockIn(userId, companyId);
-			fetchTimeEntries();
-			return timeEntry;
-		} catch (error) {
-			console.error("Error clocking in:", error);
-			throw error;
-		}
-	};
-
-	// Clock out function
-	const handleClockOut = async () => {
-		if (!activeTimeEntry) return;
-
-		try {
-			const completedEntry = await clockOut(
-				activeTimeEntry.id,
-				companyId,
-			);
-			return completedEntry;
-		} catch (error) {
-			console.error("Error clocking out:", error);
-			throw error;
-		}
-	};
-
-	// Pause timer function
-	const handlePauseTimer = async () => {
-		if (!activeTimeEntry || !activeTimeEntry.id) return;
-
-		try {
-			setIsPausingOrResuming(true);
-			await pauseTimeEntry(activeTimeEntry.id, companyId);
-			// Don't need to set isPaused here as the Firestore listener will update it
-		} catch (error) {
-			console.error("Error pausing timer:", error);
-			// Show an alert or toast notification here
-			throw error;
-		} finally {
-			setIsPausingOrResuming(false);
-		}
-	};
-
-	// Resume timer function
-	const handleResumeTimer = async () => {
-		if (!activeTimeEntry || !activeTimeEntry.id) return;
-
-		try {
-			setIsPausingOrResuming(true);
-			await resumeTimeEntry(activeTimeEntry.id, companyId);
-			// Don't need to set isPaused here as the Firestore listener will update it
-		} catch (error) {
-			console.error("Error resuming timer:", error);
-			// Show an alert or toast notification here
-			throw error;
-		} finally {
-			setIsPausingOrResuming(false);
-		}
-	};
+	const todayKey = dateKeyFor(new Date(), timeZone);
 
 	return {
-		activeTimeEntry,
-		timeEntries,
-		isClockedIn: !!activeTimeEntry,
-		isLoading,
+		activeEntry,
+		entries,
+		isActive,
 		isPaused,
-		isPausingOrResuming,
-		clockIn: handleClockIn,
-		clockOut: handleClockOut,
-		pauseTimer: handlePauseTimer,
-		resumeTimer: handleResumeTimer,
-		fetchTimeEntries,
-		weeklyStats: getWeeklyStats(),
+		isBusy,
+		isLoading,
+		elapsedSeconds,
+		weeklyStats,
+		todayKey,
+		hasMore,
+		loadMore,
+		refresh,
+		...actions,
 	};
-};
+}

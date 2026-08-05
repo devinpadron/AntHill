@@ -7,6 +7,10 @@ import { useAuth } from "../../hooks/useAuth";
 import { FormInput } from "../../components/ui/FormInput";
 import { Button } from "../../components/ui/Button";
 
+/*
+ * Login. Identical to the v1 screen apart from the hook it calls — the UI was
+ * never schema-aware, only the data layer underneath it was.
+ */
 const LoginPage = ({ navigation }) => {
 	const {
 		email,
@@ -35,7 +39,6 @@ const LoginPage = ({ navigation }) => {
 			[
 				{
 					text: "Cancel",
-					onPress: () => console.log("Reset password cancelled"),
 					style: "cancel",
 				},
 				{

@@ -4,10 +4,10 @@
  * Nothing outside src/services/** may import from here — the layering guard in
  * the pre-commit hook enforces that. Screens and hooks go through services.
  *
- * v1 is PascalCase (`Companies`, `Events`); v2 is lowerCamel plural
- * (`companies`, `events`). Firestore collection IDs are case-sensitive, so the
- * two schemas are disjoint collections living side by side — which is what
- * makes v1 a working rollback target during the migration.
+ * All lowerCamel plural. The old schema used PascalCase (`Companies`,
+ * `Events`); since Firestore collection IDs are case-sensitive, those are
+ * disjoint collections that the app no longer reads. tools/migration keeps its
+ * own copy of the old names.
  */
 
 export const C = {
@@ -41,25 +41,7 @@ export const C = {
 export const APP_DATA = { collection: "AppData", doc: "Data" } as const;
 export const APP_CONFIG = { collection: "appConfig", doc: "schema" } as const;
 
-/*
- * v1 collections. Referenced only by code that must still read the old schema
- * (the migration tooling and the rollback path). New code uses `C`.
- */
-export const LEGACY = {
-	users: "Users",
-	preferences: "Preferences",
-	companies: "Companies",
-	settings: "Settings",
-	events: "Events",
-	timeEntries: "TimeEntries",
-	attachments: "Attachments",
-	checklists: "Checklists",
-	packages: "Packages",
-	eventLabels: "EventLabels",
-	employees: "Employees",
-} as const;
-
-/** Deterministic composite IDs — see the migration plan §3.3 (idempotency). */
+/** Deterministic composite IDs, so re-running the migration is idempotent. */
 export const membershipId = (companyId: string, userId: string) =>
 	`${companyId}_${userId}`;
 

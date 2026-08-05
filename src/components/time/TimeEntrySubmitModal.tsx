@@ -4,7 +4,6 @@ import {
 	Text,
 	TextInput,
 	TouchableOpacity,
-	StyleSheet,
 	ActivityIndicator,
 	Platform,
 	Keyboard,
@@ -12,10 +11,12 @@ import {
 } from "react-native";
 import { format } from "date-fns";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import { getEventsByDate } from "../../services/eventService";
+import { getEventsInRange } from "../../services/eventService";
 import { useUser } from "../../contexts/UserContext";
 import { useUploadManager } from "../../contexts/UploadManagerContext"; // Add this import
 import moment from "moment";
+import { FilterType } from "../../types";
+import { getSchema } from "../../services/formSchemaService";
 import BottomSheet, {
 	BottomSheetScrollView,
 	BottomSheetTextInput,
@@ -23,10 +24,12 @@ import BottomSheet, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CustomFormRender from "./CustomFormRender";
 import { useCompany } from "../../contexts/CompanyContext";
-
-//TODO: What I did before was attach the formResponses directly to each connected event
-// Next we need to:
-// 1. Update the timeEntryDetails to handle the new structure and display the form responses correctly
+import { styles } from "./TimeEntrySubmitModal.styles";
+import type { RenderableForm } from "./CustomFormRender";
+import {
+	blankResponsesFor,
+	useSubmitFormSchemas,
+} from "../../hooks/useSubmitFormSchemas";
 
 const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const [notes, setNotes] = useState("");
@@ -37,8 +40,15 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const [isLoadingEvents, setIsLoadingEvents] = useState(false);
 	const [showOtherEvents, setShowOtherEvents] = useState(false);
 	const { userId, companyId } = useUser();
-	const [customForm, setCustomForm] = useState(null);
-	const [customFullForm, setCustomFullForm] = useState(null);
+	/*
+	 * Local copies of the two schemas, seeded from useSubmitFormSchemas below.
+	 * Local because CustomFormRender writes resolved checklist item counts back
+	 * into the fields as it renders them.
+	 */
+	const [customForm, setCustomForm] = useState<RenderableForm | null>(null);
+	const [customFullForm, setCustomFullForm] = useState<RenderableForm | null>(
+		null,
+	);
 	const [fullFormResponses, setFullFormResponses] = useState({});
 	// Replace single formResponses with a map keyed by event ID
 	const [formResponsesByEvent, setFormResponsesByEvent] = useState({});
@@ -47,15 +57,42 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const [fullFormErrors, setFullFormErrors] = useState({});
 	// Update filesToUpload to be organized by event
 	const [filesToUpload, setFilesToUpload] = useState({});
-	const { uploadFiles, isUploading, uploadProgress, resetUploadProgress } =
-		useUploadManager();
+	const { uploadFiles, isUploading, uploadProgress } = useUploadManager();
 
 	const bottomSheetRef = useRef(null);
 	const scrollViewRef = useRef(null);
 	const notesInputRef = useRef(null);
 	const snapPoints = useRef(["85%"]).current;
 	const insets = useSafeAreaInsets();
-	const { preferences } = useCompany();
+	const { preferences, isLoading: preferencesLoading } = useCompany();
+	const { eventSchema, entrySchema, isSchemaLoading } = useSubmitFormSchemas(
+		companyId,
+		preferences.eventFormSchemaId,
+		preferences.timeEntryFormSchemaId,
+	);
+
+	// Enabled schemas only; null means the form is off for this company.
+	useEffect(() => setCustomForm(eventSchema), [eventSchema]);
+	useEffect(() => setCustomFullForm(entrySchema), [entrySchema]);
+
+	/*
+	 * Whether the custom form is ready to be filled in.
+	 *
+	 * This gates SUBMISSION, and it has to. The form is not part of the first
+	 * render: company preferences arrive over a subscription, and the schema
+	 * they name is a second round trip after that. Until both land there are no
+	 * fields on screen — so a fast tap submitted an entry containing clock
+	 * times and nothing else, silently, with no way to tell afterwards that
+	 * anything was missing.
+	 *
+	 * Production has 57 such entries in one company alone, spread thinly across
+	 * 19 people (most of them a single entry out of dozens) and still arriving
+	 * — the shape of a race, not of a misconfigured user.
+	 *
+	 * v1 had one await here and v2 has two, so the window got WIDER, not
+	 * narrower.
+	 */
+	const isFormReady = !preferencesLoading && !isSchemaLoading;
 
 	useEffect(() => {
 		if (visible && bottomSheetRef.current) {
@@ -86,46 +123,18 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 		}
 	}, [visible, timeEntry]);
 
-	// First useEffect - only for initializing the form templates
+	/*
+	 * Seed the time-entry form's responses once its schema arrives. The schema
+	 * resolution itself lives in useSubmitFormSchemas.
+	 */
 	useEffect(() => {
-		const loadCustomForms = async () => {
-			if (!companyId) return;
-
-			try {
-				if (preferences?.eventForm?.isEnabled) {
-					setCustomForm(preferences.eventForm);
-				}
-
-				if (preferences?.timeEntryForm?.isEnabled) {
-					setCustomFullForm(preferences.timeEntryForm);
-
-					// Only initialize the full form responses if they're empty
-					if (Object.keys(fullFormResponses).length === 0) {
-						const initialResponses = {};
-						preferences.timeEntryForm.fields.forEach((field) => {
-							if (field.type === "checkbox") {
-								initialResponses[field.id] = false;
-							} else if (
-								field.type === "multiSelect" ||
-								field.type === "checklist"
-							) {
-								initialResponses[field.id] = [];
-							} else {
-								initialResponses[field.id] = "";
-							}
-						});
-						setFullFormResponses(initialResponses);
-					}
-				}
-			} catch (error) {
-				console.error("Failed to load custom forms:", error);
-			}
-		};
-
-		if (visible && !customForm && !customFullForm) {
-			loadCustomForms();
-		}
-	}, [visible, companyId]);
+		if (!customFullForm) return;
+		setFullFormResponses((prev) =>
+			Object.keys(prev).length === 0
+				? blankResponsesFor(customFullForm)
+				: prev,
+		);
+	}, [customFullForm]);
 
 	// Second useEffect - only for initializing event form responses
 	useEffect(() => {
@@ -145,21 +154,7 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 			// Skip if we already have responses for this event
 			if (newResponsesByEvent[event.id]) return;
 
-			const initialResponses = {};
-			formTemplate.fields.forEach((field) => {
-				if (field.type === "checkbox") {
-					initialResponses[field.id] = false;
-				} else if (
-					field.type === "multiSelect" ||
-					field.type === "checklist"
-				) {
-					initialResponses[field.id] = [];
-				} else {
-					initialResponses[field.id] = "";
-				}
-			});
-
-			newResponsesByEvent[event.id] = initialResponses;
+			newResponsesByEvent[event.id] = blankResponsesFor(formTemplate);
 		});
 
 		setFormResponsesByEvent(newResponsesByEvent);
@@ -180,35 +175,36 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 		try {
 			setIsLoadingEvents(true);
 
-			const clockInDate = moment(new Date(timeEntry.clockInTime)).format(
+			const clockInDate = moment(timeEntry.clockInAt.toDate()).format(
 				"YYYY-MM-DD",
 			);
-			const events = await getEventsByDate(companyId, clockInDate);
 
-			const userEvents = events.filter((event) => {
-				if (
-					!event.assignedWorkers ||
-					!Array.isArray(event.assignedWorkers)
-				) {
-					return false;
-				}
-
-				return event.assignedWorkers.includes(userId);
+			/*
+			 * The server filters by assignment. v1 fetched every event on the
+			 * day and then filtered in JS.
+			 */
+			const userEvents = await getEventsInRange(companyId, {
+				from: clockInDate,
+				to: clockInDate,
+				filter: FilterType.MY,
+				userId,
 			});
 
-			const clockInTime = new Date(timeEntry.clockInTime).getTime();
-			const clockOutTime = new Date(timeEntry.clockOutTime).getTime();
+			const clockInTime = timeEntry.clockInAt.toDate().getTime();
+			const clockOutTime = timeEntry.clockOutAt
+				? timeEntry.clockOutAt.toDate().getTime()
+				: Date.now();
 
 			const autoConnectedEvents = [];
 			const otherEvents = [];
 
 			userEvents.forEach((event) => {
-				if (!event.startTime) {
+				if (!event.startAt) {
 					autoConnectedEvents.push(event);
 					return;
 				}
 
-				const eventStartTime = new Date(event.startTime).getTime();
+				const eventStartTime = event.startAt.toDate().getTime();
 
 				const thirtyMinsBeforeClockIn = clockInTime - 30 * 60 * 1000;
 				const thirtyMinsAfterClockIn = clockInTime + 30 * 60 * 1000;
@@ -380,10 +376,9 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 							// Use checklistRequiredMode for validation
 							const requiredMode =
 								field.checklistRequiredMode || "atLeastOne";
-							const totalItems =
-								typeof field.checklistItemCount === "number"
-									? field.checklistItemCount
-									: field.options?.length || 0;
+							// checklistItemCount is denormalized onto the field so
+							// validation never has to load the checklist.
+							const totalItems = field.checklistItemCount ?? 0;
 							if (requiredMode === "atLeastOne") {
 								if (
 									!Array.isArray(value) ||
@@ -441,10 +436,9 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 					if (field.type === "checklist") {
 						const requiredMode =
 							field.checklistRequiredMode || "atLeastOne";
-						const totalItems =
-							typeof field.checklistItemCount === "number"
-								? field.checklistItemCount
-								: field.options?.length || 0;
+						// checklistItemCount is denormalized onto the field so
+						// validation never has to load the checklist.
+						const totalItems = field.checklistItemCount ?? 0;
 
 						if (requiredMode === "atLeastOne") {
 							if (!Array.isArray(value) || value.length === 0) {
@@ -497,6 +491,17 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 
 	// Updated to handle file uploads before submission
 	const handleSubmit = async () => {
+		/*
+		 * Refuse while the form is still arriving. The button is disabled too,
+		 * but this is the check that matters: submitting here writes an entry
+		 * with no form data and no record that any was expected, and nobody
+		 * finds out until payroll.
+		 */
+		if (!isFormReady) {
+			setError("Still loading this company's form — one moment.");
+			return;
+		}
+
 		if (selectedEvents.length === 0) {
 			setError("Please attach at least one event to this time entry.");
 			return;
@@ -562,14 +567,13 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 					});
 
 					// Upload the files
-					console.log("Files with IDS: ", filesWithIds);
 					const uploadedFiles = await uploadFiles(
-						filesWithIds,
 						companyId,
+						"timeEntry",
 						timeEntry.id,
-						"TimeEntries",
+						filesWithIds,
+						userId,
 					);
-					console.log("Uploaded Files: ", uploadedFiles);
 
 					// Update form responses with uploaded file references
 					const updatedFormResponsesByEvent = {
@@ -592,15 +596,15 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 									] || []),
 								];
 
-								// Replace local files with uploaded versions
-								const updatedFiles = fieldFiles.map((file) => {
-									const uploadedFile = uploadedFiles.find(
-										(u) =>
-											file.uri === u.uri ||
-											(file.id && file.id === u.id),
-									);
-									return uploadedFile || file;
-								});
+								/*
+								 * uploadFiles returns the ids it persisted, so a
+								 * form answer becomes a REFERENCE rather than an
+								 * inlined copy of the file object — which is what
+								 * v1 embedded in formResponses.
+								 */
+								const updatedFiles = fieldFiles
+									.map((file) => file.id)
+									.filter((id) => uploadedFiles.includes(id));
 
 								updatedFormResponsesByEvent[eventId][fieldId] =
 									updatedFiles;
@@ -613,15 +617,10 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 								...(updatedFullFormResponses[fieldId] || []),
 							];
 
-							// Replace local files with uploaded versions
-							const updatedFiles = fieldFiles.map((file) => {
-								const uploadedFile = uploadedFiles.find(
-									(u) =>
-										file.uri === u.uri ||
-										(file.id && file.id === u.id),
-								);
-								return uploadedFile || file;
-							});
+							// Same as above: store ids, not file objects.
+							const updatedFiles = fieldFiles
+								.map((file) => file.id)
+								.filter((id) => uploadedFiles.includes(id));
 
 							updatedFullFormResponses[fieldId] = updatedFiles;
 						}
@@ -654,23 +653,31 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 		finalFormResponsesByEvent,
 		finalFullFormResponses,
 	) => {
-		const enrichedTimeEntry = {
-			...timeEntry,
-			notes: notes,
-			submittedAt: new Date().toISOString(),
-			status: "pending_approval",
-			connectedEvents: selectedEvents.map((event) => ({
-				eventId: event.id,
-				eventTitle: event.title,
-				formResponses: finalFormResponsesByEvent[event.id] || null,
+		/*
+		 * A PATCH, not the whole entry.
+		 *
+		 * v1 spread `...timeEntry` from client state and wrote it back, so a
+		 * device holding a stale copy could resurrect superseded values. It also
+		 * embedded two complete form schemas per submission — the 4,087 copies
+		 * the migration collapsed into 39 documents. Schemas are referenced now.
+		 */
+		const submission = {
+			notes,
+			formResponses: customFullForm ? finalFullFormResponses : {},
+			formSchemaIds: {
+				timeEntry: preferences.timeEntryFormSchemaId,
+				event: preferences.eventFormSchemaId,
+			},
+			connections: selectedEvents.map((event) => ({
+				// Ad-hoc entries carry no event reference.
+				eventId: event.isCustom ? null : event.id,
+				title: event.title,
+				userId,
+				formResponses: finalFormResponsesByEvent[event.id] || {},
 			})),
-			eventForm: customForm,
-			generalForm: customFullForm,
-			// Add the full form responses to the time entry
-			formResponses: customFullForm ? finalFullFormResponses : null,
 		};
 
-		await onSubmit(timeEntry.id, enrichedTimeEntry);
+		await onSubmit(timeEntry.id, submission);
 
 		resetModalState();
 		handleClosePress();
@@ -693,8 +700,13 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 			return;
 		}
 
+		/*
+		 * v1 minted ids as `custom-...` while every consumer filtered on
+		 * `custom_`, so ad-hoc entries were never recognised as such. The id is
+		 * now local-only — what persists is `eventId: null`.
+		 */
 		const newEvent = {
-			id: `custom-${Date.now()}`,
+			id: `custom_${Date.now()}`,
 			title: newEventTitle.trim(),
 			isCustom: true,
 		};
@@ -725,7 +737,7 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 		setNewEventTitle("");
 
 		// Reset upload state
-		resetUploadProgress();
+		// progress is per-upload in v2; nothing to reset
 	};
 
 	if (!timeEntry || !visible) return null;
@@ -761,7 +773,7 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 						<Text style={styles.detailLabel}>Date:</Text>
 						<Text style={styles.detailValue}>
 							{format(
-								new Date(timeEntry.clockInTime),
+								timeEntry.clockInAt.toDate(),
 								"EEEE, MMMM d, yyyy",
 							)}
 						</Text>
@@ -770,22 +782,21 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 					<View style={styles.detailRow}>
 						<Text style={styles.detailLabel}>Time:</Text>
 						<Text style={styles.detailValue}>
-							{format(new Date(timeEntry.clockInTime), "h:mm a")}{" "}
-							-{" "}
-							{timeEntry.clockOutTime
+							{format(timeEntry.clockInAt.toDate(), "h:mm a")} -{" "}
+							{timeEntry.clockOutAt
 								? format(
-										new Date(timeEntry.clockOutTime),
+										timeEntry.clockOutAt.toDate(),
 										"h:mm a",
 									)
 								: "Now"}
 						</Text>
 					</View>
 
-					{timeEntry.duration && (
+					{timeEntry.workedSeconds && (
 						<View style={styles.detailRow}>
 							<Text style={styles.detailLabel}>Duration:</Text>
 							<Text style={styles.detailValue}>
-								{formatDuration(timeEntry.duration)}
+								{formatDuration(timeEntry.workedSeconds)}
 							</Text>
 						</View>
 					)}
@@ -1062,12 +1073,13 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 						style={[
 							styles.button,
 							styles.submitButton,
-							isSubmitting && styles.disabledButton,
+							(isSubmitting || !isFormReady) &&
+								styles.disabledButton,
 						]}
 						onPress={handleSubmit}
-						disabled={isSubmitting}
+						disabled={isSubmitting || !isFormReady}
 					>
-						{isSubmitting ? (
+						{isSubmitting || !isFormReady ? (
 							<ActivityIndicator size="small" color="white" />
 						) : (
 							<Text style={styles.submitButtonText}>
@@ -1080,279 +1092,5 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 		</BottomSheet>
 	);
 };
-
-const styles = StyleSheet.create({
-	sheetBackground: {
-		backgroundColor: "white",
-	},
-	sheetIndicator: {
-		backgroundColor: "#ccc",
-		width: 40,
-		height: 4,
-	},
-	scrollContent: {
-		paddingHorizontal: 20,
-		paddingTop: 8,
-	},
-	modalHeader: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		marginBottom: 16,
-		paddingBottom: 12,
-		paddingHorizontal: 20,
-		borderBottomWidth: 1,
-		borderBottomColor: "#eaeaea",
-	},
-	modalTitle: {
-		fontSize: 18,
-		fontWeight: "600",
-	},
-	entryDetails: {
-		backgroundColor: "#f7f7f7",
-		borderRadius: 8,
-		padding: 12,
-		marginBottom: 16,
-	},
-	detailRow: {
-		flexDirection: "row",
-		marginBottom: 6,
-	},
-	detailLabel: {
-		fontSize: 14,
-		fontWeight: "500",
-		color: "#666",
-		width: 70,
-	},
-	detailValue: {
-		fontSize: 14,
-		color: "#333",
-		flex: 1,
-	},
-	notesLabel: {
-		fontSize: 14,
-		fontWeight: "500",
-		color: "#333",
-		marginBottom: 6,
-	},
-	notesInput: {
-		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 8,
-		padding: 12,
-		fontSize: 14,
-		color: "#333",
-		height: 100,
-		textAlignVertical: "top",
-		marginBottom: 16,
-	},
-	errorText: {
-		color: "#ff3b30",
-		marginBottom: 12,
-	},
-	buttonRow: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		marginBottom: 8,
-	},
-	button: {
-		paddingVertical: 12,
-		paddingHorizontal: 16,
-		borderRadius: 8,
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	cancelButton: {
-		backgroundColor: "#f2f2f2",
-		flex: 1,
-		marginRight: 8,
-	},
-	submitButton: {
-		backgroundColor: "#007AFF",
-		flex: 2,
-	},
-	disabledButton: {
-		backgroundColor: "#80b3ff",
-	},
-	cancelButtonText: {
-		color: "#666",
-		fontWeight: "500",
-	},
-	submitButtonText: {
-		color: "white",
-		fontWeight: "600",
-	},
-	eventsCard: {
-		backgroundColor: "#f0f7ff",
-		borderRadius: 8,
-		padding: 12,
-		marginBottom: 16,
-		borderLeftWidth: 3,
-		borderLeftColor: "#007AFF",
-	},
-	cardTitle: {
-		fontSize: 15,
-		fontWeight: "600",
-		color: "#333",
-		marginBottom: 8,
-	},
-	relatedEventsContainer: {
-		marginTop: 2,
-	},
-	eventItem: {
-		fontSize: 14,
-		color: "#333",
-		marginLeft: 4,
-		marginTop: 2,
-		lineHeight: 20,
-	},
-	eventsLoadingContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-	},
-	loadingText: {
-		fontSize: 14,
-		color: "#666",
-		marginLeft: 8,
-	},
-	eventRow: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		marginBottom: 6,
-	},
-	eventInfo: {
-		flexDirection: "row",
-		alignItems: "center",
-		flex: 1,
-	},
-	eventActionButton: {
-		padding: 4,
-	},
-	noEventsText: {
-		fontStyle: "italic",
-		color: "#666",
-		marginVertical: 4,
-	},
-	toggleOtherEventsButton: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-		paddingVertical: 8,
-		marginTop: 8,
-		borderTopWidth: 1,
-		borderTopColor: "rgba(0, 122, 255, 0.2)",
-	},
-	toggleButtonText: {
-		color: "#007AFF",
-		fontSize: 14,
-		marginRight: 4,
-	},
-	otherEventsContainer: {
-		marginTop: 8,
-		paddingTop: 8,
-	},
-	otherEventsTitle: {
-		fontSize: 14,
-		fontWeight: "500",
-		color: "#666",
-		marginBottom: 8,
-	},
-	otherEventItem: {
-		fontSize: 14,
-		color: "#666",
-		marginLeft: 4,
-	},
-	uploadProgressContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-		backgroundColor: "#f0f7ff",
-		padding: 12,
-		borderRadius: 8,
-		marginBottom: 16,
-	},
-	uploadProgressText: {
-		marginLeft: 8,
-		color: "#007AFF",
-		fontSize: 14,
-	},
-	addEventButton: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-		paddingVertical: 8,
-		marginTop: 6,
-		borderTopWidth: 1,
-		borderTopColor: "rgba(0, 122, 255, 0.2)",
-	},
-	addEventButtonText: {
-		color: "#007AFF",
-		fontSize: 14,
-		marginLeft: 4,
-	},
-	addEventInputContainer: {
-		marginTop: 8,
-		borderTopWidth: 1,
-		borderTopColor: "rgba(0, 122, 255, 0.2)",
-		paddingTop: 8,
-	},
-	addEventInput: {
-		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 8,
-		padding: 8,
-		fontSize: 14,
-	},
-	addEventButtonsRow: {
-		flexDirection: "row",
-		justifyContent: "flex-end",
-		marginTop: 8,
-	},
-	addEventCancelButton: {
-		paddingVertical: 6,
-		paddingHorizontal: 12,
-		marginRight: 8,
-	},
-	addEventCancelText: {
-		color: "#666",
-	},
-	addEventSaveButton: {
-		backgroundColor: "#007AFF",
-		paddingVertical: 6,
-		paddingHorizontal: 12,
-		borderRadius: 6,
-	},
-	addEventSaveText: {
-		color: "white",
-		fontWeight: "500",
-	},
-	eventFormsContainer: {
-		marginBottom: 16,
-	},
-	eventFormsTitle: {
-		fontSize: 15,
-		fontWeight: "600",
-		marginBottom: 8,
-	},
-	eventFormContainer: {
-		backgroundColor: "#f7f9fc",
-		borderRadius: 8,
-		padding: 12,
-		marginBottom: 12,
-		borderLeftWidth: 3,
-		borderLeftColor: "#007AFF",
-	},
-	eventFormHeader: {
-		marginBottom: 12,
-		borderBottomWidth: 1,
-		borderBottomColor: "#e0e0e0",
-		paddingBottom: 8,
-	},
-	eventFormTitle: {
-		fontSize: 14,
-		fontWeight: "600",
-		color: "#333",
-	},
-});
 
 export default TimeEntrySubmitModal;

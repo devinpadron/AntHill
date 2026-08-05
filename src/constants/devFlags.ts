@@ -6,13 +6,12 @@
 /**
  * Diagnostics harness.
  *
- * OFF by default now that the app itself is v2 — leaving it on would mean dev
- * never exercises the pieces the harness deliberately omits (AppGate and
- * NotificationProvider), which is exactly where an untested difference would
- * hide.
+ * OFF by default. Leaving it on would mean dev never exercises the pieces the
+ * harness deliberately omits — AppGate and NotificationProvider — which is
+ * exactly where an untested difference would hide.
  *
- * Turn it on to get the v2 diagnostics screen and the PROD/TEST database badge,
- * which are worth having when a query or a rule is misbehaving. It mounts the
- * same v2 contexts, so what it shows is what the app sees.
+ * Turn it on for the diagnostics screen and the PROD/TEST database badge, both
+ * worth having when a query or a security rule is misbehaving. It mounts the
+ * same contexts as the app, so what it shows is what the app sees.
  */
-export const V2_SMOKE_TEST = __DEV__ && false;
+export const DIAGNOSTICS_MODE = __DEV__ && false;

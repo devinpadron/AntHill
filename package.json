@@ -9,6 +9,7 @@
 		"web": "expo start --web",
 		"lint": "npx prettier --check .",
 		"format": "npx prettier --write .",
+		"typecheck": "tsc --noEmit",
 		"prepare": "husky",
 		"postinstall": "patch-package",
 		"test": "jest",

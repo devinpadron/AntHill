@@ -11,8 +11,8 @@ import {
 } from "react-native";
 import { useUser } from "../../contexts/UserContext";
 import {
-	getUserPreferences,
-	setUserPreferences,
+	subscribeUserSettings,
+	updateUserSettings,
 } from "../../services/userService";
 import {
 	SafeAreaView,
@@ -41,6 +41,13 @@ const calendarFilterOptions = [
 
 const UserPreferences = ({ navigation }) => {
 	const { userId, isAdmin, companyId } = useUser();
+	/*
+	 * MUST stay above the `if (loading)` early return below. It sat after it,
+	 * so the hook count changed between renders once loading resolved —
+	 * React's "change in the order of Hooks" warning, and undefined behaviour
+	 * in the general case.
+	 */
+	const insets = useSafeAreaInsets();
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [prefMap, setPrefMap] = useState(
@@ -48,31 +55,26 @@ const UserPreferences = ({ navigation }) => {
 	);
 	const [prefFilter, setPrefFilter] = useState("all");
 
-	// Fetch user preferences on component mount
+	/*
+	 * Live, from userSettings/{userId}.
+	 *
+	 * This screen was still calling the v1 userService, which reads
+	 * Users/{uid}/Preferences/settings — a path a v2-only account has nothing
+	 * under, so it loaded blank and saved into a document nothing else reads.
+	 */
 	useEffect(() => {
-		const fetchUserPreferences = async () => {
-			try {
-				setLoading(true);
-				const preferencesDoc = await getUserPreferences(userId);
+		if (!userId) return;
 
-				if (preferencesDoc) {
-					const data = preferencesDoc;
-					if (data) {
-						setPrefMap(data.preferredMapApp);
-						setPrefFilter(data.defaultCalendarFilter);
-					}
-				}
-			} catch (error) {
-				console.error("Error fetching preferences:", error);
-				Alert.alert("Error", "Failed to load your preferences");
-			} finally {
-				setLoading(false);
+		setLoading(true);
+		return subscribeUserSettings(userId, (settings) => {
+			if (settings) {
+				if (settings.preferredMapApp)
+					setPrefMap(settings.preferredMapApp);
+				if (settings.defaultCalendarFilter)
+					setPrefFilter(settings.defaultCalendarFilter);
 			}
-		};
-
-		if (userId) {
-			fetchUserPreferences();
-		}
+			setLoading(false);
+		});
 	}, [userId]);
 
 	// Save preferences to Firestore
@@ -83,7 +85,7 @@ const UserPreferences = ({ navigation }) => {
 		};
 		try {
 			setSaving(true);
-			await setUserPreferences(userId, preferences);
+			await updateUserSettings(userId, preferences as any);
 
 			Alert.alert("Success", "Your preferences have been saved");
 		} catch (error) {
@@ -127,8 +129,6 @@ const UserPreferences = ({ navigation }) => {
 			</SafeAreaView>
 		);
 	}
-
-	const insets = useSafeAreaInsets();
 
 	return (
 		<View style={[styles.container, { paddingTop: insets.top }]}>

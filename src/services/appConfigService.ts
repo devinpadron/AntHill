@@ -1,4 +1,5 @@
-import db from "../constants/firestore";
+import db from "../lib/db";
+import { APP_CONFIG, APP_DATA } from "../constants/paths";
 import { FALLBACK_ACTIVE_SCHEMA_VERSION } from "../constants/schema";
 
 /* Remote app-level configuration. Read before auth, so the security rules must
@@ -23,7 +24,10 @@ export const FALLBACK_APP_CONFIG: AppConfigSchema = {
  */
 export async function getRequiredVersion(): Promise<string | null> {
 	try {
-		const snapshot = await db.collection("AppData").doc("Data").get();
+		const snapshot = await db
+			.collection(APP_DATA.collection)
+			.doc(APP_DATA.doc)
+			.get();
 		const required = snapshot.data()?.required_version;
 		return typeof required === "string" ? required : null;
 	} catch (e) {
@@ -38,7 +42,10 @@ export async function getRequiredVersion(): Promise<string | null> {
  */
 export async function getAppConfig(): Promise<AppConfigSchema> {
 	try {
-		const snapshot = await db.collection("appConfig").doc("schema").get();
+		const snapshot = await db
+			.collection(APP_CONFIG.collection)
+			.doc(APP_CONFIG.doc)
+			.get();
 		if (!snapshot.exists()) {
 			return FALLBACK_APP_CONFIG;
 		}
@@ -55,25 +62,5 @@ export async function getAppConfig(): Promise<AppConfigSchema> {
 	} catch (e) {
 		console.error("Error getting app config", e);
 		return FALLBACK_APP_CONFIG;
-	}
-}
-
-/**
- * Records which build a user is on, so adoption can be measured before a forced
- * cutover. Best-effort: a failure here must never surface to the user.
- */
-export async function recordAppLaunch(
-	userId: string,
-	appVersion: string,
-): Promise<void> {
-	if (!userId) return;
-
-	try {
-		await db.collection("Users").doc(userId).update({
-			lastSeenAppVersion: appVersion,
-			lastSeenAt: new Date().toISOString(),
-		});
-	} catch (e) {
-		console.error("Error recording app launch", e);
 	}
 }

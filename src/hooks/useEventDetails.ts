@@ -1,115 +1,189 @@
-import { useState, useEffect } from "react";
-import { getUser } from "../services/userService";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-	getEventAttachments,
+	setEventResponse,
 	subscribeEvent,
+	subscribeEventResponses,
 	updateEvent,
 } from "../services/eventService";
+import { subscribeAttachments } from "../services/attachmentService";
+import {
+	getChecklistsByIds,
+	getPackagesByIds,
+	subscribeEventLabels,
+} from "../services/libraryService";
+import {
+	Attachment,
+	Event,
+	EventResponseStatus,
+	Checklist,
+	EventLabel,
+	Package,
+} from "../types";
+import { useCompanyMembers } from "./useCompanyMembers";
 import { useUser } from "../contexts/UserContext";
-import { get, set } from "lodash";
+import { useCompany } from "../contexts/CompanyContext";
 
-export const useEventDetails = (eventId: string) => {
-	const [event, setEvent] = useState<any>(null);
-	const [attachments, setAttachments] = useState<any[]>([]);
-	const [workerList, setWorkerList] = useState("");
-	const [localNotes, setLocalNotes] = useState("");
+/*
+ * A single event.
+ *
+ * Worker names come from useCompanyMembers rather than a getUser() per assigned
+ * worker, and notes save as a field patch rather than writing the whole event
+ * document back — v1's saveNotes spread `{...event, userNotes}`, which
+ * clobbered any concurrent admin edit and is now rejected by the rules anyway.
+ */
+
+export function useEventDetails(eventId: string) {
+	const { userId, companyId, isAdmin, user } = useUser();
+	const { preferences } = useCompany();
+
+	const [event, setEvent] = useState<Event | null>(null);
+	const [attachments, setAttachments] = useState<Attachment[]>([]);
+	/*
+	 * Packages carry `checklistIds`; the UI wants the checklists themselves.
+	 * They are resolved in ONE batched query for all packages, then attached —
+	 * v1 fetched a package at a time, each of which fetched its checklists one
+	 * at a time.
+	 */
+	const [packages, setPackages] = useState<
+		(Package & { checklists: Checklist[] })[]
+	>([]);
+	const [responses, setResponses] = useState<Record<string, string>>({});
+	const [labels, setLabels] = useState<EventLabel[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
-	const [refreshKey, setRefreshKey] = useState(0);
 
-	// Subscribe to current user
-	const { user, isAdmin } = useUser();
+	// Local draft so typing does not fight the live subscription.
+	const [localNotes, setLocalNotes] = useState("");
 
-	// Subscribe to event data
+	const { namesFor, byUserId } = useCompanyMembers(companyId ?? "");
+
 	useEffect(() => {
-		if (!user) return;
+		if (!eventId) return;
+		setIsLoading(true);
+		return subscribeEvent(eventId, (next) => {
+			setEvent(next);
+			setIsLoading(false);
+		});
+	}, [eventId]);
 
-		const subscriber = subscribeEvent(
-			user.loggedInCompany,
+	// Seed the draft once, and again if the remote value changes while the
+	// field is untouched.
+	useEffect(() => {
+		setLocalNotes(event?.workerNotes ?? "");
+	}, [event?.workerNotes]);
+
+	useEffect(() => {
+		if (!companyId || !eventId) return;
+		return subscribeAttachments(
+			companyId,
+			"event",
 			eventId,
-			(event) => {
-				setEvent(event.data());
-			},
+			setAttachments,
 		);
-
-		return () => subscriber();
-	}, [user, eventId]);
+	}, [companyId, eventId]);
 
 	useEffect(() => {
-		if (!event) return;
+		if (!companyId || !eventId) return;
+		return subscribeEventResponses(companyId, eventId, setResponses);
+	}, [companyId, eventId]);
 
-		const getAttachments = async () => {
-			const attachments = await getEventAttachments(
-				user.loggedInCompany,
-				eventId,
-			);
-			setAttachments(attachments);
-		};
-
-		getAttachments();
-
-		console.log(attachments);
-	}, [event, refreshKey]);
-
-	// Process event data
+	// One batched query, keyed on the id list rather than the array identity.
+	const packageKey = (event?.packageIds ?? []).join(",");
 	useEffect(() => {
-		if (!event) return;
-
-		// Initialize local notes
-		setLocalNotes(event.userNotes || "");
-
-		// Get worker list
-		const getWorkerList = async () => {
-			setWorkerList("");
-			const assignedWorkers = event.assignedWorkers || [];
-
-			if (assignedWorkers.length === 0) {
-				setIsLoading(false);
-				return;
-			}
-
-			try {
-				const workerNames = await Promise.all(
-					assignedWorkers.map(async (workerId) => {
-						const workerData = await getUser(workerId);
-						return `${workerData.firstName} ${workerData.lastName}`;
-					}),
-				);
-
-				setWorkerList(workerNames.join(", "));
-			} catch (error) {
-				console.error("Error fetching workers:", error);
-			} finally {
-				setIsLoading(false);
-			}
-		};
-
-		getWorkerList();
-	}, [event]);
-
-	// Save user notes
-	const saveNotes = () => {
-		if (localNotes !== event?.userNotes && user && event) {
-			const updatedEvent = {
-				...event,
-				userNotes: localNotes,
-			};
-
-			updateEvent(user.loggedInCompany, eventId, updatedEvent);
+		if (!companyId || !packageKey) {
+			setPackages([]);
+			return;
 		}
-	};
+		let cancelled = false;
+		(async () => {
+			const found = await getPackagesByIds(
+				companyId,
+				packageKey.split(","),
+			);
+			const allIds = found.flatMap((pkg) => pkg.checklistIds ?? []);
+			const byId = await getChecklistsByIds(companyId, allIds);
+			if (cancelled) return;
+			setPackages(
+				found.map((pkg) => ({
+					...pkg,
+					checklists: (pkg.checklistIds ?? [])
+						.map((id) => byId[id])
+						.filter(Boolean),
+				})),
+			);
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [companyId, packageKey]);
 
-	const hasEditPermission = isAdmin;
+	// Labels are few per company, so one subscription beats a read per event.
+	useEffect(() => {
+		if (!companyId) return;
+		return subscribeEventLabels(companyId, setLabels);
+	}, [companyId]);
+
+	const eventLabel = useMemo(
+		() => labels.find((l) => l.id === event?.labelId) ?? null,
+		[labels, event?.labelId],
+	);
+
+	/** Patches only the worker-editable field. */
+	const saveNotes = useCallback(async () => {
+		if (!eventId || !userId) return;
+		await updateEvent(eventId, { workerNotes: localNotes }, userId);
+	}, [eventId, userId, localNotes]);
+
+	const respond = useCallback(
+		async (status: EventResponseStatus) => {
+			if (!event || !userId) return;
+			await setEventResponse(
+				companyId ?? "",
+				event.id,
+				userId,
+				status,
+				event.dateKey,
+			);
+		},
+		[companyId, event, userId],
+	);
+
+	const workerNames = useMemo(
+		() => namesFor(event?.assignedUserIds ?? []),
+		[namesFor, event?.assignedUserIds],
+	);
+
+	/** Comma-joined, matching what the v1 screen rendered. */
+	const workerList = useMemo(() => workerNames.join(", "), [workerNames]);
+
+	/*
+	 * Admins always edit; everyone else only when the company allows it AND
+	 * they are actually on the event. The rules enforce the narrower version of
+	 * this (workerNotes only), so this is a UI affordance, not the guard.
+	 */
+	const hasEditPermission = Boolean(
+		isAdmin ||
+		(preferences.allowUserEventEditing &&
+			event?.assignedUserIds?.includes(userId)),
+	);
+
+	const myResponse = (responses[userId] ?? "pending") as EventResponseStatus;
 
 	return {
 		user,
 		event,
 		attachments,
+		packages,
+		eventLabel,
+		responses,
+		myResponse,
+		workerNames,
 		workerList,
+		membersById: byUserId,
 		localNotes,
 		setLocalNotes,
 		isLoading,
-		saveNotes,
 		hasEditPermission,
-		setRefreshKey,
+		saveNotes,
+		respond,
 	};
-};
+}

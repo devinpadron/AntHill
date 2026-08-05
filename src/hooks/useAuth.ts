@@ -1,9 +1,15 @@
 import { useState } from "react";
 import { Alert } from "react-native";
 import auth from "@react-native-firebase/auth";
-import { getUser, updateUser } from "../services/userService";
+import { getUser, updateProfile } from "../services/userService";
 import { sendResetPassword } from "../services/authService";
 
+/*
+ * Login, against the v2 schema.
+ *
+ * `authService` is shared with v1 unchanged — it only talks to Firebase Auth
+ * and never touches Firestore, so there is nothing schema-specific in it.
+ */
 export const useAuth = () => {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
@@ -38,22 +44,50 @@ export const useAuth = () => {
 	const login = async () => {
 		try {
 			setLoading(true);
+
+			/*
+			 * Clear a stale unverified session first.
+			 *
+			 * Signing in as a uid that is ALREADY signed in is not an auth
+			 * state change, so onAuthStateChanged does not fire and nothing
+			 * navigates — the button appears dead until the app is relaunched.
+			 * Signup now signs out on its way out, but it cannot if the app was
+			 * killed between creating the account and finishing, so this
+			 * guarantees the transition rather than assuming it.
+			 *
+			 * Only unverified sessions: a verified one signing in again is
+			 * already in the state it wants.
+			 */
+			const stale = auth().currentUser;
+			if (stale && !stale.emailVerified) {
+				await auth()
+					.signOut()
+					.catch(() => {});
+			}
+
 			const userCredential = await auth().signInWithEmailAndPassword(
 				email,
 				password,
 			);
-
-			// If login successful, sync email in database
 			const user = userCredential.user;
+
+			/*
+			 * Keep the stored email in step with the Auth record, which is the
+			 * source of truth for it.
+			 *
+			 * Guarded on the profile existing. v1 read `userData.email` off the
+			 * result unconditionally and crashed on a null — the same
+			 * unrecoverable loop that made leaving your last company brick the
+			 * app, because v1 deleted the user document.
+			 *
+			 * updateProfile also fans the change out to the denormalized copies
+			 * on this user's memberships, so a member list cannot go stale.
+			 */
 			const userData = await getUser(user.uid);
-			if (user.email !== userData.email) {
-				await updateUser(user.uid, {
-					...userData,
-					email: user.email,
-				});
+			if (userData && user.email && user.email !== userData.email) {
+				await updateProfile(user.uid, { email: user.email });
 			}
 
-			console.log("User account signed in!");
 			return true;
 		} catch (error) {
 			handleAuthError(error);
@@ -66,10 +100,6 @@ export const useAuth = () => {
 	const resetPassword = async (resetEmail: string) => {
 		try {
 			await sendResetPassword(resetEmail);
-			Alert.alert(
-				"Reset Email Sent",
-				"Check your email for password reset instructions.",
-			);
 			return true;
 		} catch (error) {
 			Alert.alert(

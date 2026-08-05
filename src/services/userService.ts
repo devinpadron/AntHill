@@ -1,261 +1,251 @@
-import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
-import db from "../constants/firestore";
-import auth from "@react-native-firebase/auth";
-import { User } from "../types";
+import firestore from "@react-native-firebase/firestore";
+import db from "../lib/db";
+import { C, APP_DATA, APP_CONFIG } from "../constants/paths";
+import { FALLBACK_ACTIVE_SCHEMA_VERSION } from "../constants/schema";
+import { User, UserSettings } from "../types";
+import { syncProfileToMemberships } from "./membershipService";
 
-/* A UserController that contains:
-  - A user interface that provides the structure of user data
-  - A function that uses a userID to pull from Firestore and retrieve the user entry
-  - A function that uses a userID to update exisiting user data
-  - A function that uses a userID to delete a user from Firestore
-  - A function that creates a new user entry and puts it into Firestore
-*/
-export async function getUser(userID: string) {
+/*
+ * User profiles.
+ *
+ * Membership has moved out entirely — `companies[]` does not exist in v2. That
+ * removes the bidirectional-sync orphan class by construction.
+ */
+
+export async function getUser(userId: string): Promise<User | null> {
 	try {
-		//Retrieve user data
-		const userEntry = await db.collection("Users").doc(userID).get();
-		if (userEntry.exists()) {
-			const dbData = userEntry.data();
-			if (dbData) {
-				return dbData as User;
-			} else {
-				console.log("Document exists but data is undefined");
-				return null;
-			}
-		} else {
-			console.log("No such document");
-			return null;
-		}
+		const doc = await db.collection(C.users).doc(userId).get();
+		return doc.exists() ? { ...(doc.data() as User), id: doc.id } : null;
 	} catch (e) {
 		console.error("Error getting user", e);
-	}
-}
-
-export async function getUserPrivilege(userID: string, company: string) {
-	try {
-		const userEntry = await db
-			.collection("Companies")
-			.doc(company)
-			.collection("Users")
-			.doc(userID)
-			.get();
-		if (userEntry.exists()) {
-			return userEntry.data().role;
-		} else {
-			return null;
-		}
-	} catch (e) {
-		console.log("Error getting user privilege", e);
 		return null;
 	}
 }
 
-export async function subscribeUserPrivilege(
-	userID: string,
-	company: string,
-	onSnap: (
-		snapshot: FirebaseFirestoreTypes.DocumentSnapshot<FirebaseFirestoreTypes.DocumentData>,
-	) => void,
-) {
+export function subscribeUser(
+	userId: string,
+	onChange: (user: User | null) => void,
+): () => void {
+	if (!userId) return () => {};
+
 	return db
-		.collection("Companies")
-		.doc(company)
-		.collection("Users")
-		.doc(userID)
-		.onSnapshot(onSnap);
+		.collection(C.users)
+		.doc(userId)
+		.onSnapshot(
+			(doc) =>
+				onChange(
+					doc.exists()
+						? { ...(doc.data() as User), id: doc.id }
+						: null,
+				),
+			(error) => console.error("Error subscribing to user", error),
+		);
 }
 
-export function subscribeCurrentUser(
-	onSnap: (
-		snapshot: FirebaseFirestoreTypes.DocumentSnapshot<FirebaseFirestoreTypes.DocumentData>,
-	) => void,
-) {
+export async function createUser(
+	userId: string,
+	profile: { firstName: string; lastName: string; email: string },
+): Promise<void> {
+	const now = firestore.FieldValue.serverTimestamp();
+
+	await db.collection(C.users).doc(userId).set({
+		id: userId,
+		firstName: profile.firstName,
+		lastName: profile.lastName,
+		email: profile.email,
+		emailLower: profile.email.toLowerCase(),
+		phone: null,
+		loggedInCompanyId: null,
+		fcmTokens: [],
+		lastSeenAppVersion: null,
+		lastSeenAt: null,
+		createdAt: now,
+		updatedAt: now,
+		schemaVersion: 2,
+	});
+}
+
+/**
+ * Updates the profile and propagates it to the denormalized copies on the
+ * user's memberships, which is what keeps member lists a single query.
+ *
+ * Replaces useProfile.updatePhone, which wrote the same field THREE times —
+ * directly to Users, to the dead Companies/{c}/Employees document, and again
+ * via updateUser.
+ */
+export async function updateProfile(
+	userId: string,
+	patch: {
+		firstName?: string;
+		lastName?: string;
+		email?: string;
+		phone?: string | null;
+	},
+): Promise<void> {
+	const update: Record<string, unknown> = {
+		...patch,
+		updatedAt: firestore.FieldValue.serverTimestamp(),
+	};
+	if (patch.email) update.emailLower = patch.email.toLowerCase();
+
+	await db.collection(C.users).doc(userId).update(update);
+	await syncProfileToMemberships(userId, patch);
+}
+
+/** Switches the active company. Membership is verified by the security rules. */
+export async function setActiveCompany(
+	userId: string,
+	companyId: string | null,
+): Promise<void> {
+	await db.collection(C.users).doc(userId).update({
+		loggedInCompanyId: companyId,
+		updatedAt: firestore.FieldValue.serverTimestamp(),
+	});
+}
+
+export async function recordAppLaunch(
+	userId: string,
+	appVersion: string,
+): Promise<void> {
+	if (!userId) return;
+	try {
+		await db.collection(C.users).doc(userId).update({
+			lastSeenAppVersion: appVersion,
+			lastSeenAt: firestore.FieldValue.serverTimestamp(),
+		});
+	} catch (e) {
+		console.error("Error recording app launch", e);
+	}
+}
+
+/* ------------------------------------------------------------ push tokens */
+
+/**
+ * Single object argument on purpose.
+ *
+ * v1's `clearNotificationToken(token, userId)` was called as
+ * `(userId, token)` at UserContext.tsx:258, so logout never removed the token
+ * and instead wrote to a document named after the token. Named fields make that
+ * mistake unrepresentable.
+ */
+export async function addPushToken({
+	userId,
+	token,
+}: {
+	userId: string;
+	token: string;
+}): Promise<void> {
+	if (!userId || !token) return;
+	try {
+		await db
+			.collection(C.users)
+			.doc(userId)
+			.update({ fcmTokens: firestore.FieldValue.arrayUnion(token) });
+	} catch (e) {
+		console.error("Error adding push token", e);
+	}
+}
+
+export async function removePushToken({
+	userId,
+	token,
+}: {
+	userId: string;
+	token: string;
+}): Promise<void> {
+	if (!userId || !token) return;
+	try {
+		await db
+			.collection(C.users)
+			.doc(userId)
+			.update({ fcmTokens: firestore.FieldValue.arrayRemove(token) });
+	} catch (e) {
+		console.error("Error removing push token", e);
+	}
+}
+
+/* --------------------------------------------------------------- settings */
+
+export function subscribeUserSettings(
+	userId: string,
+	onChange: (settings: UserSettings | null) => void,
+): () => void {
+	if (!userId) return () => {};
+
 	return db
-		.collection("Users")
-		.doc(auth().currentUser.uid)
-		.onSnapshot(onSnap);
-}
-
-export async function deleteUser(userID: string) {
-	// Delete an existing user
-	try {
-		await db.collection("Users").doc(userID).delete();
-		console.log("User successfully deleted");
-		return true;
-	} catch (e) {
-		console.error("Error deleting user:", e);
-		throw e;
-	}
-}
-
-export async function addUser(newUser: User, userID: string) {
-	try {
-		await db.collection("Users").doc(userID).set(newUser);
-	} catch (e) {
-		console.error("Error adding user:", e);
-		throw e;
-	}
-}
-
-export async function updateUser(userID: string, userData: any) {
-	try {
-		await db.collection("Users").doc(userID).update(userData);
-		console.log("User successfully updated");
-		return true;
-	} catch (e) {
-		console.error("Error updating user:", e);
-		throw e;
-	}
-}
-
-export async function swapUserCompany(userID: string, companyID: string) {
-	const userData = await getUser(userID);
-	var companyID = companyID;
-	if (companyID === "") {
-		const companies = userData.companies;
-		companyID = companies[0];
-	}
-
-	if (!userData.companies.includes(companyID)) {
-		console.error("User does not belong to company");
-		return false;
-	}
-
-	try {
-		await db.collection("Users").doc(userID).update({
-			loggedInCompany: companyID,
-		});
-		return true;
-	} catch (e) {
-		console.error("Error swapping user company:", e);
-		throw e;
-	}
-}
-
-export async function deleteCompanyFromUser(userID: string, companyID: string) {
-	const userData = await getUser(userID);
-	if (!userData.companies.includes(companyID)) {
-		console.error("User does not belong to company");
-		return -1;
-	}
-
-	try {
-		const companies = userData.companies;
-		companies.splice(companies.indexOf(companyID), 1);
-		await db.collection("Users").doc(userID).update({
-			companies: companies,
-		});
-		if (companies.length === 0) {
-			await deleteUser(userID);
-			return 1;
-		}
-		return userData.loggedInCompany;
-	} catch (e) {
-		console.error("Error deleting company from user:", e);
-		throw e;
-	}
-}
-
-// Batch get user data using Promise.all for React Native Firebase
-export const batchGetUsers = async (
-	userIds: string[],
-): Promise<Record<string, any>> => {
-	try {
-		if (userIds.length === 0) return {};
-
-		// Use Promise.all to fetch documents in parallel
-		const userPromises = userIds.map((id) =>
-			db.collection("Users").doc(id).get(),
+		.collection(C.userSettings)
+		.doc(userId)
+		.onSnapshot(
+			(doc) =>
+				onChange(doc.exists() ? (doc.data() as UserSettings) : null),
+			(error) => console.error("Error subscribing to settings", error),
 		);
+}
 
-		const userSnapshots = await Promise.all(userPromises);
-
-		// Process results into dictionary format
-		return userIds.reduce(
-			(acc, id, index) => {
-				const snapshot = userSnapshots[index];
-				if (snapshot.exists() && snapshot.data()) {
-					acc[id] = snapshot.data();
-				}
-				return acc;
-			},
-			{} as Record<string, any>,
-		);
-	} catch (error) {
-		console.error("Error batch fetching users:", error);
-		return {};
-	}
-};
-
-// Batch get user privileges using Promise.all for React Native Firebase
-export const batchGetUserPrivileges = async (
-	userIds: string[],
-	companyId: string,
-): Promise<Record<string, string>> => {
-	try {
-		if (userIds.length === 0 || !companyId) return {};
-
-		// Use Promise.all to fetch documents in parallel
-		const privilegePromises = userIds.map((id) =>
-			db
-				.collection("Companies")
-				.doc(companyId)
-				.collection("Users")
-				.doc(id)
-				.get(),
-		);
-
-		const privilegeSnapshots = await Promise.all(privilegePromises);
-
-		// Process results into dictionary format
-		return userIds.reduce(
-			(acc, id, index) => {
-				const snapshot = privilegeSnapshots[index];
-				if (snapshot.exists() && snapshot.data()) {
-					acc[id] = snapshot.data().role || "";
-				} else {
-					acc[id] = "";
-				}
-				return acc;
-			},
-			{} as Record<string, string>,
-		);
-	} catch (error) {
-		console.error("Error batch fetching user privileges:", error);
-		return {};
-	}
-};
-
-export const getUserPreferences = async (userID: string) => {
-	const preferencesDoc = await db
-		.collection("Users")
-		.doc(userID)
-		.collection("Preferences")
-		.doc("settings")
-		.get();
-
-	return preferencesDoc.exists() ? preferencesDoc.data() : null;
-};
-
-export const setUserPreferences = async (userID: string, preferences) => {
+export async function updateUserSettings(
+	userId: string,
+	patch: Partial<UserSettings>,
+): Promise<void> {
 	await db
-		.collection("Users")
-		.doc(userID)
-		.collection("Preferences")
-		.doc("settings")
-		.set(preferences, { merge: true });
-};
+		.collection(C.userSettings)
+		.doc(userId)
+		.set(
+			{
+				...patch,
+				userId,
+				updatedAt: firestore.FieldValue.serverTimestamp(),
+			},
+			{ merge: true },
+		);
+}
 
-export const subscribeUserPreferences = (
-	userID: string,
-	onSnap: (
-		snapshot: FirebaseFirestoreTypes.DocumentSnapshot<FirebaseFirestoreTypes.DocumentData>,
-	) => void,
-) => {
-	return db
-		.collection("Users")
-		.doc(userID)
-		.collection("Preferences")
-		.doc("settings")
-		.onSnapshot(onSnap);
-};
+/* ------------------------------------------------------------- app config */
+
+/** Read before sign-in by the launch gate. */
+export async function getRequiredVersion(): Promise<string | null> {
+	try {
+		const doc = await db
+			.collection(APP_DATA.collection)
+			.doc(APP_DATA.doc)
+			.get();
+		const value = doc.data()?.required_version;
+		return typeof value === "string" ? value : null;
+	} catch (e) {
+		console.error("Error getting required version", e);
+		return null;
+	}
+}
+
+export async function getAppConfig(): Promise<{
+	activeVersion: number;
+	maintenance: boolean;
+	message: string;
+}> {
+	// Imported, not repeated. A safety value with two definitions is a value
+	// that will eventually disagree with itself.
+	const fallback = {
+		activeVersion: FALLBACK_ACTIVE_SCHEMA_VERSION,
+		maintenance: false,
+		message: "",
+	};
+	try {
+		const doc = await db
+			.collection(APP_CONFIG.collection)
+			.doc(APP_CONFIG.doc)
+			.get();
+		if (!doc.exists()) return fallback;
+
+		const data = doc.data();
+		return {
+			activeVersion:
+				typeof data?.activeVersion === "number"
+					? data.activeVersion
+					: fallback.activeVersion,
+			maintenance: data?.maintenance === true,
+			message: typeof data?.message === "string" ? data.message : "",
+		};
+	} catch (e) {
+		console.error("Error getting app config", e);
+		return fallback;
+	}
+}

@@ -17,12 +17,11 @@ import * as Clipboard from "expo-clipboard";
 
 const CompanyPreferences = ({ navigation }) => {
 	const { user } = useUser();
-	const { companyData, preferences, isLoading, updatePreferences } =
-		useCompany();
+	const { company, preferences, isLoading, updatePreferences } = useCompany();
 	const [copySuccess, setCopySuccess] = useState(false);
 
-	const inviteCode = companyData?.accessCode || "";
-	const companyName = companyData?.name || "";
+	const inviteCode = company?.accessCode || "";
+	const companyName = company?.name || "";
 
 	const handleCopyInviteCode = async () => {
 		await Clipboard.setStringAsync(inviteCode);

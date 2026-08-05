@@ -1,33 +1,70 @@
 import React, { useEffect, useState } from "react";
-import {
-	View,
-	Text,
-	TextInput,
-	TouchableOpacity,
-	StyleSheet,
-} from "react-native";
+import { View, Text, TextInput, TouchableOpacity } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import DatePicker from "react-native-date-picker";
 import { format } from "date-fns";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import AttachmentsSelector from "../ui/AttachmentsSelector";
-import db from "../../constants/firestore";
 import { useUser } from "../../contexts/UserContext";
+import { getChecklistsByIds } from "../../services/libraryService";
+import { UploadProgressMap } from "../../contexts/UploadManagerContext";
+import { styles } from "./CustomFormRender.styles";
+import { FormField, FormFieldType } from "../../types";
 
-// Update the props interface to include the missing properties
+/**
+ * A form schema plus the local, editable copy of its fields.
+ *
+ * Not the stored `FormSchema` itself: schema documents are immutable, and this
+ * component mutates `fields` in place while a checklist field resolves its
+ * items. Structural so callers can pass either a loaded schema or one they
+ * assembled.
+ */
+export type RenderableField = FormField & {
+	/** Local dropdown state. UI only — never persisted. */
+	isOpen?: boolean;
+};
+
+export type RenderableForm = {
+	title?: string;
+	description?: string;
+	fields: RenderableField[];
+};
+
+/*
+ * DRAFT response values, deliberately not `FormResponses`.
+ *
+ * While the form is open a media field holds SelectableAttachment[] and a
+ * multiSelect holds string[] — neither of which the persisted
+ * `FormResponseValue` union describes. That union currently has no consumers
+ * anywhere in the app, so it is an unverified model rather than an enforced
+ * one, and narrowing to it here would encode a guess about what actually
+ * reaches Firestore. Left loose until the submit path is typed end to end.
+ */
+type DraftResponses = Record<string, any>;
+
+/**
+ * DropDownPicker's `setOpen` passes either the next value or an updater.
+ * Storing the updater unchanged would leave `isOpen` holding a function, which
+ * is truthy — the dropdown would never close.
+ */
+const resolveOpen = (
+	next: boolean | ((prev: boolean) => boolean),
+	prev: boolean | undefined,
+): boolean => (typeof next === "function" ? next(prev ?? false) : next);
+
 interface CustomFormRenderProps {
-	customForm: any;
-	formResponses: any;
-	formErrors: any;
-	onFieldChange: (fieldId: string, fieldType: string, value: any) => void;
-	setCustomForm: React.Dispatch<React.SetStateAction<any>>;
-	uploadProgress?: {
-		[fileId: string]: {
-			progress: number;
-			status: "pending" | "uploading" | "complete" | "error";
-			error?: string;
-		};
-	};
+	customForm: RenderableForm | null;
+	formResponses: DraftResponses;
+	/** fieldId -> validation message, for fields that failed submit. */
+	formErrors: Record<string, string>;
+	onFieldChange: (
+		fieldId: string,
+		fieldType: FormFieldType,
+		value: any,
+	) => void;
+	setCustomForm: React.Dispatch<React.SetStateAction<RenderableForm | null>>;
+	/* The v2 upload manager's map, which also reports "cancelled". */
+	uploadProgress?: UploadProgressMap;
 	deletionQueue?: string[];
 	setDeletionQueue?: React.Dispatch<React.SetStateAction<string[]>>;
 }
@@ -61,59 +98,41 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 		const loadChecklistItems = async () => {
 			if (!companyId || !customForm?.fields) return;
 
+			const fields = customForm.fields.filter(
+				(f) => f.type === "checklist" && f.checklistId,
+			);
+			if (!fields.length) return;
+
+			/*
+			 * ONE batched query for every checklist the form references. v1
+			 * issued a separate read per checklist-typed field, on every render
+			 * pass where the id list changed.
+			 */
+			const byId = await getChecklistsByIds(
+				companyId,
+				fields.map((f) => f.checklistId),
+			);
+
 			const newMap: { [fieldId: string]: string[] } = {};
 			const newNamesMap: { [fieldId: string]: string } = {};
-			// Fetch each checklist's items
-			await Promise.all(
-				customForm.fields
-					.filter((f) => f.type === "checklist" && f.checklistId)
-					.map(async (f) => {
-						try {
-							const docRef = db
-								.collection("Companies")
-								.doc(companyId)
-								.collection("Checklists")
-								.doc(f.checklistId);
-							const snap = await docRef.get();
-							const data =
-								typeof snap?.data === "function"
-									? snap.data()
-									: undefined;
-							const rawItems = Array.isArray(data?.items)
-								? (data?.items as any[])
-								: [];
-							const items = rawItems
-								.map((it: any) =>
-									typeof it === "string" ? it : it?.text,
-								)
-								.filter(
-									(t: any) =>
-										typeof t === "string" &&
-										t.trim().length > 0,
-								);
-							newMap[f.id] = items;
 
-							// Store checklist name/title for label display
-							const checklistName =
-								data?.title || data?.name || f.label;
-							newNamesMap[f.id] = checklistName;
-
-							// Also annotate the field with item count for validation use
-							// without altering other properties
-						} catch (e) {
-							newMap[f.id] = [];
-							console.warn(
-								`Failed to load checklist items for ${f.checklistId}:`,
-								e,
-							);
-						}
-					}),
-			);
+			for (const field of fields) {
+				const checklist = byId[field.checklistId];
+				/*
+				 * v2 items are always {id, text}. The old `typeof it === "string"`
+				 * normalization is gone — the migration converted every legacy
+				 * string[] checklist, and production had none left anyway.
+				 */
+				newMap[field.id] = (checklist?.items ?? [])
+					.map((item) => item.text)
+					.filter((text) => text && text.trim().length > 0);
+				newNamesMap[field.id] = checklist?.title || field.label;
+			}
 
 			setChecklistItemsByField(newMap);
 			setChecklistNamesByField(newNamesMap);
 
-			// Update customForm with checklistItemCount to aid validation elsewhere
+			// Annotate fields with item counts, which validation elsewhere reads.
 			if (Object.keys(newMap).length > 0) {
 				setCustomForm((prev) => ({
 					...prev,
@@ -237,20 +256,27 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 						<DropDownPicker
 							open={field.isOpen}
 							value={formResponses[field.id] || null}
-							items={(field.options || []).map((option) => ({
-								label: option,
-								value: option,
-							}))}
+							items={(field.selectOptions || []).map(
+								(option) => ({
+									label: option,
+									value: option,
+								}),
+							)}
 							setOpen={(open) => {
-								// Close all other dropdowns when opening this one
-								setCustomForm({
-									...customForm,
-									fields: customForm.fields.map((f) =>
-										f.id === field.id
-											? { ...f, isOpen: open }
-											: { ...f, isOpen: false },
-									),
-								});
+								// Close all other dropdowns when opening this one.
+								// DropDownPicker may hand back an updater rather
+								// than a boolean, which would otherwise be stored
+								// as-is and read as permanently open.
+								setCustomForm((prevForm) => ({
+									...prevForm,
+									fields: prevForm.fields.map((f) => ({
+										...f,
+										isOpen:
+											f.id === field.id
+												? resolveOpen(open, f.isOpen)
+												: false,
+									})),
+								}));
 							}}
 							setValue={(callback) => {
 								const value = callback(formResponses[field.id]);
@@ -289,18 +315,22 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 							multiple={true}
 							open={field.isOpen}
 							value={multiSelect}
-							items={(field.options || []).map((option) => ({
-								label: option,
-								value: option,
-							}))}
+							items={(field.selectOptions || []).map(
+								(option) => ({
+									label: option,
+									value: option,
+								}),
+							)}
 							setOpen={(open) => {
 								setCustomForm((prevForm) => ({
 									...prevForm,
-									fields: prevForm.fields.map((f) =>
-										f.id === field.id
-											? { ...f, isOpen: open }
-											: { ...f, isOpen: false },
-									),
+									fields: prevForm.fields.map((f) => ({
+										...f,
+										isOpen:
+											f.id === field.id
+												? resolveOpen(open, f.isOpen)
+												: false,
+									})),
 								}));
 							}}
 							setValue={setMultiSelect}
@@ -327,7 +357,7 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 								paddingHorizontal: 10,
 								paddingBottom: 20,
 							}}
-							searchable={field.options?.length > 8}
+							searchable={field.selectOptions?.length > 8}
 							closeAfterSelecting={false}
 							disableBorderRadius={false}
 							itemSeparator={true}
@@ -638,164 +668,5 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 		</View>
 	);
 };
-
-const styles = StyleSheet.create({
-	customFormCard: {
-		backgroundColor: "#f7fbff",
-		borderRadius: 8,
-		padding: 16,
-		marginBottom: 16,
-		borderLeftWidth: 3,
-		borderLeftColor: "#5856d6",
-	},
-	cardTitle: {
-		fontSize: 15,
-		fontWeight: "600",
-		color: "#333",
-		marginBottom: 8,
-	},
-	formDescription: {
-		fontSize: 14,
-		color: "#666",
-		marginBottom: 16,
-	},
-	formField: {
-		marginBottom: 16,
-	},
-	fieldLabel: {
-		fontSize: 15,
-		fontWeight: "500",
-		marginBottom: 8,
-		color: "#333",
-	},
-	requiredIndicator: {
-		color: "#FF3B30",
-		fontWeight: "bold",
-	},
-	textInput: {
-		height: 44,
-		borderWidth: 1,
-		borderColor: "#ccc",
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		fontSize: 16,
-		backgroundColor: "white",
-	},
-	checkboxContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-	},
-	checkbox: {
-		marginRight: 10,
-	},
-	checkboxLabel: {
-		fontSize: 16,
-		color: "#333",
-	},
-	dropdownContainer: {
-		marginBottom: 10,
-		position: "relative",
-	},
-	dropdown: {
-		borderColor: "#ccc",
-		backgroundColor: "white",
-		minHeight: 44,
-	},
-	dropdownList: {
-		borderColor: "#ccc",
-		backgroundColor: "white",
-		elevation: 5,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.2,
-		shadowRadius: 3,
-	},
-	dateButton: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		height: 44,
-		borderWidth: 1,
-		borderColor: "#ccc",
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		backgroundColor: "white",
-	},
-	dateText: {
-		fontSize: 16,
-		color: "#333",
-	},
-	datePlaceholder: {
-		fontSize: 16,
-		color: "#999",
-	},
-	errorText: {
-		color: "#FF3B30",
-		fontSize: 12,
-		marginTop: 4,
-	},
-	multiplierResult: {
-		marginTop: 8,
-	},
-	multiplierText: {
-		fontSize: 14,
-		color: "#333",
-	},
-	uploaderContainer: {
-		marginVertical: 10,
-	},
-	filePreviewContainer: {
-		marginTop: 8,
-		flexDirection: "row",
-		flexWrap: "wrap",
-		gap: 8,
-	},
-	filePreview: {
-		width: 80,
-		height: 80,
-		borderRadius: 4,
-		backgroundColor: "#f0f0f0",
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	imagePreview: {
-		width: 80,
-		height: 80,
-		borderRadius: 4,
-		resizeMode: "cover",
-	},
-	docPreviewText: {
-		fontSize: 10,
-		color: "#666",
-		textAlign: "center",
-		marginTop: 4,
-		paddingHorizontal: 2,
-	},
-	expandableInput: {
-		minHeight: 48,
-		borderWidth: 1,
-		borderColor: "#ccc",
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		paddingVertical: 8,
-		fontSize: 16,
-		backgroundColor: "white",
-		textAlignVertical: "center",
-	},
-	checklistContainer: {
-		gap: 12,
-	},
-	checklistItem: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingVertical: 4,
-	},
-	checklistLabel: {
-		fontSize: 16,
-		color: "#333",
-		marginLeft: 10,
-		flex: 1,
-	},
-});
 
 export default CustomFormRender;
