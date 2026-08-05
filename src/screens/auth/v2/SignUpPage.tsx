@@ -67,11 +67,18 @@ const SignUpPage = ({ navigation }) => {
 				secureTextEntry
 			/>
 
+			{/*
+			 * NOT autoCapitalize="characters". Group codes are generated from
+			 * an uppercase alphabet and lookupJoinCode uppercases whatever is
+			 * typed, so they match either way — but a COMPANY access code is
+			 * matched exactly, and real ones are mixed case ("CaseCreativeCo",
+			 * "SoBridal!"). Forcing caps made every one of those fail as an
+			 * invalid code.
+			 */}
 			<FormInput
 				placeholder="Company or Group Code:"
 				value={accessCode}
 				onChangeText={setAccessCode}
-				autoCapitalize="characters"
 			/>
 
 			<Button

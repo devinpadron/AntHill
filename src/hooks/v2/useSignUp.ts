@@ -8,6 +8,7 @@ import {
 	resolveJoinCode,
 } from "../../services/v2/membershipService";
 import { validateSignupFields, handleAuthError } from "../../utils/authUtils";
+import { beginSignup, endSignup } from "../../contexts/v2/signupInProgress";
 
 /*
  * Signup, against the v2 schema.
@@ -58,6 +59,9 @@ export const useSignUp = (navigation: any) => {
 		}
 
 		setIsLoading(true);
+		// Silences UserContext's verification alert until this knows how it
+		// ended — see signupInProgress.
+		beginSignup();
 
 		try {
 			const userCredential = await auth().createUserWithEmailAndPassword(
@@ -105,10 +109,22 @@ export const useSignUp = (navigation: any) => {
 
 			await user.sendEmailVerification();
 
+			/*
+			 * Reported here rather than left to UserContext, which is muted for
+			 * the duration. One message, and it can say the account was
+			 * actually created — the generic one cannot, because it fires for
+			 * failed signups too.
+			 */
+			Alert.alert(
+				"Account created",
+				"Check your email to verify your address, then sign in.",
+			);
+
 			navigation.pop();
 		} catch (error) {
 			handleAuthError(error);
 		} finally {
+			endSignup();
 			setIsLoading(false);
 		}
 	};

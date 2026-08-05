@@ -17,6 +17,7 @@ import {
 	removePushToken,
 } from "../../services/v2/userService";
 import { subscribeMembership } from "../../services/v2/membershipService";
+import { isSignupInProgress } from "./signupInProgress";
 import { Membership, User, UserSettings } from "../../types/v2";
 import { Role } from "../../types";
 
@@ -175,7 +176,14 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 					// isLoading stays true until the profile arrives.
 				} else {
 					setLoggedIn(false);
-					showVerificationAlert();
+					/*
+					 * Stay quiet while a signup is running. It creates the
+					 * account before it can validate the join code, so this
+					 * fires for an account that may be about to be deleted —
+					 * and the user would be told to verify an email alongside
+					 * "invalid access code". useSignUp reports the outcome.
+					 */
+					if (!isSignupInProgress()) showVerificationAlert();
 					await clearAuthState();
 					setIsLoading(false);
 				}
