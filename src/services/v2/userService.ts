@@ -1,6 +1,7 @@
 import firestore from "@react-native-firebase/firestore";
 import db from "../../lib/db";
 import { C, APP_DATA, APP_CONFIG } from "../../constants/paths";
+import { FALLBACK_ACTIVE_SCHEMA_VERSION } from "../../constants/schema";
 import { User, UserSettings } from "../../types/v2";
 import { syncProfileToMemberships } from "./membershipService";
 
@@ -217,7 +218,13 @@ export async function getAppConfig(): Promise<{
 	maintenance: boolean;
 	message: string;
 }> {
-	const fallback = { activeVersion: 2, maintenance: false, message: "" };
+	// Imported, not repeated. A safety value with two definitions is a value
+	// that will eventually disagree with itself.
+	const fallback = {
+		activeVersion: FALLBACK_ACTIVE_SCHEMA_VERSION,
+		maintenance: false,
+		message: "",
+	};
 	try {
 		const doc = await db
 			.collection(APP_CONFIG.collection)

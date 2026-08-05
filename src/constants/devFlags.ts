@@ -4,12 +4,15 @@
  */
 
 /**
- * Mounts the v2 provider tree instead of the normal app, so the whole v2 stack
- * (contexts -> hooks -> services -> rules -> indexes) can be exercised against
- * the `test` database before cutover.
+ * Diagnostics harness.
  *
- * The harness now runs the real v2 AppNavigator, so it has its own login and
- * signup — a fresh account can be created here rather than first being tried
- * in the release that depends on it. A diagnostics screen sits alongside it.
+ * OFF by default now that the app itself is v2 — leaving it on would mean dev
+ * never exercises the pieces the harness deliberately omits (AppGate and
+ * NotificationProvider), which is exactly where an untested difference would
+ * hide.
+ *
+ * Turn it on to get the v2 diagnostics screen and the PROD/TEST database badge,
+ * which are worth having when a query or a rule is misbehaving. It mounts the
+ * same v2 contexts, so what it shows is what the app sees.
  */
-export const V2_SMOKE_TEST = __DEV__ && true;
+export const V2_SMOKE_TEST = __DEV__ && false;

@@ -1,11 +1,6 @@
 import React, { useEffect } from "react";
-import { AppNavigator } from "./src/navigation/AppNavigator";
-import { UserProvider, useUser } from "./src/contexts/UserContext";
-import { CompanyProvider, useCompany } from "./src/contexts/CompanyContext";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { UploadManagerProvider } from "./src/contexts/UploadManagerContext";
-import { NotificationProvider } from "./src/contexts/NotificationContext";
 import { NotifierWrapper } from "react-native-notifier";
 import { NavigationContainer } from "@react-navigation/native";
 import {
@@ -14,8 +9,13 @@ import {
 } from "./src/navigation/navigationRef";
 import { AppGate } from "./src/components/ui/AppGate";
 import { getCurrentAppVersion } from "./src/utils/versionUtils";
-import { recordAppLaunch } from "./src/services/appConfigService";
 import { V2_SMOKE_TEST } from "./src/constants/devFlags";
+import { AppNavigator } from "./src/navigation/v2/AppNavigator";
+import { UserProvider, useUser } from "./src/contexts/v2/UserContext";
+import { CompanyProvider } from "./src/contexts/v2/CompanyContext";
+import { UploadManagerProvider } from "./src/contexts/v2/UploadManagerContext";
+import { NotificationProvider } from "./src/contexts/v2/NotificationContext";
+import { recordAppLaunch } from "./src/services/v2/userService";
 import { UserProvider as V2UserProvider } from "./src/contexts/v2/UserContext";
 import { CompanyProvider as V2CompanyProvider } from "./src/contexts/v2/CompanyContext";
 import { UploadManagerProvider as V2UploadManagerProvider } from "./src/contexts/v2/UploadManagerContext";
@@ -43,19 +43,19 @@ const V2SmokeApp = () => (
 	</GestureHandlerRootView>
 );
 
-// Component to initialize the company context after user auth
-const CompanyInitializer = () => {
-	const { user } = useUser();
-	const { setActiveCompany } = useCompany();
-
-	useEffect(() => {
-		if (user?.loggedInCompany) {
-			setActiveCompany(user.loggedInCompany);
-		}
-	}, [user?.loggedInCompany]);
-
-	return null;
-};
+/*
+ * CompanyInitializer is GONE.
+ *
+ * v1 needed a bridge component to push `user.loggedInCompany` into
+ * CompanyContext, because the two contexts did not know about each other. The
+ * v2 CompanyProvider subscribes to `useUser().companyId` itself, so the active
+ * company follows the user with no wiring in between — and there is no window
+ * where the user has loaded but the company has not been told about it.
+ *
+ * Keeping it would also have been a live bug: it read `user.loggedInCompany`,
+ * which does not exist in v2 (it is `loggedInCompanyId`), so it would have
+ * silently never fired.
+ */
 
 // Records which build this user is on, so update adoption can be measured
 // before a forced cutover. Best-effort and non-blocking.
@@ -71,6 +71,19 @@ const LaunchTelemetry = () => {
 	return null;
 };
 
+/*
+ * The app.
+ *
+ * Reads and writes the v2 schema. The provider order is unchanged from v1 and
+ * still matters: NotificationProvider sits INSIDE NavigationContainer because
+ * push handling navigates, and AppGate wraps everything so a forced update or
+ * a schema-version mismatch blocks the tree rather than rendering behind it.
+ *
+ * This build declares SUPPORTED_SCHEMA_VERSIONS = [2]. While the server still
+ * says activeVersion 1 it gates ITSELF behind the update screen — which is what
+ * lets the release sit in the store, approved and inert, until the migration
+ * window actually flips the switch.
+ */
 const MainApp: React.FC = () => {
 	// Add this effect to check pending navigation periodically
 	useEffect(() => {
@@ -103,7 +116,6 @@ const MainApp: React.FC = () => {
 								>
 									<NotificationProvider>
 										<NotifierWrapper>
-											<CompanyInitializer />
 											<LaunchTelemetry />
 											<AppNavigator />
 										</NotifierWrapper>
