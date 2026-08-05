@@ -42,8 +42,15 @@ export interface Event extends BaseDoc, CompanyScoped {
 	 */
 	audienceGroupIds: string[];
 	/**
-	 * `audienceGroupIds.length > 0`, denormalized because Firestore cannot
-	 * query on array length.
+	 * Individual workers invited to this event, independent of any group.
+	 *
+	 * For the one-off case a group cannot express: this specific bartender,
+	 * because they worked the venue last month.
+	 */
+	audienceUserIds: string[];
+	/**
+	 * True when either audience list is non-empty, denormalized because
+	 * Firestore cannot query on array length.
 	 *
 	 * Always present. The open-availability query filters on
 	 * `isTargeted == false`, and an equality filter does not match documents

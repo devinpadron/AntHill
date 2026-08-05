@@ -257,6 +257,9 @@ export async function createEvent(
 	const assignedUserIds = input.assignedUserIds ?? [];
 
 	const audienceGroupIds = input.audienceGroupIds ?? [];
+	const audienceUserIds = input.audienceUserIds ?? [];
+	const isTargeted =
+		audienceGroupIds.length > 0 || audienceUserIds.length > 0;
 
 	await ref.set({
 		...toPersisted(input),
@@ -266,11 +269,12 @@ export async function createEvent(
 		assignedCount: assignedUserIds.length,
 		attachmentCount: 0,
 		audienceGroupIds,
+		audienceUserIds,
 		// Written explicitly, always. The open-availability query filters on
 		// `isTargeted == false`, and an equality filter skips documents where
 		// the field is absent — so an omitted `false` here is an event that
 		// exists for nobody.
-		isTargeted: audienceGroupIds.length > 0,
+		isTargeted,
 		responseCounts: {
 			confirmed: 0,
 			declined: 0,
@@ -295,13 +299,14 @@ export async function createEvent(
 	 * was saved but nobody has been asked yet. syncEventAudience is
 	 * re-runnable, so re-saving fixes it.
 	 */
-	if (audienceGroupIds.length) {
+	if (isTargeted) {
 		try {
 			await syncEventAudience(
 				companyId,
 				ref.id,
 				(input.dateKey as string) ?? "",
 				audienceGroupIds,
+				audienceUserIds,
 			);
 		} catch {
 			const error: any = new Error("Event saved, invitations not sent");
@@ -336,10 +341,18 @@ export async function updateEvent(
 		update.assignedCount = patch.assignedUserIds.length;
 	}
 
-	// Same pairing as assignedUserIds/assignedCount: the denormalized flag is
-	// derived here so it cannot drift from the array it describes.
-	if (patch.audienceGroupIds) {
-		update.isTargeted = patch.audienceGroupIds.length > 0;
+	/*
+	 * Same pairing as assignedUserIds/assignedCount: the denormalized flag is
+	 * derived here so it cannot drift from the lists it describes.
+	 *
+	 * Both lists have to be considered together — patching only the groups to
+	 * empty on an event with individual invitees must NOT clear isTargeted, or
+	 * the job would reappear for the whole company.
+	 */
+	if (patch.audienceGroupIds || patch.audienceUserIds) {
+		update.isTargeted =
+			(patch.audienceGroupIds ?? []).length > 0 ||
+			(patch.audienceUserIds ?? []).length > 0;
 	}
 
 	try {
@@ -389,7 +402,13 @@ export async function deleteEvent(
 }
 
 /**
- * Publishes an event to a set of groups by writing one invitation per worker.
+ * Publishes an event by writing one invitation per targeted worker.
+ *
+ * The audience is the UNION of two things: everyone in the named groups, and
+ * any individually named workers. Groups cover the standing case ("all
+ * bartenders"); named users cover the one-off a group cannot express ("this
+ * bartender, because they worked the venue last month"). Someone reachable
+ * both ways is invited once — the set handles it.
  *
  * This is what enforces targeting. A restricted worker's availability screen
  * reads their own eventResponses, so a worker with no invitation has no
@@ -399,7 +418,7 @@ export async function deleteEvent(
  * Re-runnable. Invitations that already exist are left alone, so re-saving an
  * event never resets a reply that has already come in.
  *
- * Retraction is deliberately narrow: removing a group withdraws only
+ * Retraction is deliberately narrow: dropping a group or a name withdraws only
  * invitations nobody has answered yet. A worker who already confirmed or
  * declined keeps their response, because that answer is real information a
  * manager may be looking at.
@@ -409,6 +428,7 @@ export async function syncEventAudience(
 	eventId: string,
 	dateKey: string,
 	groupIds: string[],
+	userIds: string[] = [],
 ): Promise<void> {
 	try {
 		const [members, existing] = await Promise.all([
@@ -421,7 +441,10 @@ export async function syncEventAudience(
 				.get(),
 		]);
 
-		const invited = new Set(members.map((m) => m.userId));
+		const invited = new Set([
+			...members.map((m) => m.userId),
+			...userIds.filter(Boolean),
+		]);
 		const byUser = new Map(
 			existing.docs.map((doc) => [doc.data().userId as string, doc]),
 		);
@@ -447,13 +470,26 @@ export async function syncEventAudience(
 			writes += 1;
 		}
 
-		for (const [userId, doc] of byUser) {
-			if (invited.has(userId)) continue;
-			const data = doc.data();
-			// Untouched invitation: nothing was said, so nothing is lost.
-			if (data.status === "pending" && !data.respondedAt) {
-				batch.delete(doc.ref);
-				writes += 1;
+		/*
+		 * Retract only while there IS an audience.
+		 *
+		 * An empty audience means the event went back to being open to
+		 * everyone, and an open event does not use invitations to control who
+		 * sees it — so there is nothing to withdraw. Retracting anyway would
+		 * delete every unanswered response on the event, and migrated records
+		 * are exactly that shape (`status: "pending"`, `respondedAt: null`):
+		 * a manager editing the date on an old event would silently erase the
+		 * record that those workers had ever been asked.
+		 */
+		if (invited.size) {
+			for (const [userId, doc] of byUser) {
+				if (invited.has(userId)) continue;
+				const data = doc.data();
+				// Untouched invitation: nothing was said, so nothing is lost.
+				if (data.status === "pending" && !data.respondedAt) {
+					batch.delete(doc.ref);
+					writes += 1;
+				}
 			}
 		}
 

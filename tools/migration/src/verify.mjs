@@ -226,14 +226,15 @@ for (const doc of v2[C.events].docs) {
 	const d = doc.data();
 	if (
 		typeof d.isTargeted !== "boolean" ||
-		!Array.isArray(d.audienceGroupIds)
+		!Array.isArray(d.audienceGroupIds) ||
+		!Array.isArray(d.audienceUserIds)
 	) {
 		missingTargeting += 1;
 		fail("EVENT_TARGETING_FIELD_MISSING", doc.id);
 	}
 }
 check(
-	"every event carries isTargeted + audienceGroupIds",
+	"every event carries isTargeted + both audience lists",
 	missingTargeting === 0,
 	missingTargeting ? `${missingTargeting} events` : "",
 );

@@ -114,6 +114,7 @@ export function transformEvent(id, v1, ctx) {
 			 * availability list.
 			 */
 			audienceGroupIds: [],
+			audienceUserIds: [],
 			isTargeted: false,
 			responseCounts: countResponses(v1, assignedUserIds),
 			createdAt: startAt ?? null,

@@ -44,6 +44,8 @@ const DAN = "dan";
  * branch and proves nothing. Erin's role is never mutated.
  */
 const ERIN = "erin";
+/** Invited to one job by name, belonging to no group. */
+const FRANK = "frank";
 
 let env;
 
@@ -240,6 +242,45 @@ before(async () => {
 			audienceGroupIds: ["g1"],
 			isTargeted: true,
 		});
+		// Targeted at ONE NAMED PERSON with no group involved. Frank holds the
+		// invitation; nobody else does.
+		await setDoc(doc(db, "memberships", mid(A, FRANK)), {
+			id: mid(A, FRANK),
+			companyId: A,
+			userId: FRANK,
+			role: "user",
+			status: "active",
+			visibility: "restricted",
+			groupIds: [],
+			firstName: FRANK,
+			lastName: FRANK,
+			email: `${FRANK}@e.com`,
+		});
+		await setDoc(doc(db, "users", FRANK), {
+			id: FRANK,
+			email: `${FRANK}@e.com`,
+		});
+		await setDoc(doc(db, "events", "ePerson"), {
+			id: "ePerson",
+			companyId: A,
+			title: "One named bartender",
+			dateKey: "2027-01-14",
+			assignedUserIds: [],
+			assignedCount: 0,
+			audienceGroupIds: [],
+			audienceUserIds: [FRANK],
+			isTargeted: true,
+		});
+		await setDoc(doc(db, "eventResponses", `ePerson_${FRANK}`), {
+			id: `ePerson_${FRANK}`,
+			companyId: A,
+			eventId: "ePerson",
+			userId: FRANK,
+			dateKey: "2027-01-14",
+			status: "pending",
+			respondedAt: null,
+		});
+
 		// No isTargeted field at all — a v2 document written before targeting
 		// existed. Must read as open, not deny.
 		await setDoc(doc(db, "events", "eLegacy"), {
@@ -591,6 +632,31 @@ describe("v2 — worker groups gate who can answer a job", () => {
 		// assignee never gets a response document.
 		await assertSucceeds(
 			getDoc(doc(as(ERIN), "events", "eTargetedStaffed")),
+		);
+	});
+
+	test("a job can target one named person with no group at all", async () => {
+		await assertSucceeds(
+			updateDoc(doc(as(FRANK), "eventResponses", `ePerson_${FRANK}`), {
+				status: "confirmed",
+			}),
+		);
+		await assertSucceeds(getDoc(doc(as(FRANK), "events", "ePerson")));
+	});
+
+	test("...and nobody else can see or answer it", async () => {
+		// Belonging to the targeted GROUP is not the mechanism — holding an
+		// invitation is. Dan is in Bartenders and still has no business here.
+		await assertFails(getDoc(doc(as(DAN), "events", "ePerson")));
+		await assertFails(
+			setDoc(doc(as(DAN), "eventResponses", `ePerson_${DAN}`), {
+				id: `ePerson_${DAN}`,
+				companyId: A,
+				eventId: "ePerson",
+				userId: DAN,
+				dateKey: "2027-01-14",
+				status: "confirmed",
+			}),
 		);
 	});
 

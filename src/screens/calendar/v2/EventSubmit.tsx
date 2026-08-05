@@ -1,5 +1,11 @@
 import "react-native-get-random-values";
-import React, { useRef, useEffect, useState } from "react";
+import React, {
+	useRef,
+	useEffect,
+	useState,
+	useMemo,
+	useCallback,
+} from "react";
 import {
 	View,
 	Text,
@@ -84,6 +90,8 @@ const EventSubmit = ({ navigation }) => {
 		hasFormChanged,
 		audienceGroupIds,
 		setAudienceGroupIds,
+		audienceUserIds,
+		setAudienceUserIds,
 	} = useEventForm(navigation, eventId);
 
 	const { userId, companyId: currentCompany } = useUser();
@@ -107,6 +115,7 @@ const EventSubmit = ({ navigation }) => {
 
 	const { preferences } = useCompany();
 	const { groups } = useGroups(currentCompany ?? "");
+	const [personSearch, setPersonSearch] = useState("");
 
 	// Add these at the top of your component
 	const isMounted = useRef(true);
@@ -162,6 +171,56 @@ const EventSubmit = ({ navigation }) => {
 	 * come from their own subscription.
 	 */
 	const { members } = useCompanyMembers(currentCompany ?? "");
+
+	/*
+	 * The audience picker.
+	 *
+	 * Rendered as plain rows rather than a DropDownPicker like the assigned-
+	 * workers field: this section sits low in the form, and a dropdown overlay
+	 * here would have to win a zIndex fight with everything below it.
+	 *
+	 * Selected people are pinned above the search box so that typing a name
+	 * cannot hide someone already chosen — otherwise a manager filtering for
+	 * one person appears to have lost the rest.
+	 */
+	const isTargetedAudience =
+		audienceGroupIds.length > 0 || audienceUserIds.length > 0;
+
+	const toggleAudienceUser = useCallback(
+		(userId: string) =>
+			setAudienceUserIds((prev) =>
+				prev.includes(userId)
+					? prev.filter((id) => id !== userId)
+					: [...prev, userId],
+			),
+		[setAudienceUserIds],
+	);
+
+	const selectedAudienceMembers = useMemo(
+		() => members.filter((m) => audienceUserIds.includes(m.userId)),
+		[members, audienceUserIds],
+	);
+
+	const matchingUnselected = useMemo(() => {
+		const term = personSearch.trim().toLowerCase();
+		return members.filter(
+			(m) =>
+				!audienceUserIds.includes(m.userId) &&
+				(!term || m.displayName.toLowerCase().includes(term)),
+		);
+	}, [members, audienceUserIds, personSearch]);
+
+	// Capped so a 65-person company does not render 65 rows inside a form.
+	const PERSON_ROW_CAP = 12;
+	const unselectedAudienceMembers = matchingUnselected.slice(
+		0,
+		PERSON_ROW_CAP,
+	);
+	const hiddenPersonCount = Math.max(
+		0,
+		matchingUnselected.length - PERSON_ROW_CAP,
+	);
+
 	const [workerResponses, setWorkerResponses] = useState<
 		Record<string, string>
 	>({});
@@ -373,6 +432,7 @@ const EventSubmit = ({ navigation }) => {
 			packageIds: selectedPackages,
 			labelId: selectedLabelId,
 			audienceGroupIds,
+			audienceUserIds,
 		});
 
 		if (savedId) await handleAttachmentSubmit(savedId);
@@ -1026,11 +1086,14 @@ const EventSubmit = ({ navigation }) => {
 										Who can see this job
 									</Text>
 									<Text style={styles.audienceHint}>
-										{audienceGroupIds.length === 0
-											? "Everyone who can see open jobs. Pick a group to send it only to them."
-											: "Only these groups will be asked about it."}
+										{isTargetedAudience
+											? "Only the people below will be asked about it."
+											: "Everyone who can see open jobs. Pick a group or specific people to send it only to them."}
 									</Text>
 
+									<Text style={styles.audienceSectionTitle}>
+										Groups
+									</Text>
 									{groups.length === 0 ? (
 										<Text style={styles.audienceEmpty}>
 											No groups yet — create one under
@@ -1084,6 +1147,90 @@ const EventSubmit = ({ navigation }) => {
 												</TouchableOpacity>
 											);
 										})
+									)}
+
+									{/*
+									 * Specific people, for the one-off a group
+									 * cannot express. Selected names are pinned
+									 * above the search so filtering never hides
+									 * someone you already picked.
+									 */}
+									<Text style={styles.audienceSectionTitle}>
+										Specific people
+									</Text>
+
+									{selectedAudienceMembers.map((member) => (
+										<TouchableOpacity
+											key={member.userId}
+											style={styles.audienceRow}
+											onPress={() =>
+												toggleAudienceUser(
+													member.userId,
+												)
+											}
+										>
+											<Ionicons
+												name="checkbox"
+												size={22}
+												color="#2078c8"
+											/>
+											<Text style={styles.audienceLabel}>
+												{member.displayName}
+											</Text>
+										</TouchableOpacity>
+									))}
+
+									{members.length > 8 && (
+										<TextInput
+											style={styles.audienceSearch}
+											value={personSearch}
+											onChangeText={setPersonSearch}
+											placeholder="Search people"
+											placeholderTextColor="#aaa"
+											autoCorrect={false}
+										/>
+									)}
+
+									{unselectedAudienceMembers.length === 0 ? (
+										<Text style={styles.audienceEmpty}>
+											{personSearch.trim()
+												? "Nobody matches that name."
+												: "Everyone is already selected."}
+										</Text>
+									) : (
+										unselectedAudienceMembers.map(
+											(member) => (
+												<TouchableOpacity
+													key={member.userId}
+													style={styles.audienceRow}
+													onPress={() =>
+														toggleAudienceUser(
+															member.userId,
+														)
+													}
+												>
+													<Ionicons
+														name="square-outline"
+														size={22}
+														color="#999"
+													/>
+													<Text
+														style={
+															styles.audienceLabel
+														}
+													>
+														{member.displayName}
+													</Text>
+												</TouchableOpacity>
+											),
+										)
+									)}
+
+									{hiddenPersonCount > 0 && (
+										<Text style={styles.audienceEmpty}>
+											{hiddenPersonCount} more — search to
+											narrow the list.
+										</Text>
 									)}
 								</View>
 							)}
@@ -1490,6 +1637,24 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		color: "#999",
 		paddingVertical: 8,
+	},
+	audienceSectionTitle: {
+		fontSize: 12,
+		fontWeight: "700",
+		color: "#888",
+		textTransform: "uppercase",
+		marginTop: 14,
+		marginBottom: 2,
+	},
+	audienceSearch: {
+		backgroundColor: "#f4f4f6",
+		borderRadius: 8,
+		paddingHorizontal: 12,
+		paddingVertical: 9,
+		fontSize: 14,
+		color: "#222",
+		marginTop: 6,
+		marginBottom: 4,
 	},
 	audienceRow: {
 		flexDirection: "row",

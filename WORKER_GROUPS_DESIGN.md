@@ -16,8 +16,14 @@ memberships/{companyId}_{userId}
 
 events/{eventId}
   + audienceGroupIds: string[]            // default []
-  + isTargeted: boolean                   // audienceGroupIds.length > 0
+  + audienceUserIds: string[]             // default []
+  + isTargeted: boolean                   // either list non-empty
 ```
+
+An event's audience is the UNION of the two lists. Groups cover the standing
+case ("all bartenders"); named users cover the one-off a group cannot express
+("this bartender, because they worked the venue last month"). Someone reachable
+both ways is invited once.
 
 `isTargeted` is denormalized because Firestore cannot query on array length,
 and the open-availability query has to exclude targeted events.
@@ -39,8 +45,9 @@ nothing until someone designates work for them.
 
 ### Invitations
 
-Publishing an event to a group writes one `eventResponses` document per member
-of that group, with `status: "pending"` (`syncEventAudience`).
+Publishing an event writes one `eventResponses` document per targeted worker —
+every member of the named groups, plus anyone named individually
+(`syncEventAudience`).
 
 This is what makes the restriction real rather than cosmetic: **a worker with
 no invitation has no document, so there is nothing for their availability
@@ -49,9 +56,17 @@ can forget to apply.
 
 Re-running is safe. Existing invitations are left alone, so re-saving an event
 never resets a reply that already came in. Retraction is narrow on purpose:
-removing a group withdraws only invitations nobody has answered. A worker who
-already confirmed or declined keeps their response, because that answer is real
-information a manager may be looking at.
+dropping a group or a name withdraws only invitations nobody has answered. A
+worker who already confirmed or declined keeps their response, because that
+answer is real information a manager may be looking at.
+
+Retraction is also skipped entirely when the audience is empty. An empty
+audience means the event went back to being open to everyone, and an open event
+does not use invitations to control who sees it — so there is nothing to
+withdraw. Retracting anyway would delete every unanswered response on the
+event, and migrated records are exactly that shape (`status: "pending"`,
+`respondedAt: null`): editing the date on an old event would have silently
+erased the record that those workers had been asked.
 
 ## Queries
 

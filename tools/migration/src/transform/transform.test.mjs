@@ -109,6 +109,7 @@ describe("transformEvent", () => {
 		assert.equal(typeof doc.isTargeted, "boolean");
 		assert.equal(doc.isTargeted, false);
 		assert.deepEqual(doc.audienceGroupIds, []);
+		assert.deepEqual(doc.audienceUserIds, []);
 	});
 
 	test("responseCounts covers the availability flow, not just assignees", () => {

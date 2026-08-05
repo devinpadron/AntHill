@@ -39,6 +39,8 @@ export const useEventForm = (navigation, eventId?: string) => {
 	 * every invitation nobody had answered yet.
 	 */
 	const [audienceGroupIds, setAudienceGroupIds] = useState<string[]>([]);
+	/** Individually invited workers, seeded for the same reason as the groups. */
+	const [audienceUserIds, setAudienceUserIds] = useState<string[]>([]);
 	const [notes, setNotes] = useState("");
 	const [originalValues, setOriginalValues] = useState({
 		title: "",
@@ -95,6 +97,7 @@ export const useEventForm = (navigation, eventId?: string) => {
 				setLocations(data.locations);
 				setAssignedWorkers(data.assignedUserIds || []);
 				setAudienceGroupIds(data.audienceGroupIds || []);
+				setAudienceUserIds(data.audienceUserIds || []);
 				setNotes(data.adminNotes || "");
 
 				setOriginalValues({
@@ -278,6 +281,7 @@ export const useEventForm = (navigation, eventId?: string) => {
 			packageIds?: string[];
 			labelId?: string | null;
 			audienceGroupIds?: string[];
+			audienceUserIds?: string[];
 		}) => {
 			if (!validateFields()) return;
 
@@ -351,6 +355,9 @@ export const useEventForm = (navigation, eventId?: string) => {
 					...(extra?.audienceGroupIds
 						? { audienceGroupIds: extra.audienceGroupIds }
 						: {}),
+					...(extra?.audienceUserIds
+						? { audienceUserIds: extra.audienceUserIds }
+						: {}),
 				};
 
 				let eventId;
@@ -365,12 +372,13 @@ export const useEventForm = (navigation, eventId?: string) => {
 					 * to a group get an invitation, and invitations nobody
 					 * answered are withdrawn if their group was removed.
 					 */
-					if (extra?.audienceGroupIds) {
+					if (extra?.audienceGroupIds || extra?.audienceUserIds) {
 						await syncEventAudience(
 							currentCompany,
 							editID,
 							dateKey,
-							extra.audienceGroupIds,
+							extra.audienceGroupIds ?? [],
+							extra.audienceUserIds ?? [],
 						);
 					}
 				} else {
@@ -545,6 +553,8 @@ export const useEventForm = (navigation, eventId?: string) => {
 		setAssignedWorkers,
 		audienceGroupIds,
 		setAudienceGroupIds,
+		audienceUserIds,
+		setAudienceUserIds,
 		notes,
 		setNotes,
 		originalValues,

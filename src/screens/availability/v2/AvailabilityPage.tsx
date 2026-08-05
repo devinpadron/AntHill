@@ -117,7 +117,9 @@ const AvailabilityPage = ({ navigation }) => {
 	 * loading the whole event document.
 	 */
 	const [myResponses, setMyResponses] = useState<Record<string, string>>({});
-	const { members } = useCompanyMembers(companyId ?? "");
+	const { members, namesFor: personNamesFor } = useCompanyMembers(
+		companyId ?? "",
+	);
 	const { namesFor: groupNamesFor } = useGroups(companyId ?? "");
 
 	/*
@@ -250,6 +252,9 @@ const AvailabilityPage = ({ navigation }) => {
 						status: status,
 						confirmed: confirmed,
 						groupNames: groupNamesFor(event.audienceGroupIds ?? []),
+						personNames: personNamesFor(
+							event.audienceUserIds ?? [],
+						),
 						rawData: event,
 					};
 				});
@@ -441,15 +446,16 @@ const AvailabilityPage = ({ navigation }) => {
 							</View>
 
 							{/*
-							 * Which group this job went to. Only targeted jobs
-							 * carry one, so the absence of a badge reads as
+							 * Who this job went to. Only targeted jobs carry
+							 * any badge, so the absence of one reads as
 							 * "everyone" without needing its own label.
 							 */}
-							{item.groupNames?.length > 0 && (
+							{(item.groupNames?.length > 0 ||
+								item.personNames?.length > 0) && (
 								<View style={styles.groupBadgeRow}>
 									{item.groupNames.map((name) => (
 										<View
-											key={name}
+											key={`g-${name}`}
 											style={styles.groupBadge}
 										>
 											<Ionicons
@@ -465,6 +471,40 @@ const AvailabilityPage = ({ navigation }) => {
 											</Text>
 										</View>
 									))}
+									{/*
+									 * Individually invited people, capped — a
+									 * job sent to a dozen names should not push
+									 * the date and location off the card.
+									 */}
+									{item.personNames
+										.slice(0, 2)
+										.map((name) => (
+											<View
+												key={`p-${name}`}
+												style={styles.groupBadge}
+											>
+												<Ionicons
+													name="person"
+													size={11}
+													color="#5a3ec8"
+												/>
+												<Text
+													style={
+														styles.groupBadgeText
+													}
+													numberOfLines={1}
+												>
+													{name}
+												</Text>
+											</View>
+										))}
+									{item.personNames.length > 2 && (
+										<View style={styles.groupBadge}>
+											<Text style={styles.groupBadgeText}>
+												+{item.personNames.length - 2}
+											</Text>
+										</View>
+									)}
 								</View>
 							)}
 						</View>
