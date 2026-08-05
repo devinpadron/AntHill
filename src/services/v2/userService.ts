@@ -15,7 +15,7 @@ import { syncProfileToMemberships } from "./membershipService";
 export async function getUser(userId: string): Promise<User | null> {
 	try {
 		const doc = await db.collection(C.users).doc(userId).get();
-		return doc.exists ? { ...(doc.data() as User), id: doc.id } : null;
+		return doc.exists() ? { ...(doc.data() as User), id: doc.id } : null;
 	} catch (e) {
 		console.error("Error getting user", e);
 		return null;
@@ -34,7 +34,9 @@ export function subscribeUser(
 		.onSnapshot(
 			(doc) =>
 				onChange(
-					doc.exists ? { ...(doc.data() as User), id: doc.id } : null,
+					doc.exists()
+						? { ...(doc.data() as User), id: doc.id }
+						: null,
 				),
 			(error) => console.error("Error subscribing to user", error),
 		);
@@ -174,7 +176,8 @@ export function subscribeUserSettings(
 		.collection(C.userSettings)
 		.doc(userId)
 		.onSnapshot(
-			(doc) => onChange(doc.exists ? (doc.data() as UserSettings) : null),
+			(doc) =>
+				onChange(doc.exists() ? (doc.data() as UserSettings) : null),
 			(error) => console.error("Error subscribing to settings", error),
 		);
 }
@@ -230,7 +233,7 @@ export async function getAppConfig(): Promise<{
 			.collection(APP_CONFIG.collection)
 			.doc(APP_CONFIG.doc)
 			.get();
-		if (!doc.exists) return fallback;
+		if (!doc.exists()) return fallback;
 
 		const data = doc.data();
 		return {

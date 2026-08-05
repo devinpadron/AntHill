@@ -63,7 +63,7 @@ export const getPackageDetails = async (companyId, packageId) => {
 			.doc(packageId)
 			.get();
 
-		if (!packageDoc.exists) return null;
+		if (!packageDoc.exists()) return null;
 
 		const packageData = {
 			id: packageDoc.id,
@@ -81,7 +81,7 @@ export const getPackageDetails = async (companyId, packageId) => {
 						.doc(checklist.checklistId)
 						.get();
 
-					if (checklistDoc.exists) {
+					if (checklistDoc.exists()) {
 						const checklistData = checklistDoc.data();
 						return {
 							...checklist,
@@ -120,7 +120,7 @@ export const getChecklistById = async (companyId, checklistId) => {
 			.doc(checklistId)
 			.get();
 
-		if (!checklistDoc.exists) return null;
+		if (!checklistDoc.exists()) return null;
 
 		return {
 			id: checklistDoc.id,

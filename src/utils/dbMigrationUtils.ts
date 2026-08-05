@@ -58,7 +58,7 @@ async function migrateToV1(userId: string) {
 	const userRef = db.collection("Users").doc(userId);
 	const userDoc = await userRef.get();
 
-	if (!userDoc.exists) {
+	if (!userDoc.exists()) {
 		console.log("User document not found");
 		return false;
 	}

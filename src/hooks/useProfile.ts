@@ -169,7 +169,7 @@ export const useProfile = () => {
 
 			const employeeDoc = await employeeRef.get();
 
-			if (employeeDoc.exists) {
+			if (employeeDoc.exists()) {
 				await employeeRef.update({
 					phone: phone,
 				});

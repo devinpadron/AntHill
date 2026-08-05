@@ -27,7 +27,7 @@ export function subscribeChecklistState(
 		.onSnapshot(
 			(doc) =>
 				onChange(
-					doc.exists
+					doc.exists()
 						? { ...(doc.data() as EventChecklistState), eventId }
 						: null,
 				),
@@ -84,7 +84,7 @@ export async function getChecklistState(
 			.collection(C.eventChecklistStates)
 			.doc(eventId)
 			.get();
-		return doc.exists
+		return doc.exists()
 			? { ...(doc.data() as EventChecklistState), eventId }
 			: null;
 	} catch (e) {

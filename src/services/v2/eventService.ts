@@ -224,7 +224,7 @@ export async function getEventsInRange(
 export async function getEvent(eventId: string): Promise<Event | null> {
 	try {
 		const doc = await db.collection(C.events).doc(eventId).get();
-		return doc.exists ? toEvent(doc) : null;
+		return doc.exists() ? toEvent(doc) : null;
 	} catch (e) {
 		console.error("Error getting event", e);
 		return null;
@@ -241,7 +241,7 @@ export function subscribeEvent(
 		.collection(C.events)
 		.doc(eventId)
 		.onSnapshot(
-			(doc) => onChange(doc.exists ? toEvent(doc) : null),
+			(doc) => onChange(doc.exists() ? toEvent(doc) : null),
 			(error) => console.error("Error subscribing to event", error),
 		);
 }

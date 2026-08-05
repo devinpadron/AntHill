@@ -62,7 +62,7 @@ export const useEventForm = (navigation, eventId?: string) => {
 
 		setIsLoading(true);
 		const subscriber = subscribeEvent(currentCompany, editID, (event) => {
-			if (event.exists) {
+			if (event.exists()) {
 				const data = event.data();
 				setTitle(data.title);
 				setDate(moment(data.date).toDate());

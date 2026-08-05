@@ -181,7 +181,7 @@ const EventDetails = ({ navigation }) => {
 
 				const labelDoc = await labelRef.get();
 
-				if (labelDoc.exists) {
+				if (labelDoc.exists()) {
 					setEventLabel({
 						id: labelDoc.id,
 						...labelDoc.data(),

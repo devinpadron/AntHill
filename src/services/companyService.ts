@@ -33,7 +33,7 @@ export async function getCompanyById(company: string) {
 			.collection("Companies")
 			.doc(company)
 			.get();
-		if (companyEntry.exists) {
+		if (companyEntry.exists()) {
 			data = companyEntry.data();
 		} else {
 			throw new Error("Company not found");
@@ -209,7 +209,7 @@ export async function getCompanyPreferences(
 			.doc("preferences")
 			.get();
 
-		if (preferencesDoc.exists) {
+		if (preferencesDoc.exists()) {
 			return preferencesDoc.data();
 		}
 

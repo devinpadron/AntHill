@@ -129,7 +129,7 @@ export async function lookupJoinCode(
 
 	try {
 		const doc = await db.collection(C.groupJoinCodes).doc(trimmed).get();
-		return doc.exists ? (doc.data() as GroupJoinCode) : null;
+		return doc.exists() ? (doc.data() as GroupJoinCode) : null;
 	} catch (e) {
 		// A miss is the normal case for a company access code, so this is not
 		// worth shouting about — the caller falls through to the company
@@ -206,7 +206,7 @@ export async function setGroupJoinCode(
 			await db.runTransaction(async (tx) => {
 				const codeRef = db.collection(C.groupJoinCodes).doc(code);
 				const existing = await tx.get(codeRef);
-				if (existing.exists) {
+				if (existing.exists()) {
 					// Retried below. Thrown rather than returned so the
 					// transaction commits nothing.
 					throw new Error("CODE_TAKEN");

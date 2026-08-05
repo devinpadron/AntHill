@@ -202,7 +202,7 @@ export const getEventsByIds = async (companyId: string, eventIds: string[]) => {
 					.doc(eventId)
 					.get()
 					.then((doc) => {
-						if (doc.exists) {
+						if (doc.exists()) {
 							return { id: doc.id, ...doc.data() };
 						}
 						return null;
@@ -277,7 +277,7 @@ export const getEventPackages = async (
 			.doc(eventId)
 			.get();
 
-		if (!event.exists) {
+		if (!event.exists()) {
 			console.log(`Event ${eventId} not found`);
 			return [];
 		}
@@ -304,7 +304,7 @@ export const getEventPackages = async (
 
 		// Filter out any non-existent documents and map to their data
 		return packageDocs
-			.filter((doc) => doc.exists)
+			.filter((doc) => doc.exists())
 			.map((doc) => {
 				const data = doc.data();
 				return {

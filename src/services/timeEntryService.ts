@@ -32,7 +32,7 @@ export const clockOut = async (timeEntryId: string, companyId: string) => {
 			.doc(timeEntryId);
 
 		const doc = await timeEntryRef.get();
-		if (!doc.exists) {
+		if (!doc.exists()) {
 			throw new Error("Time entry not found");
 		}
 
@@ -318,7 +318,7 @@ export const resumeTimeEntry = async (
 
 		const doc = await entryRef.get();
 
-		if (!doc.exists) {
+		if (!doc.exists()) {
 			throw new Error("Time entry not found");
 		}
 
@@ -387,7 +387,7 @@ export const getTimeEntry = async (companyId: string, timeEntryId: string) => {
 			.doc(timeEntryId)
 			.get();
 
-		if (!doc.exists) {
+		if (!doc.exists()) {
 			return null;
 		}
 

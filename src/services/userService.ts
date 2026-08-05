@@ -14,7 +14,7 @@ export async function getUser(userID: string) {
 	try {
 		//Retrieve user data
 		const userEntry = await db.collection("Users").doc(userID).get();
-		if (userEntry.exists) {
+		if (userEntry.exists()) {
 			const dbData = userEntry.data();
 			if (dbData) {
 				return dbData as User;
@@ -39,7 +39,7 @@ export async function getUserPrivilege(userID: string, company: string) {
 			.collection("Users")
 			.doc(userID)
 			.get();
-		if (userEntry.exists) {
+		if (userEntry.exists()) {
 			return userEntry.data().role;
 		} else {
 			return null;
@@ -174,7 +174,7 @@ export const batchGetUsers = async (
 		return userIds.reduce(
 			(acc, id, index) => {
 				const snapshot = userSnapshots[index];
-				if (snapshot.exists && snapshot.data()) {
+				if (snapshot.exists() && snapshot.data()) {
 					acc[id] = snapshot.data();
 				}
 				return acc;
@@ -211,7 +211,7 @@ export const batchGetUserPrivileges = async (
 		return userIds.reduce(
 			(acc, id, index) => {
 				const snapshot = privilegeSnapshots[index];
-				if (snapshot.exists && snapshot.data()) {
+				if (snapshot.exists() && snapshot.data()) {
 					acc[id] = snapshot.data().role || "";
 				} else {
 					acc[id] = "";
@@ -234,7 +234,7 @@ export const getUserPreferences = async (userID: string) => {
 		.doc("settings")
 		.get();
 
-	return preferencesDoc.exists ? preferencesDoc.data() : null;
+	return preferencesDoc.exists() ? preferencesDoc.data() : null;
 };
 
 export const setUserPreferences = async (userID: string, preferences) => {

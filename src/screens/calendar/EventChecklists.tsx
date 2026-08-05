@@ -76,7 +76,7 @@ const EventChecklists = () => {
 
 				const checklistDocs = await Promise.all(checklistPromises);
 				const checklistItems = checklistDocs
-					.filter((doc) => doc.exists)
+					.filter((doc) => doc.exists())
 					.map((doc) => ({ id: doc.id, ...doc.data() }) as any);
 
 				// Initialize item states for all checklist items

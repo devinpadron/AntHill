@@ -34,7 +34,7 @@ export async function getSchema(schemaId: string): Promise<FormSchema | null> {
 
 	try {
 		const doc = await db.collection(C.formSchemas).doc(schemaId).get();
-		if (!doc.exists) return null;
+		if (!doc.exists()) return null;
 
 		const schema = { ...(doc.data() as FormSchema), id: doc.id };
 		cache.set(schemaId, schema);

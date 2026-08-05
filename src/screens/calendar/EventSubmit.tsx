@@ -275,7 +275,7 @@ const EventSubmit = ({ navigation }) => {
 						.doc(eventId)
 						.get();
 
-					if (eventDoc.exists && eventDoc.data().labelId) {
+					if (eventDoc.exists() && eventDoc.data().labelId) {
 						setSelectedLabelId(eventDoc.data().labelId);
 					}
 				}

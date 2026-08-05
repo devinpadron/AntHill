@@ -318,7 +318,7 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
 					.doc(attachmentId)
 					.get();
 
-				if (attachmentDoc.exists) {
+				if (attachmentDoc.exists()) {
 					const attachmentData = attachmentDoc.data();
 
 					// Delete from storage if reference exists

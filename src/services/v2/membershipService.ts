@@ -78,7 +78,7 @@ export async function getMembership(
 			.collection(C.memberships)
 			.doc(membershipId(companyId, userId))
 			.get();
-		return doc.exists ? toMembership(doc) : null;
+		return doc.exists() ? toMembership(doc) : null;
 	} catch (e) {
 		console.error("Error getting membership", e);
 		return null;
@@ -99,7 +99,7 @@ export function subscribeMembership(
 		.collection(C.memberships)
 		.doc(membershipId(companyId, userId))
 		.onSnapshot(
-			(doc) => onChange(doc.exists ? toMembership(doc) : null),
+			(doc) => onChange(doc.exists() ? toMembership(doc) : null),
 			(error) => console.error("Error subscribing to membership", error),
 		);
 }
@@ -210,7 +210,7 @@ export async function joinCompanyWithAccessCode(
 				tx.get(userRef),
 			]);
 
-			if (existing.exists && existing.data()?.status === "active") {
+			if (existing.exists() && existing.data()?.status === "active") {
 				return null; // already a member
 			}
 

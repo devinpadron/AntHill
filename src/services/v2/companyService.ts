@@ -29,7 +29,7 @@ export const defaultPreferences: CompanyPreferences = {
 export async function getCompany(companyId: string): Promise<Company | null> {
 	try {
 		const doc = await db.collection(C.companies).doc(companyId).get();
-		return doc.exists ? { ...(doc.data() as Company), id: doc.id } : null;
+		return doc.exists() ? { ...(doc.data() as Company), id: doc.id } : null;
 	} catch (e) {
 		console.error("Error getting company", e);
 		return null;
@@ -48,7 +48,7 @@ export function subscribeCompany(
 		.onSnapshot(
 			(doc) =>
 				onChange(
-					doc.exists
+					doc.exists()
 						? { ...(doc.data() as Company), id: doc.id }
 						: null,
 				),
@@ -74,7 +74,7 @@ export function subscribePreferences(
 				onChange({
 					...defaultPreferences,
 					companyId,
-					...(doc.exists ? (doc.data() as CompanyPreferences) : {}),
+					...(doc.exists() ? (doc.data() as CompanyPreferences) : {}),
 				}),
 			(error) => console.error("Error subscribing to preferences", error),
 		);
@@ -91,7 +91,7 @@ export async function getPreferences(
 		return {
 			...defaultPreferences,
 			companyId,
-			...(doc.exists ? (doc.data() as CompanyPreferences) : {}),
+			...(doc.exists() ? (doc.data() as CompanyPreferences) : {}),
 		};
 	} catch (e) {
 		console.error("Error getting preferences", e);

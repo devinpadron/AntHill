@@ -39,7 +39,7 @@ export async function getRequiredVersion(): Promise<string | null> {
 export async function getAppConfig(): Promise<AppConfigSchema> {
 	try {
 		const snapshot = await db.collection("appConfig").doc("schema").get();
-		if (!snapshot.exists) {
+		if (!snapshot.exists()) {
 			return FALLBACK_APP_CONFIG;
 		}
 

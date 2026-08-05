@@ -186,7 +186,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 		if (loggedIn) {
 			userSubscriber = subscribeCurrentUser(async (userSnapshot) => {
 				try {
-					if (!userSnapshot.exists) {
+					if (!userSnapshot.exists()) {
 						setIsLoading(false);
 						return;
 					}
@@ -215,7 +215,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 		const subscriber = subscribeUserPreferences(
 			userId,
 			(userPreferencesSnapshot) => {
-				if (userPreferencesSnapshot.exists) {
+				if (userPreferencesSnapshot.exists()) {
 					const preferences = userPreferencesSnapshot.data();
 					setSettings(preferences);
 					console.log("User preferences updated:", preferences);
@@ -234,7 +234,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 			userId,
 			companyId,
 			async (userPrivilegeSnapshot) => {
-				if (userPrivilegeSnapshot.exists) {
+				if (userPrivilegeSnapshot.exists()) {
 					const privilege = userPrivilegeSnapshot.data().role;
 					setUserPrivilege(privilege);
 					setIsAdmin(

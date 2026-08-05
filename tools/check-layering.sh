@@ -58,8 +58,12 @@ for file in $violations; do
 done
 
 # --- 2. Services must not depend on the layers above them ------------------
+# find, not git grep: git grep skips UNTRACKED files, so a new service could
+# import upward on the very commit that adds it. Same fix as rule 1.
 inverted=$(
-	git grep -lE "from \"[^\"]*(contexts|hooks|screens)/" -- 'src/services/*' 2>/dev/null || true
+	find src/services \( -name '*.ts' -o -name '*.tsx' \) -print0 2>/dev/null \
+		| xargs -0 grep -lE 'from "[^"]*(contexts|hooks|screens)/' 2>/dev/null \
+		| sed "s|^\./||" | sort || true
 )
 for file in $inverted; do
 	echo "LAYERING: $file imports from contexts/hooks/screens — services are the bottom layer."
@@ -71,7 +75,9 @@ done
 # Every list query needs an explicit .limit(). v1 had none anywhere, which is
 # how the calendar ended up streaming the whole collection.
 unbounded=$(
-	git grep -lE "\.where\(" -- 'src/services/v2/*' 2>/dev/null || true
+	find src/services/v2 -name '*.ts' -print0 2>/dev/null \
+		| xargs -0 grep -lE '\.where\(' 2>/dev/null \
+		| sed "s|^\./||" | sort || true
 )
 for file in $unbounded; do
 	if ! grep -q "\.limit(" "$file"; then
@@ -200,6 +206,36 @@ if [ -n "$v1DbServices" ]; then
 			fi
 		done
 	done
+fi
+
+# --- 7. `.exists` used as a property ---------------------------------------
+#
+# In @react-native-firebase/firestore v23 `exists` is a METHOD. `doc.exists` is
+# therefore a function reference, which is ALWAYS TRUTHY — so every missing
+# document reads as existing and `data()` quietly returns undefined.
+#
+# It hid for a long time because the usual shape, `doc.exists ? map(doc) : null`,
+# degrades to an object of undefined fields rather than throwing. It only became
+# obvious where the check was decisive: issuing a join code treated every
+# freshly generated code as taken and gave up after five tries.
+#
+# SCOPED TO src/ ON PURPOSE. tools/migration uses firebase-admin, where `exists`
+# really is a property — the same expression is correct there and wrong here.
+#
+# Pattern deliberately simple. An earlier version used a bracket expression with
+# an escaped `]`, which the grep in an interactive shell accepted and the grep
+# xargs actually execs did not — so the guard matched nothing and passed
+# cheerfully. `._exists` cannot match this, since the literal ".exists" is not a
+# substring of "._exists".
+badExists=$(
+	find src \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' \) -print0 2>/dev/null \
+		| xargs -0 grep -nE '\.exists([^(]|$)' 2>/dev/null \
+		| grep -vE ':[[:space:]]*(\*|//)' || true
+)
+if [ -n "$badExists" ]; then
+	echo "\`.exists\` USED AS A PROPERTY (it is a method — this is always truthy):"
+	echo "$badExists"
+	status=1
 fi
 
 if [ "$status" -eq 0 ]; then

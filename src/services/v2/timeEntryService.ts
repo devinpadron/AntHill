@@ -83,7 +83,7 @@ export async function clockOut(entryId: string): Promise<void> {
 
 	await db.runTransaction(async (tx) => {
 		const snap = await tx.get(ref);
-		if (!snap.exists) throw new Error(`Time entry ${entryId} not found`);
+		if (!snap.exists()) throw new Error(`Time entry ${entryId} not found`);
 
 		const entry = snap.data() as TimeEntry;
 		const now = new Date();
@@ -131,7 +131,7 @@ export async function resumeEntry(entryId: string): Promise<void> {
 
 	await db.runTransaction(async (tx) => {
 		const snap = await tx.get(ref);
-		if (!snap.exists) return;
+		if (!snap.exists()) return;
 
 		const entry = snap.data() as TimeEntry;
 		const pausedFor = entry.pauseStartedAt
@@ -250,7 +250,7 @@ export function subscribeTimeEntries(
 export async function getTimeEntry(entryId: string): Promise<TimeEntry | null> {
 	try {
 		const doc = await db.collection(C.timeEntries).doc(entryId).get();
-		return doc.exists ? toEntry(doc) : null;
+		return doc.exists() ? toEntry(doc) : null;
 	} catch (e) {
 		console.error("Error getting time entry", e);
 		return null;

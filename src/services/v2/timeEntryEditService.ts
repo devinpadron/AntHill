@@ -43,7 +43,7 @@ export async function appendEdit(
 
 	await db.runTransaction(async (tx) => {
 		const snap = await tx.get(entryRef);
-		if (!snap.exists) throw new Error(`Time entry ${entryId} not found`);
+		if (!snap.exists()) throw new Error(`Time entry ${entryId} not found`);
 
 		const seq = snap.data()?.editCount ?? 0;
 		const ref = entryRef.collection(C.edits).doc(editId(entryId, seq));

@@ -106,7 +106,7 @@ export const CompanyProvider: React.FC<CompanyProviderProps> = ({
 					.doc(activeCompanyId)
 					.get();
 
-				if (!companyDoc.exists) {
+				if (!companyDoc.exists()) {
 					throw new Error("Company not found");
 				}
 

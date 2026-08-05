@@ -30,7 +30,7 @@ export const useEmployeeData = () => {
 				async (snapshot) => {
 					// Extract all user IDs first
 					const userIds = snapshot.docs
-						.filter((doc) => doc.exists)
+						.filter((doc) => doc.exists())
 						.map((doc) => doc.id);
 
 					if (userIds.length === 0) {
