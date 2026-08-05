@@ -4,11 +4,12 @@
  */
 
 /**
- * Mounts the v2 provider tree and a diagnostic screen instead of the normal
- * app, so the v2 stack (contexts -> hooks -> services -> rules -> indexes) can
- * be exercised against the `test` database before any screen is ported.
+ * Mounts the v2 provider tree instead of the normal app, so the whole v2 stack
+ * (contexts -> hooks -> services -> rules -> indexes) can be exercised against
+ * the `test` database before cutover.
  *
- * Sign in through the normal app FIRST — the harness has no auth UI and relies
- * on the persisted session.
+ * The harness now runs the real v2 AppNavigator, so it has its own login and
+ * signup — a fresh account can be created here rather than first being tried
+ * in the release that depends on it. A diagnostics screen sits alongside it.
  */
 export const V2_SMOKE_TEST = __DEV__ && true;

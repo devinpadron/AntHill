@@ -16,14 +16,21 @@ status=0
 #
 # src/lib/db.ts is the only handle. Anything importing it, or the Firestore SDK
 # directly, must live under src/services/.
+#
+# Plain find, NOT git grep. git grep silently skips UNTRACKED files, so a brand
+# new screen reaching straight into Firestore would sail through this guard on
+# the very commit that introduced it — which is the whole moment it exists to
+# catch. Rules 4 and 5 already learned this the hard way.
 violations=$(
-	git grep -lE "from \"[^\"]*(lib/db|constants/firestore)\"|@react-native-firebase/firestore" -- \
-		'src/*' \
-		':!src/services/*' \
-		':!src/lib/db.ts' \
-		':!src/constants/firestore.js' \
-		':!src/types/*' \
-		2>/dev/null || true
+	find src \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' \) \
+		-not -path 'src/services/*' \
+		-not -path 'src/types/*' \
+		-not -path 'src/lib/db.ts' \
+		-not -path 'src/constants/firestore.js' \
+		-print0 2>/dev/null \
+		| xargs -0 grep -lE "from \"[^\"]*(lib/db|constants/firestore)\"|@react-native-firebase/firestore" 2>/dev/null \
+		| sed "s|^\./||" \
+		| sort || true
 )
 
 # Known v1 violations, removed as Phase 2 rewrites each file.

@@ -8,6 +8,8 @@ type FormInputProps = {
 	onChangeText: (text: string) => void;
 	secureTextEntry?: boolean;
 	keyboardType?: "default" | "email-address" | "numeric" | "phone-pad";
+	/** Defaults to "none" — every existing caller is an email or a password. */
+	autoCapitalize?: "none" | "characters" | "words" | "sentences";
 };
 
 export const FormInput = ({
@@ -16,6 +18,7 @@ export const FormInput = ({
 	onChangeText,
 	secureTextEntry = false,
 	keyboardType = "default",
+	autoCapitalize = "none",
 }: FormInputProps) => {
 	return (
 		<TextInput
@@ -24,7 +27,7 @@ export const FormInput = ({
 			onChangeText={onChangeText}
 			value={value}
 			secureTextEntry={secureTextEntry}
-			autoCapitalize="none"
+			autoCapitalize={autoCapitalize}
 			autoCorrect={false}
 			keyboardType={keyboardType}
 		/>

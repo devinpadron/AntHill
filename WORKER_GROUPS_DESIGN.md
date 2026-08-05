@@ -104,8 +104,9 @@ company _and_ in that group, with the visibility the manager picked — so a 109
 contractor is restricted from their first launch instead of depending on
 someone remembering to set it afterwards.
 
-One field accepts both kinds of code. The company access code is tried first,
-so an existing code can never be shadowed by a group code that collides.
+One field accepts both kinds of code, at signup and at "Join company" alike.
+The company access code is tried first, so an existing code can never be
+shadowed by a group code that collides.
 
 ### Why this does not reintroduce self-assignment
 
@@ -215,12 +216,6 @@ pre-change `test` data they fail on 657 events and 90 memberships.
 
 ## Known gaps
 
-- **Group codes do not work at SIGNUP yet**, only via "Join company" on the
-  profile screen. `src/hooks/useSignUp.ts` still writes the v1 membership
-  (`Companies/{c}/Users/{uid}`) and there is no v2 auth stack at all — that is
-  a pre-existing cutover blocker, not something this feature introduced, but it
-  is the path a new hire actually takes. Porting the auth stack is cutover
-  work.
 - **`Alert.prompt` is iOS-only**, so renaming a group is a no-op on Android.
   Android is out of scope (all users are on iOS), and the call is written
   `Alert.prompt?.()` so it cannot crash — but it would need a modal before any

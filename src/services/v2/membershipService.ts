@@ -2,7 +2,7 @@ import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
 import firestore from "@react-native-firebase/firestore";
 import db from "../../lib/db";
 import { C, membershipId } from "../../constants/paths";
-import { Membership } from "../../types/v2";
+import { Membership, WorkerVisibility } from "../../types/v2";
 import { Role } from "../../types";
 import { lookupJoinCode } from "./groupService";
 
@@ -137,29 +137,68 @@ export async function getMembershipsForUser(
  * together. v1 did these as two separate writes, which is the orphan window
  * the audit found.
  */
+export type ResolvedJoinCode = {
+	companyId: string;
+	/** Present only for a group code. */
+	group?: { groupId: string; code: string; visibility: WorkerVisibility };
+};
+
+/**
+ * Works out what a typed code means, WITHOUT writing anything.
+ *
+ * Split out so signup can check a code before it creates any documents. A
+ * users/{uid} document cannot be deleted by its owner (firestore.rules —
+ * `allow delete: if false`), so a signup that created the profile first and
+ * then discovered a bad code would have no way to clean up after itself.
+ *
+ * The company access code is tried first, so an existing code can never be
+ * shadowed by a group code that happens to collide.
+ */
+export async function resolveJoinCode(
+	code: string,
+): Promise<ResolvedJoinCode | null> {
+	const trimmed = code.trim();
+	if (!trimmed) return null;
+
+	const matches = await db
+		.collection(C.companies)
+		.where("accessCode", "==", trimmed)
+		.limit(1)
+		.get();
+
+	if (!matches.empty) return { companyId: matches.docs[0].id };
+
+	/*
+	 * Falls through to a group code only when the company lookup misses. The
+	 * group code is read by document id — the id IS the code — so a wrong code
+	 * is a miss, not an enumeration.
+	 */
+	const groupCode = await lookupJoinCode(trimmed);
+	if (!groupCode) return null;
+
+	return {
+		companyId: groupCode.companyId,
+		group: {
+			groupId: groupCode.groupId,
+			code: groupCode.code,
+			visibility: groupCode.visibility,
+		},
+	};
+}
+
 export async function joinCompanyWithAccessCode(
 	userId: string,
 	accessCode: string,
+	resolved?: ResolvedJoinCode | null,
 ): Promise<{ companyId: string; groupId?: string } | null> {
 	try {
-		const matches = await db
-			.collection(C.companies)
-			.where("accessCode", "==", accessCode)
-			.limit(1)
-			.get();
+		// Signup resolves the code up front to decide whether to create an
+		// account at all, and passes the result through rather than paying for
+		// the lookup twice.
+		const match = resolved ?? (await resolveJoinCode(accessCode));
+		if (!match) return null;
 
-		/*
-		 * Falls through to a group code only when the company lookup misses.
-		 * The group code is read by document id — the id IS the code — so a
-		 * wrong code is a miss, not an enumeration.
-		 */
-		const groupCode = matches.empty
-			? await lookupJoinCode(accessCode)
-			: null;
-
-		if (matches.empty && !groupCode) return null;
-
-		const companyId = groupCode ? groupCode.companyId : matches.docs[0].id;
+		const { companyId, group: groupCode } = match;
 		const id = membershipId(companyId, userId);
 
 		return await db.runTransaction(async (tx) => {
