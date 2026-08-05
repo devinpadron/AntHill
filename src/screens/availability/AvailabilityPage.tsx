@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
 	View,
 	Text,
@@ -16,21 +16,8 @@ import {
 	Switch,
 	Dimensions,
 } from "react-native";
-import { useUser } from "../../contexts/UserContext";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
-import {
-	getAvailabilityEvents,
-	getEventResponses,
-	getEventsInRange,
-	setEventResponse,
-	subscribeMyResponses,
-	subscribeMyUpcomingEvents,
-} from "../../services/eventService";
-import { useCompanyMembers } from "../../hooks/useCompanyMembers";
-import { useCompany } from "../../contexts/CompanyContext";
-import { useGroups } from "../../hooks/useGroups";
-import { FilterType } from "../../types";
+import { useAvailability } from "../../hooks/useAvailability";
 import { styles } from "./AvailabilityPage.styles";
 
 const { width: screenWidth } = Dimensions.get("window");
@@ -73,273 +60,29 @@ const TabIndicator = ({ activeTab }) => {
 };
 
 const AvailabilityPage = ({ navigation }) => {
-	const [activeTab, setActiveTab] = useState("unconfirmed");
-	const [events, setEvents] = useState([]);
-	const [loading, setLoading] = useState(true);
+	const {
+		isAdmin,
+		activeTab,
+		setActiveTab,
+		events,
+		filteredEvents,
+		loading,
+		respondToEvent,
+		reminder,
+		saveReminderSettings: persistReminderSettings,
+		workerBuckets: eventWorkerDetails,
+		loadingWorkers: loadingWorkerDetails,
+		loadWorkerBuckets,
+		setWorkerResponse,
+	} = useAvailability();
+
+	// Modal state stays here — it is presentation, not data.
 	const [reminderModalVisible, setReminderModalVisible] = useState(false);
 	const [reminderHours, setReminderHours] = useState("24");
 	const [reminderMinutes, setReminderMinutes] = useState("0");
 	const [remindersEnabled, setRemindersEnabled] = useState(true);
 	const [adminModalVisible, setAdminModalVisible] = useState(false);
 	const [selectedEventForAdmin, setSelectedEventForAdmin] = useState(null);
-	const [eventWorkerDetails, setEventWorkerDetails] = useState({
-		confirmed: [],
-		declined: [],
-		unconfirmed: [],
-	});
-	const [loadingWorkerDetails, setLoadingWorkerDetails] = useState(false);
-	const { userId, companyId, isAdmin, membership } = useUser();
-
-	/*
-	 * Which jobs this worker is allowed to see.
-	 *
-	 * "open" is the default and what every migrated membership carries: all
-	 * unassigned events that were not published to a specific group, exactly as
-	 * in v1. A "restricted" worker — a 1099 contractor — sees only the jobs
-	 * they were invited to.
-	 */
-	const visibility = membership?.visibility ?? "open";
-
-	/*
-	 * Preferences come from CompanyContext, not a one-shot read.
-	 *
-	 * This screen was still calling the v1 companyService, which reads
-	 * Companies/{c}/Settings/preferences — a path a v2-only account has no
-	 * membership for, so the read is denied. The context already holds these,
-	 * live, and v1 nested the reminder fields flat while v2 groups them under
-	 * `availabilityReminder`.
-	 */
-	const { preferences, updatePreferences } = useCompany();
-
-	// Refresh data every time the screen comes into focus
-	useFocusEffect(
-		React.useCallback(() => {
-			fetchEventsFromFirebase();
-		}, [userId, companyId]),
-	);
-
-	/*
-	 * The user's own responses, one query.
-	 *
-	 * v1 read each event's embedded workerStatus map, so a response required
-	 * loading the whole event document.
-	 */
-	const [myResponses, setMyResponses] = useState<Record<string, string>>({});
-	const { members, namesFor: personNamesFor } = useCompanyMembers(
-		companyId ?? "",
-	);
-	const { namesFor: groupNamesFor } = useGroups(companyId ?? "");
-
-	/*
-	 * The response ids double as the invitation list, and the focus handler
-	 * fetches from a callback whose deps are only [userId, companyId] — so it
-	 * would close over an empty map and show a restricted worker nothing.
-	 * A ref keeps the fetch reading the current set whenever it runs.
-	 */
-	const myResponsesRef = React.useRef<Record<string, string>>({});
-
-	useEffect(() => {
-		if (!companyId || !userId) return;
-		const today = new Date().toISOString().slice(0, 10);
-		return subscribeMyResponses(companyId, userId, today, (next) => {
-			myResponsesRef.current = next;
-			setMyResponses(next);
-		});
-	}, [companyId, userId]);
-
-	// `visibility` is in here because the membership subscription is live: a
-	// manager restricting a worker takes effect on their device immediately,
-	// without a relaunch.
-	useEffect(() => {
-		fetchEventsFromFirebase();
-	}, [userId, myResponses, visibility]);
-
-	const fetchEventsFromFirebase = async () => {
-		setLoading(true);
-
-		try {
-			const today = new Date().toISOString().slice(0, 10);
-			/*
-			 * Open jobs plus this worker's invitations, or invitations alone if
-			 * they are restricted. The invitation ids come from their own
-			 * eventResponses, which the security rules already scope to them —
-			 * a worker who was never invited to a targeted job has no document
-			 * for it, so it cannot appear here.
-			 */
-			const fetchedEvents: any = await getAvailabilityEvents(
-				companyId,
-				today,
-				visibility,
-				Object.keys(myResponsesRef.current),
-				Boolean(isAdmin),
-			);
-
-			// Days the user is already committed to, for the conflict badge.
-			const assignedEvents: any = await getEventsInRange(companyId, {
-				from: today,
-				to: "2999-12-31",
-				filter: FilterType.MY,
-				userId,
-			});
-
-			if (fetchedEvents && fetchedEvents.length > 0) {
-				// Create a set of dates where the user already has assigned events
-				const assignedEventDates = new Set(
-					assignedEvents?.map((event) => {
-						return event.dateKey; // Use the date string directly for comparison
-					}) || [],
-				);
-
-				// Transform the fetched events to match the UI requirements
-				const formattedEvents = fetchedEvents.map((event) => {
-					// Use the date string directly from Firebase (YYYY-MM-DD format)
-					const eventDateString = event.dateKey;
-
-					// Parse the date string correctly to avoid timezone issues
-					const [year, month, day] = event.dateKey.split("-");
-					const eventDate = new Date(
-						parseInt(year),
-						parseInt(month) - 1,
-						parseInt(day),
-					);
-
-					// Format date to a user-friendly string - UPDATE THIS PART:
-					const formattedDate = eventDate.toLocaleDateString(
-						"en-US",
-						{
-							weekday: "short", // Mon, Tue, Wed, etc.
-							month: "short", // Jan, Feb, Mar, etc.
-							day: "numeric", // 1, 2, 3, etc.
-							year: "numeric", // 2024, 2025, etc.
-						},
-					);
-
-					// Set location based on event.locations map (address -> {lat, lng})
-					let location = "Location TBD";
-					if (event.locations) {
-						const locationKeys = Object.keys(event.locations);
-						if (locationKeys.length === 1) {
-							location = locationKeys[0]; // Use the address (the key) as location
-						} else if (locationKeys.length > 1) {
-							location = "Multiple locations";
-						}
-					}
-
-					// Check if user is in workerStatus map
-					let status = "available";
-					let confirmed = false;
-
-					// One lookup in the responses map. v1 read each event's
-					// embedded workerStatus map.
-					if (myResponses[event.id]) {
-						const userStatus = myResponses[event.id];
-						if (userStatus === "confirmed") {
-							status = "on_potential_event";
-							confirmed = true;
-						} else if (userStatus === "declined") {
-							status = "on_potential_event";
-							confirmed = false;
-						}
-					}
-
-					// Check if user is already assigned to another event on the same day
-					// Only override status if user hasn't responded to this event yet
-					if (
-						assignedEventDates.has(eventDateString) &&
-						status === "available"
-					) {
-						status = "already_on_event";
-						// Don't change confirmed status - keep it false so it shows in unconfirmed tab
-					}
-
-					return {
-						id: event.id,
-						date: formattedDate,
-						location: location,
-						title: event.title || "Unnamed Event",
-						status: status,
-						confirmed: confirmed,
-						groupNames: groupNamesFor(event.audienceGroupIds ?? []),
-						personNames: personNamesFor(
-							event.audienceUserIds ?? [],
-						),
-						rawData: event,
-					};
-				});
-
-				setEvents(formattedEvents);
-			} else {
-				// No events found
-				setEvents([]);
-			}
-		} catch (error) {
-			console.error("Error fetching events:", error);
-			// Set fallback empty state
-			setEvents([]);
-		} finally {
-			setLoading(false);
-		}
-	};
-
-	const updateEventStatus = async (eventId, confirmed, eventDateKey = "") => {
-		// Firebase update will go here
-
-		if (confirmed) {
-			await setEventResponse(
-				companyId,
-				eventId,
-				userId,
-				"confirmed",
-				eventDateKey,
-			);
-		} else {
-			await setEventResponse(
-				companyId,
-				eventId,
-				userId,
-				"declined",
-				eventDateKey,
-			);
-		}
-
-		// Mock update for now
-		setEvents((prevEvents) =>
-			prevEvents.map((event) =>
-				event.id === eventId
-					? {
-							...event,
-							confirmed,
-							status: confirmed
-								? "already_on_event"
-								: "on_potential_event",
-						}
-					: event,
-			),
-		);
-	};
-
-	const getFilteredEvents = () => {
-		switch (activeTab) {
-			case "unconfirmed":
-				// Show available events and already_on_event events that haven't been responded to
-				return events.filter(
-					(event) =>
-						(event.status === "available" ||
-							event.status === "already_on_event") &&
-						!event.confirmed,
-				);
-			case "confirmed":
-				return events.filter((event) => event.confirmed === true);
-			case "declined":
-				return events.filter(
-					(event) =>
-						event.confirmed === false &&
-						event.status === "on_potential_event",
-				);
-			default:
-				return events;
-		}
-	};
 
 	const renderEventCard = ({ item }) => {
 		const getStatusColor = () => {
@@ -394,32 +137,10 @@ const AvailabilityPage = ({ navigation }) => {
 			}
 		};
 
-		const handleConfirm = () => {
-			updateEventStatus(item.id, true);
-		};
-
-		const handleDecline = () => {
-			updateEventStatus(item.id, false);
-		};
-
-		const handleUndecline = () => {
-			// Change status from declined/on_potential_event back to available
-			setEventResponse(
-				companyId,
-				item.id,
-				userId,
-				"pending",
-				item.rawData?.dateKey ?? "",
-			);
-
-			setEvents((prevEvents) =>
-				prevEvents.map((event) =>
-					event.id === item.id
-						? { ...event, status: "available", confirmed: false }
-						: event,
-				),
-			);
-		};
+		const handleConfirm = () => respondToEvent(item, "confirmed");
+		const handleDecline = () => respondToEvent(item, "declined");
+		// Back to unanswered, from either the confirmed or declined tab.
+		const handleUndecline = () => respondToEvent(item, "pending");
 
 		// Show status badge on all tabs
 		const showStatusBadge = true;
@@ -607,7 +328,6 @@ const AvailabilityPage = ({ navigation }) => {
 	);
 
 	const handleReminderSettings = () => {
-		const reminder = preferences?.availabilityReminder;
 		setReminderHours(String(reminder?.hours ?? 24));
 		setReminderMinutes(String(reminder?.minutes ?? 0));
 		setRemindersEnabled(reminder?.enabled !== false);
@@ -615,102 +335,27 @@ const AvailabilityPage = ({ navigation }) => {
 	};
 
 	const saveReminderSettings = async () => {
-		try {
-			const hours = parseInt(reminderHours) || 24;
-			const minutes = parseInt(reminderMinutes) || 0;
-
-			await updatePreferences({
-				availabilityReminder: {
-					enabled: remindersEnabled,
-					hours,
-					minutes,
-				},
-			});
-
-			setReminderModalVisible(false);
-			Alert.alert("Success", "Reminder settings updated successfully!");
-		} catch (error) {
-			console.error("Error saving reminder preferences:", error);
-			Alert.alert("Error", "Failed to save reminder settings");
-		}
+		const saved = await persistReminderSettings({
+			enabled: remindersEnabled,
+			hours: reminderHours,
+			minutes: reminderMinutes,
+		});
+		if (saved) setReminderModalVisible(false);
 	};
 
-	// Add this function before your return statement
-	const fetchEventWorkerDetails = async (event) => {
-		setLoadingWorkerDetails(true);
-		try {
-			/*
-			 * Members come from the membership query already running, and their
-			 * responses from one eventResponses query. v1 fetched every user
-			 * profile in the company and then re-read the event for its
-			 * workerStatus map.
-			 */
-			const responses = await getEventResponses(companyId, event.id);
-
-			const categorizedUsers = {
-				confirmed: [],
-				declined: [],
-				unconfirmed: [],
-			};
-
-			members.forEach((member) => {
-				const userStatus = responses[member.userId];
-				const userWithStatus = {
-					...member,
-					id: member.userId,
-					status: userStatus ?? "pending",
-				};
-
-				if (userStatus === "confirmed") {
-					categorizedUsers.confirmed.push(userWithStatus);
-				} else if (userStatus === "declined") {
-					categorizedUsers.declined.push(userWithStatus);
-				} else {
-					categorizedUsers.unconfirmed.push(userWithStatus);
-				}
-			});
-
-			setEventWorkerDetails(categorizedUsers);
-		} catch (error) {
-			console.error("Error fetching worker details:", error);
-		} finally {
-			setLoadingWorkerDetails(false);
-		}
-	};
-
-	const handleAdminStatusChange = async (targetUserId, newStatus) => {
+	const handleAdminStatusChange = (targetUserId, newStatus) => {
 		if (!selectedEventForAdmin) return;
-		const eventId = selectedEventForAdmin.id;
-		const eventDateKey = selectedEventForAdmin.rawData?.dateKey ?? "";
-
-		if (newStatus === "confirmed") {
-			await setEventResponse(
-				companyId,
-				eventId,
-				targetUserId,
-				"confirmed",
-				eventDateKey,
-			);
-		} else if (newStatus === "declined") {
-			await setEventResponse(
-				companyId,
-				eventId,
-				targetUserId,
-				"declined",
-				eventDateKey,
-			);
-		}
-
-		// Refresh worker details in the modal
-		fetchEventWorkerDetails(selectedEventForAdmin);
-		// Refresh the main event list
-		fetchEventsFromFirebase();
+		return setWorkerResponse(
+			selectedEventForAdmin,
+			targetUserId,
+			newStatus,
+		);
 	};
 
 	const handleAdminEventPress = (event) => {
 		setSelectedEventForAdmin(event);
 		setAdminModalVisible(true);
-		fetchEventWorkerDetails(event);
+		loadWorkerBuckets(event.id);
 	};
 
 	// Update the header to include admin button
@@ -805,7 +450,7 @@ const AvailabilityPage = ({ navigation }) => {
 				</View>
 			) : (
 				<FlatList
-					data={getFilteredEvents()}
+					data={filteredEvents}
 					renderItem={renderEventCard}
 					keyExtractor={(item) => item.id}
 					contentContainerStyle={styles.eventList}
