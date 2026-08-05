@@ -41,7 +41,15 @@ export const AppGate: React.FC<{ children: React.ReactNode }> = ({
 		);
 	}
 
+	/*
+	 * A schema mismatch is a server-state condition, not something the user
+	 * can fix — so it reads like maintenance and offers a retry, not a trip to
+	 * the App Store. After a rollback the build they would need is OLDER, and
+	 * "Update Now" would send them somewhere that cannot help.
+	 */
+	const isSchema = status === "schema";
 	const isMaintenance = status === "maintenance";
+	const isRetryable = isMaintenance || isSchema;
 
 	return (
 		<SafeAreaView style={styles.container}>
@@ -49,14 +57,19 @@ export const AppGate: React.FC<{ children: React.ReactNode }> = ({
 				<Image source={LOGO} style={styles.logo} resizeMode="contain" />
 
 				<Text style={styles.title}>
-					{isMaintenance ? "AntHill is updating" : "Update Required"}
+					{isRetryable ? "AntHill is updating" : "Update Required"}
 				</Text>
 
 				<Text style={styles.body}>
-					{isMaintenance
+					{isRetryable
 						? message ||
 							"We're making some improvements and will be back shortly. Your data is safe."
-						: `You're on version ${currentVersion}${
+						: /*
+							 * Versions are named ONLY when the version is the
+							 * reason. Printing them under a schema gate made a
+							 * correct comparison look broken.
+							 */
+							`You're on version ${currentVersion}${
 								requiredVersion
 									? `, and version ${requiredVersion} is required`
 									: ""
@@ -64,9 +77,9 @@ export const AppGate: React.FC<{ children: React.ReactNode }> = ({
 				</Text>
 
 				<Button
-					title={isMaintenance ? "Try Again" : "Update Now"}
-					onPress={isMaintenance ? recheck : openAppStore}
-					loading={isMaintenance && isChecking}
+					title={isRetryable ? "Try Again" : "Update Now"}
+					onPress={isRetryable ? recheck : openAppStore}
+					loading={isRetryable && isChecking}
 					size="large"
 					fullWidth
 					style={styles.button}
