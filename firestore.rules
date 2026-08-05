@@ -79,21 +79,24 @@ service cloud.firestore {
     // ---- Companies ---------------------------------------------------------
 
     match /Companies/{companyId} {
-      // TEMPORARY: public read.
-      //
-      // Signup on the CURRENTLY RELEASED app (1.0.98) queries this collection
-      // by accessCode BEFORE creating the auth account (useSignUp.ts, pre-fix
-      // ordering). Requiring auth here breaks signup for every live user.
-      //
-      // 1.0.100 reorders that flow to authenticate first. TIGHTEN THIS TO
-      // `isSignedIn()` once 1.0.100 adoption is complete — until then, company
-      // names and access codes are publicly readable, which means an access
-      // code can be harvested and used to join a company.
-      //
-      // Everything reachable THROUGH a company (members, events, time entries,
-      // settings) is already locked to members below, so this leak is bounded
-      // to the company document itself.
-      allow read: if true;
+      /*
+       * Was `if true` while 1.0.98 was the released build: its signup queried
+       * this collection by accessCode BEFORE creating the auth account, so
+       * requiring auth would have broken signup for every live user. 1.0.100
+       * reordered that flow to authenticate first.
+       *
+       * Tightened ahead of full 1.0.100 adoption, deliberately. Existing
+       * signed-in users on older builds are unaffected — they are
+       * authenticated, so their reads still pass. The only thing this breaks
+       * is a NEW signup from a pre-1.0.100 build, which now fails with
+       * "Invalid Access Code" until that phone updates.
+       *
+       * That is a far smaller cost than the alternative: an access code is a
+       * shared secret that lets someone join a company, and public read meant
+       * anyone could enumerate every company and harvest one without holding
+       * an account at all.
+       */
+      allow read: if isSignedIn();
       // Companies are provisioned out of band; the app never writes them.
       allow write: if false;
 

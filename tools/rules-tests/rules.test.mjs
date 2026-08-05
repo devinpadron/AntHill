@@ -125,15 +125,17 @@ describe("the breach that was live in production", () => {
 		);
 	});
 
-	// TEMPORARY: the Companies collection is deliberately public-read right now.
-	// Signup on the released app (1.0.98) queries it by accessCode BEFORE
-	// creating the auth account, so requiring auth would break signup for every
-	// live user. 1.0.100 reorders that flow.
-	//
-	// WHEN 1.0.100 ADOPTION COMPLETES: change `allow read: if true` to
-	// `isSignedIn()` in firestore.rules and flip this test back to assertFails.
-	test("Companies is still public-read (temporary, for 1.0.98 signup)", async () => {
-		await assertSucceeds(getDocs(collection(unauth(), "Companies")));
+	// This was assertSucceeds while 1.0.98 was the released build, whose signup
+	// read this collection before authenticating. Access codes are what let
+	// someone join a company, so leaving them world-readable meant anyone could
+	// harvest one without holding an account.
+	test("anonymous readers cannot harvest company access codes", async () => {
+		await assertFails(getDocs(collection(unauth(), "Companies")));
+		await assertFails(getDoc(doc(unauth(), "Companies", COMPANY_A)));
+	});
+
+	test("a signed-in user still can, which is how joining works", async () => {
+		await assertSucceeds(getDocs(collection(as(BOB), "Companies")));
 	});
 
 	test("...but nothing INSIDE a company leaks to anonymous readers", async () => {
