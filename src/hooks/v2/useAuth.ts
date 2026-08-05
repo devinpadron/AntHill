@@ -44,6 +44,27 @@ export const useAuth = () => {
 	const login = async () => {
 		try {
 			setLoading(true);
+
+			/*
+			 * Clear a stale unverified session first.
+			 *
+			 * Signing in as a uid that is ALREADY signed in is not an auth
+			 * state change, so onAuthStateChanged does not fire and nothing
+			 * navigates — the button appears dead until the app is relaunched.
+			 * Signup now signs out on its way out, but it cannot if the app was
+			 * killed between creating the account and finishing, so this
+			 * guarantees the transition rather than assuming it.
+			 *
+			 * Only unverified sessions: a verified one signing in again is
+			 * already in the state it wants.
+			 */
+			const stale = auth().currentUser;
+			if (stale && !stale.emailVerified) {
+				await auth()
+					.signOut()
+					.catch(() => {});
+			}
+
 			const userCredential = await auth().signInWithEmailAndPassword(
 				email,
 				password,

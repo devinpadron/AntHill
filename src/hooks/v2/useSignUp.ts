@@ -124,6 +124,38 @@ export const useSignUp = (navigation: any) => {
 		} catch (error) {
 			handleAuthError(error);
 		} finally {
+			/*
+			 * Sign out before leaving. THIS IS LOAD-BEARING, and not obvious.
+			 *
+			 * createUserWithEmailAndPassword leaves the new account SIGNED IN,
+			 * unverified. UserContext used to end that itself: it showed the
+			 * "verify your email" alert, whose buttons signed you out. Muting
+			 * that alert during signup — so a failed signup would not nag about
+			 * an account it was deleting — quietly removed the sign-out too.
+			 *
+			 * The consequence stayed invisible until the user came back and
+			 * tapped Login. signInWithEmailAndPassword for a uid that is
+			 * ALREADY signed in is not an auth state change, so
+			 * onAuthStateChanged never fired, the context never re-read
+			 * emailVerified, and nothing navigated. Relaunching the app ran the
+			 * listener from scratch and looked like a fix.
+			 *
+			 * Signing out here restores the invariant the alert used to carry:
+			 * you are not signed in until you have verified. Login is then a
+			 * real transition and the listener fires.
+			 *
+			 * Covers every exit. On a bad code the account was already deleted,
+			 * so currentUser is null and this is a no-op; on an unexpected
+			 * error it clears a half-built session rather than leaving someone
+			 * signed in as an account with no membership.
+			 */
+			const current = auth().currentUser;
+			if (current && !current.emailVerified) {
+				await auth()
+					.signOut()
+					.catch(() => {});
+			}
+
 			endSignup();
 			setIsLoading(false);
 		}
