@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
 	View,
 	Text,
@@ -10,20 +10,15 @@ import {
 	ActivityIndicator,
 	Platform,
 } from "react-native";
-import { useUser } from "../../../contexts/UserContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import DropDownPicker from "react-native-dropdown-picker";
 import DraggableFlatList from "react-native-draggable-flatlist";
-import { useCompany } from "../../../contexts/CompanyContext";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { RouteProp, useRoute } from "@react-navigation/native";
-
-// Form field types
-import { subscribeChecklists } from "../../../services/libraryService";
-import { getSchema, publishSchema } from "../../../services/formSchemaService";
+import { useFormSchemaEditor } from "../../../hooks/useFormSchemaEditor";
 import { styles } from "./CompanyCustomForm.styles";
-import { FormField } from "../../../types";
+import { FormFieldType } from "../../../types";
 
 const FIELD_TYPES = [
 	{ label: "Text Input", value: "text" },
@@ -51,124 +46,40 @@ const CompanyCustomForm = ({ navigation }) => {
 	const route = useRoute<CompanyCustomFormRouteProp>();
 	const isEventForm = route.params?.isEventForm || false;
 	const insets = useSafeAreaInsets();
-	const { companyId, userId } = useUser();
-	const { preferences, updatePreferences, isLoading } = useCompany();
 
-	// Form state
-	const [isSaving, setIsSaving] = useState(false);
-	/*
-	 * Starts empty and is filled by the schema load below. Preferences no longer
-	 * carry the schema inline — only a reference to an immutable version.
-	 */
-	const [customForm, setCustomForm] = useState<{
-		title: string;
-		description: string;
-		isEnabled: boolean;
-		fields: FormField[];
-	}>({ title: "", description: "", isEnabled: false, fields: [] });
+	const {
+		draft: customForm,
+		setMeta,
+		isLoading,
+		isSaving,
+		save: saveForm,
+		checklists,
+		addField: appendField,
+		updateField,
+		removeField,
+		reorderFields,
+		toggleEnabled: toggleFormEnabled,
+		resolveFieldEdit,
+	} = useFormSchemaEditor(isEventForm);
 
-	// UI state
+	// Editor UI state. Which field is open, and the type-specific inputs that
+	// live outside the field until the edit is applied.
 	const [editingField, setEditingField] = useState(null);
 	const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
-	const [currentFieldType, setCurrentFieldType] = useState("text");
+	const [currentFieldType, setCurrentFieldType] =
+		useState<FormFieldType>("text");
 	const [currentOptions, setCurrentOptions] = useState("");
 	const [showPreview, setShowPreview] = useState(false);
-
-	// Company Checklists state (for checklist field type)
-	const [checklists, setChecklists] = useState<
-		Array<{ id: string; name: string }>
-	>([]);
 	const [checklistDropdownOpen, setChecklistDropdownOpen] = useState(false);
 	const [selectedChecklistId, setSelectedChecklistId] = useState<
 		string | null
 	>(null);
 
-	// Load existing form configuration
-	useEffect(() => {
-		const loadPreferences = async () => {
-			/*
-			 * The form is a REFERENCE now. v1 stored the whole schema inline on
-			 * the preferences document and copied it into every submitted time
-			 * entry; v2 keeps immutable versioned documents and points at one.
-			 */
-			const schemaId = isEventForm
-				? preferences.eventFormSchemaId
-				: preferences.timeEntryFormSchemaId;
+	// Kept so the JSX can go on calling setCustomForm({...customForm, x}).
+	const setCustomForm = setMeta;
 
-			if (!schemaId) return;
+	const addField = () => setEditingField(appendField());
 
-			const schema = await getSchema(schemaId);
-			if (schema) {
-				setCustomForm({
-					title: schema.title,
-					description: schema.description,
-					isEnabled: schema.isEnabled,
-					fields: schema.fields,
-				});
-			}
-		};
-
-		loadPreferences();
-	}, [companyId]);
-
-	// Save form configuration
-	const saveForm = async () => {
-		if (!companyId) return;
-
-		try {
-			setIsSaving(true);
-
-			/*
-			 * Publishes a NEW version and repoints the preference. Nothing ever
-			 * mutates a published schema — the security rules forbid it — which
-			 * is what lets historical time entries keep rendering against the
-			 * schema they were actually submitted under.
-			 */
-			const kind = isEventForm ? "eventForm" : "timeEntryForm";
-			const schemaId = await publishSchema(
-				companyId,
-				kind,
-				customForm,
-				userId,
-			);
-
-			await updatePreferences(
-				isEventForm
-					? { eventFormSchemaId: schemaId }
-					: { timeEntryFormSchemaId: schemaId },
-			);
-
-			Alert.alert(
-				"Success",
-				"Time entry form settings saved successfully",
-			);
-		} catch (error) {
-			console.error("Failed to save form:", error);
-			Alert.alert("Error", "Failed to save time entry form");
-		} finally {
-			setIsSaving(false);
-		}
-	};
-
-	// Add a new field
-	const addField = () => {
-		const newField: FormField = {
-			id: Date.now().toString(),
-			type: "text",
-			label: "New Field",
-			placeholder: "",
-			required: false,
-		};
-
-		setCustomForm({
-			...customForm,
-			fields: [...customForm.fields, newField],
-		});
-
-		setEditingField(newField);
-	};
-
-	// Delete a field
 	const deleteField = (fieldId) => {
 		Alert.alert(
 			"Delete Field",
@@ -179,37 +90,14 @@ const CompanyCustomForm = ({ navigation }) => {
 					text: "Delete",
 					style: "destructive",
 					onPress: () => {
-						setCustomForm({
-							...customForm,
-							fields: customForm.fields.filter(
-								(field) => field.id !== fieldId,
-							),
-						});
-
-						if (editingField?.id === fieldId) {
-							setEditingField(null);
-						}
+						removeField(fieldId);
+						if (editingField?.id === fieldId) setEditingField(null);
 					},
 				},
 			],
 		);
 	};
 
-	// Update field props
-	const updateField = (fieldId, updates) => {
-		setCustomForm({
-			...customForm,
-			fields: customForm.fields.map((field) =>
-				field.id === fieldId ? { ...field, ...updates } : field,
-			),
-		});
-
-		if (editingField?.id === fieldId) {
-			setEditingField({ ...editingField, ...updates });
-		}
-	};
-
-	// Edit field
 	const editField = (field) => {
 		setEditingField(field);
 		setCurrentFieldType(field.type);
@@ -219,66 +107,21 @@ const CompanyCustomForm = ({ navigation }) => {
 		}
 	};
 
-	// Save field changes
 	const saveFieldChanges = () => {
 		if (!editingField) return;
-
-		const updatedField = {
-			...editingField,
-			type: currentFieldType,
-		};
-
-		// Handle options for select/multiSelect
-		if (["select", "multiSelect"].includes(currentFieldType)) {
-			updatedField.selectOptions = currentOptions
-				.split(",")
-				.map((option) => option.trim())
-				.filter((option) => option);
-		}
-
-		// Checklist-specific data
-		if (currentFieldType === "checklist") {
-			updatedField.checklistRequiredMode =
-				editingField.checklistRequiredMode || "atLeastOne";
-			updatedField.checklistId = selectedChecklistId || null;
-			// Store name for convenience in UI
-			const chosen = checklists.find(
-				(c) =>
-					c.id === selectedChecklistId ||
-					c.id === editingField.checklistId,
-			);
-			updatedField.checklistName =
-				chosen?.name || updatedField.checklistName || null;
-			// Ensure options are not carried over
-			delete updatedField.selectOptions;
-		}
-
-		updateField(editingField.id, updatedField);
+		updateField(
+			editingField.id,
+			resolveFieldEdit(
+				editingField,
+				currentFieldType,
+				currentOptions,
+				selectedChecklistId,
+			),
+		);
 		setEditingField(null);
 	};
 
-	// Handle field reordering
-	const onDragEnd = ({ data }) => {
-		setCustomForm({ ...customForm, fields: data });
-	};
-
-	// Load company checklists once companyId is available
-	useEffect(() => {
-		// One live subscription; v1 read the collection with a template-string path.
-		return subscribeChecklists(companyId, (next) =>
-			setChecklists(
-				next.map((checklist) => ({
-					id: checklist.id,
-					name: checklist.title || checklist.id,
-				})),
-			),
-		);
-	}, [companyId]);
-
-	// Toggle form enabled state
-	const toggleFormEnabled = () => {
-		setCustomForm({ ...customForm, isEnabled: !customForm.isEnabled });
-	};
+	const onDragEnd = ({ data }) => reorderFields(data);
 
 	const calculateMultiplied = (value, multiplier) => {
 		if (!multiplier) return value;
