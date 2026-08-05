@@ -32,6 +32,7 @@ import {
 	updateConnectionResponses,
 } from "../../services/timeEntryEditService";
 import { getAttachmentsForParent } from "../../services/attachmentService";
+import { getSchema } from "../../services/formSchemaService";
 import {
 	getStatusBadgeColor,
 	getStatusBadgeText,
@@ -71,12 +72,13 @@ const TimeEntryDetails = ({ route, navigation }) => {
 		return entryUserId ? (membersById[entryUserId] ?? null) : null;
 	}, [timeEntries, passedUserId, membersById]);
 	const [connectedEvents, setConnectedEvents] = useState({});
+	// entryId -> { timeEntrySchema, eventSchema }, resolved from formSchemaIds.
+	const [schemasByEntry, setSchemasByEntry] = useState({});
 	const [attachmentMap, setAttachmentsMap] = useState({});
 
 	// Calculations
 	const [totalDurationSeconds, setTotalDurationSeconds] = useState(0);
 	const [totalDurationDecimal, setTotalDurationDecimal] = useState(0);
-	const [fieldTotals, setFieldTotals] = useState({});
 
 	// UI state
 	const [selectedEntries, setSelectedEntries] = useState({});
@@ -167,31 +169,54 @@ const TimeEntryDetails = ({ route, navigation }) => {
 			});
 			setSelectedEntries(initialSelection);
 
-			// Get employee info
-			const totals = calculateFieldTotals(validEntries);
-			setFieldTotals(totals);
+			/*
+			 * Connections are their own documents now (a `connections`
+			 * subcollection per entry) rather than v1's embedded
+			 * `connectedEvents` array, so they need a read per entry.
+			 *
+			 * This branch used to be `if (false)`, leaving every entry with an
+			 * empty list — connected events never rendered at all.
+			 */
+			const connectionLists = await Promise.all(
+				validEntries.map((entry) => getConnections(entry.id)),
+			);
 
-			// Get connected events
 			const entryConnectionMap = {};
-
-			// Just organize the connections by entry, don't try to fetch actual events
-			validEntries.forEach((entry) => {
-				if (false) {
-					// Initialize the array for this entry with the connection data we already have
-					entryConnectionMap[entry.id] = [].map(
-						(connection: any) => ({
-							...connection,
-							// Include minimal default properties to avoid UI errors
-							title: connection.eventTitle || "Connected Event",
-							formResponses: connection.formResponses || {},
-						}),
-					);
-				} else {
-					entryConnectionMap[entry.id] = [];
-				}
+			validEntries.forEach((entry, i) => {
+				entryConnectionMap[entry.id] = connectionLists[i].map(
+					(connection) => ({
+						...connection,
+						title:
+							connection.customTitle ||
+							connection.eventTitleSnapshot ||
+							"Connected Event",
+						formResponses: connection.formResponses || {},
+					}),
+				);
 			});
 
 			setConnectedEvents(entryConnectionMap);
+
+			/*
+			 * Form schemas are references now, not the two full copies v1
+			 * embedded on every entry, so the totals need them resolved.
+			 * getSchema memoizes, so entries sharing a schema cost one read.
+			 */
+			const schemaMap = {};
+			await Promise.all(
+				validEntries.map(async (entry) => {
+					const [timeEntrySchema, eventSchema] = await Promise.all([
+						entry.formSchemaIds?.timeEntry
+							? getSchema(entry.formSchemaIds.timeEntry)
+							: null,
+						entry.formSchemaIds?.event
+							? getSchema(entry.formSchemaIds.event)
+							: null,
+					]);
+					schemaMap[entry.id] = { timeEntrySchema, eventSchema };
+				}),
+			);
+			setSchemasByEntry(schemaMap);
 		} catch (error) {
 			console.error("Error loading time entry details:", error);
 			Alert.alert("Error", "Failed to load time entry details");
@@ -242,13 +267,23 @@ const TimeEntryDetails = ({ route, navigation }) => {
 		setExportModalVisible(false);
 	}, []);
 
-	// Add this useEffect
-	useEffect(() => {
-		if (timeEntries.length > 0) {
-			const totals = calculateFieldTotals(timeEntries);
-			setFieldTotals(totals);
-		}
-	}, [timeEntries]);
+	/*
+	 * Derived, not stored. This used to be computed twice — once inside
+	 * loadTimeEntries and again in an effect on `timeEntries` that overwrote
+	 * it — so the first result was always discarded.
+	 */
+	const fieldTotals = useMemo(
+		() =>
+			calculateFieldTotals(
+				timeEntries.map((entry) => ({
+					formResponses: entry.formResponses,
+					timeEntrySchema: schemasByEntry[entry.id]?.timeEntrySchema,
+					eventSchema: schemasByEntry[entry.id]?.eventSchema,
+					connections: connectedEvents[entry.id],
+				})),
+			),
+		[timeEntries, schemasByEntry, connectedEvents],
+	);
 
 	// If still loading, show loading indicator
 	if (isLoading) {

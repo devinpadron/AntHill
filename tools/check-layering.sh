@@ -73,30 +73,21 @@ done
 # the field name there is legitimate.
 #
 # This rule used to scan only src/**/v2/**, back when the two schemas lived
-# side by side. That scoping is why the export path below went unnoticed: it
-# sits in src/services and src/utils, outside any v2 directory, and was never
-# ported. It now scans all of src/.
+# side by side. That scoping is why the export path stayed broken for so long:
+# it sits in src/services and src/utils, outside any v2 directory, so nothing
+# ever checked it. It now scans all of src/, with no exceptions.
 OLD_FIELDS='\b(entry|item|timeEntry|event|doc|data|user|userData|snapshot)\??\.(clockInTime|clockOutTime|assignedWorkers|workerStatus|editHistory|connectedEvents|loggedInCompany|userNotes)\b'
-
-# KNOWN UNPORTED, and failing in production today — the CSV/PDF export reads
-# v1 field names off current documents and throws "Invalid time value" on the
-# first entry. Delete these two lines as part of porting the export path; do
-# not add to this list.
-knownStale="src/services/exportService.ts
-src/utils/timeUtils.ts"
 
 stale=$(
 	find src \( -name '*.ts' -o -name '*.tsx' \) -print0 2>/dev/null \
 		| xargs -0 grep -nE "$OLD_FIELDS" 2>/dev/null \
 		| grep -vE ':\s*(\*|//)' || true
 )
-while IFS= read -r line; do
-	[ -n "$line" ] || continue
-	file="${line%%:*}"
-	grep -Fxq "$file" <<<"$knownStale" && continue
-	echo "STALE FIELD NAME: $line"
+if [ -n "$stale" ]; then
+	echo "STALE FIELD NAMES from the old schema:"
+	echo "$stale"
 	status=1
-done <<<"$stale"
+fi
 
 # --- 5. new Date() wrapping a Firestore Timestamp --------------------------
 #
