@@ -2,7 +2,7 @@ import RNFS from "react-native-fs";
 import { Share, Platform } from "react-native";
 import { format } from "date-fns";
 import RNHTMLtoPDF from "react-native-html-to-pdf";
-import { getCompanyById } from "./companyService";
+import { getCompany } from "./v2/companyService";
 import { formatDuration } from "../utils/timeUtils";
 
 /**
@@ -195,8 +195,9 @@ export const exportTimeEntriesToPDF = async (
 	fileName: string,
 ): Promise<string> => {
 	try {
-		// Get company information for header
-		const company = await getCompanyById(companyId);
+		// Header company name. Null when the company is unreadable, which the
+		// template below falls back on rather than failing the whole export.
+		const company = await getCompany(companyId);
 
 		// Start building HTML content with styles (keep existing styles)
 		let htmlContent = `

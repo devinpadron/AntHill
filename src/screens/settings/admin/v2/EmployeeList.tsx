@@ -25,7 +25,7 @@ import {
 	setMemberGroups,
 	setMemberVisibility,
 } from "../../../../services/v2/groupService";
-import { handleEmployeeAction } from "../../../../utils/employeeUtils";
+import { showMemberActions } from "../../../../utils/memberActions";
 
 // Enable LayoutAnimation on Android
 if (
@@ -85,14 +85,14 @@ const EmployeeList = ({ navigation }) => {
 	// Handle long-press actions
 	const handleLongPress = useCallback(
 		(employee) => {
-			handleEmployeeAction(
+			showMemberActions(
 				employee,
 				userPrivilege,
 				companyId,
 				refetchEmployees,
 			);
 		},
-		[user, companyId, refetchEmployees],
+		[userPrivilege, companyId, refetchEmployees],
 	);
 
 	// Render individual employee item
