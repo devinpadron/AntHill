@@ -74,8 +74,12 @@ const WorkerGroups = ({ navigation }) => {
 		try {
 			await createGroup(companyId ?? "", name);
 			setNewName("");
-		} catch {
-			Alert.alert("Could not create group", "Please try again.");
+		} catch (e: any) {
+			console.error("Could not create group", e);
+			Alert.alert(
+				"Could not create group",
+				e?.message ?? "Please try again.",
+			);
 		} finally {
 			setBusy(false);
 		}
@@ -90,8 +94,12 @@ const WorkerGroups = ({ navigation }) => {
 				if (!name || name === group.name) return;
 				try {
 					await renameGroup(group.id, name);
-				} catch {
-					Alert.alert("Could not rename group", "Please try again.");
+				} catch (e: any) {
+					console.error("Could not rename group", e);
+					Alert.alert(
+						"Could not rename group",
+						e?.message ?? "Please try again.",
+					);
 				}
 			},
 			"plain-text",
@@ -114,8 +122,15 @@ const WorkerGroups = ({ navigation }) => {
 					visibility,
 					group.joinCode,
 				);
-			} catch {
-				Alert.alert("Could not create code", "Please try again.");
+			} catch (e: any) {
+				// The message, not a shrug. A bare "please try again" hides
+				// whether this was permissions, a missing company, or the
+				// network — which are three different things to do next.
+				console.error("Could not create join code", e);
+				Alert.alert(
+					"Could not create code",
+					e?.message ?? "Please try again.",
+				);
 			}
 		};
 
@@ -143,10 +158,11 @@ const WorkerGroups = ({ navigation }) => {
 					onPress: async () => {
 						try {
 							await clearGroupJoinCode(group.id, group.joinCode);
-						} catch {
+						} catch (e: any) {
+							console.error("Could not remove join code", e);
 							Alert.alert(
 								"Could not remove code",
-								"Please try again.",
+								e?.message ?? "Please try again.",
 							);
 						}
 					},
@@ -191,10 +207,11 @@ const WorkerGroups = ({ navigation }) => {
 								group.id,
 								group.joinCode,
 							);
-						} catch {
+						} catch (e: any) {
+							console.error("Could not delete group", e);
 							Alert.alert(
 								"Could not delete group",
-								"Please try again.",
+								e?.message ?? "Please try again.",
 							);
 						}
 					},

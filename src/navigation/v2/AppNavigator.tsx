@@ -1,6 +1,7 @@
 import React from "react";
 import HomeTabs from "./HomeTabs";
 import AuthStack from "./AuthStack";
+import NoCompanyScreen from "../../screens/auth/v2/NoCompanyScreen";
 import SplashScreen from "../../screens/SplashScreen";
 import { useUser } from "../../contexts/v2/UserContext";
 
@@ -17,13 +18,33 @@ import { useUser } from "../../contexts/v2/UserContext";
  * every time a company's data reloaded.
  */
 export const AppNavigator = () => {
-	const { loggedIn, initializing } = useUser();
+	const { loggedIn, initializing, isLoading, companyId } = useUser();
 
 	if (initializing) {
 		return <SplashScreen />;
 	}
 
-	return loggedIn ? <HomeTabs /> : <AuthStack />;
+	if (!loggedIn) {
+		return <AuthStack />;
+	}
+
+	/*
+	 * Signed in with no company.
+	 *
+	 * Gated on isLoading as well, or this flashes on every launch in the gap
+	 * before the profile arrives — companyId is undefined then too, and the
+	 * two states are indistinguishable from companyId alone.
+	 *
+	 * Without this the tabs mounted with an undefined company and every query
+	 * ran against an empty id: a blank app, permission errors in the log, and
+	 * no way back. removeMember produces exactly this state by design, since
+	 * it clears loggedInCompanyId rather than deleting the profile.
+	 */
+	if (!isLoading && !companyId) {
+		return <NoCompanyScreen />;
+	}
+
+	return <HomeTabs />;
 };
 
 export default AppNavigator;

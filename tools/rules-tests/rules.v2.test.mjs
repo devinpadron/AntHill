@@ -15,6 +15,8 @@ import {
 	setDoc,
 	updateDoc,
 	where,
+	writeBatch,
+	runTransaction,
 } from "firebase/firestore";
 
 /*
@@ -751,6 +753,61 @@ describe("v2 — same bug class: reads of documents that may not exist", () => {
 
 	test("company preferences before any have been saved", async () => {
 		await assertSucceeds(getDoc(doc(as(BOB), "companyPreferences", A)));
+	});
+});
+
+describe("v2 — issuing a code, exactly as setGroupJoinCode does", () => {
+	test("read the candidate code document that does not exist yet", async () => {
+		await assertSucceeds(
+			getDoc(doc(as(ALICE), "groupJoinCodes", "CANDIDATE")),
+		);
+	});
+
+	test("query companies by accessCode to check for shadowing", async () => {
+		await assertSucceeds(
+			getDocs(
+				query(
+					collection(as(ALICE), "companies"),
+					where("accessCode", "==", "CANDIDATE"),
+				),
+			),
+		);
+	});
+
+	test("the whole thing as ONE transaction, read included", async () => {
+		// Closer to the real call than the batch below: setGroupJoinCode reads
+		// the candidate inside the transaction before writing it.
+		const dbA = as(ALICE);
+		await assertSucceeds(
+			runTransaction(dbA, async (tx) => {
+				const ref = doc(dbA, "groupJoinCodes", "TXCODE");
+				const existing = await tx.get(ref);
+				if (existing.exists()) throw new Error("CODE_TAKEN");
+				tx.set(ref, {
+					code: "TXCODE",
+					companyId: A,
+					groupId: "g1",
+					visibility: "open",
+				});
+				tx.update(doc(dbA, "groups", "g1"), { joinCode: "TXCODE" });
+			}),
+		);
+	});
+
+	test("write the code document and stamp the group, together", async () => {
+		const dbA = as(ALICE);
+		const batch = writeBatch(dbA);
+		batch.set(doc(dbA, "groupJoinCodes", "CANDIDATE"), {
+			code: "CANDIDATE",
+			companyId: A,
+			groupId: "g1",
+			visibility: "restricted",
+		});
+		batch.update(doc(dbA, "groups", "g1"), {
+			joinCode: "CANDIDATE",
+			joinVisibility: "restricted",
+		});
+		await assertSucceeds(batch.commit());
 	});
 });
 

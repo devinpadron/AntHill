@@ -173,20 +173,36 @@ export async function setGroupJoinCode(
 	visibility: WorkerVisibility,
 	previousCode?: string | null,
 ): Promise<string> {
+	/*
+	 * Guarded rather than assumed. Every rule below is phrased as
+	 * v2IsManager(companyId), so an empty id fails as "permission denied" —
+	 * which reads like a rules problem and sends you looking in the wrong
+	 * place. It is worth one explicit check to say what actually happened.
+	 */
+	if (!companyId || !groupId) {
+		throw new Error(
+			`Cannot issue a join code without a company and group (companyId="${companyId}", groupId="${groupId}").`,
+		);
+	}
+
 	for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt += 1) {
 		const code = generateJoinCode();
 
-		// Would this be shadowed by a company access code? Same lookup order
-		// resolveJoinCode uses, so this asks the question that actually
-		// matters rather than a proxy for it.
-		const shadowed = await db
-			.collection(C.companies)
-			.where("accessCode", "==", code)
-			.limit(1)
-			.get();
-		if (!shadowed.empty) continue;
-
 		try {
+			// Inside the try. This was outside it, so a failure here escaped
+			// the function with nothing logged — the one path that produced a
+			// bare "could not create code" and no explanation anywhere.
+			//
+			// Would this be shadowed by a company access code? Same lookup
+			// order resolveJoinCode uses, so it asks the question that
+			// actually matters rather than a proxy for it.
+			const shadowed = await db
+				.collection(C.companies)
+				.where("accessCode", "==", code)
+				.limit(1)
+				.get();
+			if (!shadowed.empty) continue;
+
 			await db.runTransaction(async (tx) => {
 				const codeRef = db.collection(C.groupJoinCodes).doc(code);
 				const existing = await tx.get(codeRef);
