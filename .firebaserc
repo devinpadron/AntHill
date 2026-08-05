@@ -1,5 +1,13 @@
 {
-	"projects": {
-		"default": "anthill-51de0"
-	}
+  "projects": {
+    "default": "anthill-51de0"
+  },
+  "targets": {},
+  "etags": {
+    "anthill-51de0": {
+      "extensionInstances": {
+        "firestore-bigquery-export": "baa274d1273b8551ad2769fc8e939ef084383c9f217b7cf81e19a29a56995d73"
+      }
+    }
+  }
 }

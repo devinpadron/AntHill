@@ -32,7 +32,8 @@ const COMPANY_A = "companyA";
 const COMPANY_B = "companyB";
 
 const ALICE = "alice"; // owner of A
-const BOB = "bob"; // plain user in A
+const BOB = "bob"; // plain user in A — must STAY a plain user
+const CARL = "carl"; // plain user in A, promoted by the escalation suite
 const MALLORY = "mallory"; // member of B only
 const DANA = "dana"; // legacy "Admin" in A
 
@@ -51,7 +52,7 @@ before(async () => {
 	await testEnv.withSecurityRulesDisabled(async (ctx) => {
 		const db = ctx.firestore();
 
-		await setDoc(doc(db, "AppData/Data"), { required_version: "1.0.99" });
+		await setDoc(doc(db, "AppData/Data"), { required_version: "1.0.100" });
 		await setDoc(doc(db, "appConfig/schema"), {
 			activeVersion: 1,
 			maintenance: false,
@@ -73,6 +74,9 @@ before(async () => {
 		await setDoc(doc(db, "Companies", COMPANY_A, "Users", BOB), {
 			role: "user",
 		});
+		await setDoc(doc(db, "Companies", COMPANY_A, "Users", CARL), {
+			role: "user",
+		});
 		await setDoc(doc(db, "Companies", COMPANY_A, "Users", DANA), {
 			role: "Admin", // legacy capitalization, still live in production
 		});
@@ -80,7 +84,7 @@ before(async () => {
 			role: "user",
 		});
 
-		for (const uid of [ALICE, BOB, MALLORY, DANA]) {
+		for (const uid of [ALICE, BOB, CARL, MALLORY, DANA]) {
 			await setDoc(doc(db, "Users", uid), {
 				firstName: uid,
 				email: `${uid}@example.com`,
@@ -121,8 +125,37 @@ describe("the breach that was live in production", () => {
 		);
 	});
 
-	test("unauthenticated users cannot list Companies", async () => {
-		await assertFails(getDocs(collection(unauth(), "Companies")));
+	// TEMPORARY: the Companies collection is deliberately public-read right now.
+	// Signup on the released app (1.0.98) queries it by accessCode BEFORE
+	// creating the auth account, so requiring auth would break signup for every
+	// live user. 1.0.100 reorders that flow.
+	//
+	// WHEN 1.0.100 ADOPTION COMPLETES: change `allow read: if true` to
+	// `isSignedIn()` in firestore.rules and flip this test back to assertFails.
+	test("Companies is still public-read (temporary, for 1.0.98 signup)", async () => {
+		await assertSucceeds(getDocs(collection(unauth(), "Companies")));
+	});
+
+	test("...but nothing INSIDE a company leaks to anonymous readers", async () => {
+		await assertFails(
+			getDocs(collection(unauth(), "Companies", COMPANY_A, "Users")),
+		);
+		await assertFails(
+			getDocs(
+				collection(unauth(), "Companies", COMPANY_A, "TimeEntries"),
+			),
+		);
+		await assertFails(
+			getDoc(
+				doc(
+					unauth(),
+					"Companies",
+					COMPANY_A,
+					"Settings",
+					"preferences",
+				),
+			),
+		);
 	});
 });
 
@@ -212,9 +245,12 @@ describe("privilege escalation is blocked", () => {
 		);
 	});
 
+	// Promotes CARL, not BOB — this test MUTATES the fixture, and the
+	// "admin-authored company config" suite below relies on BOB still being a
+	// plain user.
 	test("a manager can change another member's role", async () => {
 		await assertSucceeds(
-			updateDoc(doc(as(ALICE), "Companies", COMPANY_A, "Users", BOB), {
+			updateDoc(doc(as(ALICE), "Companies", COMPANY_A, "Users", CARL), {
 				role: "manager",
 			}),
 		);

@@ -1,0 +1,315 @@
+{
+	"__comment__": [
+		"COMPOSITE INDEXES REQUIRED BY THE v2 SERVICES.",
+		"",
+		"DO NOT DEPLOY THIS FILE AS-IS. It contains ONLY v2 indexes. The v1",
+		"indexes were created by hand in the console and have never been in",
+		"version control, so deploying this alone would mark every one of them",
+		"for deletion and break the currently-running v1 app.",
+		"",
+		"Before deploying:",
+		"  1. firebase firestore:indexes --project anthill-51de0 > firestore.indexes.prod.json",
+		"  2. merge that file's indexes into this one",
+		"  3. save the result as firestore.indexes.json",
+		"  4. add \"indexes\" to the firestore block in firebase.json",
+		"",
+		"Deploy indexes BEFORE the v2 app ships: index builds are near-instant on",
+		"collections that already hold data at this scale, but a query issued",
+		"against a missing index fails with failed-precondition."
+	],
+	"indexes": [
+		{
+			"collectionGroup": "events",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "dateKey",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "events",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "assignedUserIds",
+					"arrayConfig": "CONTAINS"
+				},
+				{
+					"fieldPath": "dateKey",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "events",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "assignedCount",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "dateKey",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "eventResponses",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "eventId",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "eventResponses",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "userId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "status",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "dateKey",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "memberships",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "status",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "lastName",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "memberships",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "userId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "status",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "timeEntries",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "userId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "dateKey",
+					"order": "DESCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "timeEntries",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "dateKey",
+					"order": "DESCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "timeEntries",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "status",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "dateKey",
+					"order": "DESCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "timeEntries",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "userId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "status",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "attachments",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "parentType",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "parentId",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "packages",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "title",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "checklists",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "updatedAt",
+					"order": "DESCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "eventLabels",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "name",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "formSchemas",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "kind",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "version",
+					"order": "DESCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "connections",
+			"queryScope": "COLLECTION_GROUP",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "eventId",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "edits",
+			"queryScope": "COLLECTION_GROUP",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "at",
+					"order": "DESCENDING"
+				}
+			]
+		}
+	],
+	"fieldOverrides": []
+}

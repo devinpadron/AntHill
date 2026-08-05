@@ -1,8 +1,14 @@
 {
-	"firestore": {
-		"database": "test",
-		"rules": "firestore.rules"
-	},
+	"firestore": [
+		{
+			"database": "(default)",
+			"rules": "firestore.rules"
+		},
+		{
+			"database": "test",
+			"rules": "firestore.rules"
+		}
+	],
 	"emulators": {
 		"firestore": {
 			"port": 8080
@@ -11,5 +17,8 @@
 		"ui": {
 			"enabled": false
 		}
+	},
+	"storage": {
+		"rules": "storage.rules"
 	}
 }

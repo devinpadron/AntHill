@@ -29,5 +29,13 @@ GoogleService-Info.plist
 .env
 .env.*
 
+# Firebase admin credentials — NEVER commit these
+service-account.json
+**/service-account.json
+*-service-account.json
+
+# Migration tooling output
+tools/migration/reports/
+
 # macOS
 .DS_Store

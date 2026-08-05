@@ -23,6 +23,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function uid() {
+      return request.auth.uid;
+    }
+
     function isSelf(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
@@ -81,8 +85,8 @@ service cloud.firestore {
       // by accessCode BEFORE creating the auth account (useSignUp.ts, pre-fix
       // ordering). Requiring auth here breaks signup for every live user.
       //
-      // 1.0.99 reorders that flow to authenticate first. TIGHTEN THIS TO
-      // `isSignedIn()` once 1.0.99 adoption is complete — until then, company
+      // 1.0.100 reorders that flow to authenticate first. TIGHTEN THIS TO
+      // `isSignedIn()` once 1.0.100 adoption is complete — until then, company
       // names and access codes are publicly readable, which means an access
       // code can be harvested and used to join a company.
       //
@@ -149,6 +153,234 @@ service cloud.firestore {
         allow read: if isMember(companyId);
         allow write: if isManager(companyId);
       }
+    }
+
+    // =====================================================================
+    // v2 SCHEMA — flat, lowerCamel collections.
+    //
+    // Added ADDITIVELY: every v1 block above is untouched, so the running v1
+    // app is unaffected and v1 remains the rollback target.
+    //
+    // The scoping mechanism is different from v1 and is the main reason the
+    // flattening is safe. Membership is decided by `resource.data.companyId`
+    // rather than by the document's position in the tree, and because Firestore
+    // rules are NOT filters, a query that does not carry
+    // `where("companyId","==",...)` is rejected outright. The client physically
+    // cannot issue an unscoped query — it is enforced, not conventional.
+    // =====================================================================
+
+    function v2Membership(companyId) {
+      return /databases/$(database)/documents/memberships/$(companyId + "_" + request.auth.uid);
+    }
+
+    function v2IsMember(companyId) {
+      return isSignedIn()
+        && exists(v2Membership(companyId))
+        && get(v2Membership(companyId)).data.status == "active";
+    }
+
+    /** Membership derived from a time entry's parent document. */
+    function v2IsMemberOfEntry(entryId) {
+      return isSignedIn()
+        && v2IsMember(
+             get(/databases/$(database)/documents/timeEntries/$(entryId)).data.companyId
+           );
+    }
+
+    function v2IsManagerOfEntry(entryId) {
+      return isSignedIn()
+        && v2IsManager(
+             get(/databases/$(database)/documents/timeEntries/$(entryId)).data.companyId
+           );
+    }
+
+    function v2IsManager(companyId) {
+      return v2IsMember(companyId)
+        && get(v2Membership(companyId)).data.role in ["owner", "manager"];
+    }
+
+    // ---- identity --------------------------------------------------------
+
+    // Self only. v1 had to expose every profile because member lists were built
+    // by fanning out over Users; v2 denormalizes name/email/phone onto
+    // memberships, so nothing needs to read another user's profile document.
+    match /users/{userId} {
+      allow read: if isSelf(userId);
+      allow create, update: if isSelf(userId);
+      allow delete: if false;
+    }
+
+    match /userSettings/{userId} {
+      allow read, write: if isSelf(userId);
+    }
+
+    match /companies/{companyId} {
+      // Joining by access code queries this collection before membership
+      // exists, so any signed-in user may read a company document.
+      allow read: if isSignedIn();
+      // Companies are provisioned out of band.
+      allow write: if false;
+    }
+
+    match /companyPreferences/{companyId} {
+      allow read: if v2IsMember(companyId);
+      allow write: if v2IsManager(companyId);
+    }
+
+    match /memberships/{membershipId} {
+      /*
+       * Two ways to read a membership:
+       *   - it is YOURS, which is how the profile screen finds every company
+       *     you belong to (a query filtered on userId, with no companyId to
+       *     scope by); or
+       *   - you are an active member of the company it belongs to, which is
+       *     how member lists work.
+       *
+       * The first clause is not redundant. Scoping by company alone forces a
+       * cross-company query to satisfy a per-company predicate, which Firestore
+       * cannot prove and therefore rejects outright.
+       */
+      allow read: if isSelf(resource.data.userId)
+                  || v2IsMember(resource.data.companyId);
+      // Joining: only your own membership, only as a plain user, and the id
+      // must be the canonical composite so it cannot collide with someone
+      // else's. This is the privilege-escalation guard.
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == uid()
+                    && membershipId == request.resource.data.companyId + "_" + uid()
+                    && request.resource.data.role == "user"
+                    && request.resource.data.status == "active";
+      allow update: if v2IsManager(resource.data.companyId)
+                    // A member may keep their own denormalized profile fresh,
+                    // but never their own role or status.
+                    || (isSelf(resource.data.userId)
+                        && request.resource.data.diff(resource.data)
+                             .affectedKeys()
+                             .hasOnly(["firstName","lastName","email","phone","updatedAt"]));
+      allow delete: if false;   // removal is a status change, not a delete
+    }
+
+    // ---- company library -------------------------------------------------
+
+    // Immutable once written: editing a form publishes a NEW schema and
+    // repoints the preference. Enforced here so a future bug cannot rewrite
+    // history that historical time entries still reference.
+    match /formSchemas/{schemaId} {
+      allow read: if v2IsMember(resource.data.companyId);
+      allow create: if v2IsManager(request.resource.data.companyId);
+      allow update, delete: if false;
+    }
+
+    match /packages/{packageId} {
+      allow read: if v2IsMember(resource.data.companyId);
+      allow create: if v2IsManager(request.resource.data.companyId);
+      allow update, delete: if v2IsManager(resource.data.companyId);
+    }
+
+    match /checklists/{checklistId} {
+      allow read: if v2IsMember(resource.data.companyId);
+      allow create: if v2IsManager(request.resource.data.companyId);
+      allow update, delete: if v2IsManager(resource.data.companyId);
+    }
+
+    match /eventLabels/{labelId} {
+      allow read: if v2IsMember(resource.data.companyId);
+      allow create: if v2IsManager(request.resource.data.companyId);
+      allow update, delete: if v2IsManager(resource.data.companyId);
+    }
+
+    // ---- events ----------------------------------------------------------
+
+    match /events/{eventId} {
+      allow read: if v2IsMember(resource.data.companyId);
+      allow create: if v2IsManager(request.resource.data.companyId);
+      allow update: if v2IsManager(resource.data.companyId)
+                    // A worker may edit their own notes on an event and
+                    // nothing else. In v1 this same action wrote the entire
+                    // event document back, clobbering concurrent admin edits.
+                    || (v2IsMember(resource.data.companyId)
+                        && request.resource.data.diff(resource.data)
+                             .affectedKeys()
+                             .hasOnly(["workerNotes","updatedAt","updatedBy"]));
+      allow delete: if v2IsManager(resource.data.companyId);
+    }
+
+    // One document per (event, user).
+    //
+    // This is why responses are separate documents rather than a map on the
+    // event: rules can only diff TOP-LEVEL keys, so with an embedded
+    // workerStatus map every worker would need write access to the whole map —
+    // i.e. the ability to confirm or decline on a colleague's behalf.
+    match /eventResponses/{responseId} {
+      allow read: if v2IsMember(resource.data.companyId);
+      allow create, update: if v2IsMember(request.resource.data.companyId)
+                            && request.resource.data.userId == uid()
+                            && responseId == request.resource.data.eventId + "_" + uid();
+      allow delete: if v2IsManager(resource.data.companyId);
+    }
+
+    match /eventChecklistStates/{eventId} {
+      allow read: if v2IsMember(resource.data.companyId);
+      // Any member ticks items; concurrent workers no longer clobber each
+      // other because writes are per-item field paths, not whole-map sets.
+      allow create: if v2IsMember(request.resource.data.companyId);
+      allow update: if v2IsMember(resource.data.companyId);
+      allow delete: if v2IsManager(resource.data.companyId);
+    }
+
+    // ---- time entries ----------------------------------------------------
+
+    match /timeEntries/{entryId} {
+      allow read: if v2IsMember(resource.data.companyId);
+      allow create: if v2IsMember(request.resource.data.companyId)
+                    && request.resource.data.userId == uid();
+      // Owners edit their own entry; managers review anyone's.
+      allow update: if v2IsManager(resource.data.companyId)
+                    || isSelf(resource.data.userId);
+      allow delete: if v2IsManager(resource.data.companyId);
+
+      /*
+       * Subcollections are authorized via their PARENT entry, not their own
+       * companyId field.
+       *
+       * Firestore evaluates a LIST query against its potential result set, not
+       * the documents actually returned — so a rule reading
+       * `resource.data.companyId` can only be satisfied when the query itself
+       * constrains companyId. These are always read as "every edit for THIS
+       * entry", with no such filter, so that form rejected them outright.
+       *
+       * Reading the parent instead is both statically evaluable and more
+       * honest: a subcollection's access should follow its parent's.
+       */
+      match /connections/{connectionId} {
+        allow read: if v2IsMemberOfEntry(entryId);
+        allow write: if v2IsMemberOfEntry(entryId);
+      }
+
+      /*
+       * Append-only audit trail: an edit record can never be REWRITTEN.
+       *
+       * Deletion is allowed for managers, and only because deleting a time
+       * entry has to remove its trail too — v1 left subcollections orphaned
+       * when their parent was deleted, and an audit record for an entry that
+       * no longer exists explains nothing while still costing storage.
+       * Rewriting history stays impossible for everyone.
+       */
+      match /edits/{editId} {
+        allow read: if v2IsMemberOfEntry(entryId);
+        allow create: if v2IsMemberOfEntry(entryId);
+        allow update: if false;
+        allow delete: if v2IsManagerOfEntry(entryId);
+      }
+    }
+
+    match /attachments/{attachmentId} {
+      allow read: if v2IsMember(resource.data.companyId);
+      allow create: if v2IsMember(request.resource.data.companyId);
+      allow update: if v2IsManager(resource.data.companyId)
+                    || isSelf(resource.data.ownerUserId);
+      allow delete: if v2IsManager(resource.data.companyId)
+                    || isSelf(resource.data.ownerUserId);
     }
   }
 }

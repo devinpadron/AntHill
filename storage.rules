@@ -1,0 +1,80 @@
+rules_version = '2';
+
+// Storage rules for anthill-51de0.firebasestorage.app
+//
+// REPLACES a deny-all ruleset (see storage.rules.v1.backup). Attachment uploads
+// have almost certainly been broken since that was deployed — the newest object
+// in the bucket is from 2026-05-22, on an app in daily use.
+//
+// THREE PATH LAYOUTS EXIST. Discovered by listing the bucket, not from the
+// code, which only knows about the newest one:
+//
+//   companies/{companyId}/Events/{eventId}/{fileId}                 19 objects
+//     current — written by UploadManagerContext
+//   companies/{companyId}/events/{eventId}/documents/{fileId}       13 objects
+//   companies/{companyId}/events/{eventId}/images/{fileId}           7 objects
+//     legacy — lowercase `events` plus a type subdirectory, 2025-01..2025-05
+//
+// The legacy objects are still referenced by live attachment records, so a rule
+// matching only the current layout would break every historical photo. The
+// wildcard below covers all three deliberately.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // v2 membership. Storage rules can only reach the (default) Firestore
+    // database, which is where production membership lives.
+    function isV2Member(companyId) {
+      return signedIn()
+        && firestore.exists(
+             /databases/(default)/documents/memberships/$(companyId + '_' + request.auth.uid)
+           )
+        && firestore.get(
+             /databases/(default)/documents/memberships/$(companyId + '_' + request.auth.uid)
+           ).data.status == 'active';
+    }
+
+    // v1 membership, kept until the v1 app is retired. Additive, exactly like
+    // the Firestore rules — the currently shipping build must keep working.
+    function isV1Member(companyId) {
+      return signedIn()
+        && firestore.exists(
+             /databases/(default)/documents/Companies/$(companyId)/Users/$(request.auth.uid)
+           );
+    }
+
+    function isMember(companyId) {
+      return isV2Member(companyId) || isV1Member(companyId);
+    }
+
+    /*
+     * Everything under a company, in any of the three layouts.
+     *
+     * Scoping is by company only. Per-attachment ownership is enforced in
+     * Firestore, where the attachment record lives; duplicating it here would
+     * mean a Firestore lookup per byte range and would still be weaker, since
+     * the object path carries no owner.
+     */
+    match /companies/{companyId}/{allPaths=**} {
+      allow read: if isMember(companyId);
+      allow write: if isMember(companyId)
+                   // 50 MB ceiling: the largest existing object is ~4.9 MB, so
+                   // this bounds abuse without affecting real uploads.
+                   && request.resource.size < 50 * 1024 * 1024;
+      allow delete: if isMember(companyId);
+    }
+
+    /*
+     * Root-level app assets (currently one icon). Readable, never writable.
+     * Nothing user-generated lives here.
+     */
+    match /{fileName} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}
