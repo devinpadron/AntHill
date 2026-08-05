@@ -33,6 +33,38 @@
 			"queryScope": "COLLECTION",
 			"fields": [
 				{
+					"fieldPath": "startTime",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "date",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "Events",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "userId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "endTime",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "startTime",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "Events",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
 					"fieldPath": "userId",
 					"order": "ASCENDING"
 				},
@@ -79,11 +111,193 @@
 			]
 		},
 		{
+			"collectionGroup": "attachments",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "parentType",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "parentId",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "checklists",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "updatedAt",
+					"order": "DESCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "connections",
+			"queryScope": "COLLECTION_GROUP",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "eventId",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "edits",
+			"queryScope": "COLLECTION_GROUP",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "at",
+					"order": "DESCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "eventLabels",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "name",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "eventResponses",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "eventId",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "eventResponses",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "userId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "dateKey",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "eventResponses",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "userId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "status",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "dateKey",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
 			"collectionGroup": "events",
 			"queryScope": "COLLECTION",
 			"fields": [
 				{
 					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "dateKey",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "events",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "assignedCount",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "dateKey",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "events",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "assignedUserIds",
+					"arrayConfig": "CONTAINS"
+				},
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "dateKey",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "events",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "assignedCount",
 					"order": "ASCENDING"
 				},
 				{
@@ -123,203 +337,11 @@
 					"order": "ASCENDING"
 				},
 				{
-					"fieldPath": "dateKey",
-					"order": "ASCENDING"
-				}
-			]
-		},
-		{
-			"collectionGroup": "eventResponses",
-			"queryScope": "COLLECTION",
-			"fields": [
-				{
-					"fieldPath": "companyId",
-					"order": "ASCENDING"
-				},
-				{
-					"fieldPath": "eventId",
-					"order": "ASCENDING"
-				}
-			]
-		},
-		{
-			"collectionGroup": "eventResponses",
-			"queryScope": "COLLECTION",
-			"fields": [
-				{
-					"fieldPath": "companyId",
-					"order": "ASCENDING"
-				},
-				{
-					"fieldPath": "userId",
-					"order": "ASCENDING"
-				},
-				{
-					"fieldPath": "status",
+					"fieldPath": "isTargeted",
 					"order": "ASCENDING"
 				},
 				{
 					"fieldPath": "dateKey",
-					"order": "ASCENDING"
-				}
-			]
-		},
-		{
-			"collectionGroup": "memberships",
-			"queryScope": "COLLECTION",
-			"fields": [
-				{
-					"fieldPath": "companyId",
-					"order": "ASCENDING"
-				},
-				{
-					"fieldPath": "status",
-					"order": "ASCENDING"
-				},
-				{
-					"fieldPath": "lastName",
-					"order": "ASCENDING"
-				}
-			]
-		},
-		{
-			"collectionGroup": "memberships",
-			"queryScope": "COLLECTION",
-			"fields": [
-				{
-					"fieldPath": "userId",
-					"order": "ASCENDING"
-				},
-				{
-					"fieldPath": "status",
-					"order": "ASCENDING"
-				}
-			]
-		},
-		{
-			"collectionGroup": "timeEntries",
-			"queryScope": "COLLECTION",
-			"fields": [
-				{
-					"fieldPath": "companyId",
-					"order": "ASCENDING"
-				},
-				{
-					"fieldPath": "userId",
-					"order": "ASCENDING"
-				},
-				{
-					"fieldPath": "dateKey",
-					"order": "DESCENDING"
-				}
-			]
-		},
-		{
-			"collectionGroup": "timeEntries",
-			"queryScope": "COLLECTION",
-			"fields": [
-				{
-					"fieldPath": "companyId",
-					"order": "ASCENDING"
-				},
-				{
-					"fieldPath": "dateKey",
-					"order": "DESCENDING"
-				}
-			]
-		},
-		{
-			"collectionGroup": "timeEntries",
-			"queryScope": "COLLECTION",
-			"fields": [
-				{
-					"fieldPath": "companyId",
-					"order": "ASCENDING"
-				},
-				{
-					"fieldPath": "status",
-					"order": "ASCENDING"
-				},
-				{
-					"fieldPath": "dateKey",
-					"order": "DESCENDING"
-				}
-			]
-		},
-		{
-			"collectionGroup": "timeEntries",
-			"queryScope": "COLLECTION",
-			"fields": [
-				{
-					"fieldPath": "companyId",
-					"order": "ASCENDING"
-				},
-				{
-					"fieldPath": "userId",
-					"order": "ASCENDING"
-				},
-				{
-					"fieldPath": "status",
-					"order": "ASCENDING"
-				}
-			]
-		},
-		{
-			"collectionGroup": "attachments",
-			"queryScope": "COLLECTION",
-			"fields": [
-				{
-					"fieldPath": "companyId",
-					"order": "ASCENDING"
-				},
-				{
-					"fieldPath": "parentType",
-					"order": "ASCENDING"
-				},
-				{
-					"fieldPath": "parentId",
-					"order": "ASCENDING"
-				}
-			]
-		},
-		{
-			"collectionGroup": "packages",
-			"queryScope": "COLLECTION",
-			"fields": [
-				{
-					"fieldPath": "companyId",
-					"order": "ASCENDING"
-				},
-				{
-					"fieldPath": "title",
-					"order": "ASCENDING"
-				}
-			]
-		},
-		{
-			"collectionGroup": "checklists",
-			"queryScope": "COLLECTION",
-			"fields": [
-				{
-					"fieldPath": "companyId",
-					"order": "ASCENDING"
-				},
-				{
-					"fieldPath": "updatedAt",
-					"order": "DESCENDING"
-				}
-			]
-		},
-		{
-			"collectionGroup": "eventLabels",
-			"queryScope": "COLLECTION",
-			"fields": [
-				{
-					"fieldPath": "companyId",
-					"order": "ASCENDING"
-				},
-				{
-					"fieldPath": "name",
 					"order": "ASCENDING"
 				}
 			]
@@ -343,30 +365,162 @@
 			]
 		},
 		{
-			"collectionGroup": "connections",
-			"queryScope": "COLLECTION_GROUP",
+			"collectionGroup": "groups",
+			"queryScope": "COLLECTION",
 			"fields": [
 				{
 					"fieldPath": "companyId",
 					"order": "ASCENDING"
 				},
 				{
-					"fieldPath": "eventId",
+					"fieldPath": "name",
 					"order": "ASCENDING"
 				}
 			]
 		},
 		{
-			"collectionGroup": "edits",
-			"queryScope": "COLLECTION_GROUP",
+			"collectionGroup": "memberships",
+			"queryScope": "COLLECTION",
 			"fields": [
 				{
 					"fieldPath": "companyId",
 					"order": "ASCENDING"
 				},
 				{
-					"fieldPath": "at",
+					"fieldPath": "groupIds",
+					"arrayConfig": "CONTAINS"
+				}
+			]
+		},
+		{
+			"collectionGroup": "memberships",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "userId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "status",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "memberships",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "status",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "groupIds",
+					"arrayConfig": "CONTAINS"
+				}
+			]
+		},
+		{
+			"collectionGroup": "memberships",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "status",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "lastName",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "packages",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "title",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "timeEntries",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "dateKey",
 					"order": "DESCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "timeEntries",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "status",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "dateKey",
+					"order": "DESCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "timeEntries",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "userId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "dateKey",
+					"order": "DESCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "timeEntries",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "userId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "status",
+					"order": "ASCENDING"
 				}
 			]
 		}

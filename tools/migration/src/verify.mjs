@@ -211,6 +211,50 @@ check(
 	badAssignedCount === 0,
 );
 
+/*
+ * Audience-targeting fields must be PRESENT, not merely falsy.
+ *
+ * A Firestore equality filter does not match documents where the field is
+ * absent, so an event missing `isTargeted` drops out of
+ * `where("isTargeted","==",false)` — the open-availability query — and simply
+ * stops existing for every worker. Absent and false are indistinguishable in
+ * every other check, which is why this one tests for the field rather than its
+ * value.
+ */
+let missingTargeting = 0;
+for (const doc of v2[C.events].docs) {
+	const d = doc.data();
+	if (
+		typeof d.isTargeted !== "boolean" ||
+		!Array.isArray(d.audienceGroupIds)
+	) {
+		missingTargeting += 1;
+		fail("EVENT_TARGETING_FIELD_MISSING", doc.id);
+	}
+}
+check(
+	"every event carries isTargeted + audienceGroupIds",
+	missingTargeting === 0,
+	missingTargeting ? `${missingTargeting} events` : "",
+);
+
+let missingVisibility = 0;
+for (const doc of v2[C.memberships].docs) {
+	const d = doc.data();
+	if (
+		(d.visibility !== "open" && d.visibility !== "restricted") ||
+		!Array.isArray(d.groupIds)
+	) {
+		missingVisibility += 1;
+		fail("MEMBERSHIP_VISIBILITY_FIELD_MISSING", doc.id);
+	}
+}
+check(
+	"every membership carries visibility + groupIds",
+	missingVisibility === 0,
+	missingVisibility ? `${missingVisibility} memberships` : "",
+);
+
 let badWorked = 0;
 for (const doc of v2[C.timeEntries].docs) {
 	const d = doc.data();

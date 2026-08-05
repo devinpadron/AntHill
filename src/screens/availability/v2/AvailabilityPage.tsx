@@ -21,9 +21,9 @@ import { useUser } from "../../../contexts/v2/UserContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import {
+	getAvailabilityEvents,
 	getEventResponses,
 	getEventsInRange,
-	getUnassignedUpcomingEvents,
 	setEventResponse,
 	subscribeMyResponses,
 	subscribeMyUpcomingEvents,
@@ -90,7 +90,17 @@ const AvailabilityPage = ({ navigation }) => {
 		unconfirmed: [],
 	});
 	const [loadingWorkerDetails, setLoadingWorkerDetails] = useState(false);
-	const { userId, companyId, isAdmin } = useUser();
+	const { userId, companyId, isAdmin, membership } = useUser();
+
+	/*
+	 * Which jobs this worker is allowed to see.
+	 *
+	 * "open" is the default and what every migrated membership carries: all
+	 * unassigned events that were not published to a specific group, exactly as
+	 * in v1. A "restricted" worker — a 1099 contractor — sees only the jobs
+	 * they were invited to.
+	 */
+	const visibility = membership?.visibility ?? "open";
 
 	// Refresh data every time the screen comes into focus
 	useFocusEffect(
@@ -108,25 +118,47 @@ const AvailabilityPage = ({ navigation }) => {
 	const [myResponses, setMyResponses] = useState<Record<string, string>>({});
 	const { members } = useCompanyMembers(companyId ?? "");
 
+	/*
+	 * The response ids double as the invitation list, and the focus handler
+	 * fetches from a callback whose deps are only [userId, companyId] — so it
+	 * would close over an empty map and show a restricted worker nothing.
+	 * A ref keeps the fetch reading the current set whenever it runs.
+	 */
+	const myResponsesRef = React.useRef<Record<string, string>>({});
+
 	useEffect(() => {
 		if (!companyId || !userId) return;
 		const today = new Date().toISOString().slice(0, 10);
-		return subscribeMyResponses(companyId, userId, today, setMyResponses);
+		return subscribeMyResponses(companyId, userId, today, (next) => {
+			myResponsesRef.current = next;
+			setMyResponses(next);
+		});
 	}, [companyId, userId]);
 
+	// `visibility` is in here because the membership subscription is live: a
+	// manager restricting a worker takes effect on their device immediately,
+	// without a relaunch.
 	useEffect(() => {
 		fetchEventsFromFirebase();
-	}, [userId, myResponses]);
+	}, [userId, myResponses, visibility]);
 
 	const fetchEventsFromFirebase = async () => {
 		setLoading(true);
 
 		try {
-			// Get unassigned events from your service
 			const today = new Date().toISOString().slice(0, 10);
-			const fetchedEvents: any = await getUnassignedUpcomingEvents(
+			/*
+			 * Open jobs plus this worker's invitations, or invitations alone if
+			 * they are restricted. The invitation ids come from their own
+			 * eventResponses, which the security rules already scope to them —
+			 * a worker who was never invited to a targeted job has no document
+			 * for it, so it cannot appear here.
+			 */
+			const fetchedEvents: any = await getAvailabilityEvents(
 				companyId,
 				today,
+				visibility,
+				Object.keys(myResponsesRef.current),
 			);
 
 			// Days the user is already committed to, for the conflict badge.

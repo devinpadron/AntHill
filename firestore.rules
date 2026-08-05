@@ -199,6 +199,19 @@ service cloud.firestore {
         && get(v2Membership(companyId)).data.role in ["owner", "manager"];
     }
 
+    /*
+     * An event nobody was specifically invited to, i.e. open to the company.
+     *
+     * Defaults to open when the field is absent: reading a missing map key
+     * raises an error in rules, which would deny rather than fall through, and
+     * "no audience recorded" means the same thing as "everyone" everywhere else
+     * in the schema.
+     */
+    function v2EventIsOpen(eventId) {
+      return get(/databases/$(database)/documents/events/$(eventId))
+               .data.get("isTargeted", false) != true;
+    }
+
     // ---- identity --------------------------------------------------------
 
     // Self only. v1 had to expose every profile because member lists were built
@@ -249,15 +262,36 @@ service cloud.firestore {
                     && request.resource.data.userId == uid()
                     && membershipId == request.resource.data.companyId + "_" + uid()
                     && request.resource.data.role == "user"
-                    && request.resource.data.status == "active";
+                    && request.resource.data.status == "active"
+                    // Joining cannot put you in a group or change what you can
+                    // see. Without this, a restricted worker could rejoin by
+                    // access code and hand themselves an audience.
+                    //
+                    // Read with defaults: a missing key raises an error in
+                    // rules, which DENIES rather than falling through, so
+                    // reading these directly would reject every join issued by
+                    // a client that does not send them.
+                    && request.resource.data.get("visibility", "open") == "open"
+                    && request.resource.data.get("groupIds", []) == [];
       allow update: if v2IsManager(resource.data.companyId)
                     // A member may keep their own denormalized profile fresh,
-                    // but never their own role or status.
+                    // but never their own role, status, visibility or groups.
+                    // hasOnly is what enforces that: the segmentation fields
+                    // are absent from this list, so a worker cannot widen
+                    // their own access.
                     || (isSelf(resource.data.userId)
                         && request.resource.data.diff(resource.data)
                              .affectedKeys()
                              .hasOnly(["firstName","lastName","email","phone","updatedAt"]));
       allow delete: if false;   // removal is a status change, not a delete
+    }
+
+    // Named sets of workers a manager publishes events to. Membership is a
+    // field on the membership document, not a roster here.
+    match /groups/{groupId} {
+      allow read: if v2IsMember(resource.data.companyId);
+      allow create: if v2IsManager(request.resource.data.companyId);
+      allow update, delete: if v2IsManager(resource.data.companyId);
     }
 
     // ---- company library -------------------------------------------------
@@ -292,7 +326,30 @@ service cloud.firestore {
     // ---- events ----------------------------------------------------------
 
     match /events/{eventId} {
-      allow read: if v2IsMember(resource.data.companyId);
+      /*
+       * Single-document reads are checked against the audience: a targeted
+       * event can only be fetched by a manager, someone assigned to it, or
+       * someone holding an invitation.
+       *
+       * `list` is deliberately NOT narrowed the same way. Firestore evaluates a
+       * list query against its potential result set, so a per-caller audience
+       * predicate cannot be expressed without rejecting the query outright —
+       * the same mechanic behind the permission bugs this migration fixed.
+       * Narrowing list would have to deny it to restricted members entirely,
+       * which would break their own calendar, since that is a list query too.
+       *
+       * So the honest boundary: responding is enforced (below), and fetching a
+       * targeted event by id is enforced here, but a restricted member issuing
+       * a raw list query could still enumerate event titles and dates for their
+       * own company. The app never shows them; the exposure is via direct API
+       * access, not the product.
+       */
+      allow get: if v2IsManager(resource.data.companyId)
+                 || (v2IsMember(resource.data.companyId)
+                     && (resource.data.get("isTargeted", false) != true
+                         || uid() in resource.data.get("assignedUserIds", [])
+                         || exists(/databases/$(database)/documents/eventResponses/$(eventId + "_" + uid()))));
+      allow list: if v2IsMember(resource.data.companyId);
       allow create: if v2IsManager(request.resource.data.companyId);
       allow update: if v2IsManager(resource.data.companyId)
                     // A worker may edit their own notes on an event and
@@ -313,9 +370,31 @@ service cloud.firestore {
     // i.e. the ability to confirm or decline on a colleague's behalf.
     match /eventResponses/{responseId} {
       allow read: if v2IsMember(resource.data.companyId);
-      allow create, update: if v2IsMember(request.resource.data.companyId)
+
+      /*
+       * Create and update are split, and that split is what makes worker
+       * groups real rather than decorative.
+       *
+       * A manager creates responses as INVITATIONS when publishing an event to
+       * a group. A worker may create their own only for an event that is open
+       * to everyone. Without the distinction a restricted worker could simply
+       * write their own response document for a targeted event and opt
+       * themselves in — the group would be a suggestion, not a boundary.
+       */
+      allow create: if responseId == request.resource.data.eventId + "_" + request.resource.data.userId
+                    && (v2IsManager(request.resource.data.companyId)
+                        || (v2IsMember(request.resource.data.companyId)
                             && request.resource.data.userId == uid()
-                            && responseId == request.resource.data.eventId + "_" + uid();
+                            && v2EventIsOpen(request.resource.data.eventId)));
+
+      // Answering an invitation. A worker changes their own reply and nothing
+      // else — not whose response it is, not which event it belongs to.
+      allow update: if v2IsManager(resource.data.companyId)
+                    || (isSelf(resource.data.userId)
+                        && request.resource.data.diff(resource.data)
+                             .affectedKeys()
+                             .hasOnly(["status","respondedAt","updatedAt","dateKey"]));
+
       allow delete: if v2IsManager(resource.data.companyId);
     }
 

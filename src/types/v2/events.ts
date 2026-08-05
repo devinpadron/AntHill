@@ -35,6 +35,21 @@ export interface Event extends BaseDoc, CompanyScoped {
 	checklistIds: string[];
 	labelId: string | null;
 	attachmentCount: number;
+	/**
+	 * Groups this event was published to. Empty means open to everyone, which
+	 * is how every migrated event and every event created without a group
+	 * behaves — i.e. exactly v1.
+	 */
+	audienceGroupIds: string[];
+	/**
+	 * `audienceGroupIds.length > 0`, denormalized because Firestore cannot
+	 * query on array length.
+	 *
+	 * Always present. The open-availability query filters on
+	 * `isTargeted == false`, and an equality filter does not match documents
+	 * where the field is missing — absent would mean invisible to everyone.
+	 */
+	isTargeted: boolean;
 	/** Denormalized, best-effort; `verify` re-derives it. */
 	responseCounts: {
 		confirmed: number;

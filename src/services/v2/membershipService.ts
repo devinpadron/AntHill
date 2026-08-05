@@ -170,6 +170,13 @@ export async function joinCompanyWithAccessCode(
 				email: profile.email ?? "",
 				phone: profile.phone ?? null,
 				status: "active",
+				// Written explicitly, not left to a default. A membership
+				// without these fields is skipped by every equality and
+				// array-contains filter that uses them, so a new joiner would
+				// be invisible to group resolution — and the rules pin both
+				// values anyway, so a worker cannot join pre-grouped.
+				visibility: "open",
+				groupIds: [],
 				joinedAt: now,
 				createdAt: now,
 				updatedAt: now,

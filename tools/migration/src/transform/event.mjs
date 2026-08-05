@@ -102,6 +102,19 @@ export function transformEvent(id, v1, ctx) {
 			checklistIds: [],
 			labelId,
 			attachmentCount: 0,
+			/*
+			 * Audience targeting. v1 had no concept of it, so every migrated
+			 * event is open to everyone — which is exactly today's behaviour.
+			 *
+			 * `isTargeted` is written explicitly rather than left absent
+			 * because the open-availability query filters on
+			 * `isTargeted == false`, and a Firestore equality filter does not
+			 * match documents where the field is missing. Absent here would
+			 * mean every historical event silently vanished from the
+			 * availability list.
+			 */
+			audienceGroupIds: [],
+			isTargeted: false,
 			responseCounts: countResponses(v1, assignedUserIds),
 			createdAt: startAt ?? null,
 			createdBy: null,

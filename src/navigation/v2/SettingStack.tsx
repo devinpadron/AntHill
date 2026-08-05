@@ -9,6 +9,7 @@ import CompanyCustomForm from "../../screens/settings/admin/v2/CompanyCustomForm
 import ChecklistCreator from "../../screens/settings/admin/v2/ChecklistCreator";
 import PackageCreator from "../../screens/settings/admin/v2/PackageCreator";
 import LabelCreator from "../../screens/settings/admin/v2/LabelCreator";
+import WorkerGroups from "../../screens/settings/admin/v2/WorkerGroups";
 import PayrollReviewStack from "./PayrollReviewStack";
 
 /*
@@ -70,6 +71,11 @@ const SettingStack = () => (
 		<Stack.Screen
 			name="LabelCreator"
 			component={LabelCreator}
+			options={{ headerShown: false, gestureEnabled: true }}
+		/>
+		<Stack.Screen
+			name="WorkerGroups"
+			component={WorkerGroups}
 			options={{ headerShown: false, gestureEnabled: true }}
 		/>
 	</Stack.Navigator>

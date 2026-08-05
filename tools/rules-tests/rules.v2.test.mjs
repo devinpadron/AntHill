@@ -34,6 +34,16 @@ const BOB = "bob";
 const CARL = "carl";
 const MALLORY = "mallory";
 const RITA = "rita";
+/** A 1099 contractor: visibility "restricted", in the Bartenders group. */
+const DAN = "dan";
+/*
+ * A plain, open, ungrouped worker.
+ *
+ * Deliberately NOT Carl: an earlier test promotes Carl to manager, so every
+ * later "a worker cannot..." assertion against him passes through the manager
+ * branch and proves nothing. Erin's role is never mutated.
+ */
+const ERIN = "erin";
 
 let env;
 
@@ -146,6 +156,99 @@ before(async () => {
 			parentType: "event",
 			parentId: "e1",
 			ownerUserId: BOB,
+		});
+
+		// --- worker groups ------------------------------------------------
+		// Dan is a 1099 contractor: restricted, and in the Bartenders group.
+		// Erin stays open and ungrouped, which is what every migrated worker
+		// looks like.
+		await setDoc(doc(db, "groups", "g1"), {
+			id: "g1",
+			companyId: A,
+			name: "Bartenders",
+		});
+		await setDoc(doc(db, "memberships", mid(A, DAN)), {
+			id: mid(A, DAN),
+			companyId: A,
+			userId: DAN,
+			role: "user",
+			status: "active",
+			visibility: "restricted",
+			groupIds: ["g1"],
+			firstName: DAN,
+			lastName: DAN,
+			email: `${DAN}@e.com`,
+		});
+		await setDoc(doc(db, "users", DAN), { id: DAN, email: `${DAN}@e.com` });
+
+		await setDoc(doc(db, "memberships", mid(A, ERIN)), {
+			id: mid(A, ERIN),
+			companyId: A,
+			userId: ERIN,
+			role: "user",
+			status: "active",
+			visibility: "open",
+			groupIds: [],
+			firstName: ERIN,
+			lastName: ERIN,
+			email: `${ERIN}@e.com`,
+		});
+		await setDoc(doc(db, "users", ERIN), {
+			id: ERIN,
+			email: `${ERIN}@e.com`,
+		});
+
+		// Open to the whole company — the shape every migrated event has.
+		await setDoc(doc(db, "events", "eOpen"), {
+			id: "eOpen",
+			companyId: A,
+			title: "Open shift",
+			dateKey: "2027-01-10",
+			assignedUserIds: [],
+			assignedCount: 0,
+			audienceGroupIds: [],
+			isTargeted: false,
+		});
+		// Published to Bartenders. Dan holds the invitation; Erin does not.
+		await setDoc(doc(db, "events", "eTargeted"), {
+			id: "eTargeted",
+			companyId: A,
+			title: "Contractor shift",
+			dateKey: "2027-01-11",
+			assignedUserIds: [],
+			assignedCount: 0,
+			audienceGroupIds: ["g1"],
+			isTargeted: true,
+		});
+		await setDoc(doc(db, "eventResponses", `eTargeted_${DAN}`), {
+			id: `eTargeted_${DAN}`,
+			companyId: A,
+			eventId: "eTargeted",
+			userId: DAN,
+			dateKey: "2027-01-11",
+			status: "pending",
+			respondedAt: null,
+		});
+		// Targeted AND staffed — Erin is on it without ever being invited.
+		await setDoc(doc(db, "events", "eTargetedStaffed"), {
+			id: "eTargetedStaffed",
+			companyId: A,
+			title: "Already staffed",
+			dateKey: "2027-01-12",
+			assignedUserIds: [ERIN],
+			assignedCount: 1,
+			audienceGroupIds: ["g1"],
+			isTargeted: true,
+		});
+		// No isTargeted field at all — a v2 document written before targeting
+		// existed. Must read as open, not deny.
+		await setDoc(doc(db, "events", "eLegacy"), {
+			id: "eLegacy",
+			companyId: A,
+			title: "Pre-targeting",
+			dateKey: "2027-01-13",
+			assignedUserIds: [],
+			assignedCount: 0,
 		});
 	});
 });
@@ -347,12 +450,31 @@ describe("v2 — events", () => {
 
 describe("v2 — event responses are per-user", () => {
 	test("a worker records their own response", async () => {
+		// Merge, matching what setEventResponse actually issues. A worker may
+		// only move their own answer, so a full replacement that drops `id`
+		// would — correctly — be refused.
 		await assertSucceeds(
-			setDoc(doc(as(BOB), "eventResponses", "e1_bob"), {
-				companyId: A,
-				eventId: "e1",
-				userId: BOB,
-				status: "confirmed",
+			setDoc(
+				doc(as(BOB), "eventResponses", "e1_bob"),
+				{
+					id: "e1_bob",
+					companyId: A,
+					eventId: "e1",
+					userId: BOB,
+					status: "confirmed",
+				},
+				{ merge: true },
+			),
+		);
+	});
+
+	test("a worker cannot repoint their own response at another event", async () => {
+		// The response id is what ties an answer to an invitation. Letting the
+		// eventId move would let a worker answer a job they were never offered
+		// using a document they legitimately own.
+		await assertFails(
+			updateDoc(doc(as(BOB), "eventResponses", "e1_bob"), {
+				eventId: "eTargeted",
 			}),
 		);
 	});
@@ -378,6 +500,187 @@ describe("v2 — event responses are per-user", () => {
 				eventId: "e1",
 				userId: BOB,
 				status: "confirmed",
+			}),
+		);
+	});
+});
+
+describe("v2 — worker groups gate who can answer a job", () => {
+	test("an open worker still answers an open job, exactly as before", async () => {
+		// The regression test for the whole feature: nothing changes for the
+		// W2 staff who make up every migrated membership.
+		await assertSucceeds(
+			setDoc(doc(as(ERIN), "eventResponses", `eOpen_${ERIN}`), {
+				id: `eOpen_${ERIN}`,
+				companyId: A,
+				eventId: "eOpen",
+				userId: ERIN,
+				dateKey: "2027-01-10",
+				status: "confirmed",
+			}),
+		);
+	});
+
+	test("an event with no isTargeted field reads as open, not denied", async () => {
+		// Reading a missing map key raises an error in rules, which denies
+		// rather than falls through. Any v2 document written before targeting
+		// existed would otherwise become unanswerable.
+		await assertSucceeds(
+			setDoc(doc(as(ERIN), "eventResponses", `eLegacy_${ERIN}`), {
+				id: `eLegacy_${ERIN}`,
+				companyId: A,
+				eventId: "eLegacy",
+				userId: ERIN,
+				dateKey: "2027-01-13",
+				status: "confirmed",
+			}),
+		);
+	});
+
+	test("an uninvited worker CANNOT opt themselves into a targeted job", async () => {
+		// The load-bearing assertion. Without the create/update split a worker
+		// simply writes their own response document and the group becomes a
+		// suggestion rather than a boundary.
+		await assertFails(
+			setDoc(doc(as(ERIN), "eventResponses", `eTargeted_${ERIN}`), {
+				id: `eTargeted_${ERIN}`,
+				companyId: A,
+				eventId: "eTargeted",
+				userId: ERIN,
+				dateKey: "2027-01-11",
+				status: "confirmed",
+			}),
+		);
+	});
+
+	test("an invited worker answers their invitation", async () => {
+		await assertSucceeds(
+			updateDoc(doc(as(DAN), "eventResponses", `eTargeted_${DAN}`), {
+				status: "confirmed",
+			}),
+		);
+	});
+
+	test("a manager invites a worker by creating the response", async () => {
+		await assertSucceeds(
+			setDoc(doc(as(ALICE), "eventResponses", `eTargeted_${ERIN}`), {
+				id: `eTargeted_${ERIN}`,
+				companyId: A,
+				eventId: "eTargeted",
+				userId: ERIN,
+				dateKey: "2027-01-11",
+				status: "pending",
+			}),
+		);
+	});
+
+	test("an uninvited worker cannot even read the targeted job", async () => {
+		await assertFails(getDoc(doc(as(BOB), "events", "eTargeted")));
+	});
+
+	test("the invited worker can", async () => {
+		await assertSucceeds(getDoc(doc(as(DAN), "events", "eTargeted")));
+	});
+
+	test("so can a manager, who has to be able to edit it", async () => {
+		await assertSucceeds(getDoc(doc(as(ALICE), "events", "eTargeted")));
+	});
+
+	test("and so can someone assigned to it without an invitation", async () => {
+		// Staffing an event directly skips the availability round trip, so the
+		// assignee never gets a response document.
+		await assertSucceeds(
+			getDoc(doc(as(ERIN), "events", "eTargetedStaffed")),
+		);
+	});
+
+	test("a targeted job in another company is still invisible", async () => {
+		await assertFails(getDoc(doc(as(MALLORY), "events", "eTargeted")));
+	});
+});
+
+describe("v2 — a worker cannot widen their own audience", () => {
+	test("no self-promotion out of restricted", async () => {
+		await assertFails(
+			updateDoc(doc(as(DAN), "memberships", mid(A, DAN)), {
+				visibility: "open",
+			}),
+		);
+	});
+
+	test("no adding yourself to a group", async () => {
+		await assertFails(
+			updateDoc(doc(as(ERIN), "memberships", mid(A, ERIN)), {
+				groupIds: ["g1"],
+			}),
+		);
+	});
+
+	test("a manager can do both", async () => {
+		await assertSucceeds(
+			updateDoc(doc(as(ALICE), "memberships", mid(A, ERIN)), {
+				visibility: "restricted",
+				groupIds: ["g1"],
+			}),
+		);
+	});
+
+	test("joining a company cannot smuggle in a group", async () => {
+		// Membership create is self-service via access code, so the audience
+		// fields have to be pinned there too — otherwise a restricted worker
+		// rejoins and hands themselves an audience.
+		await assertFails(
+			setDoc(doc(as(MALLORY), "memberships", mid(A, MALLORY)), {
+				id: mid(A, MALLORY),
+				companyId: A,
+				userId: MALLORY,
+				role: "user",
+				status: "active",
+				visibility: "open",
+				groupIds: ["g1"],
+			}),
+		);
+	});
+});
+
+describe("v2 — groups are manager-owned", () => {
+	test("a member reads the groups in their company", async () => {
+		await assertSucceeds(
+			getDocs(
+				query(
+					collection(as(BOB), "groups"),
+					where("companyId", "==", A),
+				),
+			),
+		);
+	});
+
+	test("a plain member cannot create one", async () => {
+		await assertFails(
+			setDoc(doc(as(BOB), "groups", "g2"), {
+				id: "g2",
+				companyId: A,
+				name: "Invented",
+			}),
+		);
+	});
+
+	test("a manager can", async () => {
+		await assertSucceeds(
+			setDoc(doc(as(ALICE), "groups", "g3"), {
+				id: "g3",
+				companyId: A,
+				name: "Weekend crew",
+			}),
+		);
+	});
+
+	test("a manager of another company cannot", async () => {
+		await assertFails(
+			setDoc(doc(as(MALLORY), "groups", "g4"), {
+				id: "g4",
+				companyId: A,
+				name: "Cross-company",
 			}),
 		);
 	});

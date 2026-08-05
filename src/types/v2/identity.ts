@@ -51,7 +51,33 @@ export interface Membership extends BaseDoc, CompanyScoped {
 	email: string;
 	phone: string | null;
 	status: "active" | "removed";
+	/**
+	 * Which unassigned events this worker may see and respond to.
+	 *
+	 * `open` is v1's behaviour and the default: every event that is not
+	 * targeted at a group. `restricted` is for 1099 contractors — they see
+	 * nothing but the events they were explicitly invited to.
+	 *
+	 * Always written explicitly. A query filtering on it would skip documents
+	 * where it is absent, so an implicit default is not available here.
+	 */
+	visibility: WorkerVisibility;
+	/** Groups this worker belongs to. Managers publish events to groups. */
+	groupIds: string[];
 	joinedAt: Timestamp;
+}
+
+export type WorkerVisibility = "open" | "restricted";
+
+/**
+ * groups/{groupId}
+ *
+ * A named set of workers a manager can publish an event to — "Bartenders",
+ * "1099 Contractors", "Weekend Crew". Membership is stored on the membership
+ * document (`groupIds`), not here, so a member list stays one query.
+ */
+export interface Group extends BaseDoc, CompanyScoped {
+	name: string;
 }
 
 /** companyPreferences/{companyId} */

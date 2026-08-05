@@ -99,6 +99,18 @@ describe("transformEvent", () => {
 		assert.deepEqual(absent.doc.assignedUserIds, []);
 	});
 
+	test("targeting fields are PRESENT and open, not merely absent", () => {
+		// The distinction is the whole point. A Firestore equality filter skips
+		// documents where the field is missing, so an event without an explicit
+		// `isTargeted: false` drops out of the open-availability query and
+		// disappears for every worker. Asserting `!doc.isTargeted` would pass on
+		// `undefined` and miss exactly that.
+		const { doc } = transformEvent("e1", { date: "2025-06-15" }, ctx());
+		assert.equal(typeof doc.isTargeted, "boolean");
+		assert.equal(doc.isTargeted, false);
+		assert.deepEqual(doc.audienceGroupIds, []);
+	});
+
 	test("responseCounts covers the availability flow, not just assignees", () => {
 		// An unassigned upcoming event collects availability replies BEFORE
 		// anyone is assigned. Counting only assignees reported zero for an
@@ -599,6 +611,19 @@ describe("identity", () => {
 		});
 		assert.equal(doc.role, "manager");
 		assert.equal(doc.firstName, "Alice");
+	});
+
+	test("every migrated member is explicitly open, in no groups", () => {
+		// v1 had no segmentation: every worker saw every unassigned event.
+		// Migrating as "open" is what preserves that; "restricted" is opt-in.
+		const { doc } = transformMembership({
+			companyId: "c1",
+			userId: "u1",
+			membershipDoc: { role: "user" },
+			userDoc: { firstName: "Alice" },
+		});
+		assert.equal(doc.visibility, "open");
+		assert.deepEqual(doc.groupIds, []);
 	});
 });
 

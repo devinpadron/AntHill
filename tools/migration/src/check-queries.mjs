@@ -12,6 +12,7 @@
  * logged and returned [], so a missing index looked like "no events" rather
  * than an error.
  */
+import { FieldPath } from "firebase-admin/firestore";
 import { db, parseArgs } from "./admin.mjs";
 import { C } from "./paths.mjs";
 
@@ -110,6 +111,54 @@ const shapes = [
 				.where("dateKey", "<=", TO)
 				.orderBy("dateKey")
 				.limit(300),
+	],
+	[
+		"eventService.getOpenUpcomingEvents (targeted excluded)",
+		() =>
+			firestore
+				.collection(C.events)
+				.where("companyId", "==", companyId)
+				.where("assignedCount", "==", 0)
+				.where("isTargeted", "==", false)
+				.where("dateKey", ">=", FROM)
+				.orderBy("dateKey")
+				.limit(300),
+	],
+	[
+		"eventService.getEventsByIds (invitations)",
+		() =>
+			firestore
+				.collection(C.events)
+				.where("companyId", "==", companyId)
+				.where(FieldPath.documentId(), "in", [eventId]),
+	],
+	[
+		"groupService.subscribeGroups",
+		() =>
+			firestore
+				.collection(C.groups)
+				.where("companyId", "==", companyId)
+				.orderBy("name")
+				.limit(100),
+	],
+	[
+		"groupService.getMembersInGroups",
+		() =>
+			firestore
+				.collection(C.memberships)
+				.where("companyId", "==", companyId)
+				.where("status", "==", "active")
+				.where("groupIds", "array-contains-any", ["anyGroup"])
+				.limit(500),
+	],
+	[
+		"groupService.deleteGroup (strip from memberships)",
+		() =>
+			firestore
+				.collection(C.memberships)
+				.where("companyId", "==", companyId)
+				.where("groupIds", "array-contains", "anyGroup")
+				.limit(500),
 	],
 	[
 		"eventService.subscribeEventResponses",

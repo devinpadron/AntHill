@@ -6,6 +6,7 @@ import {
 	EventWriteInput,
 	deleteEvent,
 	subscribeEvent,
+	syncEventAudience,
 	updateEvent,
 } from "../../services/v2/eventService";
 
@@ -30,6 +31,14 @@ export const useEventForm = (navigation, eventId?: string) => {
 	const [endTime, setEndTime] = useState(new Date());
 	const [locations, setLocations] = useState<Location | null>(null);
 	const [assignedWorkers, setAssignedWorkers] = useState<string[]>([]);
+	/*
+	 * Which groups this event was published to.
+	 *
+	 * Seeded from the loaded event, NOT left empty. An unseeded picker would
+	 * submit [] on any edit, flipping the event back to open and withdrawing
+	 * every invitation nobody had answered yet.
+	 */
+	const [audienceGroupIds, setAudienceGroupIds] = useState<string[]>([]);
 	const [notes, setNotes] = useState("");
 	const [originalValues, setOriginalValues] = useState({
 		title: "",
@@ -85,6 +94,7 @@ export const useEventForm = (navigation, eventId?: string) => {
 
 				setLocations(data.locations);
 				setAssignedWorkers(data.assignedUserIds || []);
+				setAudienceGroupIds(data.audienceGroupIds || []);
 				setNotes(data.adminNotes || "");
 
 				setOriginalValues({
@@ -264,7 +274,11 @@ export const useEventForm = (navigation, eventId?: string) => {
 	 * makes it one.
 	 */
 	const handleSubmitData = useCallback(
-		async (extra?: { packageIds?: string[]; labelId?: string | null }) => {
+		async (extra?: {
+			packageIds?: string[];
+			labelId?: string | null;
+			audienceGroupIds?: string[];
+		}) => {
 			if (!validateFields()) return;
 
 			try {
@@ -334,6 +348,9 @@ export const useEventForm = (navigation, eventId?: string) => {
 					...(extra?.labelId !== undefined
 						? { labelId: extra.labelId }
 						: {}),
+					...(extra?.audienceGroupIds
+						? { audienceGroupIds: extra.audienceGroupIds }
+						: {}),
 				};
 
 				let eventId;
@@ -342,6 +359,20 @@ export const useEventForm = (navigation, eventId?: string) => {
 					// A patch, not a whole-document write.
 					await updateEvent(editID, eventData, userId);
 					eventId = editID;
+					/*
+					 * Re-publishing an edited event. createEvent does this
+					 * itself, but an edit has to be reconciled: workers added
+					 * to a group get an invitation, and invitations nobody
+					 * answered are withdrawn if their group was removed.
+					 */
+					if (extra?.audienceGroupIds) {
+						await syncEventAudience(
+							currentCompany,
+							editID,
+							dateKey,
+							extra.audienceGroupIds,
+						);
+					}
 				} else {
 					// ONE write. v1 did add() then update({id}).
 					eventId = await createEvent(
@@ -501,6 +532,8 @@ export const useEventForm = (navigation, eventId?: string) => {
 		locations,
 		assignedWorkers,
 		setAssignedWorkers,
+		audienceGroupIds,
+		setAudienceGroupIds,
 		notes,
 		setNotes,
 		originalValues,

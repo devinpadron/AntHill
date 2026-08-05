@@ -33,6 +33,7 @@ import AttachmentsSelector from "../../../components/ui/v2/AttachmentsSelector";
 import type { SelectableAttachment } from "../../../components/ui/v2/AttachmentsSelector";
 import { useUploadManager } from "../../../contexts/v2/UploadManagerContext";
 import { useCompany } from "../../../contexts/v2/CompanyContext";
+import { useGroups } from "../../../hooks/v2/useGroups";
 
 const EventSubmit = ({ navigation }) => {
 	const insets = useSafeAreaInsets();
@@ -81,6 +82,8 @@ const EventSubmit = ({ navigation }) => {
 		handleSubmitData,
 		handleDelete,
 		hasFormChanged,
+		audienceGroupIds,
+		setAudienceGroupIds,
 	} = useEventForm(navigation, eventId);
 
 	const { userId, companyId: currentCompany } = useUser();
@@ -103,6 +106,7 @@ const EventSubmit = ({ navigation }) => {
 	const [availableWorkers, setAvailableWorkers] = useState([]);
 
 	const { preferences } = useCompany();
+	const { groups } = useGroups(currentCompany ?? "");
 
 	// Add these at the top of your component
 	const isMounted = useRef(true);
@@ -368,6 +372,7 @@ const EventSubmit = ({ navigation }) => {
 		const savedId = await handleSubmitData({
 			packageIds: selectedPackages,
 			labelId: selectedLabelId,
+			audienceGroupIds,
 		});
 
 		if (savedId) await handleAttachmentSubmit(savedId);
@@ -1009,6 +1014,80 @@ const EventSubmit = ({ navigation }) => {
 								</View>
 							</View>
 
+							{/* Who gets asked about this job */}
+							{preferences.enableAvailability && (
+								<View
+									style={[
+										styles.sectionContainer,
+										{ zIndex: 1 },
+									]}
+								>
+									<Text style={styles.sectionTitle}>
+										Who can see this job
+									</Text>
+									<Text style={styles.audienceHint}>
+										{audienceGroupIds.length === 0
+											? "Everyone who can see open jobs. Pick a group to send it only to them."
+											: "Only these groups will be asked about it."}
+									</Text>
+
+									{groups.length === 0 ? (
+										<Text style={styles.audienceEmpty}>
+											No groups yet — create one under
+											Settings › Worker Groups.
+										</Text>
+									) : (
+										groups.map((group) => {
+											const on =
+												audienceGroupIds.includes(
+													group.id,
+												);
+											return (
+												<TouchableOpacity
+													key={group.id}
+													style={styles.audienceRow}
+													onPress={() =>
+														setAudienceGroupIds(
+															on
+																? audienceGroupIds.filter(
+																		(g) =>
+																			g !==
+																			group.id,
+																	)
+																: [
+																		...audienceGroupIds,
+																		group.id,
+																	],
+														)
+													}
+												>
+													<Ionicons
+														name={
+															on
+																? "checkbox"
+																: "square-outline"
+														}
+														size={22}
+														color={
+															on
+																? "#2078c8"
+																: "#999"
+														}
+													/>
+													<Text
+														style={
+															styles.audienceLabel
+														}
+													>
+														{group.name}
+													</Text>
+												</TouchableOpacity>
+											);
+										})
+									)}
+								</View>
+							)}
+
 							{/* Notes Section */}
 							<View
 								style={[styles.sectionContainer, { zIndex: 1 }]}
@@ -1400,6 +1479,28 @@ const styles = StyleSheet.create({
 	labelOptionText: {
 		fontSize: 14,
 		color: "#333",
+	},
+	audienceHint: {
+		fontSize: 13,
+		color: "#777",
+		lineHeight: 18,
+		marginBottom: 10,
+	},
+	audienceEmpty: {
+		fontSize: 14,
+		color: "#999",
+		paddingVertical: 8,
+	},
+	audienceRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		paddingVertical: 10,
+	},
+	audienceLabel: {
+		fontSize: 15,
+		color: "#333",
+		marginLeft: 10,
+		flex: 1,
 	},
 	selectedLabelContainer: {
 		marginTop: 16,

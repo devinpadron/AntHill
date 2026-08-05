@@ -2,8 +2,9 @@ import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
 import firestore from "@react-native-firebase/firestore";
 import db from "../../lib/db";
 import { C, eventResponseId } from "../../constants/paths";
-import { Event } from "../../types/v2";
+import { Event, WorkerVisibility } from "../../types/v2";
 import { FilterType } from "../../types/enums/FilterType";
+import { getMembersInGroups } from "./groupService";
 
 /*
  * Events.
@@ -255,6 +256,8 @@ export async function createEvent(
 	const now = firestore.FieldValue.serverTimestamp();
 	const assignedUserIds = input.assignedUserIds ?? [];
 
+	const audienceGroupIds = input.audienceGroupIds ?? [];
+
 	await ref.set({
 		...toPersisted(input),
 		id: ref.id,
@@ -262,6 +265,12 @@ export async function createEvent(
 		assignedUserIds,
 		assignedCount: assignedUserIds.length,
 		attachmentCount: 0,
+		audienceGroupIds,
+		// Written explicitly, always. The open-availability query filters on
+		// `isTargeted == false`, and an equality filter skips documents where
+		// the field is absent — so an omitted `false` here is an event that
+		// exists for nobody.
+		isTargeted: audienceGroupIds.length > 0,
 		responseCounts: {
 			confirmed: 0,
 			declined: 0,
@@ -273,6 +282,15 @@ export async function createEvent(
 		updatedBy: createdBy,
 		schemaVersion: 2,
 	});
+
+	if (audienceGroupIds.length) {
+		await syncEventAudience(
+			companyId,
+			ref.id,
+			(input.dateKey as string) ?? "",
+			audienceGroupIds,
+		);
+	}
 
 	return ref.id;
 }
@@ -297,6 +315,12 @@ export async function updateEvent(
 
 	if (patch.assignedUserIds) {
 		update.assignedCount = patch.assignedUserIds.length;
+	}
+
+	// Same pairing as assignedUserIds/assignedCount: the denormalized flag is
+	// derived here so it cannot drift from the array it describes.
+	if (patch.audienceGroupIds) {
+		update.isTargeted = patch.audienceGroupIds.length > 0;
 	}
 
 	try {
@@ -341,6 +365,82 @@ export async function deleteEvent(
 		await batch.commit();
 	} catch (e) {
 		console.error("Error deleting event", e);
+		throw e;
+	}
+}
+
+/**
+ * Publishes an event to a set of groups by writing one invitation per worker.
+ *
+ * This is what enforces targeting. A restricted worker's availability screen
+ * reads their own eventResponses, so a worker with no invitation has no
+ * document to find — the event does not exist for them. That is a property of
+ * the data, not a filter a future caller can forget to apply.
+ *
+ * Re-runnable. Invitations that already exist are left alone, so re-saving an
+ * event never resets a reply that has already come in.
+ *
+ * Retraction is deliberately narrow: removing a group withdraws only
+ * invitations nobody has answered yet. A worker who already confirmed or
+ * declined keeps their response, because that answer is real information a
+ * manager may be looking at.
+ */
+export async function syncEventAudience(
+	companyId: string,
+	eventId: string,
+	dateKey: string,
+	groupIds: string[],
+): Promise<void> {
+	try {
+		const [members, existing] = await Promise.all([
+			getMembersInGroups(companyId, groupIds),
+			db
+				.collection(C.eventResponses)
+				.where("companyId", "==", companyId)
+				.where("eventId", "==", eventId)
+				.limit(DEFAULT_LIMIT)
+				.get(),
+		]);
+
+		const invited = new Set(members.map((m) => m.userId));
+		const byUser = new Map(
+			existing.docs.map((doc) => [doc.data().userId as string, doc]),
+		);
+
+		const batch = db.batch();
+		const now = firestore.FieldValue.serverTimestamp();
+		let writes = 0;
+
+		for (const userId of invited) {
+			if (byUser.has(userId)) continue;
+			const id = eventResponseId(eventId, userId);
+			batch.set(db.collection(C.eventResponses).doc(id), {
+				id,
+				companyId,
+				eventId,
+				userId,
+				dateKey,
+				status: "pending",
+				respondedAt: null,
+				updatedAt: now,
+				schemaVersion: 2,
+			});
+			writes += 1;
+		}
+
+		for (const [userId, doc] of byUser) {
+			if (invited.has(userId)) continue;
+			const data = doc.data();
+			// Untouched invitation: nothing was said, so nothing is lost.
+			if (data.status === "pending" && !data.respondedAt) {
+				batch.delete(doc.ref);
+				writes += 1;
+			}
+		}
+
+		if (writes) await batch.commit();
+	} catch (e) {
+		console.error("Error syncing event audience", e);
 		throw e;
 	}
 }
@@ -433,13 +533,17 @@ export function subscribeEventResponses(
 }
 
 /**
- * Upcoming events with nobody assigned — the availability flow.
+ * Upcoming events with nobody assigned that are open to the whole company.
  *
- * Uses `assignedCount == 0`. v1 queried `assignedWorkers == []`, which only
- * matches a LITERAL empty array and silently missed every event where the field
- * was absent.
+ * `assignedCount == 0` — v1 queried `assignedWorkers == []`, which only matches
+ * a LITERAL empty array and silently missed every event where the field was
+ * absent.
+ *
+ * `isTargeted == false` excludes events published to specific groups. Every
+ * migrated event carries the field explicitly, because an equality filter does
+ * not match documents where it is missing.
  */
-export async function getUnassignedUpcomingEvents(
+export async function getOpenUpcomingEvents(
 	companyId: string,
 	fromDateKey: string,
 ): Promise<Event[]> {
@@ -448,15 +552,84 @@ export async function getUnassignedUpcomingEvents(
 			.collection(C.events)
 			.where("companyId", "==", companyId)
 			.where("assignedCount", "==", 0)
+			.where("isTargeted", "==", false)
 			.where("dateKey", ">=", fromDateKey)
 			.orderBy("dateKey")
 			.limit(DEFAULT_LIMIT)
 			.get();
 		return snapshot.docs.map(toEvent);
 	} catch (e) {
-		console.error("Error getting unassigned events", e);
+		console.error("Error getting open events", e);
 		return [];
 	}
+}
+
+/** Fetches events by id, chunked to Firestore's 30-value `in` limit. */
+export async function getEventsByIds(
+	companyId: string,
+	eventIds: string[],
+): Promise<Event[]> {
+	if (!eventIds.length) return [];
+
+	const unique = [...new Set(eventIds)];
+	const chunks: string[][] = [];
+	for (let i = 0; i < unique.length; i += 30) {
+		chunks.push(unique.slice(i, i + 30));
+	}
+
+	try {
+		const snapshots = await Promise.all(
+			chunks.map((chunk) =>
+				db
+					.collection(C.events)
+					.where("companyId", "==", companyId)
+					.where(firestore.FieldPath.documentId(), "in", chunk)
+					.get(),
+			),
+		);
+		return snapshots.flatMap((s) => s.docs.map(toEvent));
+	} catch (e) {
+		console.error("Error getting events by id", e);
+		return [];
+	}
+}
+
+/**
+ * The events a worker may answer availability for.
+ *
+ * An `open` worker sees every untargeted unassigned event — exactly v1 — plus
+ * anything they were specifically invited to. A `restricted` worker sees only
+ * their invitations, which is the whole point of the flag: a 1099 contractor
+ * is shown the jobs meant for them and nothing else.
+ *
+ * `invitedEventIds` comes from the caller's own eventResponses, which the
+ * security rules already scope to the signed-in user. Both branches are then
+ * narrowed to `assignedCount === 0`, because availability is about jobs nobody
+ * is on yet; once staff are assigned the event belongs to the calendar.
+ */
+export async function getAvailabilityEvents(
+	companyId: string,
+	fromDateKey: string,
+	visibility: WorkerVisibility,
+	invitedEventIds: string[],
+): Promise<Event[]> {
+	const [open, invited] = await Promise.all([
+		visibility === "restricted"
+			? Promise.resolve([] as Event[])
+			: getOpenUpcomingEvents(companyId, fromDateKey),
+		getEventsByIds(companyId, invitedEventIds),
+	]);
+
+	const byId = new Map<string, Event>();
+	for (const event of [...open, ...invited]) {
+		if (event.assignedCount !== 0) continue;
+		if (event.dateKey < fromDateKey) continue;
+		byId.set(event.id, event);
+	}
+
+	return [...byId.values()].sort((a, b) =>
+		a.dateKey.localeCompare(b.dateKey),
+	);
 }
 
 /**

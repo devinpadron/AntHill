@@ -86,6 +86,16 @@ export function transformMembership({
 			email: userDoc?.email ?? "",
 			phone: userDoc?.phone ?? null,
 			status: "active",
+			/*
+			 * Audience segmentation. Everyone migrates as "open", which is the
+			 * v1 behaviour: every worker sees every unassigned event. A
+			 * manager marks a 1099 contractor "restricted" afterwards.
+			 *
+			 * Written explicitly for the same reason as events.isTargeted — a
+			 * query filtering on it would skip documents where it is absent.
+			 */
+			visibility: "open",
+			groupIds: [],
 			joinedAt: null,
 			createdAt: null,
 			updatedAt: null,
