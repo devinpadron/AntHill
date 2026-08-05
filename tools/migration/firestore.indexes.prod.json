@@ -1,0 +1,83 @@
+{
+	"indexes": [
+		{
+			"collectionGroup": "Events",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "assignedWorkers",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "date",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "Events",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "assignedWorkers",
+					"arrayConfig": "CONTAINS"
+				},
+				{
+					"fieldPath": "date",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "Events",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "userId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "endTime",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "startTime",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "date",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "TimeEntries",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "userId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "clockInTime",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "TimeEntries",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "userId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "clockInTime",
+					"order": "DESCENDING"
+				}
+			]
+		}
+	],
+	"fieldOverrides": []
+}

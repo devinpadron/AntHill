@@ -1,0 +1,15 @@
+{
+	"name": "anthill-migration",
+	"private": true,
+	"type": "module",
+	"description": "Firestore operational + migration tooling. Deliberately outside src/ with its own dependencies so firebase-admin never enters the React Native bundle.",
+	"scripts": {
+		"test": "node --test 'src/**/*.test.mjs'",
+		"profile": "node src/profile.mjs",
+		"seed:config": "node src/seed-app-config.mjs",
+		"audit:memberships": "node src/audit-memberships.mjs"
+	},
+	"dependencies": {
+		"firebase-admin": "^13.0.2"
+	}
+}
