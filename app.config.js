@@ -8,7 +8,7 @@ export default {
 		// databases. required_version stays 1.0.100 until the migration window —
 		// raising it now would force everyone onto a build that then gates itself
 		// behind activeVersion 1.
-		version: "1.1.0",
+		version: "1.1.1",
 		orientation: "portrait",
 		userInterfaceStyle: "light",
 		// SDK 54 defaults the New Architecture on. Staying on the legacy
