@@ -1,3 +1,8 @@
 npx prettier --write . | grep -v "unchanged" | xargs
 git add -A .
 ./tools/check-layering.sh
+
+# The only real correctness gate in the repo — `npm test` maps to jest, but
+# there is no jest config and no test file with anything in it. tsc is what
+# actually catches a broken import or a renamed field.
+npm run --silent typecheck
