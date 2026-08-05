@@ -1,12 +1,18 @@
 /*
- * Schema-neutral enums.
+ * Every shared type in the app. Import from "../types".
  *
- * These describe app-level concepts rather than document shapes, so they
- * survived the v1 -> v2 schema change unchanged and are shared by both the
- * Firestore models and the UI.
- *
- * Document shapes live in "./v2" — import those from there.
+ * `enums/` holds app-level concepts that describe behaviour rather than
+ * document shape, which is why they were unaffected by the schema change. The
+ * rest are the Firestore document models: flat, lowerCamel collections
+ * (`companies`, `events`, `timeEntries`) keyed as described in constants/paths.
  */
 
 export * from "./enums/Role";
 export * from "./enums/FilterType";
+
+export * from "./common";
+export * from "./identity";
+export * from "./forms";
+export * from "./events";
+export * from "./time";
+export * from "./attachments";

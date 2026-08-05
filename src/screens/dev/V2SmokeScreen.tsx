@@ -10,12 +10,12 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import auth from "@react-native-firebase/auth";
-import { useUser } from "../../contexts/v2/UserContext";
-import { useCompany } from "../../contexts/v2/CompanyContext";
-import { useCalendarEvents } from "../../hooks/v2/useCalendarEvents";
-import { useCompanyMembers } from "../../hooks/v2/useCompanyMembers";
-import { useTimeTracking } from "../../hooks/v2/useTimeTracking";
-import { useFormSchema } from "../../hooks/v2/useFormSchema";
+import { useUser } from "../../contexts/UserContext";
+import { useCompany } from "../../contexts/CompanyContext";
+import { useCalendarEvents } from "../../hooks/useCalendarEvents";
+import { useCompanyMembers } from "../../hooks/useCompanyMembers";
+import { useTimeTracking } from "../../hooks/useTimeTracking";
+import { useFormSchema } from "../../hooks/useFormSchema";
 import { FilterType } from "../../types/enums/FilterType";
 import { AntHill } from "../../constants/colors";
 import {

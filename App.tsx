@@ -10,16 +10,13 @@ import {
 import { AppGate } from "./src/components/ui/AppGate";
 import { getCurrentAppVersion } from "./src/utils/versionUtils";
 import { V2_SMOKE_TEST } from "./src/constants/devFlags";
-import { AppNavigator } from "./src/navigation/v2/AppNavigator";
-import { UserProvider, useUser } from "./src/contexts/v2/UserContext";
-import { CompanyProvider } from "./src/contexts/v2/CompanyContext";
-import { UploadManagerProvider } from "./src/contexts/v2/UploadManagerContext";
-import { NotificationProvider } from "./src/contexts/v2/NotificationContext";
-import { recordAppLaunch } from "./src/services/v2/userService";
-import { UserProvider as V2UserProvider } from "./src/contexts/v2/UserContext";
-import { CompanyProvider as V2CompanyProvider } from "./src/contexts/v2/CompanyContext";
-import { UploadManagerProvider as V2UploadManagerProvider } from "./src/contexts/v2/UploadManagerContext";
-import { V2SmokeNavigator } from "./src/navigation/v2/V2SmokeNavigator";
+import { AppNavigator } from "./src/navigation/AppNavigator";
+import { UserProvider, useUser } from "./src/contexts/UserContext";
+import { CompanyProvider } from "./src/contexts/CompanyContext";
+import { UploadManagerProvider } from "./src/contexts/UploadManagerContext";
+import { NotificationProvider } from "./src/contexts/NotificationContext";
+import { recordAppLaunch } from "./src/services/userService";
+import { V2SmokeNavigator } from "./src/navigation/V2SmokeNavigator";
 
 /*
  * Dev-only harness for the v2 stack.
@@ -32,13 +29,13 @@ import { V2SmokeNavigator } from "./src/navigation/v2/V2SmokeNavigator";
 const V2SmokeApp = () => (
 	<GestureHandlerRootView style={{ flex: 1 }}>
 		<SafeAreaProvider>
-			<V2UploadManagerProvider>
-				<V2UserProvider>
-					<V2CompanyProvider>
+			<UploadManagerProvider>
+				<UserProvider>
+					<CompanyProvider>
 						<V2SmokeNavigator />
-					</V2CompanyProvider>
-				</V2UserProvider>
-			</V2UploadManagerProvider>
+					</CompanyProvider>
+				</UserProvider>
+			</UploadManagerProvider>
 		</SafeAreaProvider>
 	</GestureHandlerRootView>
 );

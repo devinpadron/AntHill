@@ -2,7 +2,7 @@ import RNFS from "react-native-fs";
 import { Share, Platform } from "react-native";
 import { format } from "date-fns";
 import RNHTMLtoPDF from "react-native-html-to-pdf";
-import { getCompany } from "./v2/companyService";
+import { getCompany } from "./companyService";
 import { formatDuration } from "../utils/timeUtils";
 
 /**

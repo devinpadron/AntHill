@@ -1,8 +1,5 @@
 import { Alert } from "react-native";
-import {
-	removeMember,
-	changeMemberRole,
-} from "../services/v2/membershipService";
+import { removeMember, changeMemberRole } from "../services/membershipService";
 import { Role } from "../types";
 
 /**
