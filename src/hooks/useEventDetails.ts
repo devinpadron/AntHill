@@ -207,7 +207,9 @@ export function useEventDetails(eventId: string) {
 	const amAssigned = Boolean(event?.assignedUserIds?.includes(userId));
 	const myDoc = responseDocs[userId];
 	const myAcknowledgement = {
-		required: amAssigned,
+		required:
+			amAssigned &&
+			preferences.requireAssignmentAcknowledgement !== false,
 		acknowledged: Boolean(myDoc?.acknowledgedAt),
 		problem: myDoc?.problemFlaggedAt
 			? {

@@ -10,7 +10,6 @@ import {
 	Card,
 	EmptyState,
 	Icon,
-	Input,
 	ListRow,
 	Loading,
 	Screen,
@@ -19,7 +18,6 @@ import {
 	Sheet,
 	Text,
 	toast,
-	Toggle,
 } from "../../components/ui";
 import { IconName } from "../../components/ui/Icon";
 import { Theme, useThemedStyles } from "../../theme";
@@ -32,8 +30,11 @@ import { Theme, useThemedStyles } from "../../theme";
  * — which meant it was wrong on rotation and on any device it had not been
  * tuned against. They are a `SegmentedControl` now, laid out from measurement.
  *
- * Both full-screen `Modal`s became sheets: the reminder settings and the
- * admin-only worker roster.
+ * The admin-only worker roster became a sheet rather than a full-screen
+ * `Modal`. The reminder settings that used to sit behind the header's bell now
+ * live in Company preferences — they configure what the company sends, which is
+ * where an admin goes looking for it, and there are two schedules now rather
+ * than the one this screen knew about.
  */
 
 type Tab = "unconfirmed" | "confirmed" | "declined";
@@ -49,8 +50,6 @@ const AvailabilityPage = ({ navigation }) => {
 		filteredEvents,
 		loading,
 		respondToEvent,
-		reminder,
-		saveReminderSettings: persistReminderSettings,
 		workerBuckets: eventWorkerDetails,
 		loadingWorkers: loadingWorkerDetails,
 		loadWorkerBuckets,
@@ -58,11 +57,7 @@ const AvailabilityPage = ({ navigation }) => {
 	} = useAvailability();
 
 	// Sheet state stays here — it is presentation, not data.
-	const reminderSheet = useRef<BottomSheet>(null);
 	const adminSheet = useRef<BottomSheet>(null);
-	const [reminderHours, setReminderHours] = useState("24");
-	const [reminderMinutes, setReminderMinutes] = useState("0");
-	const [remindersEnabled, setRemindersEnabled] = useState(true);
 	const [selectedEventForAdmin, setSelectedEventForAdmin] = useState(null);
 
 	/*
@@ -81,28 +76,6 @@ const AvailabilityPage = ({ navigation }) => {
 		}),
 		[events],
 	);
-
-	const openReminderSettings = () => {
-		setReminderHours(String(reminder?.hours ?? 24));
-		setReminderMinutes(String(reminder?.minutes ?? 0));
-		setRemindersEnabled(reminder?.enabled !== false);
-		reminderSheet.current?.snapToIndex(0);
-	};
-
-	const saveReminderSettings = async () => {
-		const saved = await persistReminderSettings({
-			enabled: remindersEnabled,
-			hours: reminderHours,
-			minutes: reminderMinutes,
-		});
-
-		if (saved) {
-			reminderSheet.current?.close();
-			toast.success("Reminder settings saved");
-		} else {
-			toast.error("Could not save those settings");
-		}
-	};
 
 	const openAdminSheet = (event) => {
 		setSelectedEventForAdmin(event);
@@ -307,17 +280,6 @@ const AvailabilityPage = ({ navigation }) => {
 					variant="large"
 					title="Availability"
 					subtitle="Events you've been asked about"
-					actions={
-						isAdmin
-							? [
-									{
-										icon: "notifications-outline",
-										label: "Reminder settings",
-										onPress: openReminderSettings,
-									},
-								]
-							: []
-					}
 				>
 					<View style={styles.tabs}>
 						<SegmentedControl<Tab>
@@ -365,84 +327,6 @@ const AvailabilityPage = ({ navigation }) => {
 					}
 				/>
 			)}
-
-			{/* Reminder settings — admin only. */}
-			<Sheet
-				ref={reminderSheet}
-				snapPoints={["62%"]}
-				title="Availability reminders"
-				onClose={() => reminderSheet.current?.close()}
-			>
-				<BottomSheetScrollView
-					contentContainerStyle={styles.sheetBody}
-					keyboardShouldPersistTaps="handled"
-				>
-					<Text variant="body" color="textSecondary">
-						How often workers are nudged to answer an event they
-						have not responded to.
-					</Text>
-
-					<Card flush style={styles.sheetCard}>
-						<ListRow
-							title="Send reminders"
-							subtitle="Automatic nudges until they answer"
-							icon="notifications-outline"
-							separator={false}
-							accessory={
-								<Toggle
-									value={remindersEnabled}
-									onValueChange={setRemindersEnabled}
-								/>
-							}
-						/>
-					</Card>
-
-					{remindersEnabled ? (
-						<>
-							<View style={styles.intervalRow}>
-								<Input
-									label="Hours"
-									value={reminderHours}
-									onChangeText={setReminderHours}
-									keyboardType="number-pad"
-									placeholder="24"
-									containerStyle={styles.flex}
-								/>
-								<Input
-									label="Minutes"
-									value={reminderMinutes}
-									onChangeText={setReminderMinutes}
-									keyboardType="number-pad"
-									placeholder="0"
-									containerStyle={styles.flex}
-								/>
-							</View>
-
-							<Text variant="caption" color="textSecondary">
-								Workers are reminded every{" "}
-								{reminderHours || "24"}h{" "}
-								{reminderMinutes || "0"}m until they confirm or
-								decline. One reminder covers every event they
-								owe an answer on, however many that is.
-							</Text>
-						</>
-					) : (
-						<Text variant="caption" color="textSecondary">
-							Reminders are off. Workers will not be nudged to
-							answer.
-						</Text>
-					)}
-
-					<Button
-						title="Save settings"
-						icon="checkmark"
-						onPress={saveReminderSettings}
-						fullWidth
-						haptic="press"
-						style={styles.sheetAction}
-					/>
-				</BottomSheetScrollView>
-			</Sheet>
 
 			{/* Who has answered — admin only, opened by tapping an event. */}
 			<Sheet

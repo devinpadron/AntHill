@@ -21,6 +21,14 @@ export const defaultPreferences: CompanyPreferences = {
 	enableAvailability: false,
 	availabilityReminder: { enabled: false, hours: 0, minutes: 0 },
 	/*
+	 * TRUE, unlike its neighbours, because it is not a new capability — it is
+	 * what the app already did for every company. Defaulting it off would
+	 * silently switch off the confirm banner and the Calendar badge everywhere
+	 * the moment this shipped.
+	 */
+	requireAssignmentAcknowledgement: true,
+	acknowledgementReminder: { enabled: false, hours: 0, minutes: 0 },
+	/*
 	 * Off by default: letting a worker decline an assignment in the app is a
 	 * real change to how a company staffs jobs, and an existing company that
 	 * never opted in should not discover it because a preference defaulted on.

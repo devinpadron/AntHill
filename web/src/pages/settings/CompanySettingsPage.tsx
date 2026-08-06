@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCompanyMembers } from "@app/hooks/useCompanyMembers";
-import type { CompanyPreferences } from "@app/types";
+import type { CompanyPreferences, ReminderSchedule } from "@app/types";
 import { useCompany } from "../../contexts/CompanyContext";
 import { Badge, Button, Card, Icon, Input, Text, useToast } from "../../ui";
 import styles from "./CompanySettingsPage.module.css";
@@ -26,6 +26,13 @@ export function CompanySettingsPage() {
 	const [busy, setBusy] = useState<string | null>(null);
 
 	const activeCount = members.filter((m) => m.status === "active").length;
+
+	/*
+	 * Absent on companies that predate the setting, and absent means REQUIRED —
+	 * confirmation is what the app already did for everyone, so a missing field
+	 * must not read as "switched off".
+	 */
+	const requireAck = preferences.requireAssignmentAcknowledgement !== false;
 
 	async function patch(key: string, value: Partial<CompanyPreferences>) {
 		setBusy(key);
@@ -185,21 +192,35 @@ export function CompanySettingsPage() {
 						}
 						affects={activeCount}
 					/>
-					{/*
-					 * Acknowledgement itself is always asked — an assignment
-					 * nobody has seen is what it exists to prevent. This flag
-					 * only decides whether the worker gets a second button.
-					 */}
 					<Toggle
-						label="Workers can flag a problem with a shift"
-						description="Assigned workers always confirm they've seen a shift. With this on, they can also say they can't make it — which flags it for you to resolve. It never unassigns them."
-						checked={preferences.allowAssignmentDecline}
-						busy={busy === "decline"}
+						label="Require shift confirmation"
+						description="Assigned workers confirm they've seen a shift. Off, the shift simply appears in their list and nothing is asked — the banner, the badge and the reminder all go with it."
+						checked={requireAck}
+						busy={busy === "requireAck"}
 						onChange={(v) =>
-							patch("decline", { allowAssignmentDecline: v })
+							patch("requireAck", {
+								requireAssignmentAcknowledgement: v,
+							})
 						}
 						affects={activeCount}
 					/>
+					{/*
+					 * Only offered where there is an acknowledgement to flag a
+					 * problem during. Leaving it visible under a disabled
+					 * requirement would advertise a button no worker can reach.
+					 */}
+					{requireAck && (
+						<Toggle
+							label="Workers can flag a problem with a shift"
+							description="Adds a second button beside the confirmation, so a worker can say they can't make it. It flags the shift for you to resolve and never unassigns them."
+							checked={preferences.allowAssignmentDecline}
+							busy={busy === "decline"}
+							onChange={(v) =>
+								patch("decline", { allowAssignmentDecline: v })
+							}
+							affects={activeCount}
+						/>
+					)}
 					<Toggle
 						label="Workers see event labels"
 						description="Shows the colour-coded label on an event in the app. Admins always see them."
@@ -213,90 +234,37 @@ export function CompanySettingsPage() {
 				</Card>
 
 				{preferences.enableAvailability && (
-					<Card title="Reply reminders">
-						<Text variant="caption" tone="secondary">
-							How often to remind a worker who still has events
-							awaiting a reply. One reminder covers all of them.
-						</Text>
+					<ReminderCard
+						title="Unanswered availability"
+						hint="How often to chase a worker who still has invitations awaiting a reply. One reminder covers all of them."
+						schedule={preferences.availabilityReminder}
+						busy={busy === "availabilityReminder"}
+						onChange={(availabilityReminder) =>
+							patch("availabilityReminder", {
+								availabilityReminder,
+							})
+						}
+					/>
+				)}
 
-						<Toggle
-							label="Send reminders"
-							description=""
-							checked={preferences.availabilityReminder?.enabled}
-							busy={busy === "reminder"}
-							onChange={(v) =>
-								patch("reminder", {
-									availabilityReminder: {
-										...preferences.availabilityReminder,
-										enabled: v,
-									},
-								})
-							}
-						/>
-
-						{preferences.availabilityReminder?.enabled && (
-							<>
-								<div className={styles.durationRow}>
-									<Input
-										label="Every (hours)"
-										type="number"
-										min={0}
-										value={String(
-											preferences.availabilityReminder
-												?.hours ?? 0,
-										)}
-										onChange={(e) =>
-											patch("reminder", {
-												availabilityReminder: {
-													...preferences.availabilityReminder,
-													hours:
-														Number(
-															e.target.value,
-														) || 0,
-												},
-											})
-										}
-									/>
-									<Input
-										label="Minutes"
-										type="number"
-										min={0}
-										max={59}
-										value={String(
-											preferences.availabilityReminder
-												?.minutes ?? 0,
-										)}
-										onChange={(e) =>
-											patch("reminder", {
-												availabilityReminder: {
-													...preferences.availabilityReminder,
-													minutes:
-														Number(
-															e.target.value,
-														) || 0,
-												},
-											})
-										}
-									/>
-								</div>
-								<div className={styles.preview}>
-									<Icon name="time-outline" size="sm" />
-									<Text variant="caption" as="span">
-										Unanswered events are chased every{" "}
-										<strong>
-											{preferences.availabilityReminder
-												?.hours ?? 0}
-											h{" "}
-											{preferences.availabilityReminder
-												?.minutes ?? 0}
-											m
-										</strong>
-										, in a single reminder per worker.
-									</Text>
-								</div>
-							</>
-						)}
-					</Card>
+				{/*
+				 * Paired with the requirement above, not with the availability
+				 * feature: a company can require confirmation without using
+				 * availability at all. Hidden — and silenced server-side — when
+				 * nothing is being asked for.
+				 */}
+				{requireAck && (
+					<ReminderCard
+						title="Unconfirmed shifts"
+						hint="How often to chase a worker who is scheduled but has not confirmed seeing it. One reminder covers all of them."
+						schedule={preferences.acknowledgementReminder}
+						busy={busy === "acknowledgementReminder"}
+						onChange={(acknowledgementReminder) =>
+							patch("acknowledgementReminder", {
+								acknowledgementReminder,
+							})
+						}
+					/>
 				)}
 
 				<Card title="Forms">
@@ -319,6 +287,100 @@ export function CompanySettingsPage() {
 				</Card>
 			</div>
 		</div>
+	);
+}
+
+/*
+ * One repeating reminder: whether to send it, and the gap between reminders to
+ * the same worker.
+ *
+ * An INTERVAL, not a lead time before the event. Extracted because there are
+ * two of these now — availability and acknowledgement — and the second was
+ * going to be ninety lines of the first with the field names changed.
+ */
+function ReminderCard({
+	title,
+	hint,
+	schedule,
+	busy,
+	onChange,
+}: {
+	title: string;
+	hint: string;
+	schedule: ReminderSchedule | undefined;
+	busy: boolean;
+	onChange: (next: ReminderSchedule) => void;
+}) {
+	const current = schedule ?? { enabled: false, hours: 0, minutes: 0 };
+	const zero = (current.hours || 0) === 0 && (current.minutes || 0) === 0;
+
+	return (
+		<Card title={title}>
+			<Text variant="caption" tone="secondary">
+				{hint}
+			</Text>
+
+			<Toggle
+				label="Send reminders"
+				description=""
+				checked={current.enabled}
+				busy={busy}
+				onChange={(enabled) => onChange({ ...current, enabled })}
+			/>
+
+			{current.enabled && (
+				<>
+					<div className={styles.durationRow}>
+						<Input
+							label="Every (hours)"
+							type="number"
+							min={0}
+							value={String(current.hours ?? 0)}
+							onChange={(e) =>
+								onChange({
+									...current,
+									hours: Number(e.target.value) || 0,
+								})
+							}
+						/>
+						<Input
+							label="Minutes"
+							type="number"
+							min={0}
+							max={59}
+							value={String(current.minutes ?? 0)}
+							onChange={(e) =>
+								onChange({
+									...current,
+									minutes: Number(e.target.value) || 0,
+								})
+							}
+						/>
+					</div>
+					<div className={styles.preview}>
+						<Icon
+							name={zero ? "warning" : "time-outline"}
+							size="sm"
+						/>
+						{/* Zero means unconfigured, not "every pass" — so say
+						    so here rather than leave it to be discovered. */}
+						<Text variant="caption" as="span">
+							{zero ? (
+								<>Set an interval — at zero, nothing is sent.</>
+							) : (
+								<>
+									Chased every{" "}
+									<strong>
+										{current.hours}h {current.minutes}m
+									</strong>
+									, in a single reminder per worker.
+								</>
+							)}
+						</Text>
+					</div>
+				</>
+			)}
+		</Card>
 	);
 }
 

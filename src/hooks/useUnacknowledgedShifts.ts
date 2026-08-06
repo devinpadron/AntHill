@@ -5,6 +5,7 @@ import {
 } from "../services/eventService";
 import { Event, EventResponse } from "../types";
 import { useUser } from "../contexts/UserContext";
+import { useCompany } from "../contexts/CompanyContext";
 
 /*
  * Upcoming shifts this worker is assigned to but has not confirmed seeing.
@@ -37,6 +38,7 @@ function todayKey(): string {
 
 export function useUnacknowledgedShifts() {
 	const { companyId, userId } = useUser();
+	const { preferences } = useCompany();
 
 	const [events, setEvents] = useState<Event[]>([]);
 	const [responses, setResponses] = useState<Record<string, EventResponse>>(
@@ -44,7 +46,16 @@ export function useUnacknowledgedShifts() {
 	);
 
 	const from = todayKey();
-	const enabled = Boolean(companyId && userId);
+	/*
+	 * Nothing to chase when the company does not ask for acknowledgement — the
+	 * badge counts shifts nobody is being prompted about, so it would sit there
+	 * permanently with no way to clear it.
+	 */
+	const enabled = Boolean(
+		companyId &&
+		userId &&
+		preferences.requireAssignmentAcknowledgement !== false,
+	);
 
 	useEffect(() => {
 		if (!enabled) {

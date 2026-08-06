@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useCompany } from "../../../contexts/CompanyContext";
 import {
 	Card,
 	Icon,
+	Input,
 	ListRow,
 	Pressable,
 	Screen,
@@ -16,6 +17,10 @@ import {
 	Toggle,
 } from "../../../components/ui";
 import { IconName } from "../../../components/ui/Icon";
+import {
+	CompanyPreferences as CompanyPrefs,
+	ReminderSchedule,
+} from "../../../types";
 import { haptics, Theme, useThemedStyles } from "../../../theme";
 
 /*
@@ -67,6 +72,108 @@ const FLAGS: {
 	},
 ];
 
+/*
+ * One repeating reminder: whether to send it, and how long to leave between
+ * reminders to the same worker.
+ *
+ * An INTERVAL, not a lead time before the event. The fields are held locally
+ * and committed on blur — writing per keystroke would publish "2" on the way
+ * to typing "24", and preferences are a live subscription, so every member's
+ * app would see each intermediate value.
+ */
+function ReminderRows({
+	title,
+	subtitle,
+	icon,
+	schedule,
+	onChange,
+}: {
+	title: string;
+	subtitle: string;
+	icon: IconName;
+	schedule: ReminderSchedule | undefined;
+	onChange: (next: ReminderSchedule) => void;
+}) {
+	const styles = useThemedStyles(companyPrefStyles);
+	const current = schedule ?? { enabled: false, hours: 0, minutes: 0 };
+
+	const [hours, setHours] = useState(String(current.hours ?? 0));
+	const [minutes, setMinutes] = useState(String(current.minutes ?? 0));
+
+	// Re-seed when the server value changes underneath — another admin, or
+	// another device.
+	useEffect(() => {
+		setHours(String(current.hours ?? 0));
+		setMinutes(String(current.minutes ?? 0));
+	}, [current.hours, current.minutes]);
+
+	const commit = () => {
+		const h = Math.max(0, parseInt(hours, 10) || 0);
+		const m = Math.min(59, Math.max(0, parseInt(minutes, 10) || 0));
+		setHours(String(h));
+		setMinutes(String(m));
+		if (h === current.hours && m === current.minutes) return;
+		onChange({ ...current, hours: h, minutes: m });
+	};
+
+	const zero = (current.hours ?? 0) === 0 && (current.minutes ?? 0) === 0;
+
+	return (
+		<>
+			<ListRow
+				title={title}
+				subtitle={subtitle}
+				icon={icon}
+				separator={current.enabled}
+				accessory={
+					<Toggle
+						value={current.enabled}
+						onValueChange={(enabled) =>
+							onChange({ ...current, enabled })
+						}
+					/>
+				}
+			/>
+
+			{current.enabled && (
+				<View style={styles.intervalBlock}>
+					<View style={styles.intervalRow}>
+						<Input
+							label="Every (hours)"
+							value={hours}
+							onChangeText={setHours}
+							onBlur={commit}
+							keyboardType="number-pad"
+							placeholder="24"
+							containerStyle={styles.flex}
+						/>
+						<Input
+							label="Minutes"
+							value={minutes}
+							onChangeText={setMinutes}
+							onBlur={commit}
+							keyboardType="number-pad"
+							placeholder="0"
+							containerStyle={styles.flex}
+						/>
+					</View>
+
+					{/* Zero would mean "every time the scheduler runs", so it
+					    is treated as unconfigured — said here, not discovered. */}
+					<Text
+						variant="caption"
+						color={zero ? "warning" : "textSecondary"}
+					>
+						{zero
+							? "Set an interval — at zero, nothing is sent."
+							: `Reminders repeat every ${current.hours}h ${current.minutes}m until answered.`}
+					</Text>
+				</View>
+			)}
+		</>
+	);
+}
+
 const CompanyPreferences = ({ navigation }) => {
 	const styles = useThemedStyles(companyPrefStyles);
 	const { company, preferences, isLoading, updatePreferences } = useCompany();
@@ -84,6 +191,16 @@ const CompanyPreferences = ({ navigation }) => {
 
 	const setFlag = (key: FlagKey, value: boolean) =>
 		updatePreferences({ ...preferences, [key]: value });
+
+	const save = (patch: Partial<CompanyPrefs>) =>
+		updatePreferences({ ...preferences, ...patch });
+
+	/*
+	 * Absent on companies that predate the setting, and absent means REQUIRED —
+	 * it is what the app already did for everyone, so a missing field must not
+	 * read as "switched off".
+	 */
+	const requireAck = preferences.requireAssignmentAcknowledgement !== false;
 
 	const header = (
 		<ScreenHeader
@@ -176,6 +293,85 @@ const CompanyPreferences = ({ navigation }) => {
 				))}
 			</Card>
 
+			{/*
+			 * Notifications, gathered here rather than on the Availability
+			 * screen where the reminder settings used to live. They are company
+			 * configuration, and an admin looking for what the company sends
+			 * looks in company preferences.
+			 */}
+			<Card title="Notifications" flush style={styles.card}>
+				<Text
+					variant="caption"
+					color="textSecondary"
+					style={styles.flushHint}
+				>
+					Each reminder is one message per worker covering every event
+					they owe that answer on — never one per event.
+				</Text>
+
+				{/*
+				 * Only meaningful where the feature exists. Without the
+				 * Availability tab there are no invitations to answer.
+				 */}
+				{preferences.enableAvailability && (
+					<ReminderRows
+						title="Chase unanswered availability"
+						subtitle="Workers who have not replied to an invitation"
+						icon="hand-left-outline"
+						schedule={preferences.availabilityReminder}
+						onChange={(availabilityReminder) =>
+							save({ availabilityReminder })
+						}
+					/>
+				)}
+
+				<ListRow
+					title="Require shift confirmation"
+					subtitle="Assigned workers must confirm they have seen it"
+					icon="checkmark-circle-outline"
+					separator={requireAck}
+					accessory={
+						<Toggle
+							value={requireAck}
+							onValueChange={(value) =>
+								save({
+									requireAssignmentAcknowledgement: value,
+								})
+							}
+						/>
+					}
+				/>
+
+				{requireAck && (
+					<>
+						<ReminderRows
+							title="Chase unconfirmed shifts"
+							subtitle="Workers scheduled but not yet confirmed"
+							icon="alarm-outline"
+							schedule={preferences.acknowledgementReminder}
+							onChange={(acknowledgementReminder) =>
+								save({ acknowledgementReminder })
+							}
+						/>
+
+						<ListRow
+							title="Let workers flag a problem"
+							subtitle="Adds a way to say they can't make a shift. Never unassigns anyone — it raises it for you."
+							icon="alert-circle-outline"
+							separator={false}
+							accessory={
+								<Toggle
+									value={!!preferences.allowAssignmentDecline}
+									onValueChange={(value) =>
+										save({ allowAssignmentDecline: value })
+									}
+								/>
+							}
+						/>
+					</>
+				)}
+			</Card>
+
 			<View style={styles.footnote}>
 				<Text variant="caption" color="textTertiary" align="center">
 					Feature changes reach everyone in the company immediately.
@@ -194,6 +390,22 @@ const companyPrefStyles = (theme: Theme) =>
 		},
 		hint: {
 			marginBottom: theme.spacing.md,
+		},
+		flushHint: {
+			paddingHorizontal: theme.spacing.lg,
+			paddingBottom: theme.spacing.sm,
+		},
+		intervalBlock: {
+			paddingHorizontal: theme.spacing.lg,
+			paddingBottom: theme.spacing.md,
+			gap: theme.spacing.sm,
+		},
+		intervalRow: {
+			flexDirection: "row",
+			gap: theme.spacing.md,
+		},
+		flex: {
+			flex: 1,
 		},
 		codeChip: {
 			flexDirection: "row",

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useUser } from "../contexts/UserContext";
 import { useCompany } from "../contexts/CompanyContext";
@@ -73,7 +72,7 @@ const describeLocation = (locations?: Record<string, unknown>) => {
  */
 export const useAvailability = () => {
 	const { userId, companyId, isAdmin, membership } = useUser();
-	const { preferences, updatePreferences } = useCompany();
+	const { preferences } = useCompany();
 	const { members, namesFor: personNamesFor } = useCompanyMembers(
 		companyId ?? "",
 	);
@@ -282,34 +281,6 @@ export const useAvailability = () => {
 		}
 	})();
 
-	/* ------------------------------------------------ reminder preferences */
-
-	const reminder = preferences?.availabilityReminder;
-
-	const saveReminderSettings = useCallback(
-		async (next: { enabled: boolean; hours: string; minutes: string }) => {
-			try {
-				await updatePreferences({
-					availabilityReminder: {
-						enabled: next.enabled,
-						hours: parseInt(next.hours) || 24,
-						minutes: parseInt(next.minutes) || 0,
-					},
-				});
-				Alert.alert(
-					"Success",
-					"Reminder settings updated successfully!",
-				);
-				return true;
-			} catch (error) {
-				console.error("Error saving reminder preferences:", error);
-				Alert.alert("Error", "Failed to save reminder settings");
-				return false;
-			}
-		},
-		[updatePreferences],
-	);
-
 	/* -------------------------------------------------- admin worker roster */
 
 	const [workerBuckets, setWorkerBuckets] = useState<WorkerBuckets>({
@@ -391,9 +362,6 @@ export const useAvailability = () => {
 		loading,
 		refresh: fetchEvents,
 		respondToEvent,
-
-		reminder,
-		saveReminderSettings,
 
 		workerBuckets,
 		loadingWorkers,

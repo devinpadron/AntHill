@@ -182,6 +182,19 @@ export interface GroupJoinCode {
 	createdAt: Timestamp;
 }
 
+/**
+ * A repeating nudge.
+ *
+ * `hours`/`minutes` are the gap BETWEEN reminders to the same worker, not a
+ * lead time before the event. Zero means unconfigured — never "remind on every
+ * pass", which at the scheduler's hourly cadence would be once an hour forever.
+ */
+export interface ReminderSchedule {
+	enabled: boolean;
+	hours: number;
+	minutes: number;
+}
+
 /** companyPreferences/{companyId} */
 export interface CompanyPreferences extends CompanyScoped {
 	workWeekStarts: "sunday" | "monday";
@@ -190,7 +203,7 @@ export interface CompanyPreferences extends CompanyScoped {
 	enableTimeSheet: boolean;
 	enableAvailability: boolean;
 	/**
-	 * How often to re-nudge a worker who has not answered an event invitation.
+	 * How often to re-nudge a worker who has not answered an event INVITATION.
 	 *
 	 * An INTERVAL, not a lead time. Both clients used to label it "hours before
 	 * an event", but nothing anywhere ever read the value — no function, no
@@ -200,11 +213,32 @@ export interface CompanyPreferences extends CompanyScoped {
 	 *
 	 * Zero is treated as unconfigured, not as "nudge on every pass".
 	 */
-	availabilityReminder: {
-		enabled: boolean;
-		hours: number;
-		minutes: number;
-	};
+	availabilityReminder: ReminderSchedule;
+
+	/**
+	 * Whether a worker added to a crew must confirm they have seen it.
+	 *
+	 * Assignment is a statement, not a question — the shift simply appears in
+	 * someone's list — and this is what makes them register it. Companies that
+	 * schedule by phone first and use the app only as a record do not need the
+	 * ceremony, so they can switch it off; the banner, the Calendar badge and
+	 * the reminder below all disappear with it.
+	 */
+	requireAssignmentAcknowledgement: boolean;
+
+	/**
+	 * How often to re-nudge a worker who has not confirmed an assigned SHIFT.
+	 *
+	 * A separate schedule from availabilityReminder because it asks a different
+	 * question of a different group. "Have you seen your shift" is usually
+	 * worth asking more often than "can you work this", and a company may want
+	 * one without the other.
+	 *
+	 * AUTO-SILENCED when requireAssignmentAcknowledgement is off — there is no
+	 * point chasing an answer nobody is being asked for, and leaving a live
+	 * reminder behind a disabled requirement is how a setting starts lying.
+	 */
+	acknowledgementReminder: ReminderSchedule;
 	/*
 	 * Whether an assigned worker may flag that they cannot work a shift.
 	 *
