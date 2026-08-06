@@ -80,6 +80,8 @@ type Entry = {
 	label: string | null;
 	isAllDay: boolean;
 	startValue: number | null;
+	/** Crew who said they cannot make it. Admin-facing. */
+	problemCount: number;
 };
 
 /* A STRING discriminant, not a boolean. This repo's tsconfig is non-strict,
@@ -92,7 +94,7 @@ type Row =
 export default function Timesheet(props: Props) {
 	const theme = useTheme();
 	const styles = useThemedStyles(timesheetStyles);
-	const { userId, companyId, user } = useUser();
+	const { userId, companyId, user, isAdmin } = useUser();
 	const { company } = useCompany();
 	const { unconfirmedIds } = useEventPrompts();
 
@@ -192,6 +194,7 @@ export default function Timesheet(props: Props) {
 				label: event.labelId ? (labels[event.labelId] ?? null) : null,
 				isAllDay: event.isAllDay,
 				startValue: event.startAt ? event.startAt.getTime() : null,
+				problemCount: event.problemCount,
 			}));
 
 			entries.sort((a, b) => {
@@ -210,6 +213,23 @@ export default function Timesheet(props: Props) {
 
 		return out;
 	}, [agendaItems, labels, props.selectedDate]);
+
+	/*
+	 * Every loaded event missing someone, soonest first.
+	 *
+	 * Off `events` rather than `rows` so a picked date cannot hide the warning:
+	 * filtering the list to one day should not stop an admin being told that
+	 * Friday's job is short.
+	 */
+	const shortStaffed = useMemo(
+		() =>
+			events
+				.filter((event) => (event.problemCount ?? 0) > 0)
+				.sort((a, b) =>
+					(a.dateKey ?? "").localeCompare(b.dateKey ?? ""),
+				),
+		[events],
+	);
 
 	const totalEvents = useMemo(
 		() =>
@@ -411,6 +431,18 @@ export default function Timesheet(props: Props) {
 								icon="alert-circle"
 							/>
 						)}
+						{/*
+						 * Admin-only. A worker cannot act on a colleague
+						 * dropping out, and seeing it is not theirs to know.
+						 */}
+						{isAdmin && entry.problemCount > 0 && (
+							<Badge
+								label={`Down ${entry.problemCount}`}
+								tone="danger"
+								variant="solid"
+								icon="warning"
+							/>
+						)}
 					</View>
 
 					<View style={styles.entryMeta}>
@@ -504,6 +536,52 @@ export default function Timesheet(props: Props) {
 
 			{/* A failed query is shown rather than swallowed. v1 returned [] on
 			    error, so a missing index looked like an empty schedule. */}
+			{/*
+			 * Jobs a crew member has dropped out of, at the top of the screen
+			 * rather than left to be found by scrolling.
+			 *
+			 * Flagging does not unassign anyone, so a short-staffed job looks
+			 * exactly like a full one in the list — the whole point of putting
+			 * this here is that nothing else about the event says it.
+			 */}
+			{isAdmin && shortStaffed.length > 0 && (
+				<Pressable
+					onPress={() =>
+						props.navigation.navigate("Details", {
+							eventId: shortStaffed[0].id,
+						})
+					}
+					haptic="tap"
+					scaleOnPress={false}
+					accessibilityLabel={`${shortStaffed.length} event${
+						shortStaffed.length === 1 ? "" : "s"
+					} down a worker. Open ${shortStaffed[0].title}.`}
+					style={styles.alertCard}
+				>
+					<Icon name="warning" size="md" color="danger" />
+					<View style={styles.alertBody}>
+						<Text variant="bodyStrong" color="danger">
+							{shortStaffed.length === 1
+								? "1 event is down a worker"
+								: `${shortStaffed.length} events are down a worker`}
+						</Text>
+						<Text
+							variant="caption"
+							color="textSecondary"
+							numberOfLines={1}
+						>
+							{/* The soonest, because that is the one running out
+							    of time to re-staff. */}
+							Soonest: {shortStaffed[0].title} ·{" "}
+							{moment(shortStaffed[0].dateKey).format("MMM D")}
+						</Text>
+					</View>
+					<Text variant="label" color="accent">
+						Open
+					</Text>
+				</Pressable>
+			)}
+
 			{!!error && (
 				<Card style={styles.errorCard}>
 					<Text variant="label" color="danger">
@@ -747,6 +825,22 @@ const timesheetStyles = (theme: Theme) =>
 			gap: theme.spacing.sm,
 			paddingHorizontal: theme.spacing.lg,
 			paddingBottom: theme.spacing.md,
+		},
+		alertCard: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: theme.spacing.md,
+			margin: theme.spacing.lg,
+			marginBottom: 0,
+			padding: theme.spacing.lg,
+			borderRadius: theme.radius.md,
+			backgroundColor: theme.colors.dangerSubtle,
+			borderWidth: theme.hairlineWidth,
+			borderColor: theme.colors.danger,
+		},
+		alertBody: {
+			flex: 1,
+			gap: 2,
 		},
 		errorCard: {
 			margin: theme.spacing.lg,

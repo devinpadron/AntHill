@@ -30,6 +30,20 @@ export interface Event extends BaseDoc, CompanyScoped {
 	 * every event where the field was absent rather than an empty array.
 	 */
 	assignedCount: number;
+	/**
+	 * How many of the crew have said they cannot make it.
+	 *
+	 * Maintained by the `notifyUserStatusChange` Cloud Function, never by a
+	 * client — it is RECOMPUTED from the response documents on every flag
+	 * transition rather than incremented, so it cannot drift out of step with
+	 * them however a write fails.
+	 *
+	 * It exists because flagging does not unassign anyone: `assignedCount`
+	 * stays put, so without this the calendar has nothing to show and the only
+	 * trace is a field on a document nobody opens. Absent on every event
+	 * written before this, which reads as zero.
+	 */
+	problemCount?: number;
 	packageIds: string[];
 	/** Flattened from the packages at write time. */
 	checklistIds: string[];
