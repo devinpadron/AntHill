@@ -1,0 +1,34 @@
+.wrap {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--sp-md);
+	padding: var(--sp-3xl) var(--sp-lg);
+	min-height: 240px;
+	height: 100%;
+}
+
+.well {
+	width: 72px;
+	height: 72px;
+	border-radius: var(--r-pill);
+	background: var(--c-surface-sunken);
+	color: var(--c-text-tertiary);
+	display: grid;
+	place-items: center;
+	margin-bottom: var(--sp-xs);
+}
+
+.wellError {
+	background: var(--c-danger-subtle);
+	color: var(--c-danger);
+}
+
+.description {
+	max-width: 380px;
+}
+
+.action {
+	margin-top: var(--sp-sm);
+}

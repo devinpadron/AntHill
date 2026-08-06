@@ -1,0 +1,116 @@
+.page {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-md);
+	padding: var(--sp-lg) var(--sp-xl) var(--sp-xl);
+	height: 100%;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--sp-lg);
+	flex-wrap: wrap;
+}
+
+.monthNav {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-sm);
+}
+
+.monthLabel {
+	min-width: 200px;
+}
+
+.navButton {
+	display: grid;
+	place-items: center;
+	width: 32px;
+	height: 32px;
+	border-radius: var(--r-sm);
+	color: var(--c-text-secondary);
+}
+
+.navButton:hover {
+	background: var(--c-surface-sunken);
+	color: var(--c-text);
+}
+
+.headerRight {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-md);
+}
+
+.viewSwitch {
+	display: flex;
+	gap: var(--sp-xs);
+	background: var(--c-surface-sunken);
+	border-radius: var(--r-md);
+	padding: 3px;
+}
+
+.viewButton {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-xs);
+	padding: var(--sp-sm) var(--sp-md);
+	border-radius: var(--r-sm);
+	font: var(--t-label);
+	color: var(--c-text-secondary);
+}
+
+.viewActive {
+	background: var(--c-surface);
+	box-shadow: var(--e-raised);
+	color: var(--c-text);
+}
+
+/* A running read of the current slice. The phone has nowhere to put this. */
+.stats {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-xl);
+	padding: var(--sp-sm) var(--sp-md);
+	background: var(--c-surface);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-md);
+	flex-wrap: wrap;
+}
+
+.stat {
+	display: inline-flex;
+	align-items: baseline;
+	gap: var(--sp-xs);
+}
+
+.body {
+	display: flex;
+	gap: var(--sp-lg);
+	flex: 1;
+	min-height: 0;
+}
+
+.viewCard {
+	flex: 1;
+	min-width: 0;
+	min-height: 0;
+}
+
+.filteredAway {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--sp-md);
+	padding: var(--sp-sm);
+}
+
+@media (max-width: 1280px) {
+	.body {
+		gap: var(--sp-md);
+	}
+}

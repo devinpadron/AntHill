@@ -1,5 +1,18 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
-import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import React, {
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
+import {
+	ActivityIndicator,
+	FlatList,
+	RefreshControl,
+	StyleSheet,
+	View,
+	ViewToken,
+} from "react-native";
 import moment from "moment";
 import { CalendarList } from "react-native-calendars";
 import BottomSheet from "@gorhom/bottom-sheet";
@@ -11,11 +24,13 @@ import {
 	Badge,
 	Card,
 	EmptyState,
+	Icon,
 	Loading,
 	Pressable,
 	ScreenHeader,
 	Sheet,
 	Text,
+	useFloatingOffset,
 } from "../ui";
 import { Theme, useTheme, useThemedStyles } from "../../theme";
 import { calendarTheme } from "./calendarTheme";
@@ -25,6 +40,21 @@ import { calendarTheme } from "./calendarTheme";
  *
  * Data comes from useCalendarEvents, which queries a bounded date window
  * server-side. v1 pulled the whole Events collection and filtered in JS.
+ *
+ * The list OPENS ON TODAY. It used to open on the oldest event in the window,
+ * because rows are sorted ascending and the window began a month in the past —
+ * so the first thing anyone saw was history, and their next shift was somewhere
+ * below the fold. `pastWindow: "today"` starts the query at today instead.
+ *
+ * History is reached by PULLING DOWN, a week per pull. Nothing advertises it
+ * from the top of the list: a permanent "show earlier" row would put a control
+ * above the one thing this screen exists to answer, which is what you are
+ * working next. The badge in the header says how far back the window currently
+ * reaches, so the reveal still has a visible edge.
+ *
+ * The FUTURE extends by scrolling to the bottom, a quarter at a time. The
+ * window used to stop dead at MONTHS_AFTER, so anything booked beyond about
+ * three months was invisible and the list simply appeared to end.
  */
 
 type Props = {
@@ -72,13 +102,20 @@ export default function Timesheet(props: Props) {
 	);
 
 	const {
+		events,
 		agendaItems,
 		markedDates,
 		labels,
 		isLoading,
 		error,
+		window,
 		loadPastEvents,
+		clearPastEvents,
 		hasLoadedPast,
+		loadMore,
+		hasMore,
+		isLoadingMore,
+		upcomingCount,
 	} = useCalendarEvents({
 		companyId: companyId ?? "",
 		userId,
@@ -87,14 +124,34 @@ export default function Timesheet(props: Props) {
 		showAllSelectedOnly: props.showAllSelectedOnly,
 		showExactSelectedOnly: props.showExactSelectedOnly,
 		focusedMonth,
+		pastWindow: "today",
+		// Roughly two screens of rows, so reaching the bottom has the next page
+		// already on its way rather than starting the fetch from a standstill.
+		pageSize: 40,
 	});
 
-	const [refreshing, setRefreshing] = useState(false);
-	const onRefresh = useCallback(() => {
-		setRefreshing(true);
+	/*
+	 * Which window we asked to leave behind.
+	 *
+	 * Tracking the outgoing `from` rather than a plain boolean is what makes the
+	 * spinner honest: it clears only once the window has actually moved AND the
+	 * new subscription has delivered, so it cannot be cancelled by the render
+	 * that happens between those two things.
+	 */
+	const [pendingFrom, setPendingFrom] = useState<string | null>(null);
+	const loadingPast = pendingFrom !== null;
+
+	const onLoadEarlier = useCallback(() => {
+		if (pendingFrom !== null) return;
+		setPendingFrom(window.from);
 		loadPastEvents();
-		setRefreshing(false);
-	}, [loadPastEvents]);
+	}, [pendingFrom, window.from, loadPastEvents]);
+
+	useEffect(() => {
+		if (pendingFrom !== null && window.from !== pendingFrom && !isLoading) {
+			setPendingFrom(null);
+		}
+	}, [pendingFrom, window.from, isLoading]);
 
 	const rows = useMemo<Row[]>(() => {
 		const out: Row[] = [];
@@ -160,6 +217,98 @@ export default function Timesheet(props: Props) {
 			),
 		[rows],
 	);
+
+	/*
+	 * Where "today" lives in the list.
+	 *
+	 * The first row that is not already behind us — which is today when there is
+	 * something on today, and otherwise the next day that has anything. Landing
+	 * on the next thing you are actually working is more useful than landing on
+	 * an empty date, and rows only exist for days that have events.
+	 */
+	const todayIndex = useMemo(() => {
+		const today = moment().startOf("day");
+		for (let i = 0; i < rows.length; i++) {
+			const row = rows[i];
+			if (row.kind !== "day") continue;
+			if (!moment(row.date, "MMMM D, YYYY").isBefore(today)) return i;
+		}
+		// Everything loaded is in the past; the end of the list is as close to
+		// today as this list gets.
+		return rows.length - 1;
+	}, [rows]);
+
+	/*
+	 * onViewableItemsChanged must not change identity — FlatList throws
+	 * "Changing onViewableItemsChanged on the fly is not supported" — so the
+	 * moving target is read through a ref instead of closed over.
+	 */
+	const todayIndexRef = useRef(todayIndex);
+	useEffect(() => {
+		todayIndexRef.current = todayIndex;
+	}, [todayIndex]);
+
+	const listRef = useRef<FlatList<Row>>(null);
+	/** Which way you would have to travel to get back to today, if it is off screen. */
+	const [todayDirection, setTodayDirection] = useState<"up" | "down" | null>(
+		null,
+	);
+
+	const viewabilityConfig = useRef({
+		itemVisiblePercentThreshold: 10,
+	}).current;
+
+	const onViewableItemsChanged = useRef(
+		({ viewableItems }: { viewableItems: ViewToken[] }) => {
+			const target = todayIndexRef.current;
+			const indices = viewableItems
+				.map((item) => item.index)
+				.filter((index): index is number => index !== null);
+
+			if (target < 0 || !indices.length) {
+				setTodayDirection(null);
+				return;
+			}
+
+			const first = Math.min(...indices);
+			const last = Math.max(...indices);
+			setTodayDirection(
+				target < first ? "up" : target > last ? "down" : null,
+			);
+		},
+	).current;
+
+	/*
+	 * Fold the revealed history back up.
+	 *
+	 * `pendingFrom` is dropped too: collapsing restores the window this load
+	 * started from, so the "did the window move?" test that normally clears the
+	 * spinner would never fire and the refresh control would spin forever.
+	 */
+	const onClearEarlier = useCallback(() => {
+		setPendingFrom(null);
+		clearPastEvents();
+		listRef.current?.scrollToOffset({ offset: 0, animated: true });
+	}, [clearPastEvents]);
+
+	const jumpToToday = useCallback(() => {
+		const target = todayIndexRef.current;
+		if (target < 0) return;
+		listRef.current?.scrollToIndex({
+			index: target,
+			animated: true,
+			viewPosition: 0,
+		});
+	}, []);
+
+	/*
+	 * A picked date filters the list to one day, so the upcoming total would be
+	 * answering a different question than the one on screen.
+	 */
+	const headerCount =
+		props.selectedDate || upcomingCount === null
+			? totalEvents
+			: upcomingCount;
 
 	const sheetRef = useRef<BottomSheet>(null);
 	const [calOpen, setCalOpen] = useState(false);
@@ -283,14 +432,39 @@ export default function Timesheet(props: Props) {
 				]}
 			>
 				<View style={styles.headerMeta}>
-					{totalEvents > 0 && (
+					{/*
+					 * The count of what is COMING UP, from the server — not of
+					 * what happens to be loaded. It used to be `rows.length`,
+					 * which meant the number climbed as you scrolled and shrank
+					 * when you filtered, and never once answered "how many
+					 * events do I have".
+					 *
+					 * Falls back to the loaded count when the aggregate is
+					 * unavailable, which is also the case while a JS-only
+					 * sub-filter is narrowing the list.
+					 */}
+					{headerCount > 0 && (
 						<Badge
-							label={`${totalEvents} ${totalEvents === 1 ? "event" : "events"}`}
+							label={`${headerCount} ${headerCount === 1 ? "event" : "events"}${
+								upcomingCount === null ? "" : " upcoming"
+							}`}
 							tone="accent"
 						/>
 					)}
+					{/* Tapping it folds the revealed history back up — the badge
+					    is both the edge of the window and the way to undo it. */}
 					{hasLoadedPast && (
-						<Badge label="Including past" tone="neutral" />
+						<Pressable
+							onPress={onClearEarlier}
+							haptic="tap"
+							accessibilityLabel={`Showing events back to ${moment(window.from, "YYYY-MM-DD").format("MMMM D")}. Tap to hide past events.`}
+						>
+							<Badge
+								label={`Back to ${moment(window.from, "YYYY-MM-DD").format("MMM D")}`}
+								tone="neutral"
+								icon="close-circle"
+							/>
+						</Pressable>
 					)}
 					{!!props.selectedDate && (
 						<Badge
@@ -316,18 +490,54 @@ export default function Timesheet(props: Props) {
 				</Card>
 			)}
 
-			{isLoading && !rows.length ? (
+			{isLoading && !rows.length && !hasLoadedPast ? (
 				<Loading label="Loading your schedule" />
 			) : (
 				<FlatList
+					ref={listRef}
 					data={rows}
 					keyExtractor={(item, index) => item.date + index}
+					viewabilityConfig={viewabilityConfig}
+					onViewableItemsChanged={onViewableItemsChanged}
+					onEndReachedThreshold={0.6}
+					// loadMore self-guards on hasMore and on a fetch already in
+					// flight, so onEndReached firing repeatedly — which it does
+					// whenever content is shorter than the screen — is harmless.
+					onEndReached={() => {
+						if (props.selectedDate) return;
+						loadMore();
+					}}
+					ListFooterComponent={
+						props.selectedDate === null ? (
+							<ScheduleFooter
+								loading={isLoadingMore}
+								hasMore={hasMore}
+								anyRows={rows.length > 0}
+							/>
+						) : null
+					}
+					// Rows are variable height, so scrollToIndex has no layout to
+					// work from until the target has been measured. Approximate,
+					// let the measurement land, then land it exactly.
+					onScrollToIndexFailed={(info) => {
+						listRef.current?.scrollToOffset({
+							offset: info.averageItemLength * info.index,
+							animated: true,
+						});
+						setTimeout(() => {
+							listRef.current?.scrollToIndex({
+								index: info.index,
+								animated: true,
+								viewPosition: 0,
+							});
+						}, 150);
+					}}
 					refreshControl={
 						props.selectedDate === null ? (
 							<RefreshControl
-								refreshing={refreshing}
-								onRefresh={onRefresh}
-								title="Pull to load earlier events"
+								refreshing={loadingPast}
+								onRefresh={onLoadEarlier}
+								title="Pull to reveal the week before"
 								tintColor={theme.colors.accent}
 								titleColor={theme.colors.textSecondary}
 							/>
@@ -340,12 +550,12 @@ export default function Timesheet(props: Props) {
 								title={
 									props.selectedDate
 										? "Nothing on this day"
-										: "No scheduled events"
+										: "Nothing coming up"
 								}
 								description={
 									props.selectedDate
 										? "Pick another date, or clear the filter to see everything."
-										: "Events you're scheduled on will appear here. Pull down to load earlier ones."
+										: "Events you're scheduled on from today onwards appear here. Pull down to reveal earlier weeks."
 								}
 							/>
 						)
@@ -389,6 +599,15 @@ export default function Timesheet(props: Props) {
 				/>
 			)}
 
+			{props.selectedDate === null &&
+				todayDirection !== null &&
+				rows.length > 0 && (
+					<JumpToToday
+						direction={todayDirection}
+						onPress={jumpToToday}
+					/>
+				)}
+
 			<Sheet
 				ref={sheetRef}
 				snapPoints={["58%", "92%"]}
@@ -408,6 +627,84 @@ export default function Timesheet(props: Props) {
 					theme={calendarTheme(theme)}
 				/>
 			</Sheet>
+		</View>
+	);
+}
+
+/*
+ * The end of the list.
+ *
+ * A spinner while the next page is in flight, and once there are no more pages,
+ * a line saying so — otherwise reaching the bottom of an infinite list is
+ * indistinguishable from it having quietly failed to load.
+ */
+function ScheduleFooter({
+	loading,
+	hasMore,
+	anyRows,
+}: {
+	loading: boolean;
+	hasMore: boolean;
+	anyRows: boolean;
+}) {
+	const styles = useThemedStyles(timesheetStyles);
+	const theme = useTheme();
+
+	if (loading) {
+		return (
+			<View style={styles.footer}>
+				<ActivityIndicator size="small" color={theme.colors.accent} />
+			</View>
+		);
+	}
+
+	// The empty state already says there is nothing; no need to say it twice.
+	if (hasMore || !anyRows) return <View style={styles.footerSpacer} />;
+
+	return (
+		<View style={styles.footer}>
+			<Text variant="caption" color="textTertiary" style={styles.center}>
+				That's everything scheduled
+			</Text>
+		</View>
+	);
+}
+
+/*
+ * The way back to now.
+ *
+ * Appears only while today is off screen, and points the way it went: an
+ * upward arrow once you have scrolled ahead into next month, a downward one
+ * once you have walked back through earlier weeks. A permanent button would be
+ * one more thing to read on a list whose whole job is to be scanned.
+ */
+function JumpToToday({
+	direction,
+	onPress,
+}: {
+	direction: "up" | "down";
+	onPress: () => void;
+}) {
+	const styles = useThemedStyles(timesheetStyles);
+	const bottom = useFloatingOffset();
+
+	return (
+		<View style={[styles.jumpWrap, { bottom }]} pointerEvents="box-none">
+			<Pressable
+				onPress={onPress}
+				haptic="tap"
+				accessibilityLabel="Jump to today"
+				style={styles.jumpPill}
+			>
+				<Icon
+					name={direction === "up" ? "arrow-up" : "arrow-down"}
+					size="sm"
+					color="onAccent"
+				/>
+				<Text variant="label" color="onAccent">
+					Today
+				</Text>
+			</Pressable>
 		</View>
 	);
 }
@@ -501,5 +798,36 @@ const timesheetStyles = (theme: Theme) =>
 		},
 		yearText: {
 			marginHorizontal: theme.spacing.md,
+		},
+		footer: {
+			paddingHorizontal: theme.spacing.xl,
+			paddingVertical: theme.spacing.lg,
+			gap: theme.spacing.xs,
+			alignItems: "center",
+			minHeight: theme.hitTarget,
+		},
+		/* Keeps the last row clear of the floating "Today" pill. */
+		footerSpacer: {
+			height: theme.spacing.xl,
+		},
+		center: {
+			textAlign: "center",
+		},
+		jumpWrap: {
+			position: "absolute",
+			left: 0,
+			right: 0,
+			alignItems: "center",
+		},
+		jumpPill: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: theme.spacing.xs + 2,
+			paddingVertical: theme.spacing.sm,
+			paddingHorizontal: theme.spacing.lg,
+			minHeight: 40,
+			borderRadius: theme.radius.pill,
+			backgroundColor: theme.colors.accent,
+			...theme.elevation.floating,
 		},
 	});

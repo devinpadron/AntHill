@@ -1,0 +1,178 @@
+.drawer {
+	grid-area: drawer;
+	width: var(--drawer-w);
+	display: flex;
+	flex-direction: column;
+	background: var(--c-surface);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-lg);
+	overflow: hidden;
+	min-height: 0;
+}
+
+.header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--sp-md);
+	padding: var(--sp-lg);
+	border-bottom: 1px solid var(--c-border);
+}
+
+.identity {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-xs);
+	align-items: flex-start;
+	min-width: 0;
+}
+
+.close {
+	display: grid;
+	place-items: center;
+	width: 28px;
+	height: 28px;
+	border-radius: var(--r-sm);
+	color: var(--c-text-tertiary);
+	flex-shrink: 0;
+}
+
+.close:hover {
+	background: var(--c-surface-sunken);
+	color: var(--c-text);
+}
+
+.body {
+	flex: 1;
+	overflow-y: auto;
+	min-height: 0;
+	padding: var(--sp-lg);
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-xl);
+}
+
+.section {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-sm);
+}
+
+.row {
+	display: grid;
+	grid-template-columns: 80px 1fr;
+	align-items: baseline;
+	gap: var(--sp-md);
+	min-width: 0;
+}
+
+.link {
+	color: var(--c-text);
+	font: var(--t-body);
+	text-decoration: none;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.link:hover {
+	color: var(--c-accent);
+	text-decoration: underline;
+}
+
+/* Job access: two explicit choices with their consequence written out, rather
+   than a bare toggle whose meaning an admin has to remember. */
+.choices {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-sm);
+	margin-bottom: var(--sp-md);
+}
+
+.choice {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-xs);
+	padding: var(--sp-md);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-md);
+	text-align: left;
+	background: var(--c-surface);
+	color: var(--c-text-tertiary);
+}
+
+.choice:hover {
+	border-color: var(--c-border-strong);
+}
+
+.choiceActive {
+	border-color: var(--c-accent-border);
+	background: var(--c-accent-subtle);
+	color: var(--c-accent);
+}
+
+.choiceHead {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-sm);
+	color: inherit;
+}
+
+.groupList {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.groupRow {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-sm);
+	padding: var(--sp-sm);
+	border-radius: var(--r-sm);
+	cursor: pointer;
+	min-height: 36px;
+}
+
+.groupRow:hover {
+	background: var(--c-surface-sunken);
+}
+
+.groupRow input {
+	accent-color: var(--c-accent);
+	cursor: pointer;
+}
+
+.warning {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--sp-sm);
+	padding: var(--sp-md);
+	background: var(--c-warning-subtle);
+	color: var(--c-warning);
+	border-radius: var(--r-md);
+	margin-top: var(--sp-sm);
+}
+
+.footer {
+	display: flex;
+	justify-content: flex-end;
+	gap: var(--sp-sm);
+	padding: var(--sp-md) var(--sp-lg);
+	border-top: 1px solid var(--c-border);
+	background: var(--c-surface);
+}
+
+@media (max-width: 1400px) {
+	/* The drawer becomes an overlay once there is no column for it. */
+	.drawer {
+		position: fixed;
+		top: var(--topbar-h);
+		right: 0;
+		bottom: 0;
+		z-index: 50;
+		border-radius: 0;
+		border-right: none;
+		box-shadow: var(--e-floating);
+	}
+}

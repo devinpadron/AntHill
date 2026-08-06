@@ -1,0 +1,30 @@
+.page {
+	min-height: 100vh;
+	display: grid;
+	place-items: center;
+	padding: var(--sp-xl);
+	background: var(--c-bg);
+	overflow: auto;
+}
+
+.card {
+	width: min(400px, 100%);
+	padding: var(--sp-xl);
+	gap: var(--sp-xl);
+}
+
+.brand {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-xs);
+	align-items: center;
+	text-align: center;
+	margin-bottom: var(--sp-lg);
+}
+
+.form {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-lg);
+	margin-bottom: var(--sp-lg);
+}

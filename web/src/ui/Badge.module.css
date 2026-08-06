@@ -1,0 +1,76 @@
+.badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 2px var(--sp-sm);
+	border-radius: var(--r-pill);
+	border: 1px solid transparent;
+	font: var(--t-caption);
+	line-height: 16px;
+	white-space: nowrap;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.dot {
+	width: 6px;
+	height: 6px;
+	border-radius: var(--r-pill);
+	background: currentColor;
+	flex-shrink: 0;
+}
+
+/* ---- subtle: tinted fill, colored text (the common case) --------------- */
+
+.subtle.neutral {
+	background: var(--c-surface-sunken);
+	color: var(--c-text-secondary);
+}
+.subtle.accent {
+	background: var(--c-accent-subtle);
+	color: var(--c-accent);
+}
+.subtle.success {
+	background: var(--c-success-subtle);
+	color: var(--c-success);
+}
+.subtle.warning {
+	background: var(--c-warning-subtle);
+	color: var(--c-warning);
+}
+.subtle.danger {
+	background: var(--c-danger-subtle);
+	color: var(--c-danger);
+}
+.subtle.info {
+	background: var(--c-info-subtle);
+	color: var(--c-info);
+}
+
+/* ---- solid: filled, for the one badge that must win the row ----------- */
+
+.solid.neutral {
+	background: var(--c-text-secondary);
+	color: var(--c-surface);
+}
+.solid.accent {
+	background: var(--c-accent);
+	color: var(--c-on-accent);
+}
+.solid.success {
+	background: var(--c-success);
+	color: #fff;
+}
+.solid.warning {
+	background: var(--c-warning);
+	color: #fff;
+}
+.solid.danger {
+	background: var(--c-danger);
+	color: #fff;
+}
+.solid.info {
+	background: var(--c-info);
+	color: var(--c-on-accent);
+}

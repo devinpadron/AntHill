@@ -21,6 +21,10 @@ ios/
 # Expo generated files
 .expo/
 
+# Web portal build output — generated, and large enough that formatting it
+# makes the pre-commit hook crawl.
+web/dist/
+
 # Google service files
 google-services.json
 GoogleService-Info.plist

@@ -273,22 +273,6 @@ const CompanyCustomForm = ({ navigation }) => {
 													</Text>
 												</View>
 											)}
-											{item.quickEditPayroll &&
-												item.type !== "checklist" && (
-													<View
-														style={
-															styles.quickEditBadge
-														}
-													>
-														<Text
-															style={
-																styles.quickEditText
-															}
-														>
-															PAYROLL EDIT
-														</Text>
-													</View>
-												)}
 										</View>
 
 										<View style={styles.fieldActions}>
@@ -387,6 +371,10 @@ const CompanyCustomForm = ({ navigation }) => {
 								setValue={setCurrentFieldType}
 								style={styles.dropdown}
 								dropDownContainerStyle={styles.dropdownList}
+								theme={theme.isDark ? "DARK" : "LIGHT"}
+								textStyle={styles.dropdownText}
+								placeholderStyle={styles.dropdownPlaceholder}
+								listItemLabelStyle={styles.dropdownText}
 								zIndex={3000}
 								zIndexInverse={1000} // Add zIndexInverse for proper stacking
 								listMode="SCROLLVIEW" // Use scrollview mode for better rendering
@@ -452,6 +440,12 @@ const CompanyCustomForm = ({ navigation }) => {
 									setValue={setSelectedChecklistId as any}
 									style={styles.dropdown}
 									dropDownContainerStyle={styles.dropdownList}
+									theme={theme.isDark ? "DARK" : "LIGHT"}
+									textStyle={styles.dropdownText}
+									placeholderStyle={
+										styles.dropdownPlaceholder
+									}
+									listItemLabelStyle={styles.dropdownText}
 									zIndex={2500}
 									zIndexInverse={1500}
 									listMode="SCROLLVIEW"
@@ -734,46 +728,6 @@ const CompanyCustomForm = ({ navigation }) => {
 									</View>
 								)}
 							</>
-						)}
-
-						{/* New Quick Edit Toggle */}
-						{currentFieldType !== "checklist" && (
-							<View style={styles.switchRow}>
-								<View style={styles.labelWithHelp}>
-									<Text style={styles.label}>
-										Quick Edit in Payroll
-									</Text>
-									<TouchableOpacity
-										onPress={() =>
-											Alert.alert(
-												"Quick Edit in Payroll",
-												"When enabled, this field can be quickly edited when processing payroll entries without needing to open the full edit form.",
-											)
-										}
-									>
-										<Ionicons
-											name="information-circle-outline"
-											size={20}
-											color={theme.colors.textSecondary}
-										/>
-									</TouchableOpacity>
-								</View>
-								<Switch
-									value={
-										editingField.quickEditPayroll || false
-									}
-									onValueChange={(value) =>
-										setEditingField({
-											...editingField,
-											quickEditPayroll: value,
-										})
-									}
-									trackColor={{
-										false: theme.colors.switchTrack,
-										true: theme.colors.accent,
-									}}
-								/>
-							</View>
 						)}
 
 						<TouchableOpacity

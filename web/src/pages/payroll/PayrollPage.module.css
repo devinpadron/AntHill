@@ -1,0 +1,201 @@
+.page {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-md);
+	padding: var(--sp-lg) var(--sp-xl) var(--sp-xl);
+	height: 100%;
+	min-height: 0;
+	overflow: hidden;
+	position: relative;
+}
+
+.header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--sp-lg);
+	flex-wrap: wrap;
+}
+.periodNav {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-sm);
+}
+.period {
+	display: flex;
+	flex-direction: column;
+	min-width: 210px;
+}
+
+.navButton {
+	display: grid;
+	place-items: center;
+	width: 32px;
+	height: 32px;
+	border-radius: var(--r-sm);
+	color: var(--c-text-secondary);
+}
+.navButton:hover {
+	background: var(--c-surface-sunken);
+	color: var(--c-text);
+}
+
+.stats {
+	display: flex;
+	gap: var(--sp-xl);
+	padding: var(--sp-md) var(--sp-lg);
+	background: var(--c-surface);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-md);
+	flex-wrap: wrap;
+}
+.stat {
+	display: flex;
+	flex-direction: column;
+}
+
+.chips {
+	display: flex;
+	gap: var(--sp-sm);
+	flex-wrap: wrap;
+}
+.chip {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--sp-sm);
+	padding: var(--sp-xs) var(--sp-md);
+	border-radius: var(--r-pill);
+	border: 1px solid var(--c-border);
+	font: var(--t-label);
+	color: var(--c-text-secondary);
+	min-height: 32px;
+}
+.chip:hover {
+	border-color: var(--c-border-strong);
+	color: var(--c-text);
+}
+.chipActive {
+	background: var(--c-accent-subtle);
+	border-color: var(--c-accent-border);
+	color: var(--c-accent);
+}
+.chipCount {
+	font-variant-numeric: tabular-nums;
+	opacity: 0.7;
+}
+
+/* 55/45 master-detail, as the plan specifies. */
+.body {
+	display: grid;
+	grid-template-columns: minmax(0, 55fr) minmax(340px, 45fr);
+	gap: var(--sp-lg);
+	flex: 1;
+	min-height: 0;
+}
+.masterCard,
+.detailCard {
+	min-height: 0;
+	min-width: 0;
+}
+
+.closeDetail {
+	display: grid;
+	place-items: center;
+	width: 26px;
+	height: 26px;
+	border-radius: var(--r-sm);
+	color: var(--c-text-tertiary);
+}
+.closeDetail:hover {
+	background: var(--c-surface-sunken);
+	color: var(--c-text);
+}
+
+.num {
+	font-variant-numeric: tabular-nums;
+}
+.numMuted {
+	font-variant-numeric: tabular-nums;
+	color: var(--c-text-tertiary);
+}
+.numStrong {
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+}
+
+.reviewCell {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--sp-xs);
+}
+
+/*
+ * The bulk bar floats over the table rather than pushing it — losing a row of
+ * data every time you tick a checkbox is exactly the wrong trade on this page.
+ */
+.bulkBar {
+	position: absolute;
+	bottom: var(--sp-xl);
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 20;
+	display: flex;
+	align-items: center;
+	gap: var(--sp-xl);
+	padding: var(--sp-md) var(--sp-lg);
+	background: var(--c-text);
+	border-radius: var(--r-pill);
+	box-shadow: var(--e-floating);
+	animation: rise var(--motion-base) ease;
+}
+@keyframes rise {
+	from {
+		opacity: 0;
+		transform: translate(-50%, 8px);
+	}
+}
+.bulkActions {
+	display: flex;
+	gap: var(--sp-sm);
+}
+
+@media (max-width: 1400px) {
+	.body {
+		grid-template-columns: 1fr;
+	}
+	.detailCard {
+		display: none;
+	}
+}
+
+.detailActions {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-xs);
+}
+
+.modeButton {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--sp-xs);
+	padding: var(--sp-xs) var(--sp-sm);
+	border-radius: var(--r-sm);
+	font: var(--t-caption);
+	color: var(--c-text-secondary);
+}
+.modeButton:hover {
+	background: var(--c-surface-sunken);
+	color: var(--c-text);
+}
+.modeActive {
+	background: var(--c-accent-subtle);
+	color: var(--c-accent);
+}
+
+/* The week view is long — it scrolls inside the card, not the page. */
+.weekScroll {
+	overflow-y: auto;
+	min-height: 0;
+	flex: 1;
+	padding: var(--sp-md);
+}

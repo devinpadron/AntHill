@@ -65,7 +65,16 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 	const bottomSheetRef = useRef(null);
 	const scrollViewRef = useRef(null);
 	const notesInputRef = useRef(null);
-	const snapPoints = useRef(["85%"]).current;
+	/*
+	 * Nearly the full screen, measured BELOW the notch.
+	 *
+	 * This sheet is a form — event pickers, a custom schema, attachments — not a
+	 * confirmation. At 85% it opened with the fields already running off the
+	 * bottom on a small phone. `topInset` is what makes 95% safe: snap points
+	 * are computed against the space left under the inset, so the handle lands
+	 * below the status bar rather than under it.
+	 */
+	const snapPoints = useRef(["95%"]).current;
 	const insets = useSafeAreaInsets();
 	const { preferences, isLoading: preferencesLoading } = useCompany();
 	const { eventSchema, entrySchema, isSchemaLoading } = useSubmitFormSchemas(
@@ -749,6 +758,7 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 		<BottomSheet
 			ref={bottomSheetRef}
 			snapPoints={snapPoints}
+			topInset={insets.top}
 			enablePanDownToClose
 			onClose={handleClosePress}
 			handleIndicatorStyle={styles.sheetIndicator}
@@ -866,6 +876,9 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 							<View style={styles.addEventInputContainer}>
 								<TextInput
 									style={styles.addEventInput}
+									placeholderTextColor={
+										theme.colors.textTertiary
+									}
 									placeholder="Enter event title"
 									value={newEventTitle}
 									onChangeText={setNewEventTitle}
@@ -1062,6 +1075,7 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 					style={styles.notesInput}
 					multiline
 					numberOfLines={4}
+					placeholderTextColor={theme.colors.textTertiary}
 					placeholder="Add any comments about this time entry"
 					value={notes}
 					onChangeText={setNotes}

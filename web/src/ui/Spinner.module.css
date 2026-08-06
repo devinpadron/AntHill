@@ -1,0 +1,17 @@
+.spinner {
+	animation: rotate 800ms linear infinite;
+}
+
+@keyframes rotate {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.pane {
+	display: grid;
+	place-items: center;
+	min-height: 200px;
+	height: 100%;
+	width: 100%;
+}

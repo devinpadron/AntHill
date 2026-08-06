@@ -1,0 +1,93 @@
+/* A narrow column, so the preview reads like the phone it represents. */
+.phone {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-lg);
+	max-width: 320px;
+	padding: var(--sp-md);
+	background: var(--c-surface-sunken);
+	border-radius: var(--r-md);
+}
+.formHead {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-xs);
+}
+.required {
+	color: var(--c-danger);
+}
+
+.input {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--sp-sm);
+	padding: var(--sp-sm) var(--sp-md);
+	background: var(--c-surface);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-md);
+	min-height: 38px;
+}
+
+.checkboxRow,
+.checkItem {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-sm);
+}
+.box {
+	width: 16px;
+	height: 16px;
+	flex-shrink: 0;
+	border: 1.5px solid var(--c-border-strong);
+	border-radius: 4px;
+	background: var(--c-surface);
+}
+
+.chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--sp-xs);
+	align-items: center;
+}
+.checklist {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-xs);
+}
+
+.upload {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-sm);
+	padding: var(--sp-md);
+	border: 1px dashed var(--c-border-strong);
+	border-radius: var(--r-md);
+	color: var(--c-text-tertiary);
+}
+
+.warn {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-xs);
+	padding: var(--sp-sm);
+	border-radius: var(--r-sm);
+	background: var(--c-warning-subtle);
+	color: var(--c-warning);
+}
+
+.disabled {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--sp-sm);
+	padding: var(--sp-xl);
+	text-align: center;
+	color: var(--c-text-tertiary);
+}

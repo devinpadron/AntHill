@@ -1,0 +1,106 @@
+.field {
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+	min-width: 0;
+}
+
+.label {
+	font: var(--t-label);
+	color: var(--c-text-secondary);
+}
+
+.required {
+	color: var(--c-danger);
+}
+
+/*
+ * The well. Sunken by default, lifting to `surface` with an accent border on
+ * focus — the app's Input does the same, and it is what makes the focused
+ * field obvious on a dense form.
+ */
+.well {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-sm);
+	min-height: var(--hit-target);
+	padding: 0 var(--sp-md);
+	background: var(--c-surface-sunken);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-md);
+	transition:
+		border-color var(--motion-fast) ease,
+		background var(--motion-fast) ease;
+}
+
+.well:focus-within {
+	background: var(--c-surface);
+	border-color: var(--c-accent);
+	outline: none;
+}
+
+.wellError {
+	border-color: var(--c-danger);
+}
+
+.input {
+	flex: 1;
+	min-width: 0;
+	background: none;
+	border: none;
+	outline: none;
+	font: var(--t-body);
+	color: var(--c-text);
+	padding: var(--sp-sm) 0;
+}
+
+.input::placeholder {
+	color: var(--c-text-tertiary);
+}
+
+.input:disabled {
+	color: var(--c-text-tertiary);
+	cursor: not-allowed;
+}
+
+.leadingIcon {
+	color: var(--c-text-tertiary);
+}
+
+.suffix {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-xs);
+	color: var(--c-text-tertiary);
+	font: var(--t-caption);
+	flex-shrink: 0;
+}
+
+/* Textarea is its own well rather than nesting one. */
+.textarea {
+	min-height: 96px;
+	align-items: stretch;
+	padding: var(--sp-sm) var(--sp-md);
+	font: var(--t-body);
+	color: var(--c-text);
+	resize: vertical;
+	outline: none;
+	line-height: 21px;
+}
+
+.textarea:focus {
+	background: var(--c-surface);
+	border-color: var(--c-accent);
+}
+
+.select {
+	appearance: none;
+	cursor: pointer;
+	padding-right: var(--sp-lg);
+}
+
+.selectChevron {
+	color: var(--c-text-tertiary);
+	pointer-events: none;
+	margin-left: calc(-1 * var(--sp-md));
+}

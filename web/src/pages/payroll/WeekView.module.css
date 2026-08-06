@@ -1,0 +1,115 @@
+.wrap {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-md);
+}
+
+.summary {
+	display: flex;
+	align-items: baseline;
+	gap: var(--sp-xl);
+	padding: var(--sp-md) var(--sp-lg);
+	background: var(--c-surface);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-md);
+	flex-wrap: wrap;
+	position: sticky;
+	top: 0;
+	z-index: 2;
+}
+.stat {
+	display: inline-flex;
+	flex-direction: column;
+}
+
+.day {
+	padding: 0;
+}
+
+.dayHead {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: var(--sp-md) var(--sp-lg);
+	border-bottom: 1px solid var(--c-border);
+	background: var(--c-surface-sunken);
+}
+
+.shift {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-sm);
+	padding: var(--sp-md) var(--sp-lg);
+	border-bottom: 1px solid var(--c-border);
+}
+.shift:last-child {
+	border-bottom: none;
+}
+
+.shiftHead {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--sp-md);
+	flex-wrap: wrap;
+}
+.times {
+	display: flex;
+	flex-direction: column;
+	font-variant-numeric: tabular-nums;
+}
+.shiftMeta {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-sm);
+}
+
+.open {
+	display: grid;
+	place-items: center;
+	width: 26px;
+	height: 26px;
+	border-radius: var(--r-sm);
+	color: var(--c-text-tertiary);
+}
+.open:hover {
+	background: var(--c-surface-sunken);
+	color: var(--c-accent);
+}
+
+.notes {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--sp-xs);
+	padding: var(--sp-sm) var(--sp-md);
+	background: var(--c-surface-sunken);
+	border-radius: var(--r-sm);
+}
+.dim {
+	color: var(--c-text-tertiary);
+	margin-top: 2px;
+	flex-shrink: 0;
+}
+
+.answers {
+	padding-left: var(--sp-md);
+	border-left: 2px solid var(--c-border);
+}
+
+/* A connected event inside a shift: its name, then its own form answers. */
+.connection {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-xs);
+	padding: var(--sp-sm) var(--sp-md);
+	margin-left: var(--sp-md);
+	border-left: 2px solid var(--c-accent-border);
+	background: var(--c-surface-sunken);
+	border-radius: 0 var(--r-sm) var(--r-sm) 0;
+}
+
+.connectionHead {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-xs);
+}

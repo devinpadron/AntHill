@@ -84,9 +84,28 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 	deletionQueue = [],
 	setDeletionQueue,
 }) => {
+	/*
+	 * EVERY HOOK RUNS BEFORE ANY EARLY RETURN.
+	 *
+	 * `if (!customForm) return null` used to sit here, above the useState calls
+	 * below. React identifies hooks by call order, so the render where the
+	 * schema was still loading ran three hooks and stopped, and the render
+	 * after it arrived ran four — which is a Rules of Hooks violation and
+	 * crashed the screen the moment the form resolved:
+	 *
+	 *   React has detected a change in the order of Hooks called by
+	 *   CustomFormRender
+	 *     3. useMemo   4. undefined -> useState
+	 *
+	 * It only ever fired when customForm went falsy -> truthy, which is exactly
+	 * what opening the editor does. The guard now lives below, after the last
+	 * hook.
+	 */
 	const theme = useTheme();
+	/* react-native-date-picker defaults to "auto", which follows the SYSTEM
+	   scheme — so a user who forces dark in-app got a light picker. */
+	const pickerTheme = theme.isDark ? "dark" : "light";
 	const styles = useThemedStyles(customFormStyles);
-	if (!customForm) return null;
 
 	const [multiSelect, setMultiSelect] = useState([]);
 	const { companyId } = useUser();
@@ -157,6 +176,12 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [companyId, customForm?.fields?.map((f) => f.checklistId).join(",")]);
 
+	/*
+	 * The last hook has run, so it is now safe to bail. Nothing below this line
+	 * may call a hook — see the note at the top of the component.
+	 */
+	if (!customForm) return null;
+
 	// Helper function to calculate multiplied value
 	const calculateMultiplied = (value, multiplier) => {
 		if (!multiplier) return value;
@@ -174,6 +199,7 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 				return (
 					<TextInput
 						style={styles.expandableInput}
+						placeholderTextColor={theme.colors.textTertiary}
 						placeholder={field.placeholder || ""}
 						value={formResponses[field.id] || ""}
 						multiline
@@ -188,6 +214,7 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 					<View>
 						<TextInput
 							style={styles.textInput}
+							placeholderTextColor={theme.colors.textTertiary}
 							placeholder={field.placeholder || ""}
 							value={formResponses[field.id] || ""}
 							onChangeText={(text) =>
@@ -288,6 +315,11 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 							}}
 							style={styles.dropdown}
 							dropDownContainerStyle={styles.dropdownList}
+							theme={theme.isDark ? "DARK" : "LIGHT"}
+							textStyle={styles.dropdownText}
+							placeholderStyle={styles.dropdownPlaceholder}
+							listItemLabelStyle={styles.dropdownText}
+							selectedItemLabelStyle={styles.dropdownSelectedText}
 							placeholder={
 								field.placeholder ||
 								`Select ${field.label.toLowerCase()}`
@@ -346,6 +378,11 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 							}}
 							style={styles.dropdown}
 							dropDownContainerStyle={styles.dropdownList}
+							theme={theme.isDark ? "DARK" : "LIGHT"}
+							textStyle={styles.dropdownText}
+							placeholderStyle={styles.dropdownPlaceholder}
+							listItemLabelStyle={styles.dropdownText}
+							selectedItemLabelStyle={styles.dropdownSelectedText}
 							placeholder={
 								field.placeholder ||
 								`Select ${field.label.toLowerCase()}`
@@ -372,10 +409,7 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 							// Debounce selection for smoother experience
 							autoScroll={true}
 							selectedItemContainerStyle={{
-								backgroundColor: "rgba(61, 126, 234, 0.1)",
-							}}
-							selectedItemLabelStyle={{
-								fontWeight: "bold",
+								backgroundColor: theme.colors.accentSubtle,
 							}}
 							// Add checkboxes for clearer UI
 							showTickIcon={true}
@@ -432,6 +466,7 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 										: new Date()
 								}
 								mode="date"
+								theme={pickerTheme}
 								onConfirm={(date) => {
 									onFieldChange(
 										field.id,
@@ -507,6 +542,7 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 										: new Date()
 								}
 								mode="time"
+								theme={pickerTheme}
 								onConfirm={(time) => {
 									onFieldChange(
 										field.id,

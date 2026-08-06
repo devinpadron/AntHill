@@ -1,0 +1,124 @@
+/*
+ * Mirrors src/components/ui/Button.tsx: radius.md, a hairline border, and a
+ * 44px minimum on the medium size. Variants name intent, never color.
+ */
+
+.button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--sp-sm);
+	border-radius: var(--r-md);
+	border: 1px solid transparent;
+	white-space: nowrap;
+	transition:
+		background var(--motion-fast) ease,
+		border-color var(--motion-fast) ease,
+		opacity var(--motion-fast) ease;
+}
+
+.button:disabled {
+	background: var(--c-surface-sunken);
+	border-color: transparent;
+	color: var(--c-text-tertiary);
+}
+
+/* ---------------------------------------------------------------- sizes */
+
+.small {
+	min-height: 32px;
+	padding: 0 var(--sp-md);
+	font: var(--t-label);
+}
+
+.medium {
+	min-height: var(--hit-target);
+	padding: 0 var(--sp-lg);
+	font: var(--t-body-strong);
+}
+
+.large {
+	min-height: 52px;
+	padding: 0 var(--sp-xl);
+	font: var(--t-heading);
+}
+
+/* ------------------------------------------------------------- variants */
+
+.primary {
+	background: var(--c-accent);
+	color: var(--c-on-accent);
+}
+
+.primary:hover:not(:disabled) {
+	background: var(--c-accent-pressed);
+}
+
+.secondary {
+	background: var(--c-surface-sunken);
+	border-color: var(--c-border);
+	color: var(--c-text);
+}
+
+.secondary:hover:not(:disabled) {
+	background: var(--c-surface-pressed);
+	border-color: var(--c-border-strong);
+}
+
+.outline {
+	background: transparent;
+	border-color: var(--c-accent-border);
+	color: var(--c-accent);
+}
+
+.outline:hover:not(:disabled) {
+	background: var(--c-accent-subtle);
+}
+
+/* The app calls this "text"; on the web "ghost" is the clearer name for a
+   button with no chrome until you touch it. */
+.ghost {
+	background: transparent;
+	color: var(--c-text-secondary);
+	min-height: 0;
+}
+
+.ghost:hover:not(:disabled) {
+	background: var(--c-surface-sunken);
+	color: var(--c-text);
+}
+
+.destructive {
+	background: var(--c-danger);
+	color: #fff;
+}
+
+.destructive:hover:not(:disabled) {
+	filter: brightness(0.92);
+}
+
+.fullWidth {
+	width: 100%;
+}
+
+/* --------------------------------------------------------------- states */
+
+.busy {
+	position: relative;
+	color: transparent;
+	pointer-events: none;
+}
+
+.spinner {
+	position: absolute;
+	inset: 0;
+	display: grid;
+	place-items: center;
+	color: var(--c-on-accent);
+}
+
+.secondary .spinner,
+.outline .spinner,
+.ghost .spinner {
+	color: var(--c-text);
+}

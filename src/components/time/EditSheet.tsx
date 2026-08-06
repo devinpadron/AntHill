@@ -59,6 +59,9 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 		ref,
 	) => {
 		const theme = useTheme();
+		/* react-native-date-picker defaults to "auto", which follows the SYSTEM
+		   scheme — so a user who forces dark in-app got a light picker. */
+		const pickerTheme = theme.isDark ? "dark" : "light";
 		const styles = useThemedStyles(editSheetStyles);
 		// Create a local ref that we know is always an object ref
 		const bottomSheetRef = React.useRef<BottomSheet>(null);
@@ -180,13 +183,36 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 			getConnections(timeEntry.id).then((loaded) => {
 				if (cancelled || !loaded.length) return;
 
-				setLocalConnectedEvents(loaded);
+				/*
+				 * Normalized to a local shape keyed on the connection's OWN id.
+				 *
+				 * Everything in this sheet used to key on `eventId`, which is
+				 * NULL for a job the worker typed in rather than linked. Every
+				 * ad-hoc connection on an entry therefore shared one bucket:
+				 * renaming one renamed them all, deleting one deleted them all,
+				 * and they overwrote each other's answers.
+				 *
+				 * The title is resolved once, here. The input read `eventTitle`
+				 * — a field no connection document has — so every row showed the
+				 * "Connected Event" placeholder instead of what the worker
+				 * actually typed.
+				 */
+				setLocalConnectedEvents(
+					loaded.map((connection) => ({
+						id: connection.id,
+						eventId: connection.eventId,
+						title:
+							connection.customTitle ||
+							connection.eventTitleSnapshot ||
+							"",
+					})),
+				);
 
 				const eventResponses = {};
-				loaded.forEach((event) => {
-					if (event.formResponses) {
-						eventResponses[event.eventId] = {
-							...event.formResponses,
+				loaded.forEach((connection) => {
+					if (connection.formResponses) {
+						eventResponses[connection.id] = {
+							...connection.formResponses,
 						};
 					}
 				});
@@ -250,15 +276,15 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 
 			if (localConnectedEvents.length && eventForm && eventForm.fields) {
 				localConnectedEvents.forEach((event) => {
-					const eventId = event.eventId;
 					const eventErrors: Record<string, string> = {};
 
 					eventForm.fields.forEach((field) => {
 						if (
 							field.required &&
-							(!connectedEventResponses[eventId]?.[field.id] ||
-								connectedEventResponses[eventId]?.[field.id] ===
-									"")
+							(!connectedEventResponses[event.id]?.[field.id] ||
+								connectedEventResponses[event.id]?.[
+									field.id
+								] === "")
 						) {
 							eventErrors[field.id] =
 								`${field.label} is required`;
@@ -267,7 +293,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 					});
 
 					if (Object.keys(eventErrors).length > 0) {
-						errors[eventId] = eventErrors;
+						errors[event.id] = eventErrors;
 					}
 				});
 			}
@@ -307,15 +333,15 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 
 		// Handle event form response changes
 		const handleEventFormResponseChange = (
-			eventId: string,
+			connectionId: string,
 			fieldId: string,
 			fieldType: string,
 			value: any,
 		) => {
 			setConnectedEventResponses((prev) => ({
 				...prev,
-				[eventId]: {
-					...(prev[eventId] || {}),
+				[connectionId]: {
+					...(prev[connectionId] || {}),
 					[fieldId]: value,
 				},
 			}));
@@ -331,7 +357,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 					if (newFiles.length > 0) {
 						setFilesToUpload((prev) => ({
 							...prev,
-							[`event_${eventId}_${fieldId}`]: newFiles,
+							[`event_${connectionId}_${fieldId}`]: newFiles,
 						}));
 					}
 				}
@@ -499,13 +525,17 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 						pausedSeconds: pauseDuration,
 						formResponses: updatedFormResponses,
 					},
+					/*
+					 * `title` is what is on screen, not the snapshot it was
+					 * loaded from — reading `eventTitleSnapshot` here meant a
+					 * retitled connection saved under its old name, so editing
+					 * the title did nothing at all.
+					 */
 					connections: localConnectedEvents.map((event) => ({
-						eventId: event.eventId,
-						title:
-							event.eventTitleSnapshot ?? event.customTitle ?? "",
+						eventId: event.eventId ?? null,
+						title: event.title ?? "",
 						userId: timeEntry.userId,
-						formResponses:
-							connectedEventResponses[event.eventId] || {},
+						formResponses: connectedEventResponses[event.id] || {},
 					})),
 					edit: {
 						summary: editChangeSummary,
@@ -565,39 +595,44 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 
 		// Add this inside the EditSheet component
 		const handleAddConnectedEvent = () => {
-			const newEventId = `new-event-${Date.now()}`;
-			const newEvent = {
-				eventId: newEventId,
-				eventTitle: "New Event",
-				formResponses: {},
-			};
+			/*
+			 * eventId stays NULL: this is an ad-hoc job the worker is typing
+			 * in, not a link to a real event.
+			 *
+			 * It used to be given a made-up `new-event-<ts>` id, which
+			 * setConnections took for a genuine event reference — it wrote the
+			 * connection under that fake document id with `customTitle: null`,
+			 * so the row was neither resolvable as an event nor recognisable as
+			 * ad-hoc by the `custom_` checks downstream.
+			 */
+			const id = `custom_new_${Date.now()}`;
 
-			setLocalConnectedEvents((prev) => [...prev, newEvent]);
-			setConnectedEventResponses((prev) => ({
+			setLocalConnectedEvents((prev) => [
 				...prev,
-				[newEventId]: {},
-			}));
+				{ id, eventId: null, title: "" },
+			]);
+			setConnectedEventResponses((prev) => ({ ...prev, [id]: {} }));
 		};
 
-		const handleDeleteConnectedEvent = (eventId) => {
+		const handleDeleteConnectedEvent = (connectionId) => {
 			// Filter out the event to be deleted
 			setLocalConnectedEvents((prev) =>
-				prev.filter((event) => event.eventId !== eventId),
+				prev.filter((event) => event.id !== connectionId),
 			);
 
 			// Remove form responses for this event
 			setConnectedEventResponses((prev) => {
 				const updatedResponses = { ...prev };
-				delete updatedResponses[eventId];
+				delete updatedResponses[connectionId];
 				return updatedResponses;
 			});
 		};
 
-		const handleEventTitleChange = (eventId, newTitle) => {
+		const handleEventTitleChange = (connectionId, newTitle) => {
 			setLocalConnectedEvents((prev) =>
 				prev.map((event) =>
-					event.eventId === eventId
-						? { ...event, eventTitle: newTitle }
+					event.id === connectionId
+						? { ...event, title: newTitle }
 						: event,
 				),
 			);
@@ -659,6 +694,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 									open={showInPicker}
 									date={clockInDate}
 									mode="datetime"
+									theme={pickerTheme}
 									onConfirm={(date) => {
 										setShowInPicker(false);
 										setClockInDate(date);
@@ -702,6 +738,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 									open={showOutPicker}
 									date={clockOutDate}
 									mode="datetime"
+									theme={pickerTheme}
 									onConfirm={(date) => {
 										setShowOutPicker(false);
 										setClockOutDate(date);
@@ -783,6 +820,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 								style={styles.modalTextArea}
 								multiline
 								numberOfLines={4}
+								placeholderTextColor={theme.colors.textTertiary}
 								placeholder="Enter notes for this time entry"
 								value={editNotes}
 								onChangeText={setEditNotes}
@@ -796,9 +834,9 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 									Connected Events
 								</Text>
 
-								{localConnectedEvents.map((event, index) => (
+								{localConnectedEvents.map((event) => (
 									<View
-										key={event.eventId || index}
+										key={event.id}
 										style={styles.formSection}
 									>
 										<View
@@ -820,15 +858,16 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 													style={
 														styles.eventTitleInput
 													}
-													value={
-														event.eventTitle ??
-														"Connected Event"
-													} // Change || to ??
+													value={event.title}
 													onChangeText={(text) =>
 														handleEventTitleChange(
-															event.eventId,
+															event.id,
 															text,
 														)
+													}
+													placeholderTextColor={
+														theme.colors
+															.textTertiary
 													}
 													placeholder="Event Title"
 												/>
@@ -843,7 +882,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 													}
 													onPress={() =>
 														handleDeleteConnectedEvent(
-															event.eventId,
+															event.id,
 														)
 													}
 												>
@@ -863,13 +902,11 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 											customForm={eventFormState}
 											formResponses={
 												connectedEventResponses[
-													event.eventId
+													event.id
 												] || {}
 											}
 											formErrors={
-												eventFormErrors[
-													event.eventId
-												] || {}
+												eventFormErrors[event.id] || {}
 											}
 											onFieldChange={(
 												fieldId,
@@ -877,7 +914,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 												value,
 											) =>
 												handleEventFormResponseChange(
-													event.eventId,
+													event.id,
 													fieldId,
 													fieldType,
 													value,
@@ -948,6 +985,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 								style={styles.modalTextArea}
 								multiline
 								numberOfLines={3}
+								placeholderTextColor={theme.colors.textTertiary}
 								placeholder="Required: Explain what changes were made and why"
 								value={editChangeSummary}
 								onChangeText={setEditChangeSummary}

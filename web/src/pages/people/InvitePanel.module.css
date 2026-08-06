@@ -1,0 +1,85 @@
+.wrap {
+	position: relative;
+	flex-shrink: 0;
+}
+
+.backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 40;
+}
+
+.panel {
+	position: absolute;
+	top: calc(100% + var(--sp-sm));
+	right: 0;
+	z-index: 41;
+	width: 340px;
+	max-height: 70vh;
+	overflow-y: auto;
+	background: var(--c-surface-raised);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-lg);
+	box-shadow: var(--e-floating);
+	padding: var(--sp-lg);
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-sm);
+}
+
+.code {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-md);
+	width: 100%;
+	padding: var(--sp-md);
+	background: var(--c-surface-sunken);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-md);
+	color: var(--c-text);
+	margin-bottom: var(--sp-md);
+	min-height: var(--hit-target);
+	text-align: left;
+}
+
+.code:hover {
+	border-color: var(--c-accent-border);
+	background: var(--c-accent-subtle);
+}
+
+/* Codes are read aloud and typed by hand — monospace and generously tracked
+   so O and 0 stay distinguishable. */
+.codeValue {
+	flex: 1;
+	font-family: var(--font-mono);
+	font-size: 20px;
+	font-weight: 600;
+	letter-spacing: 2px;
+}
+
+.codeValueSmall {
+	font-family: var(--font-mono);
+	font-size: 15px;
+	font-weight: 600;
+	letter-spacing: 1px;
+	flex-shrink: 0;
+}
+
+.groupCodes {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-xs);
+}
+
+.groupCodes .code {
+	margin-bottom: 0;
+}
+
+.groupName {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	align-items: flex-start;
+}

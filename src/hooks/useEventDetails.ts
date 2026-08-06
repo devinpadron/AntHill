@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+	acknowledgeAssignment,
+	flagAssignmentProblem,
 	setEventResponse,
 	subscribeEvent,
-	subscribeEventResponses,
+	subscribeEventResponseDocs,
 	updateEvent,
 } from "../services/eventService";
 import { subscribeAttachments } from "../services/attachmentService";
@@ -14,6 +16,7 @@ import {
 import {
 	Attachment,
 	Event,
+	EventResponse,
 	EventResponseStatus,
 	Checklist,
 	EventLabel,
@@ -47,7 +50,9 @@ export function useEventDetails(eventId: string) {
 	const [packages, setPackages] = useState<
 		(Package & { checklists: Checklist[] })[]
 	>([]);
-	const [responses, setResponses] = useState<Record<string, string>>({});
+	const [responseDocs, setResponseDocs] = useState<
+		Record<string, EventResponse>
+	>({});
 	const [labels, setLabels] = useState<EventLabel[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 
@@ -83,7 +88,7 @@ export function useEventDetails(eventId: string) {
 
 	useEffect(() => {
 		if (!companyId || !eventId) return;
-		return subscribeEventResponses(companyId, eventId, setResponses);
+		return subscribeEventResponseDocs(companyId, eventId, setResponseDocs);
 	}, [companyId, eventId]);
 
 	// One batched query, keyed on the id list rather than the array identity.
@@ -166,7 +171,62 @@ export function useEventDetails(eventId: string) {
 			event?.assignedUserIds?.includes(userId)),
 	);
 
+	/*
+	 * The flattened status map the roster UI already consumes, derived from the
+	 * full documents rather than fetched separately — one listener, both shapes.
+	 */
+	const responses = useMemo(() => {
+		const byUser: Record<string, string> = {};
+		for (const [id, doc] of Object.entries(responseDocs)) {
+			byUser[id] = doc.status;
+		}
+		return byUser;
+	}, [responseDocs]);
+
 	const myResponse = (responses[userId] ?? "pending") as EventResponseStatus;
+
+	/*
+	 * ACKNOWLEDGEMENT — a different question from myResponse above.
+	 *
+	 *   myResponse       "can you work this?"     asked before assignment
+	 *   myAcknowledgement "I see I am working it"  asked after
+	 *
+	 * Only meaningful when this user is actually on the crew; someone merely
+	 * invited has nothing to acknowledge yet.
+	 */
+	const amAssigned = Boolean(event?.assignedUserIds?.includes(userId));
+	const myDoc = responseDocs[userId];
+	const myAcknowledgement = {
+		required: amAssigned && !isAdmin,
+		acknowledged: Boolean(myDoc?.acknowledgedAt),
+		problem: myDoc?.problemFlaggedAt
+			? {
+					at: myDoc.problemFlaggedAt.toDate?.() ?? null,
+					note: myDoc.problemNote ?? null,
+				}
+			: null,
+		/** Whether the company lets a worker say they cannot make it. */
+		canFlagProblem: Boolean(preferences.allowAssignmentDecline),
+	};
+
+	const acknowledge = useCallback(async () => {
+		if (!companyId || !event) return;
+		await acknowledgeAssignment(companyId, event.id, userId, event.dateKey);
+	}, [companyId, event, userId]);
+
+	const flagProblem = useCallback(
+		async (note: string) => {
+			if (!companyId || !event) return;
+			await flagAssignmentProblem(
+				companyId,
+				event.id,
+				userId,
+				event.dateKey,
+				note,
+			);
+		},
+		[companyId, event, userId],
+	);
 
 	return {
 		user,
@@ -175,6 +235,9 @@ export function useEventDetails(eventId: string) {
 		packages,
 		eventLabel,
 		responses,
+		myAcknowledgement,
+		acknowledge,
+		flagProblem,
 		myResponse,
 		workerNames,
 		workerList,

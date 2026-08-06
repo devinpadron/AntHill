@@ -37,6 +37,7 @@ export const customFormStyles = (theme: Theme) =>
 			fontWeight: "bold",
 		},
 		textInput: {
+			color: theme.colors.text,
 			height: 44,
 			borderWidth: 1,
 			borderColor: theme.colors.border,
@@ -73,6 +74,27 @@ export const customFormStyles = (theme: Theme) =>
 			shadowOffset: { width: 0, height: 2 },
 			shadowOpacity: 0.2,
 			shadowRadius: 3,
+		},
+		/*
+		 * DropDownPicker styles its BOX from `style` but its TEXT from separate
+		 * props, and those default to black whatever the surface underneath is
+		 * doing. Naming the box dark without naming the label was what left
+		 * black-on-dark selects in every form.
+		 */
+		dropdownText: {
+			fontSize: 16,
+			color: theme.colors.text,
+		},
+		dropdownPlaceholder: {
+			fontSize: 16,
+			color: theme.colors.textTertiary,
+		},
+		dropdownSelectedText: {
+			color: theme.colors.accent,
+			fontWeight: "600" as const,
+		},
+		dropdownIcon: {
+			tintColor: theme.colors.textSecondary,
 		},
 		dateButton: {
 			flexDirection: "row",
@@ -136,6 +158,7 @@ export const customFormStyles = (theme: Theme) =>
 			paddingHorizontal: 2,
 		},
 		expandableInput: {
+			color: theme.colors.text,
 			minHeight: 48,
 			borderWidth: 1,
 			borderColor: theme.colors.border,

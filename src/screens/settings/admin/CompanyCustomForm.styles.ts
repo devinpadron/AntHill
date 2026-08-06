@@ -237,6 +237,16 @@ export const customFormStyles = (theme: Theme) =>
 			height: 48,
 			backgroundColor: theme.colors.surface,
 		},
+		/* DropDownPicker takes its label colors from separate props, and those
+		   default to black however dark the box behind them is. */
+		dropdownText: {
+			fontSize: 16,
+			color: theme.colors.text,
+		},
+		dropdownPlaceholder: {
+			fontSize: 16,
+			color: theme.colors.textTertiary,
+		},
 		dropdownList: {
 			borderColor: theme.colors.border,
 			backgroundColor: theme.colors.surface,

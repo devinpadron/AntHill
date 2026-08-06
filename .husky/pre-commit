@@ -6,3 +6,18 @@ git add -A .
 # there is no jest config and no test file with anything in it. tsc is what
 # actually catches a broken import or a renamed field.
 npm run --silent typecheck
+
+# The web portal compiles under its OWN tsconfig — the root one excludes web/,
+# because expo/tsconfig.base sets jsx: "react-native" and would reject every
+# .tsx in there. This is also what type-checks the shim against the real
+# services: web/tsconfig.json's `paths` point the @react-native-firebase/*
+# specifiers at src/shim/, so a drift between a service and the adapter surfaces
+# here rather than at runtime in the browser.
+if [ -d web/node_modules ]; then
+	npm --prefix web run --silent typecheck
+
+	# Icon.tsx renders nothing for a name that was never vendored, so a typo is
+	# a silently missing glyph rather than an error. tsc cannot see it — the
+	# names are plain strings.
+	(cd web && node scripts/check-icons.mjs)
+fi

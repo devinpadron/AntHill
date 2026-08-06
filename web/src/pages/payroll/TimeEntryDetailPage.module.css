@@ -1,0 +1,229 @@
+.page {
+	padding: var(--sp-xl);
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-lg);
+	max-width: 1600px;
+}
+
+.header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--sp-lg);
+	flex-wrap: wrap;
+}
+.headerMain {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-xs);
+	min-width: 0;
+}
+.title {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-md);
+}
+
+.back {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--sp-xs);
+	color: var(--c-text-secondary);
+	font: var(--t-label);
+	align-self: flex-start;
+}
+.back:hover {
+	color: var(--c-accent);
+}
+
+.actions {
+	display: flex;
+	gap: var(--sp-sm);
+	flex-shrink: 0;
+	flex-wrap: wrap;
+}
+
+/* Facts | submitted | history. Reconciling all three is the whole job. */
+.columns {
+	display: grid;
+	grid-template-columns: minmax(280px, 1fr) minmax(0, 1.6fr) minmax(
+			300px,
+			1fr
+		);
+	gap: var(--sp-lg);
+	align-items: start;
+}
+.left,
+.center,
+.right {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-lg);
+	min-width: 0;
+}
+
+.facts {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-sm);
+	margin: 0;
+}
+.fact {
+	display: grid;
+	grid-template-columns: 100px 1fr;
+	align-items: baseline;
+	gap: var(--sp-md);
+}
+.fact dd {
+	margin: 0;
+}
+
+.quote {
+	padding: var(--sp-md);
+	background: var(--c-surface-sunken);
+	border-radius: var(--r-md);
+	border-left: 3px solid var(--c-border-strong);
+	margin-top: var(--sp-md);
+}
+
+.warnBox {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--sp-sm);
+	padding: var(--sp-md);
+	background: var(--c-warning-subtle);
+	color: var(--c-warning);
+	border-radius: var(--r-md);
+	margin-bottom: var(--sp-md);
+}
+
+/* ---- timeline bar ---- */
+.timelineWrap {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-xs);
+	margin-bottom: var(--sp-lg);
+}
+.bar {
+	display: flex;
+	height: 12px;
+	border-radius: var(--r-pill);
+	overflow: hidden;
+	background: var(--c-surface-sunken);
+}
+.worked {
+	background: var(--c-accent);
+}
+.paused {
+	background: repeating-linear-gradient(
+		45deg,
+		var(--c-warning) 0 3px,
+		transparent 3px 6px
+	);
+	background-color: var(--c-warning-subtle);
+}
+.barLabels {
+	display: flex;
+	justify-content: space-between;
+}
+
+/* ---- connections ---- */
+.connections {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-lg);
+}
+.connection {
+	padding: var(--sp-md);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-md);
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-sm);
+}
+.connectionHead {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-sm);
+}
+.dim {
+	color: var(--c-text-tertiary);
+	flex-shrink: 0;
+}
+
+/* ---- edit history ---- */
+.timeline {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-lg);
+}
+.editItem {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	padding-left: var(--sp-md);
+	border-left: 2px solid var(--c-border);
+	position: relative;
+}
+.editItem::before {
+	content: "";
+	position: absolute;
+	left: -5px;
+	top: 6px;
+	width: 8px;
+	height: 8px;
+	border-radius: var(--r-pill);
+	background: var(--c-border-strong);
+}
+.editHead {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-sm);
+}
+
+.diff {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin-top: var(--sp-xs);
+	padding: var(--sp-sm);
+	background: var(--c-surface-sunken);
+	border-radius: var(--r-sm);
+}
+.diffRow {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-sm);
+	font: var(--t-caption);
+}
+.diffRow > *:first-child {
+	width: 52px;
+	flex-shrink: 0;
+}
+.diffBefore {
+	color: var(--c-danger);
+	text-decoration: line-through;
+	font-variant-numeric: tabular-nums;
+}
+.diffAfter {
+	color: var(--c-success);
+	font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1500px) {
+	.columns {
+		grid-template-columns: minmax(280px, 1fr) minmax(0, 1.6fr);
+	}
+	.right {
+		grid-column: 1 / -1;
+	}
+}
+@media (max-width: 1000px) {
+	.columns {
+		grid-template-columns: 1fr;
+	}
+	.right {
+		grid-column: auto;
+	}
+}

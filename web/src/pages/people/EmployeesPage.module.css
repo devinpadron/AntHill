@@ -1,0 +1,95 @@
+/*
+ * Two columns: the roster fills the page, the detail drawer takes a fixed
+ * width beside it. The table keeps its own scroll so the drawer and the
+ * filter bar stay put while it moves.
+ */
+.page {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	grid-template-rows: auto auto 1fr;
+	grid-template-areas:
+		"header header"
+		"filters filters"
+		"table drawer";
+	gap: var(--sp-lg);
+	padding: var(--sp-xl);
+	height: 100%;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.header {
+	grid-area: header;
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--sp-lg);
+}
+
+.filters {
+	grid-area: filters;
+	display: flex;
+	align-items: center;
+	gap: var(--sp-sm);
+	flex-wrap: wrap;
+}
+
+.search {
+	min-width: 260px;
+}
+
+.tableCard {
+	grid-area: table;
+	min-height: 0;
+	min-width: 0;
+}
+
+.nameCell {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-sm);
+	min-width: 0;
+}
+
+.chips {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--sp-xs);
+	min-width: 0;
+}
+
+.link {
+	color: var(--c-text);
+	text-decoration: none;
+}
+
+.link:hover {
+	color: var(--c-accent);
+	text-decoration: underline;
+}
+
+.rowAction {
+	display: grid;
+	place-items: center;
+	width: 26px;
+	height: 26px;
+	border-radius: var(--r-sm);
+	color: var(--c-text-tertiary);
+	margin-left: auto;
+}
+
+.rowAction:hover {
+	background: var(--c-surface-sunken);
+	color: var(--c-text);
+}
+
+/* Below a comfortable desktop the drawer stops competing for width. */
+@media (max-width: 1400px) {
+	.page {
+		grid-template-columns: 1fr;
+		grid-template-areas:
+			"header"
+			"filters"
+			"table";
+	}
+}

@@ -1,0 +1,118 @@
+.scrim {
+	position: fixed;
+	inset: 0;
+	z-index: 200;
+	background: var(--c-overlay);
+	display: grid;
+	place-items: center;
+	padding: var(--sp-lg);
+}
+
+.sheet {
+	width: min(680px, 100%);
+	max-height: 90vh;
+	display: flex;
+	flex-direction: column;
+	background: var(--c-surface-raised);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-lg);
+	box-shadow: var(--e-floating);
+	overflow: hidden;
+}
+
+.header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: var(--sp-lg);
+	border-bottom: 1px solid var(--c-border);
+}
+
+.close {
+	display: grid;
+	place-items: center;
+	width: 28px;
+	height: 28px;
+	border-radius: var(--r-sm);
+	color: var(--c-text-tertiary);
+}
+.close:hover {
+	background: var(--c-surface-sunken);
+	color: var(--c-text);
+}
+
+.body {
+	flex: 1;
+	overflow-y: auto;
+	min-height: 0;
+	padding: var(--sp-lg);
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-xl);
+}
+
+.section {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-md);
+}
+
+.row {
+	display: flex;
+	gap: var(--sp-md);
+	align-items: flex-end;
+	flex-wrap: wrap;
+}
+.row > * {
+	flex: 1;
+	min-width: 160px;
+}
+
+/* The number the manager is actually deciding about. */
+.total {
+	display: flex;
+	flex-direction: column;
+	padding: var(--sp-sm) var(--sp-md);
+	background: var(--c-accent-subtle);
+	border-radius: var(--r-md);
+	min-height: var(--hit-target);
+	justify-content: center;
+}
+
+.checkRow {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-sm);
+	padding: var(--sp-sm);
+	border-radius: var(--r-sm);
+	cursor: pointer;
+	min-height: 36px;
+}
+.checkRow:hover {
+	background: var(--c-surface-sunken);
+}
+.checkRow input {
+	accent-color: var(--c-accent);
+	cursor: pointer;
+}
+
+.checklistField {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-xs);
+}
+
+.readOnly {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-xs);
+}
+
+.footer {
+	display: flex;
+	justify-content: flex-end;
+	gap: var(--sp-sm);
+	padding: var(--sp-md) var(--sp-lg);
+	border-top: 1px solid var(--c-border);
+	background: var(--c-surface);
+}
