@@ -9,7 +9,7 @@ import AvailabilityStack from "./AvailabilityStack";
 import { useCompany } from "../contexts/CompanyContext";
 import { Icon, IconName } from "../components/ui";
 import { useCompanySwitcher } from "../components/company/CompanySwitcher";
-import { useUnacknowledgedShifts } from "../hooks/useUnacknowledgedShifts";
+import { useEventPrompts } from "../hooks/useEventPrompts";
 import { haptics, useTheme } from "../theme";
 
 /*
@@ -53,7 +53,7 @@ const HomeTabs = () => {
 	const switcher = useCompanySwitcher();
 	const theme = useTheme();
 	const insets = useSafeAreaInsets();
-	const { count: unacknowledged } = useUnacknowledgedShifts();
+	const { unconfirmedCount, awaitingReply } = useEventPrompts();
 
 	return (
 		<Tab.Navigator
@@ -94,7 +94,7 @@ const HomeTabs = () => {
 					 * Undefined (not 0) when there are none: react-navigation
 					 * renders a dot for 0.
 					 */
-					tabBarBadge: unacknowledged || undefined,
+					tabBarBadge: unconfirmedCount || undefined,
 					tabBarBadgeStyle: {
 						backgroundColor: theme.colors.danger,
 						color: theme.colors.textInverse,
@@ -110,6 +110,18 @@ const HomeTabs = () => {
 					options={{
 						tabBarAccessibilityLabel: "Availability",
 						tabBarIcon: icon("people", "people-outline"),
+						/*
+						 * Invitations still unanswered. Accent rather than the
+						 * Calendar badge's danger red: an unanswered invitation
+						 * is work waiting, while an unconfirmed shift is
+						 * something already promised on your behalf.
+						 */
+						tabBarBadge: awaitingReply || undefined,
+						tabBarBadgeStyle: {
+							backgroundColor: theme.colors.accent,
+							color: theme.colors.onAccent,
+							fontSize: 11,
+						},
 					}}
 				/>
 			)}

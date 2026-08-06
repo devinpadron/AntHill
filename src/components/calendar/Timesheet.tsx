@@ -19,6 +19,7 @@ import BottomSheet from "@gorhom/bottom-sheet";
 import { useUser } from "../../contexts/UserContext";
 import { useCompany } from "../../contexts/CompanyContext";
 import { useCalendarEvents } from "../../hooks/useCalendarEvents";
+import { useEventPrompts } from "../../hooks/useEventPrompts";
 import { FilterType } from "../../types";
 import {
 	Badge,
@@ -93,6 +94,7 @@ export default function Timesheet(props: Props) {
 	const styles = useThemedStyles(timesheetStyles);
 	const { userId, companyId, user } = useUser();
 	const { company } = useCompany();
+	const { unconfirmedIds } = useEventPrompts();
 
 	// A selected date anchors the window, so picking a month far away loads
 	// that month rather than returning nothing.
@@ -356,6 +358,14 @@ export default function Timesheet(props: Props) {
 
 	const renderEntry = (entry: Entry) => {
 		const isPast = moment(entry.date).isBefore(moment().startOf("day"));
+		/*
+		 * Assigned to this worker and not yet confirmed.
+		 *
+		 * The Calendar tab badge already says how many there are; this says
+		 * WHICH, so someone opening the list to clear the badge can see where
+		 * to go instead of tapping through every shift in the week.
+		 */
+		const needsConfirming = unconfirmedIds.has(entry.id);
 
 		return (
 			<Pressable
@@ -365,7 +375,9 @@ export default function Timesheet(props: Props) {
 				}
 				scaleOnPress={false}
 				haptic="tap"
-				accessibilityLabel={`${entry.title}, ${entry.description || "all day"}`}
+				accessibilityLabel={`${entry.title}, ${entry.description || "all day"}${
+					needsConfirming ? ", not yet confirmed" : ""
+				}`}
 				style={[styles.entryCard, isPast && styles.past]}
 			>
 				{/*
@@ -384,9 +396,22 @@ export default function Timesheet(props: Props) {
 				/>
 
 				<View style={styles.entryContent}>
-					<Text variant="bodyStrong" numberOfLines={2}>
-						{entry.title}
-					</Text>
+					<View style={styles.entryTitleRow}>
+						<Text
+							variant="bodyStrong"
+							numberOfLines={2}
+							style={styles.flex}
+						>
+							{entry.title}
+						</Text>
+						{needsConfirming && (
+							<Badge
+								label="Confirm"
+								tone="warning"
+								icon="alert-circle"
+							/>
+						)}
+					</View>
 
 					<View style={styles.entryMeta}>
 						<Text variant="caption" color="textSecondary">
@@ -772,6 +797,14 @@ const timesheetStyles = (theme: Theme) =>
 		entryContent: {
 			flex: 1,
 			padding: theme.spacing.md,
+		},
+		entryTitleRow: {
+			flexDirection: "row",
+			alignItems: "flex-start",
+			gap: theme.spacing.sm,
+		},
+		flex: {
+			flex: 1,
 		},
 		entryMeta: {
 			flexDirection: "row",
