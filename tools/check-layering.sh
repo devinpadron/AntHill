@@ -147,6 +147,38 @@ if [ -n "$badExists" ]; then
 	status=1
 fi
 
+# --- 7. The same boundary, on the web portal --------------------------------
+#
+# Rule 1 keeps Firestore behind the service layer in the app. web/ needs the
+# same line, for the same reason: the portal reuses src/services verbatim, and
+# a page that reaches past them starts a second, divergent data layer.
+#
+# Scoped to web/src and exempt in three places:
+#   web/src/shim/**   IS the Firestore binding — it exists to hold the SDK
+#   web/src/contexts/UploadContext.tsx   Storage has no service; RNFirebase's
+#                                        putFile(uri) has no browser analogue,
+#                                        so this owns uploadBytesResumable
+#   web/src/lib/shimConformance.ts       the shim's own test, which has to hold
+#                                        the db handle to exercise it
+#
+# Separate block from rule 1 on purpose: that one's `find src` must keep
+# meaning src/, not "anything named src".
+if [ -d web/src ]; then
+	webViolations=$(
+		find web/src \( -name '*.ts' -o -name '*.tsx' \) \
+			-not -path 'web/src/shim/*' \
+			-not -path 'web/src/contexts/UploadContext.tsx' \
+			-not -path 'web/src/lib/shimConformance.ts' \
+			-print0 2>/dev/null \
+			| xargs -0 grep -lE "from \"firebase/(firestore|storage)\"|@app/lib/db" 2>/dev/null \
+			| sed "s|^\./||" | sort || true
+	)
+	for file in $webViolations; do
+		echo "LAYERING: $file reaches Firestore directly — go through a service in src/services."
+		status=1
+	done
+fi
+
 if [ "$status" -eq 0 ]; then
 	echo "Layering OK."
 fi

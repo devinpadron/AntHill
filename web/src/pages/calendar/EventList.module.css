@@ -1,0 +1,86 @@
+.date {
+	display: inline-flex;
+	align-items: baseline;
+	gap: var(--sp-xs);
+	font-variant-numeric: tabular-nums;
+}
+
+.weekday {
+	color: var(--c-text-tertiary);
+	font-size: 11px;
+	text-transform: uppercase;
+}
+
+.time {
+	font-variant-numeric: tabular-nums;
+	color: var(--c-text-secondary);
+}
+
+.titleCell {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--sp-sm);
+	min-width: 0;
+}
+
+/* The event label's user-chosen colour, as a dot rather than a chip — at row
+   density a chip would dominate the line. */
+.labelDot {
+	width: 8px;
+	height: 8px;
+	border-radius: var(--r-pill);
+	flex-shrink: 0;
+}
+
+.location {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--sp-xs);
+	min-width: 0;
+}
+
+.dim {
+	color: var(--c-text-tertiary);
+}
+
+.numeric {
+	font-variant-numeric: tabular-nums;
+}
+
+/* Zero assigned is what an admin is scanning for — it should catch the eye. */
+.numericAlert {
+	font-variant-numeric: tabular-nums;
+	color: var(--c-danger);
+	font-weight: 600;
+}
+
+.responses {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--sp-sm);
+}
+
+.responseNumbers {
+	display: inline-flex;
+	gap: var(--sp-xs);
+	font-variant-numeric: tabular-nums;
+	font-size: 11px;
+}
+
+.ok {
+	color: var(--c-success);
+}
+
+.wait {
+	color: var(--c-warning);
+}
+
+.no {
+	color: var(--c-danger);
+}
+
+.audience {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--sp-xs);
+}

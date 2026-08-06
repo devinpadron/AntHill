@@ -1,0 +1,153 @@
+.page {
+	padding: var(--sp-xl);
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-lg);
+	max-width: 1200px;
+}
+.grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+	gap: var(--sp-lg);
+	align-items: start;
+}
+
+.facts {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-sm);
+	margin: 0 0 var(--sp-lg);
+}
+.fact {
+	display: grid;
+	grid-template-columns: 96px 1fr;
+	align-items: baseline;
+	gap: var(--sp-md);
+	min-width: 0;
+}
+.fact dd {
+	margin: 0;
+	min-width: 0;
+}
+
+.codeBlock {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-xs);
+	padding-top: var(--sp-md);
+	border-top: 1px solid var(--c-border);
+}
+.code {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-md);
+	padding: var(--sp-md);
+	margin-top: var(--sp-xs);
+	background: var(--c-surface-sunken);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-md);
+	color: var(--c-text);
+	min-height: var(--hit-target);
+}
+.code:hover {
+	border-color: var(--c-accent-border);
+	background: var(--c-accent-subtle);
+}
+.codeValue {
+	flex: 1;
+	font-family: var(--font-mono);
+	font-size: 20px;
+	font-weight: 600;
+	letter-spacing: 2px;
+	text-align: left;
+}
+
+.choiceRow {
+	display: flex;
+	gap: var(--sp-sm);
+	margin: var(--sp-md) 0;
+}
+.choice {
+	flex: 1;
+	padding: var(--sp-md);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-md);
+	color: var(--c-text-secondary);
+}
+.choice:hover {
+	border-color: var(--c-border-strong);
+}
+.choiceActive {
+	border-color: var(--c-accent);
+	background: var(--c-accent-subtle);
+	color: var(--c-accent);
+}
+
+.preview {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-sm);
+	padding: var(--sp-md);
+	border-radius: var(--r-md);
+	background: var(--c-accent-subtle);
+	color: var(--c-accent);
+}
+
+/* Each toggle carries its consequence, so the row is tall by design. */
+.toggleRow {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--sp-md);
+	padding: var(--sp-md) 0;
+	cursor: pointer;
+	border-bottom: 1px solid var(--c-border);
+}
+.toggleRow:last-child {
+	border-bottom: none;
+}
+.toggleRow input {
+	accent-color: var(--c-accent);
+	cursor: pointer;
+	margin-top: 3px;
+	width: 16px;
+	height: 16px;
+}
+.toggleText {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.durationRow {
+	display: flex;
+	gap: var(--sp-md);
+	margin: var(--sp-md) 0;
+}
+.durationRow > * {
+	flex: 1;
+}
+
+.schemaRow {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--sp-md);
+	padding: var(--sp-md);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-md);
+	margin-top: var(--sp-sm);
+	color: var(--c-text);
+	text-decoration: none;
+	min-height: var(--hit-target);
+}
+.schemaRow:hover {
+	background: var(--c-surface-sunken);
+	border-color: var(--c-accent-border);
+	text-decoration: none;
+}
+.schemaMain {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-sm);
+}

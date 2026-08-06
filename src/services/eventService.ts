@@ -2,7 +2,7 @@ import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
 import firestore from "@react-native-firebase/firestore";
 import db from "../lib/db";
 import { C, eventResponseId } from "../constants/paths";
-import { Event, WorkerVisibility } from "../types";
+import { Event, EventResponse, WorkerVisibility } from "../types";
 import { FilterType } from "../types/enums/FilterType";
 import { getMembersInGroups } from "./groupService";
 
@@ -316,6 +316,25 @@ export async function createEvent(
 		}
 	}
 
+	/*
+	 * Anyone assigned at creation needs a record to acknowledge against.
+	 *
+	 * Best-effort rather than fatal, unlike the audience above: a missing
+	 * invitation means a worker never learns the job exists, but a missing
+	 * acknowledgement record only means they are not yet prompted, and the
+	 * event still shows in their upcoming list. Re-saving repairs it.
+	 */
+	if (assignedUserIds.length) {
+		await ensureAssignmentRecords(
+			companyId,
+			ref.id,
+			(input.dateKey as string) ?? "",
+			assignedUserIds,
+		).catch((e) =>
+			console.error("Assignment records not created for new event", e),
+		);
+	}
+
 	return ref.id;
 }
 
@@ -360,6 +379,34 @@ export async function updateEvent(
 	} catch (e) {
 		console.error("Error updating event", e);
 		throw e;
+	}
+
+	/*
+	 * Newly assigned workers need a record to acknowledge against. Only when
+	 * the patch actually touches the crew — an edit to the title must not
+	 * write eventResponses.
+	 *
+	 * `dateKey` may not be in the patch, so it is read back when needed rather
+	 * than assumed; a record stamped with the wrong day would drop out of the
+	 * worker's `dateKey >=` query and be invisible.
+	 */
+	if (patch.assignedUserIds?.length) {
+		try {
+			// One read. companyId is never in the patch, and dateKey only
+			// sometimes is, so the saved document is the reliable source for
+			// both.
+			const saved = await getEvent(eventId);
+			if (saved?.companyId && saved.dateKey) {
+				await ensureAssignmentRecords(
+					saved.companyId,
+					eventId,
+					saved.dateKey,
+					patch.assignedUserIds,
+				);
+			}
+		} catch (e) {
+			console.error("Assignment records not updated", e);
+		}
 	}
 }
 
@@ -423,6 +470,184 @@ export async function deleteEvent(
  * declined keeps their response, because that answer is real information a
  * manager may be looking at.
  */
+/**
+ * Makes sure every ASSIGNED worker has an eventResponses document.
+ *
+ * Until this existed, that document was created only for the audience — the
+ * people who were ASKED. Someone merely assigned had none, which had two
+ * consequences:
+ *
+ *   1. `responseCounts.pending` counted them (createEvent seeds it from
+ *      assignedUserIds.length) while no document backed the count, so an event
+ *      could report "5 awaiting reply" that nobody could ever answer.
+ *   2. There was nowhere to record that they had SEEN the assignment.
+ *
+ * Records created here start with `status: "pending"` and a null
+ * `acknowledgedAt`. The status is not a question being asked — assignment is
+ * not an invitation — it is just the neutral value; what matters on these is
+ * the acknowledgement.
+ *
+ * Existing documents are left completely alone. Someone who already answered
+ * the availability question keeps their answer when they are later assigned.
+ */
+export async function ensureAssignmentRecords(
+	companyId: string,
+	eventId: string,
+	dateKey: string,
+	assignedUserIds: string[],
+): Promise<void> {
+	if (!assignedUserIds.length) return;
+
+	try {
+		const existing = await db
+			.collection(C.eventResponses)
+			.where("companyId", "==", companyId)
+			.where("eventId", "==", eventId)
+			.limit(DEFAULT_LIMIT)
+			.get();
+
+		const known = new Set(
+			existing.docs.map((doc) => doc.data().userId as string),
+		);
+
+		const batch = db.batch();
+		const now = firestore.FieldValue.serverTimestamp();
+		let writes = 0;
+
+		for (const userId of new Set(assignedUserIds.filter(Boolean))) {
+			if (known.has(userId)) continue;
+			const id = eventResponseId(eventId, userId);
+			batch.set(db.collection(C.eventResponses).doc(id), {
+				id,
+				companyId,
+				eventId,
+				userId,
+				dateKey,
+				status: "pending",
+				respondedAt: null,
+				acknowledgedAt: null,
+				problemFlaggedAt: null,
+				problemNote: null,
+				updatedAt: now,
+				schemaVersion: 2,
+			});
+			writes += 1;
+		}
+
+		if (writes) await batch.commit();
+	} catch (e) {
+		console.error("Error ensuring assignment records", e);
+		throw e;
+	}
+}
+
+/**
+ * "I have seen that I am working this."
+ *
+ * Separate from setEventResponse, which answers the availability question.
+ * Clearing a previously flagged problem is deliberate: acknowledging is how a
+ * worker withdraws a flag they raised by mistake.
+ */
+export async function acknowledgeAssignment(
+	companyId: string,
+	eventId: string,
+	userId: string,
+	dateKey: string,
+): Promise<void> {
+	const id = eventResponseId(eventId, userId);
+	try {
+		await db
+			.collection(C.eventResponses)
+			.doc(id)
+			.set(
+				{
+					id,
+					companyId,
+					eventId,
+					userId,
+					dateKey,
+					acknowledgedAt: firestore.FieldValue.serverTimestamp(),
+					problemFlaggedAt: null,
+					problemNote: null,
+					updatedAt: firestore.FieldValue.serverTimestamp(),
+					schemaVersion: 2,
+				},
+				// mergeFields, so acknowledging never disturbs `status` — the
+				// availability answer and the acknowledgement are independent.
+				{
+					mergeFields: [
+						"id",
+						"companyId",
+						"eventId",
+						"userId",
+						"dateKey",
+						"acknowledgedAt",
+						"problemFlaggedAt",
+						"problemNote",
+						"updatedAt",
+						"schemaVersion",
+					],
+				},
+			);
+	} catch (e) {
+		console.error("Error acknowledging assignment", e);
+		throw e;
+	}
+}
+
+/**
+ * "I cannot work this after all."
+ *
+ * Does NOT unassign. A mis-tap must never silently unstaff an event, so this
+ * raises a flag for an admin to resolve and leaves the crew exactly as it was.
+ * Only offered when `preferences.allowAssignmentDecline` is on.
+ */
+export async function flagAssignmentProblem(
+	companyId: string,
+	eventId: string,
+	userId: string,
+	dateKey: string,
+	note: string,
+): Promise<void> {
+	const id = eventResponseId(eventId, userId);
+	try {
+		await db
+			.collection(C.eventResponses)
+			.doc(id)
+			.set(
+				{
+					id,
+					companyId,
+					eventId,
+					userId,
+					dateKey,
+					acknowledgedAt: null,
+					problemFlaggedAt: firestore.FieldValue.serverTimestamp(),
+					problemNote: note.trim() || null,
+					updatedAt: firestore.FieldValue.serverTimestamp(),
+					schemaVersion: 2,
+				},
+				{
+					mergeFields: [
+						"id",
+						"companyId",
+						"eventId",
+						"userId",
+						"dateKey",
+						"acknowledgedAt",
+						"problemFlaggedAt",
+						"problemNote",
+						"updatedAt",
+						"schemaVersion",
+					],
+				},
+			);
+	} catch (e) {
+		console.error("Error flagging assignment problem", e);
+		throw e;
+	}
+}
+
 export async function syncEventAudience(
 	companyId: string,
 	eventId: string,
@@ -464,6 +689,11 @@ export async function syncEventAudience(
 				dateKey,
 				status: "pending",
 				respondedAt: null,
+				// Present and null from the start, so a document never has to
+				// be distinguished by which fields it happens to carry.
+				acknowledgedAt: null,
+				problemFlaggedAt: null,
+				problemNote: null,
 				updatedAt: now,
 				schemaVersion: 2,
 			});
@@ -561,6 +791,44 @@ export async function getEventResponses(
 		console.error("Error getting event responses", e);
 		return {};
 	}
+}
+
+/**
+ * The full response documents for an event, keyed by user.
+ *
+ * subscribeEventResponses below flattens each document to its `status`, which
+ * was everything the availability screens needed. Acknowledgement lives on the
+ * same document in different fields, so anything showing whether an assigned
+ * worker has SEEN their shift needs the whole record.
+ *
+ * Added alongside rather than replacing: the flattened form is what the app's
+ * availability screens consume, and widening their payload would make every
+ * one of them re-render on an acknowledgement they do not display.
+ */
+export function subscribeEventResponseDocs(
+	companyId: string,
+	eventId: string,
+	onChange: (byUserId: Record<string, EventResponse>) => void,
+): () => void {
+	if (!companyId || !eventId) return () => {};
+
+	return db
+		.collection(C.eventResponses)
+		.where("companyId", "==", companyId)
+		.where("eventId", "==", eventId)
+		.limit(DEFAULT_LIMIT)
+		.onSnapshot(
+			(snapshot) => {
+				const byUserId: Record<string, EventResponse> = {};
+				for (const doc of snapshot.docs) {
+					const data = doc.data() as EventResponse;
+					byUserId[data.userId] = { ...data, id: doc.id };
+				}
+				onChange(byUserId);
+			},
+			(error) =>
+				console.error("Error subscribing to response docs", error),
+		);
 }
 
 export function subscribeEventResponses(
@@ -755,6 +1023,46 @@ export function subscribeMyResponses(
 			},
 			(error) =>
 				console.error("Error subscribing to my responses", error),
+		);
+}
+
+/**
+ * This user's own response documents, in full.
+ *
+ * Same query as subscribeMyResponses — and therefore the same index — but
+ * without flattening to `status`. The acknowledgement fields live on these
+ * documents, and "which of my shifts have I not confirmed seeing" cannot be
+ * answered from the status alone.
+ *
+ * Filtering for unacknowledged happens in JS rather than with an
+ * `acknowledgedAt == null` clause on purpose: that would need a fourth field in
+ * the composite index for a list that is only ever a handful of documents.
+ */
+export function subscribeMyResponseDocs(
+	companyId: string,
+	userId: string,
+	fromDateKey: string,
+	onChange: (byEventId: Record<string, EventResponse>) => void,
+): () => void {
+	if (!companyId || !userId) return () => {};
+
+	return db
+		.collection(C.eventResponses)
+		.where("companyId", "==", companyId)
+		.where("userId", "==", userId)
+		.where("dateKey", ">=", fromDateKey)
+		.limit(DEFAULT_LIMIT)
+		.onSnapshot(
+			(snapshot) => {
+				const byEventId: Record<string, EventResponse> = {};
+				for (const doc of snapshot.docs) {
+					const data = doc.data() as EventResponse;
+					byEventId[data.eventId] = { ...data, id: doc.id };
+				}
+				onChange(byEventId);
+			},
+			(error) =>
+				console.error("Error subscribing to my response docs", error),
 		);
 }
 

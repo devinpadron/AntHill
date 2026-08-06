@@ -52,6 +52,22 @@ export interface FormField {
 	placeholder?: string;
 
 	/**
+	 * Editable inline on the payroll screen, by an admin, without opening the
+	 * edit sheet — and saved as soon as it is changed.
+	 *
+	 * For the fields a manager routinely corrects while reviewing a week (a tip
+	 * total, a mileage figure) the edit sheet is more ceremony than the change
+	 * deserves. Marking those `quickEditPayroll` puts the input in the row.
+	 *
+	 * DECLARED LATE. `src/components/time/TimeDetailCard.tsx` has read this
+	 * since v1 and `CompanyCustomForm.tsx` has written it, but it was never on
+	 * the interface — so anything typed against FormField, including the whole
+	 * web portal's form editor, could not see the option existed and silently
+	 * dropped it on every publish.
+	 */
+	quickEditPayroll?: boolean;
+
+	/**
 	 * checklist — REQUIRED in v2.
 	 *
 	 * v1 allowed a legacy inline `options: string[]` here instead. The migration

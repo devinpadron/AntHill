@@ -1,0 +1,45 @@
+.scrim {
+	position: fixed;
+	inset: 0;
+	z-index: 200;
+	background: var(--c-overlay);
+	display: grid;
+	place-items: center;
+	padding: var(--sp-lg);
+	animation: fade var(--motion-fast) ease;
+}
+
+@keyframes fade {
+	from {
+		opacity: 0;
+	}
+}
+
+.dialog {
+	width: min(440px, 100%);
+	background: var(--c-surface-raised);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-lg);
+	box-shadow: var(--e-floating);
+	padding: var(--sp-xl);
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-md);
+	outline: none;
+	animation: rise var(--motion-base) ease;
+}
+
+@keyframes rise {
+	from {
+		opacity: 0;
+		transform: translateY(8px) scale(0.98);
+	}
+}
+
+.actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: var(--sp-sm);
+	margin-top: var(--sp-sm);
+	flex-wrap: wrap;
+}

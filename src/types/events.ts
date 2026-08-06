@@ -90,6 +90,36 @@ export interface EventResponse extends CompanyScoped {
 	dateKey: DateKey;
 	status: EventResponseStatus;
 	respondedAt: Timestamp | null;
+
+	/*
+	 * ACKNOWLEDGEMENT — a different question from `status`, on the same
+	 * document.
+	 *
+	 *   status         "can you work this?"   asked BEFORE assignment
+	 *   acknowledgedAt "I see I am working this"  asked AFTER assignment
+	 *
+	 * They are independent on purpose. A worker who never answered the
+	 * availability question can still be assigned and acknowledge it, and a
+	 * worker who confirmed availability weeks ago still has to see that the
+	 * shift became real.
+	 *
+	 * Null means not acknowledged. The document now exists for every ASSIGNED
+	 * worker as well as every invited one — see ensureAssignmentRecords.
+	 */
+	acknowledgedAt: Timestamp | null;
+
+	/*
+	 * Set when an assigned worker says they cannot work it after all.
+	 *
+	 * Deliberately does NOT unassign them: a mis-tap must never silently
+	 * unstaff an event. It surfaces to admins as something to resolve, and the
+	 * manager decides what happens to the crew.
+	 *
+	 * Only offered when `preferences.allowAssignmentDecline` is on.
+	 */
+	problemFlaggedAt: Timestamp | null;
+	problemNote: string | null;
+
 	updatedAt: Timestamp;
 	schemaVersion: number;
 }

@@ -1,0 +1,45 @@
+.shell {
+	display: grid;
+	grid-template-columns: var(--sidebar-w) 1fr;
+	height: 100vh;
+	overflow: hidden;
+	background: var(--c-bg);
+	transition: grid-template-columns var(--motion-base) ease;
+}
+
+.collapsed {
+	grid-template-columns: var(--sidebar-collapsed-w) 1fr;
+}
+
+.main {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	overflow: hidden;
+}
+
+/*
+ * The scroll container for every page. Pages that need their own frozen
+ * chrome (the staffing board, payroll's sticky bulk bar) set overflow:hidden
+ * on themselves and scroll their inner panes instead.
+ */
+.content {
+	flex: 1;
+	min-height: 0;
+	min-width: 0;
+	overflow: auto;
+	display: flex;
+	flex-direction: column;
+}
+
+/*
+ * Below ~1100px the sidebar collapses to icons whatever the stored preference
+ * says. The portal targets desktop; this keeps a laptop at 1280 usable and a
+ * split-screen window from breaking outright.
+ */
+@media (max-width: 1100px) {
+	.shell,
+	.collapsed {
+		grid-template-columns: var(--sidebar-collapsed-w) 1fr;
+	}
+}

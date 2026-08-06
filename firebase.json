@@ -22,5 +22,50 @@
 	},
 	"storage": {
 		"rules": "storage.rules"
-	}
+	},
+	"hosting": [
+		{
+			"target": "portal",
+			"public": "web/dist",
+			"_noPredeploy": "There is deliberately NO predeploy hook. Firebase runs predeploy for `hosting:channel:deploy` as well as a live deploy, so a hook that runs the production build silently overwrites a staging (test-database) build seconds before upload — which shipped a preview URL wired to REAL data. Build and deploy are paired in web/package.json instead: `npm run deploy:staging` and `npm run deploy:live`.",
+			"ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+			"rewrites": [
+				{
+					"source": "**",
+					"destination": "/index.html"
+				}
+			],
+			"_headerOrder": "Rules are applied in order and the LAST match wins per header key. The catch-all must therefore come FIRST and /assets/** last, or the immutable asset caching is overwritten by the no-cache rule. Note the catch-all also has to carry Cache-Control: every route is served by the SPA rewrite as index.html, so a rule matching the literal /index.html never fires — the request path is /, or /{companyId}/payroll. Getting that wrong pins a stale index.html in browser caches for an hour after each deploy.",
+			"headers": [
+				{
+					"source": "**",
+					"headers": [
+						{
+							"key": "Cache-Control",
+							"value": "no-cache, no-store, must-revalidate"
+						},
+						{ "key": "X-Frame-Options", "value": "DENY" },
+						{ "key": "X-Content-Type-Options", "value": "nosniff" },
+						{
+							"key": "Referrer-Policy",
+							"value": "strict-origin-when-cross-origin"
+						},
+						{
+							"key": "Permissions-Policy",
+							"value": "geolocation=(), microphone=(), camera=()"
+						}
+					]
+				},
+				{
+					"source": "/assets/**",
+					"headers": [
+						{
+							"key": "Cache-Control",
+							"value": "public, max-age=31536000, immutable"
+						}
+					]
+				}
+			]
+		}
+	]
 }

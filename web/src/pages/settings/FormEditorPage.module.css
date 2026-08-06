@@ -1,0 +1,145 @@
+.page {
+	padding: var(--sp-xl);
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-lg);
+}
+.header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--sp-lg);
+	flex-wrap: wrap;
+}
+.headerActions {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-md);
+}
+
+/* palette | builder | preview+diff */
+.columns {
+	display: grid;
+	grid-template-columns: 180px minmax(0, 1.4fr) minmax(300px, 1fr);
+	gap: var(--sp-lg);
+	align-items: start;
+}
+
+.palette {
+	position: sticky;
+	top: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-sm);
+	padding: var(--sp-md);
+	background: var(--c-surface);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-lg);
+}
+.paletteGrid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: var(--sp-xs);
+}
+.paletteItem {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	padding: var(--sp-sm) var(--sp-xs);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-sm);
+	color: var(--c-text-secondary);
+	text-align: center;
+}
+.paletteItem:hover {
+	border-color: var(--c-accent);
+	background: var(--c-accent-subtle);
+	color: var(--c-accent);
+}
+
+.builder,
+.side {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-lg);
+	min-width: 0;
+}
+.side {
+	position: sticky;
+	top: 0;
+}
+
+.stack {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-lg);
+}
+
+.enabledRow {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--sp-sm);
+	cursor: pointer;
+}
+.enabledRow input {
+	accent-color: var(--c-accent);
+	cursor: pointer;
+	margin-top: 3px;
+}
+.enabledRow span {
+	display: flex;
+	flex-direction: column;
+}
+
+.fieldList {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-sm);
+}
+.dragging {
+	opacity: 0.4;
+}
+
+.diffList {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-sm);
+	margin-bottom: var(--sp-md);
+}
+.diffLine {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--sp-sm);
+}
+
+.publishNote {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--sp-sm);
+	padding: var(--sp-md);
+	border-radius: var(--r-md);
+	background: var(--c-surface-sunken);
+	color: var(--c-text-secondary);
+}
+
+@media (max-width: 1500px) {
+	.columns {
+		grid-template-columns: 160px minmax(0, 1fr);
+	}
+	.side {
+		grid-column: 1 / -1;
+		position: static;
+	}
+}
+@media (max-width: 900px) {
+	.columns {
+		grid-template-columns: 1fr;
+	}
+	.palette {
+		position: static;
+	}
+	.paletteGrid {
+		grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+	}
+}

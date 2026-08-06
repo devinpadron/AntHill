@@ -7,6 +7,12 @@ node_modules/
 .nvm
 package-lock.json
 
+# Web portal (web/) — build output. The bare `package-lock.json` rule above
+# matches at any depth, so the portal's lockfile has to be re-included
+# explicitly: it is a deployed artifact and its build must be reproducible.
+web/dist/
+!web/package-lock.json
+
 # iOS / CocoaPods
 ios/
 
@@ -29,6 +35,16 @@ GoogleService-Info.plist
 .env
 .env.*
 
+# ...except two portal env files that carry no secrets, and must be committed:
+#   .env.example     how a new checkout learns which VITE_* vars exist
+#   .env.production  the database opt-in, which decides whether a deploy points
+#                    at real data. Losing it means the next deploy silently
+#                    ships a portal wired to the test database.
+# These negations must come AFTER `.env.*` above: gitignore resolves by last
+# match, not most specific.
+!web/.env.example
+!web/.env.production
+
 # Firebase admin credentials — NEVER commit these
 service-account.json
 **/service-account.json
@@ -39,3 +55,6 @@ tools/migration/reports/
 
 # macOS
 .DS_Store
+
+# Firebase CLI deploy cache (hashes of uploaded files)
+.firebase/

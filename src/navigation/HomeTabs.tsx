@@ -9,6 +9,7 @@ import AvailabilityStack from "./AvailabilityStack";
 import { useCompany } from "../contexts/CompanyContext";
 import { Icon, IconName } from "../components/ui";
 import { useCompanySwitcher } from "../components/company/CompanySwitcher";
+import { useUnacknowledgedShifts } from "../hooks/useUnacknowledgedShifts";
 import { haptics, useTheme } from "../theme";
 
 /*
@@ -52,6 +53,7 @@ const HomeTabs = () => {
 	const switcher = useCompanySwitcher();
 	const theme = useTheme();
 	const insets = useSafeAreaInsets();
+	const { count: unacknowledged } = useUnacknowledgedShifts();
 
 	return (
 		<Tab.Navigator
@@ -83,6 +85,21 @@ const HomeTabs = () => {
 				options={{
 					tabBarAccessibilityLabel: "Calendar",
 					tabBarIcon: icon("calendar", "calendar-outline"),
+					/*
+					 * Shifts this worker has been assigned but never confirmed
+					 * seeing. A badge rather than a notification because it is
+					 * a standing state, not an event — it should still be there
+					 * tomorrow if they ignore it today.
+					 *
+					 * Undefined (not 0) when there are none: react-navigation
+					 * renders a dot for 0.
+					 */
+					tabBarBadge: unacknowledged || undefined,
+					tabBarBadgeStyle: {
+						backgroundColor: theme.colors.danger,
+						color: theme.colors.textInverse,
+						fontSize: 11,
+					},
 				}}
 			/>
 			{preferences.enableAvailability && (

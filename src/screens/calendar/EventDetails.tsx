@@ -5,6 +5,7 @@ import moment from "moment";
 import MapView, { Marker } from "react-native-maps";
 
 // Custom hooks and utilities
+import { AcknowledgeShiftBanner } from "../../components/calendar/AcknowledgeShiftBanner";
 import { useEventDetails } from "../../hooks/useEventDetails";
 import { getRegionForMarkers, openMap, MapMarker } from "../../utils/mapUtils";
 
@@ -70,6 +71,9 @@ const EventDetails = ({ navigation }) => {
 		hasEditPermission,
 		packages,
 		eventLabel,
+		myAcknowledgement,
+		acknowledge,
+		flagProblem,
 	} = useEventDetails(eventId);
 
 	/*
@@ -180,6 +184,17 @@ const EventDetails = ({ navigation }) => {
 				/>
 			}
 		>
+			{/*
+			 * Above everything else on purpose. A worker opening a shift they have
+			 * not confirmed should meet the confirmation first, not find it below
+			 * the notes.
+			 */}
+			<AcknowledgeShiftBanner
+				acknowledgement={myAcknowledgement}
+				onAcknowledge={acknowledge}
+				onFlagProblem={flagProblem}
+			/>
+
 			{showLabel && (
 				<View style={styles.labelRow}>
 					{/* The company chose this color, so it is used as given. */}

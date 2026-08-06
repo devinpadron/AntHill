@@ -1,0 +1,47 @@
+.list,
+.listCompact {
+	display: flex;
+	flex-direction: column;
+	margin: 0;
+}
+.list {
+	gap: var(--sp-md);
+}
+.listCompact {
+	gap: var(--sp-xs);
+}
+
+.row {
+	display: grid;
+	grid-template-columns: minmax(120px, 1fr) minmax(0, 2fr);
+	align-items: baseline;
+	gap: var(--sp-md);
+	padding-bottom: var(--sp-sm);
+	border-bottom: 1px solid var(--c-border);
+}
+.row:last-child {
+	border-bottom: none;
+	padding-bottom: 0;
+}
+
+.value {
+	margin: 0;
+	min-width: 0;
+}
+
+.checklist {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.checkItem {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-xs);
+}
+
+.chips {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: var(--sp-xs);
+}

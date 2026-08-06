@@ -1,0 +1,330 @@
+.drawer {
+	width: var(--drawer-w);
+	flex-shrink: 0;
+	display: flex;
+	flex-direction: column;
+	background: var(--c-surface);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-lg);
+	overflow: hidden;
+	min-height: 0;
+}
+
+.header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--sp-md);
+	padding: var(--sp-lg);
+	border-bottom: 1px solid var(--c-border);
+}
+
+.headerMain {
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-xs);
+}
+
+.titleRow {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-sm);
+	min-width: 0;
+}
+
+.labelDot {
+	width: 10px;
+	height: 10px;
+	border-radius: var(--r-pill);
+	flex-shrink: 0;
+}
+
+.close {
+	display: grid;
+	place-items: center;
+	width: 28px;
+	height: 28px;
+	border-radius: var(--r-sm);
+	color: var(--c-text-tertiary);
+	flex-shrink: 0;
+}
+
+.close:hover {
+	background: var(--c-surface-sunken);
+	color: var(--c-text);
+}
+
+.actions {
+	display: flex;
+	gap: var(--sp-sm);
+	padding: var(--sp-md) var(--sp-lg);
+	border-bottom: 1px solid var(--c-border);
+}
+
+.body {
+	flex: 1;
+	overflow-y: auto;
+	min-height: 0;
+	padding: var(--sp-lg);
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-xl);
+}
+
+.section {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-sm);
+}
+
+.sectionHead {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--sp-sm);
+}
+
+.mix {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--sp-sm);
+}
+
+/* The roster: name + conflict flag on the left, response pill on the right. */
+.roster {
+	width: 100%;
+}
+
+.rosterRow {
+	border-bottom: 1px solid var(--c-border);
+}
+
+.rosterRow:last-child {
+	border-bottom: none;
+}
+
+.rosterName {
+	padding: var(--sp-sm) 0;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.conflict {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	color: var(--c-warning);
+	font: var(--t-caption);
+	font-size: 11px;
+}
+
+.rosterStatus {
+	padding: var(--sp-sm) 0;
+	text-align: right;
+	width: 130px;
+}
+
+.statusWrap {
+	position: relative;
+	display: inline-block;
+}
+
+.statusButton {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--sp-xs);
+	padding: 2px var(--sp-xs);
+	border-radius: var(--r-sm);
+	color: var(--c-text-tertiary);
+}
+
+.statusButton:hover {
+	background: var(--c-surface-sunken);
+}
+
+.backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 40;
+}
+
+.statusMenu {
+	position: absolute;
+	top: calc(100% + 2px);
+	right: 0;
+	z-index: 41;
+	min-width: 150px;
+	background: var(--c-surface-raised);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-md);
+	box-shadow: var(--e-floating);
+	padding: var(--sp-xs);
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.statusOption {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--sp-sm);
+	padding: var(--sp-xs) var(--sp-sm);
+	border-radius: var(--r-sm);
+	width: 100%;
+}
+
+.statusOption:hover {
+	background: var(--c-surface-sunken);
+}
+
+.invitedList {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-xs);
+}
+
+.invitedRow {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--sp-sm);
+}
+
+.warnBox {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--sp-sm);
+	padding: var(--sp-md);
+	background: var(--c-warning-subtle);
+	color: var(--c-warning);
+	border-radius: var(--r-md);
+}
+
+.chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--sp-xs);
+}
+
+.location {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-sm);
+	padding: var(--sp-sm);
+	border-radius: var(--r-md);
+	color: var(--c-text);
+	text-decoration: none;
+	border: 1px solid var(--c-border);
+}
+
+.location:hover {
+	background: var(--c-surface-sunken);
+	border-color: var(--c-accent-border);
+	text-decoration: none;
+}
+
+.locationText {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.readOnlyNotes {
+	padding: var(--sp-md);
+	background: var(--c-surface-sunken);
+	border-radius: var(--r-md);
+}
+
+.package {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-xs);
+	padding: var(--sp-sm) 0;
+}
+
+.checklistList {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding-left: var(--sp-md);
+}
+
+.files {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+	gap: var(--sp-sm);
+}
+
+.file {
+	aspect-ratio: 1;
+	border-radius: var(--r-md);
+	border: 1px solid var(--c-border);
+	background: var(--c-surface-sunken);
+	display: grid;
+	place-items: center;
+	overflow: hidden;
+	color: var(--c-text-tertiary);
+}
+
+.file img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.file:hover {
+	border-color: var(--c-accent-border);
+}
+
+.meta {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-xs);
+	padding-top: var(--sp-md);
+	border-top: 1px solid var(--c-border);
+}
+
+.idButton {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--sp-xs);
+	color: var(--c-text-tertiary);
+	align-self: flex-start;
+}
+
+.idButton:hover {
+	color: var(--c-accent);
+}
+
+/*
+ * Acknowledgement state, under the worker's name in the roster.
+ * Distinct from the response pill beside it: that answers "are you free",
+ * this answers "have you seen you're working".
+ */
+.acked,
+.unacked,
+.problem {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	font: var(--t-caption);
+	font-size: 11px;
+}
+
+.acked {
+	color: var(--c-success);
+}
+
+.unacked {
+	color: var(--c-text-tertiary);
+}
+
+.problem {
+	color: var(--c-danger);
+	font-weight: 600;
+}

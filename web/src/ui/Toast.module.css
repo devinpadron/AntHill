@@ -1,0 +1,89 @@
+.host {
+	position: fixed;
+	top: var(--sp-lg);
+	right: var(--sp-lg);
+	z-index: 100;
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-sm);
+	pointer-events: none;
+	max-width: 380px;
+}
+
+.toast {
+	pointer-events: auto;
+	display: flex;
+	align-items: flex-start;
+	gap: var(--sp-md);
+	padding: var(--sp-md);
+	background: var(--c-surface-raised);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-lg);
+	box-shadow: var(--e-floating);
+	animation: slide-in var(--motion-base) ease;
+}
+
+@keyframes slide-in {
+	from {
+		opacity: 0;
+		transform: translateX(12px);
+	}
+}
+
+.icon {
+	margin-top: 2px;
+	flex-shrink: 0;
+}
+
+.copy {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.close {
+	color: var(--c-text-tertiary);
+	flex-shrink: 0;
+	display: grid;
+	place-items: center;
+	width: 22px;
+	height: 22px;
+	border-radius: var(--r-sm);
+}
+
+.close:hover {
+	background: var(--c-surface-sunken);
+	color: var(--c-text);
+}
+
+/* Tone lives on the icon and the left edge, not the whole fill — a toast is a
+   notification, not a banner. */
+.success .icon {
+	color: var(--c-success);
+}
+.success {
+	border-left: 3px solid var(--c-success);
+}
+
+.error .icon {
+	color: var(--c-danger);
+}
+.error {
+	border-left: 3px solid var(--c-danger);
+}
+
+.warning .icon {
+	color: var(--c-warning);
+}
+.warning {
+	border-left: 3px solid var(--c-warning);
+}
+
+.info .icon {
+	color: var(--c-accent);
+}
+.info {
+	border-left: 3px solid var(--c-accent);
+}

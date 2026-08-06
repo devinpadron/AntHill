@@ -542,22 +542,35 @@ const TimeEntryDetails = ({ route, navigation }) => {
 			}
 			// For connected event fields
 			else {
-				const [connectionId, eventFieldId] = fieldId.split("_");
-
 				/*
 				 * Connections are their own documents now, so one field change
 				 * is one targeted write. v1 rebuilt the entire connectedEvents
 				 * array on the parent entry.
 				 */
 				const connections = await getConnections(entryId);
-				const connection = connections.find(
-					(c) => c.id === connectionId,
+
+				/*
+				 * Resolved by PREFIX, never by splitting on "_".
+				 *
+				 * Both halves of this key can contain underscores. A connection
+				 * the worker typed in rather than linking gets the id
+				 * `custom_<timestamp>_<index>`, and a field created in the web
+				 * portal's form editor gets `f_<base36>_<rand>`. Splitting took
+				 * the first segment — "custom" — and no connection matched, so
+				 * editing an event form on a self-made connection always failed
+				 * with "Connected event not found".
+				 *
+				 * Matching the known ids against the key has no such ambiguity.
+				 */
+				const connection = connections.find((c) =>
+					fieldId.startsWith(`${c.id}_`),
 				);
 				if (!connection) {
 					throw new Error("Connected event not found");
 				}
+				const eventFieldId = fieldId.slice(connection.id.length + 1);
 
-				await updateConnectionResponses(entryId, connectionId, {
+				await updateConnectionResponses(entryId, connection.id, {
 					...(connection.formResponses ?? {}),
 					[eventFieldId]: value,
 				});

@@ -2,7 +2,15 @@
   "projects": {
     "default": "anthill-51de0"
   },
-  "targets": {},
+  "targets": {
+    "anthill-51de0": {
+      "hosting": {
+        "portal": [
+          "anthill-portal"
+        ]
+      }
+    }
+  },
   "etags": {
     "anthill-51de0": {
       "extensionInstances": {

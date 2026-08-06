@@ -1,0 +1,23 @@
+.wrap {
+	display: inline-flex;
+	align-items: flex-end;
+	gap: 2px;
+	height: 22px;
+	width: 100%;
+}
+
+.bar {
+	flex: 1;
+	background: var(--c-accent);
+	border-radius: 1px;
+	min-height: 2px;
+}
+
+/* A day not worked is a gap, not a zero-height bar — the distinction reads. */
+.empty {
+	flex: 1;
+	height: 2px;
+	background: var(--c-border);
+	border-radius: 1px;
+	align-self: flex-end;
+}

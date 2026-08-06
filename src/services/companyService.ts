@@ -20,6 +20,12 @@ export const defaultPreferences: CompanyPreferences = {
 	enableTimeSheet: false,
 	enableAvailability: false,
 	availabilityReminder: { enabled: false, hours: 0, minutes: 0 },
+	/*
+	 * Off by default: letting a worker decline an assignment in the app is a
+	 * real change to how a company staffs jobs, and an existing company that
+	 * never opted in should not discover it because a preference defaulted on.
+	 */
+	allowAssignmentDecline: false,
 	eventFormSchemaId: null,
 	timeEntryFormSchemaId: null,
 	updatedAt: null as unknown as CompanyPreferences["updatedAt"],

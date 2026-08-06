@@ -1,0 +1,279 @@
+.page {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-md);
+	padding: var(--sp-lg) var(--sp-xl) var(--sp-xl);
+	height: 100%;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--sp-lg);
+	flex-wrap: wrap;
+}
+.controls {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-sm);
+	flex-wrap: wrap;
+}
+
+/* ---- legend ---- */
+.legend {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-lg);
+	flex-wrap: wrap;
+	padding: var(--sp-sm) var(--sp-md);
+	background: var(--c-surface);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-md);
+	font: var(--t-caption);
+	color: var(--c-text-secondary);
+}
+.legendItem {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--sp-xs);
+}
+.legendKeys {
+	margin-left: auto;
+	color: var(--c-text-tertiary);
+}
+.legendKeys kbd {
+	font-family: var(--font-mono);
+	font-size: 10px;
+	padding: 1px 4px;
+	border: 1px solid var(--c-border);
+	border-radius: 3px;
+	background: var(--c-surface-sunken);
+}
+.swatch {
+	width: 20px;
+	height: 20px;
+	border-radius: var(--r-sm);
+	display: inline-grid;
+	place-items: center;
+	font-size: 11px;
+	position: relative;
+	border: 1px solid var(--c-border);
+}
+
+/* ---- the grid ---- */
+.gridWrap {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+	background: var(--c-surface);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-lg);
+}
+
+.grid {
+	border-collapse: separate;
+	border-spacing: 0;
+}
+
+/*
+ * Frozen header AND frozen first column. The corner cell needs the highest
+ * z-index of the three or it scrolls under one of them.
+ */
+.cornerCell {
+	position: sticky;
+	top: 0;
+	left: 0;
+	z-index: 4;
+	background: var(--c-surface);
+	border-right: 1px solid var(--c-border-strong);
+	border-bottom: 1px solid var(--c-border-strong);
+	padding: var(--sp-sm) var(--sp-md);
+	text-align: left;
+	min-width: 240px;
+	width: 240px;
+}
+
+.colHead {
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	background: var(--c-surface);
+	border-bottom: 1px solid var(--c-border-strong);
+	border-right: 1px solid var(--c-border);
+	padding: 0;
+	width: 116px;
+	min-width: 116px;
+	vertical-align: bottom;
+}
+
+.colHeadInner {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: var(--sp-sm);
+	border-top: 3px solid var(--c-accent-border);
+	text-align: left;
+}
+
+.colDate {
+	font: var(--t-caption);
+	font-size: 10px;
+	color: var(--c-text-tertiary);
+	letter-spacing: 0.4px;
+}
+.colTitle {
+	font: var(--t-label);
+	color: var(--c-text);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.colMix {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-xs);
+	font-size: 10px;
+	font-variant-numeric: tabular-nums;
+}
+
+.rowHead {
+	position: sticky;
+	left: 0;
+	z-index: 1;
+	background: var(--c-surface);
+	border-right: 1px solid var(--c-border-strong);
+	border-bottom: 1px solid var(--c-border);
+	padding: var(--sp-xs) var(--sp-md);
+	text-align: left;
+	font-weight: 400;
+	min-width: 240px;
+	width: 240px;
+}
+.rowHeadInner {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+.rowMeta {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-xs);
+}
+.tally {
+	display: inline-flex;
+	gap: var(--sp-xs);
+	font-size: 10px;
+	font-variant-numeric: tabular-nums;
+}
+
+.ok {
+	color: var(--c-success);
+}
+.wait {
+	color: var(--c-warning);
+}
+.no {
+	color: var(--c-danger);
+}
+.short {
+	color: var(--c-danger);
+	font-weight: 600;
+}
+
+.cellWrap {
+	padding: 0;
+	border-bottom: 1px solid var(--c-border);
+	border-right: 1px solid var(--c-border);
+}
+
+/* ---- cells ---- */
+.cell {
+	width: 100%;
+	height: 40px;
+	display: grid;
+	place-items: center;
+	position: relative;
+	font-size: 13px;
+	transition: background var(--motion-fast) ease;
+}
+[data-density="compact"] .cell {
+	height: 28px;
+	font-size: 11px;
+}
+[data-density="compact"] .rowHead {
+	padding-top: 2px;
+	padding-bottom: 2px;
+}
+
+.cell:hover {
+	outline: 1px solid var(--c-accent);
+	outline-offset: -1px;
+}
+
+.focused {
+	outline: 2px solid var(--c-accent) !important;
+	outline-offset: -2px;
+	z-index: 1;
+}
+
+.glyph {
+	line-height: 1;
+}
+
+.confirmed {
+	background: var(--c-success-subtle);
+	color: var(--c-success);
+	font-weight: 700;
+}
+.declined {
+	background: var(--c-danger-subtle);
+	color: var(--c-danger);
+}
+.pending {
+	background: var(--c-warning-subtle);
+	color: var(--c-warning);
+}
+
+/* Not invited: nearly blank, so the answered cells carry the eye. */
+.not-invited {
+	background: transparent;
+}
+
+/* Cannot see it: distinct from "did not answer", which is the whole point. */
+.not-visible {
+	background: repeating-linear-gradient(
+		45deg,
+		var(--c-surface-sunken) 0 4px,
+		transparent 4px 8px
+	);
+	color: var(--c-text-tertiary);
+}
+
+/* Double-booked: hatched BEHIND whatever the response is. */
+.conflict::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: repeating-linear-gradient(
+		-45deg,
+		var(--c-danger) 0 1px,
+		transparent 1px 5px
+	);
+	opacity: 0.35;
+	pointer-events: none;
+}
+
+/* On the crew — a corner flag, orthogonal to the response glyph. */
+.assignedFlag {
+	position: absolute;
+	top: 0;
+	right: 0;
+	width: 0;
+	height: 0;
+	border-top: 7px solid var(--c-accent);
+	border-left: 7px solid transparent;
+}

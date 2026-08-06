@@ -1,0 +1,59 @@
+{
+	"compilerOptions": {
+		"target": "ES2022",
+		"lib": ["DOM", "DOM.Iterable", "ES2022"],
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"jsx": "react-jsx",
+		"noEmit": true,
+		"allowJs": true,
+
+		// Matches the app. The service layer is written against non-strict
+		// TypeScript and types a fair amount of Firestore data `any`; turning
+		// strict on here would fail on ../src, which is not ours to change.
+		"strict": false,
+
+		"esModuleInterop": true,
+		"allowSyntheticDefaultImports": true,
+		"skipLibCheck": true,
+		"resolveJsonModule": true,
+		"forceConsistentCasingInFileNames": true,
+		"isolatedModules": true,
+		"types": ["vite/client"],
+
+		"baseUrl": ".",
+		/*
+		 * Must mirror resolve.alias in vite.config.ts exactly. Without these,
+		 * tsc walks up to ../node_modules, finds the real @react-native-firebase
+		 * packages, and type-checks the services against an API the browser
+		 * bundle will never run.
+		 */
+		"paths": {
+			"@app/*": ["../src/*"],
+			"@react-native-firebase/firestore": [
+				"./src/shim/rnfb-firestore.ts"
+			],
+			"@react-native-firebase/app": ["./src/shim/rnfb-app.ts"],
+			"@react-native-firebase/auth": ["./src/shim/rnfb-auth.ts"],
+			"@react-native-firebase/storage": ["./src/shim/rnfb-storage.ts"],
+			"react-native": ["./src/shim/react-native.ts"],
+			"react-native-calendars/src/types": [
+				"./src/shim/rn-calendars-types.ts"
+			],
+			"react-native-fs": ["./src/shim/rn-fs.ts"],
+			"react-native-html-to-pdf": ["./src/shim/rn-html-to-pdf.ts"],
+			"react-native-prompt-android": ["./src/shim/rn-prompt.ts"]
+		}
+	},
+	"include": [
+		"src",
+		"vite.config.ts",
+		"../src/services",
+		"../src/types",
+		"../src/constants",
+		"../src/lib",
+		"../src/utils",
+		"../src/theme/palette.ts",
+		"../src/theme/themes.ts"
+	]
+}

@@ -1,0 +1,175 @@
+.wrap {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	flex: 1;
+}
+
+.weekdays {
+	display: grid;
+	grid-template-columns: repeat(7, 1fr);
+	border-bottom: 1px solid var(--c-border);
+	flex-shrink: 0;
+}
+
+.weekday {
+	padding: var(--sp-sm);
+	text-align: center;
+	font: var(--t-label);
+	color: var(--c-text-secondary);
+}
+
+/*
+ * Six equal rows filling the pane. `minmax(0, 1fr)` rather than `1fr` so a busy
+ * day scrolls inside its own cell instead of stretching the whole grid.
+ */
+.grid {
+	display: grid;
+	grid-template-columns: repeat(7, minmax(0, 1fr));
+	grid-template-rows: repeat(6, minmax(0, 1fr));
+	flex: 1;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.cell {
+	border-right: 1px solid var(--c-border);
+	border-bottom: 1px solid var(--c-border);
+	padding: var(--sp-xs);
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	overflow: hidden;
+}
+
+.cell:nth-child(7n) {
+	border-right: none;
+}
+
+/* Days spilling in from the neighbouring months stay legible but recede. */
+.outside {
+	background: var(--c-surface-sunken);
+}
+
+.outside .dayNumber {
+	color: var(--c-text-tertiary);
+}
+
+.outside .chip {
+	opacity: 0.65;
+}
+
+.today {
+	background: var(--c-accent-subtle);
+}
+
+.cellHead {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--sp-xs);
+	padding: 2px var(--sp-xs);
+	flex-shrink: 0;
+}
+
+.dayNumber {
+	font: var(--t-label);
+	color: var(--c-text-secondary);
+}
+
+.todayNumber {
+	font: var(--t-label);
+	background: var(--c-accent);
+	color: var(--c-on-accent);
+	width: 20px;
+	height: 20px;
+	border-radius: var(--r-pill);
+	display: grid;
+	place-items: center;
+}
+
+.cellCount {
+	font: var(--t-caption);
+	font-size: 10px;
+	color: var(--c-text-tertiary);
+	white-space: nowrap;
+}
+
+.chips {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	overflow-y: auto;
+	min-height: 0;
+}
+
+/*
+ * One line per event: time, title, response mix, headcount. The 3px left border
+ * carries the event label's colour — the only user-chosen colour in the app.
+ */
+.chip {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-xs);
+	width: 100%;
+	padding: 3px var(--sp-xs);
+	border-radius: var(--r-sm);
+	border-left: 3px solid var(--c-border-strong);
+	background: var(--c-surface);
+	text-align: left;
+	min-width: 0;
+	font: var(--t-caption);
+}
+
+.chip:hover {
+	background: var(--c-surface-sunken);
+}
+
+.chipTime {
+	color: var(--c-text-tertiary);
+	font-variant-numeric: tabular-nums;
+	flex-shrink: 0;
+	font-size: 10px;
+}
+
+.chipTitle {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--c-text);
+}
+
+.chipMeta {
+	display: flex;
+	align-items: center;
+	gap: 3px;
+	flex-shrink: 0;
+}
+
+.count {
+	font-size: 10px;
+	color: var(--c-text-secondary);
+	font-variant-numeric: tabular-nums;
+}
+
+/* Zero assigned is the thing an admin is scanning for. */
+.countEmpty {
+	font-size: 10px;
+	color: var(--c-danger);
+	font-weight: 600;
+}
+
+.more {
+	font: var(--t-caption);
+	font-size: 10px;
+	color: var(--c-accent);
+	padding: 2px var(--sp-xs);
+	text-align: left;
+}
+
+.more:hover {
+	text-decoration: underline;
+}

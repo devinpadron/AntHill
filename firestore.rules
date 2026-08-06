@@ -468,13 +468,27 @@ service cloud.firestore {
                             && request.resource.data.userId == uid()
                             && v2EventIsOpen(request.resource.data.eventId)));
 
-      // Answering an invitation. A worker changes their own reply and nothing
-      // else — not whose response it is, not which event it belongs to.
+      /*
+       * A worker writes their own reply and nothing else — not whose response
+       * it is, not which event it belongs to.
+       *
+       * The key list covers TWO separate answers on one document:
+       *   status / respondedAt              "can you work this?"
+       *   acknowledgedAt / problemFlaggedAt "I see I am working this"
+       * A worker may write either; both are theirs to state.
+       *
+       * `id`, `companyId`, `eventId` and `userId` are deliberately absent, so
+       * a worker cannot re-point their own response at another event or
+       * person. The acknowledgement writes send them via mergeFields, which is
+       * a no-op when the document already exists — the values are unchanged,
+       * so they never appear in affectedKeys().
+       */
       allow update: if v2IsManager(resource.data.companyId)
                     || (isSelf(resource.data.userId)
                         && request.resource.data.diff(resource.data)
                              .affectedKeys()
-                             .hasOnly(["status","respondedAt","updatedAt","dateKey"]));
+                             .hasOnly(["status","respondedAt","updatedAt","dateKey",
+                                       "acknowledgedAt","problemFlaggedAt","problemNote"]));
 
       allow delete: if v2IsManager(resource.data.companyId);
     }

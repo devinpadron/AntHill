@@ -1,0 +1,224 @@
+.wrap {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	flex: 1;
+	position: relative;
+}
+
+.scroll {
+	overflow: auto;
+	min-height: 0;
+	flex: 1;
+}
+
+.table {
+	width: 100%;
+	font: var(--t-caption);
+}
+
+/*
+ * Row height by density. The default (cozy, 36px) sits below the app's 44px hit
+ * target on purpose — see the note in DataTable.tsx. Compact is for the
+ * staffing board, where fitting a month on screen is the whole point.
+ */
+.scroll[data-density="compact"] tbody td {
+	height: var(--row-compact);
+	padding: 0 var(--sp-sm);
+}
+
+.scroll[data-density="cozy"] tbody td {
+	height: var(--row-cozy);
+	padding: 0 var(--sp-md);
+}
+
+.scroll[data-density="comfortable"] tbody td {
+	height: var(--row-comfortable);
+	padding: 0 var(--sp-md);
+}
+
+/* ---------------------------------------------------------------- header */
+
+.table thead th {
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	background: var(--c-surface);
+	border-bottom: 1px solid var(--c-border-strong);
+	padding: var(--sp-sm) var(--sp-md);
+	text-align: left;
+	white-space: nowrap;
+	font: var(--t-label);
+	color: var(--c-text-secondary);
+	/* The sticky header must paint over scrolled rows. */
+	box-shadow: 0 1px 0 var(--c-border);
+}
+
+.sortButton {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--sp-xs);
+	font: inherit;
+	color: inherit;
+	white-space: nowrap;
+}
+
+.sortButton:hover {
+	color: var(--c-text);
+}
+
+.sortIdle {
+	opacity: 0;
+	transition: opacity var(--motion-fast) ease;
+}
+
+.table thead th:hover .sortIdle {
+	opacity: 0.4;
+}
+
+.sortActive {
+	color: var(--c-accent);
+}
+
+/* ------------------------------------------------------------------ body */
+
+.table tbody tr {
+	border-bottom: 1px solid var(--c-border);
+}
+
+.table tbody td {
+	color: var(--c-text);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 320px;
+}
+
+.clickable {
+	cursor: pointer;
+}
+
+.clickable:hover {
+	background: var(--c-surface-sunken);
+}
+
+/* The row a detail drawer is showing. */
+.current {
+	background: var(--c-accent-subtle);
+}
+
+.current:hover {
+	background: var(--c-accent-subtle);
+}
+
+/* Checkbox selection, distinct from `current` — they can coexist. */
+.selected td:first-child {
+	box-shadow: inset 3px 0 0 var(--c-accent);
+}
+
+/* ---------------------------------------------------------------- footer */
+
+.table tfoot td {
+	position: sticky;
+	bottom: 0;
+	z-index: 2;
+	background: var(--c-surface-sunken);
+	border-top: 1px solid var(--c-border-strong);
+	padding: var(--sp-sm) var(--sp-md);
+	font: var(--t-label);
+	color: var(--c-text);
+	white-space: nowrap;
+}
+
+/* ------------------------------------------------------- chrome and menus */
+
+.checkCell {
+	width: 36px;
+	padding-left: var(--sp-md) !important;
+	padding-right: 0 !important;
+}
+
+.checkCell input {
+	cursor: pointer;
+	accent-color: var(--c-accent);
+}
+
+/* Absorbs leftover width so the last real column does not stretch. */
+.menuCell {
+	width: 40px;
+	position: sticky;
+	right: 0;
+	background: var(--c-surface);
+	z-index: 3;
+}
+
+.menuButton {
+	display: grid;
+	place-items: center;
+	width: 26px;
+	height: 26px;
+	border-radius: var(--r-sm);
+	color: var(--c-text-tertiary);
+}
+
+.menuButton:hover {
+	background: var(--c-surface-sunken);
+	color: var(--c-text);
+}
+
+.backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 40;
+}
+
+.menu {
+	position: absolute;
+	top: 100%;
+	right: 0;
+	z-index: 41;
+	min-width: 200px;
+	max-height: 340px;
+	overflow-y: auto;
+	background: var(--c-surface-raised);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-md);
+	box-shadow: var(--e-floating);
+	padding: var(--sp-sm);
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.menuItem {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-sm);
+	padding: var(--sp-xs) var(--sp-sm);
+	border-radius: var(--r-sm);
+	cursor: pointer;
+	font-weight: 400;
+}
+
+.menuItem:hover {
+	background: var(--c-surface-sunken);
+}
+
+.menuItem input {
+	accent-color: var(--c-accent);
+	cursor: pointer;
+}
+
+.emptyWrap {
+	flex: 1;
+	display: grid;
+	place-items: center;
+	min-height: 0;
+}
+
+.loading {
+	position: absolute;
+	top: var(--sp-lg);
+	right: var(--sp-lg);
+	z-index: 5;
+}

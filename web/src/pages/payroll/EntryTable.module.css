@@ -1,0 +1,36 @@
+.date {
+	display: inline-flex;
+	align-items: baseline;
+	gap: var(--sp-xs);
+	font-variant-numeric: tabular-nums;
+}
+.weekday {
+	color: var(--c-text-tertiary);
+	font-size: 11px;
+	text-transform: uppercase;
+}
+.num {
+	font-variant-numeric: tabular-nums;
+}
+.numMuted {
+	font-variant-numeric: tabular-nums;
+	color: var(--c-text-tertiary);
+}
+.numStrong {
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+}
+.editCount {
+	font-variant-numeric: tabular-nums;
+	color: var(--c-warning);
+	font-weight: 600;
+}
+.reviewer {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--sp-xs);
+	min-width: 0;
+}
+.dim {
+	color: var(--c-text-tertiary);
+}

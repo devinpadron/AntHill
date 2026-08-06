@@ -555,7 +555,23 @@ const TimeDetailCard = ({
 														)
 															return null;
 
-														const fieldKey = `${connection.eventId}_${field.id}`;
+														/*
+														 * Keyed on connection.id, NOT eventId.
+														 *
+														 * eventId is null for a connection the
+														 * worker typed in themselves rather than
+														 * linking to a real event, so the key came
+														 * out as "null_<field>" and the edit could
+														 * never resolve back to a connection —
+														 * "Connected event not found".
+														 *
+														 * connection.id is always present. It may
+														 * itself contain underscores (custom ones
+														 * are `custom_<ts>_<i>`), so the reader
+														 * resolves it by PREFIX rather than
+														 * splitting — see TimeEntryDetails.
+														 */
+														const fieldKey = `${connection.id}_${field.id}`;
 
 														return (
 															<View
