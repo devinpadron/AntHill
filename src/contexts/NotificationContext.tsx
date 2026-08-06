@@ -112,6 +112,13 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 
 					case "update":
 					case "assignment":
+					/*
+					 * "Confirm you have seen this shift." Carries the soonest
+					 * unconfirmed event, so it opens on the one with the confirm
+					 * button rather than a list that does not exist — the
+					 * Calendar tab badge covers however many others there are.
+					 */
+					case "assignment_ack_nudge":
 						if (data.eventId) {
 							pendingNavigation.setAction(screen, {
 								eventId: data.eventId,

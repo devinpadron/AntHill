@@ -194,10 +194,20 @@ export function useEventDetails(eventId: string) {
 	 * Only meaningful when this user is actually on the crew; someone merely
 	 * invited has nothing to acknowledge yet.
 	 */
+	/*
+	 * Anyone on the crew is asked, INCLUDING admins.
+	 *
+	 * This used to be `amAssigned && !isAdmin`, on the reasoning that a manager
+	 * who assigns themselves already knows they did. True, but it left them no
+	 * button at all — a manager scheduled on their own event could not confirm
+	 * it, and so appeared unconfirmed to everyone else looking at the crew. The
+	 * question is "are you working this", and it is the same question whoever
+	 * is being asked.
+	 */
 	const amAssigned = Boolean(event?.assignedUserIds?.includes(userId));
 	const myDoc = responseDocs[userId];
 	const myAcknowledgement = {
-		required: amAssigned && !isAdmin,
+		required: amAssigned,
 		acknowledged: Boolean(myDoc?.acknowledgedAt),
 		problem: myDoc?.problemFlaggedAt
 			? {

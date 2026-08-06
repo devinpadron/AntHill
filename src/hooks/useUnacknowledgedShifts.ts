@@ -18,8 +18,11 @@ import { useUser } from "../contexts/UserContext";
  * whether I have ACKNOWLEDGED one is a field on my response document. Both
  * queries already have indexes.
  *
- * Admins are excluded. A manager assigning themselves does not need to be
- * prompted that they did so.
+ * Admins are INCLUDED. They were excluded on the reasoning that a manager who
+ * assigns themselves already knows they did — but the same exclusion also took
+ * away their confirm button, so a manager on their own crew showed as
+ * unconfirmed to everyone else and had no way to fix it. One rule for everyone
+ * on the crew is both simpler to explain and the one the screen can honour.
  */
 
 /** Local YYYY-MM-DD. toISOString would shift the day in most time zones. */
@@ -33,7 +36,7 @@ function todayKey(): string {
 }
 
 export function useUnacknowledgedShifts() {
-	const { companyId, userId, isAdmin } = useUser();
+	const { companyId, userId } = useUser();
 
 	const [events, setEvents] = useState<Event[]>([]);
 	const [responses, setResponses] = useState<Record<string, EventResponse>>(
@@ -41,7 +44,7 @@ export function useUnacknowledgedShifts() {
 	);
 
 	const from = todayKey();
-	const enabled = Boolean(companyId && userId && isAdmin === false);
+	const enabled = Boolean(companyId && userId);
 
 	useEffect(() => {
 		if (!enabled) {
