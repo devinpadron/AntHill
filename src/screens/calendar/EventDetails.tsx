@@ -6,6 +6,7 @@ import MapView, { Marker } from "react-native-maps";
 
 // Custom hooks and utilities
 import { AcknowledgeShiftBanner } from "../../components/calendar/AcknowledgeShiftBanner";
+import { ShortStaffedBanner } from "../../components/calendar/ShortStaffedBanner";
 import { useEventDetails } from "../../hooks/useEventDetails";
 import { getRegionForMarkers, openMap, MapMarker } from "../../utils/mapUtils";
 
@@ -74,6 +75,7 @@ const EventDetails = ({ navigation }) => {
 		myAcknowledgement,
 		acknowledge,
 		flagProblem,
+		flaggedProblems,
 	} = useEventDetails(eventId);
 
 	/*
@@ -204,6 +206,17 @@ const EventDetails = ({ navigation }) => {
 				onAcknowledge={acknowledge}
 				onFlagProblem={flagProblem}
 			/>
+
+			{/*
+			 * Managers only — a worker cannot act on it and their own flag is
+			 * already shown to them by the banner above.
+			 */}
+			{isAdmin && (
+				<ShortStaffedBanner
+					problems={flaggedProblems}
+					assignedCount={event.assignedUserIds?.length ?? 0}
+				/>
+			)}
 
 			{showLabel && (
 				<View style={styles.labelRow}>
