@@ -239,18 +239,6 @@ export interface CompanyPreferences extends CompanyScoped {
 	 * reminder behind a disabled requirement is how a setting starts lying.
 	 */
 	acknowledgementReminder: ReminderSchedule;
-	/*
-	 * Whether an assigned worker may flag that they cannot work a shift.
-	 *
-	 * Acknowledgement itself is always asked — an assignment nobody has seen is
-	 * the thing this exists to prevent. This flag only controls the second
-	 * button. Off, the worker can confirm and nothing else, and anyone with a
-	 * problem is expected to phone; on, they can say so in the app and it shows
-	 * up as an unresolved flag on the crew.
-	 *
-	 * Flagging never unassigns anyone either way.
-	 */
-	allowAssignmentDecline: boolean;
 	/** Refs into `formSchemas`, not inline schemas as in v1. */
 	eventFormSchemaId: string | null;
 	timeEntryFormSchemaId: string | null;

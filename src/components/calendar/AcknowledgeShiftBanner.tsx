@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { View } from "react-native";
 import { Button, Icon, Text } from "../ui";
-import { showPrompt } from "../../utils/alertUtils";
 import { toast } from "../ui/Toast";
 import { Theme, useTheme, useThemedStyles } from "../../theme";
 
@@ -18,72 +17,30 @@ import { Theme, useTheme, useThemedStyles } from "../../theme";
  * answers "I know I am working this" after. A worker can have confirmed
  * availability weeks ago and still not have seen that the shift became real.
  *
- * The second button only appears when the company turns on
- * `allowAssignmentDecline`. Flagging never unassigns anyone — a mis-tap must
- * not silently unstaff an event — it raises something for an admin to resolve.
+ * Confirming is the ONLY answer. There was briefly a second button for saying
+ * you could not make it, which raised a flag for a manager without unassigning
+ * anyone; it is gone. A shift you cannot work is a conversation with your
+ * manager, not a form — and a flag that left the crew list looking full was a
+ * quiet way for a job to end up short.
+ *
+ * Shown only when the company requires confirmation
+ * (`requireAssignmentAcknowledgement`); `required` carries that decision.
  */
 export function AcknowledgeShiftBanner({
 	acknowledgement,
 	onAcknowledge,
-	onFlagProblem,
 }: {
 	acknowledgement: {
 		required: boolean;
 		acknowledged: boolean;
-		problem: { at: Date | null; note: string | null } | null;
-		canFlagProblem: boolean;
 	};
 	onAcknowledge: () => Promise<void>;
-	onFlagProblem: (note: string) => Promise<void>;
 }) {
 	const theme = useTheme();
 	const styles = useThemedStyles(bannerStyles);
 	const [busy, setBusy] = useState(false);
 
 	if (!acknowledgement.required) return null;
-
-	/* Already flagged — say so, and let them take it back. */
-	if (acknowledgement.problem) {
-		return (
-			<View style={[styles.banner, styles.problem]}>
-				<View style={styles.row}>
-					<Icon
-						name="alert-circle"
-						size="sm"
-						color={theme.colors.danger}
-					/>
-					<Text variant="bodyStrong" color={theme.colors.danger}>
-						You said you can&rsquo;t make this
-					</Text>
-				</View>
-				{acknowledgement.problem.note ? (
-					<Text variant="caption" color={theme.colors.textSecondary}>
-						&ldquo;{acknowledgement.problem.note}&rdquo;
-					</Text>
-				) : null}
-				<Text variant="caption" color={theme.colors.textSecondary}>
-					You are still on the crew until a manager changes it.
-				</Text>
-				<Button
-					variant="secondary"
-					size="small"
-					loading={busy}
-					title="Actually, I can work it"
-					onPress={async () => {
-						setBusy(true);
-						try {
-							await onAcknowledge();
-							toast.success("Thanks — marked as working it");
-						} catch {
-							toast.error("Could not update that");
-						} finally {
-							setBusy(false);
-						}
-					}}
-				/>
-			</View>
-		);
-	}
 
 	/* Confirmed — a quiet receipt, not a call to action. */
 	if (acknowledgement.acknowledged) {
@@ -113,99 +70,47 @@ export function AcknowledgeShiftBanner({
 				Let your manager know you&rsquo;ve seen it.
 			</Text>
 
-			<View style={styles.actions}>
-				<Button
-					variant="primary"
-					size="small"
-					loading={busy}
-					title="Got it"
-					onPress={async () => {
-						setBusy(true);
-						try {
-							await onAcknowledge();
-							toast.success("Confirmed — thanks");
-						} catch {
-							toast.error("Could not confirm", "Try again.");
-						} finally {
-							setBusy(false);
-						}
-					}}
-				/>
-
-				{acknowledgement.canFlagProblem && (
-					<Button
-						variant="text"
-						size="small"
-						title="I can't make it"
-						onPress={() =>
-							/*
-							 * A reason is asked for but not required — someone
-							 * who cannot work a shift should never be blocked
-							 * from saying so by a form.
-							 */
-							showPrompt(
-								"Can't make this shift?",
-								"Your manager will see this. You stay on the crew until they change it.",
-								[
-									{ text: "Cancel", style: "cancel" },
-									{
-										text: "Send",
-										style: "destructive",
-										onPress: (note) => {
-											void (async () => {
-												setBusy(true);
-												try {
-													await onFlagProblem(
-														note ?? "",
-													);
-													toast.success(
-														"Your manager has been told",
-													);
-												} catch {
-													toast.error(
-														"Could not send that",
-													);
-												} finally {
-													setBusy(false);
-												}
-											})();
-										},
-									},
-								],
-							)
-						}
-					/>
-				)}
-			</View>
+			<Button
+				variant="primary"
+				size="small"
+				loading={busy}
+				title="Got it"
+				onPress={async () => {
+					setBusy(true);
+					try {
+						await onAcknowledge();
+						toast.success("Confirmed — thanks");
+					} catch {
+						toast.error("Could not confirm", "Try again.");
+					} finally {
+						setBusy(false);
+					}
+				}}
+			/>
 		</View>
 	);
 }
 
 const bannerStyles = (theme: Theme) => ({
 	banner: {
+		gap: theme.spacing.sm,
+		padding: theme.spacing.lg,
+		marginHorizontal: theme.spacing.lg,
+		marginTop: theme.spacing.lg,
 		borderRadius: theme.radius.md,
-		padding: theme.spacing.md,
-		gap: theme.spacing.xs,
-		marginBottom: theme.spacing.lg,
+		borderWidth: theme.hairlineWidth,
 	},
 	pending: {
 		backgroundColor: theme.colors.warningSubtle,
+		borderColor: theme.colors.warning,
 	},
 	done: {
 		backgroundColor: theme.colors.successSubtle,
-	},
-	problem: {
-		backgroundColor: theme.colors.dangerSubtle,
+		borderColor: "transparent",
 	},
 	row: {
 		flexDirection: "row" as const,
 		alignItems: "center" as const,
 		gap: theme.spacing.sm,
-	},
-	actions: {
-		flexDirection: "row" as const,
-		alignItems: "center" as const,
-		gap: theme.spacing.sm,
-		marginTop: theme.spacing.xs,
 	},
 });

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
 	acknowledgeAssignment,
-	flagAssignmentProblem,
 	setEventResponse,
 	subscribeEvent,
 	subscribeEventResponseDocs,
@@ -161,34 +160,6 @@ export function useEventDetails(eventId: string) {
 	const workerList = useMemo(() => workerNames.join(", "), [workerNames]);
 
 	/*
-	 * Crew who have said they cannot make it.
-	 *
-	 * Flagging deliberately does NOT unassign anyone — a mis-tap must never
-	 * silently unstaff an event — so the assignment list still reads as full
-	 * and nothing else about the event changes. That is exactly why this has to
-	 * be surfaced: without it the only trace is a field on a document nobody
-	 * opens, and the job turns up short on the day.
-	 */
-	const flaggedProblems = useMemo(
-		() =>
-			Object.values(responseDocs)
-				.filter(
-					(doc) =>
-						doc.problemFlaggedAt &&
-						event?.assignedUserIds?.includes(doc.userId),
-				)
-				.map((doc) => ({
-					userId: doc.userId,
-					name:
-						byUserId[doc.userId]?.displayName ??
-						"Someone on the crew",
-					note: doc.problemNote ?? null,
-					at: doc.problemFlaggedAt?.toDate?.() ?? null,
-				})),
-		[responseDocs, byUserId, event?.assignedUserIds],
-	);
-
-	/*
 	 * Admins always edit; everyone else only when the company allows it AND
 	 * they are actually on the event. The rules enforce the narrower version of
 	 * this (workerNotes only), so this is a UI affordance, not the guard.
@@ -239,34 +210,12 @@ export function useEventDetails(eventId: string) {
 			amAssigned &&
 			preferences.requireAssignmentAcknowledgement !== false,
 		acknowledged: Boolean(myDoc?.acknowledgedAt),
-		problem: myDoc?.problemFlaggedAt
-			? {
-					at: myDoc.problemFlaggedAt.toDate?.() ?? null,
-					note: myDoc.problemNote ?? null,
-				}
-			: null,
-		/** Whether the company lets a worker say they cannot make it. */
-		canFlagProblem: Boolean(preferences.allowAssignmentDecline),
 	};
 
 	const acknowledge = useCallback(async () => {
 		if (!companyId || !event) return;
 		await acknowledgeAssignment(companyId, event.id, userId, event.dateKey);
 	}, [companyId, event, userId]);
-
-	const flagProblem = useCallback(
-		async (note: string) => {
-			if (!companyId || !event) return;
-			await flagAssignmentProblem(
-				companyId,
-				event.id,
-				userId,
-				event.dateKey,
-				note,
-			);
-		},
-		[companyId, event, userId],
-	);
 
 	return {
 		user,
@@ -276,9 +225,7 @@ export function useEventDetails(eventId: string) {
 		eventLabel,
 		responses,
 		myAcknowledgement,
-		flaggedProblems,
 		acknowledge,
-		flagProblem,
 		myResponse,
 		workerNames,
 		workerList,

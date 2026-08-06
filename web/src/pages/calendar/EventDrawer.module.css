@@ -307,8 +307,7 @@
  * this answers "have you seen you're working".
  */
 .acked,
-.unacked,
-.problem {
+.unacked {
 	display: inline-flex;
 	align-items: center;
 	gap: 3px;
@@ -322,9 +321,4 @@
 
 .unacked {
 	color: var(--c-text-tertiary);
-}
-
-.problem {
-	color: var(--c-danger);
-	font-weight: 600;
 }

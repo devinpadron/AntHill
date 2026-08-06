@@ -119,11 +119,6 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 					 * Calendar tab badge covers however many others there are.
 					 */
 					case "assignment_ack_nudge":
-					/*
-					 * A crew member cannot make this one. Opens the event,
-					 * where the warning names who and why.
-					 */
-					case "assignment_problem":
 						if (data.eventId) {
 							pendingNavigation.setAction(screen, {
 								eventId: data.eventId,

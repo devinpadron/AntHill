@@ -85,13 +85,9 @@ export function useEventPrompts() {
 		if (!requireAck) return [];
 		return events.filter((event) => {
 			const response = responses[event.id];
-			// No response document yet means nothing has been acknowledged. A
-			// flagged problem also counts as resolved-enough: the worker has
-			// said their piece and it is a manager's move now, so continuing
-			// to warn them would be asking them to agree with a shift they
-			// have already objected to.
+			// No response document yet means nothing has been acknowledged.
 			if (!response) return true;
-			return !response.acknowledgedAt && !response.problemFlaggedAt;
+			return !response.acknowledgedAt;
 		});
 	}, [events, responses, requireAck]);
 

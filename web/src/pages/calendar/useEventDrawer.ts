@@ -48,8 +48,6 @@ export type RosterRow = {
 	status: EventResponseStatus | null;
 	/** The assignment answer — "I see I am working this." Independent. */
 	acknowledged: boolean;
-	/** Set when they said they cannot work it after all. Never unassigns. */
-	problem: { at: Date | null; note: string | null } | null;
 	/** Other events the same day this worker is also assigned to. */
 	conflicts: Event[];
 };
@@ -160,12 +158,6 @@ export function useEventDrawer(eventId: string) {
 					} as Membership),
 				status: response?.status ?? null,
 				acknowledged: Boolean(response?.acknowledgedAt),
-				problem: response?.problemFlaggedAt
-					? {
-							at: response.problemFlaggedAt.toDate?.() ?? null,
-							note: response.problemNote ?? null,
-						}
-					: null,
 				conflicts: sameDay.filter(
 					(other) =>
 						other.id !== event.id &&

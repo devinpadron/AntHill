@@ -648,8 +648,6 @@ export async function ensureAssignmentRecords(
 				status: "pending",
 				respondedAt: null,
 				acknowledgedAt: null,
-				problemFlaggedAt: null,
-				problemNote: null,
 				updatedAt: now,
 				schemaVersion: 2,
 			});
@@ -689,8 +687,6 @@ export async function acknowledgeAssignment(
 					userId,
 					dateKey,
 					acknowledgedAt: firestore.FieldValue.serverTimestamp(),
-					problemFlaggedAt: null,
-					problemNote: null,
 					updatedAt: firestore.FieldValue.serverTimestamp(),
 					schemaVersion: 2,
 				},
@@ -704,8 +700,6 @@ export async function acknowledgeAssignment(
 						"userId",
 						"dateKey",
 						"acknowledgedAt",
-						"problemFlaggedAt",
-						"problemNote",
 						"updatedAt",
 						"schemaVersion",
 					],
@@ -713,59 +707,6 @@ export async function acknowledgeAssignment(
 			);
 	} catch (e) {
 		console.error("Error acknowledging assignment", e);
-		throw e;
-	}
-}
-
-/**
- * "I cannot work this after all."
- *
- * Does NOT unassign. A mis-tap must never silently unstaff an event, so this
- * raises a flag for an admin to resolve and leaves the crew exactly as it was.
- * Only offered when `preferences.allowAssignmentDecline` is on.
- */
-export async function flagAssignmentProblem(
-	companyId: string,
-	eventId: string,
-	userId: string,
-	dateKey: string,
-	note: string,
-): Promise<void> {
-	const id = eventResponseId(eventId, userId);
-	try {
-		await db
-			.collection(C.eventResponses)
-			.doc(id)
-			.set(
-				{
-					id,
-					companyId,
-					eventId,
-					userId,
-					dateKey,
-					acknowledgedAt: null,
-					problemFlaggedAt: firestore.FieldValue.serverTimestamp(),
-					problemNote: note.trim() || null,
-					updatedAt: firestore.FieldValue.serverTimestamp(),
-					schemaVersion: 2,
-				},
-				{
-					mergeFields: [
-						"id",
-						"companyId",
-						"eventId",
-						"userId",
-						"dateKey",
-						"acknowledgedAt",
-						"problemFlaggedAt",
-						"problemNote",
-						"updatedAt",
-						"schemaVersion",
-					],
-				},
-			);
-	} catch (e) {
-		console.error("Error flagging assignment problem", e);
 		throw e;
 	}
 }
@@ -814,8 +755,6 @@ export async function syncEventAudience(
 				// Present and null from the start, so a document never has to
 				// be distinguished by which fields it happens to carry.
 				acknowledgedAt: null,
-				problemFlaggedAt: null,
-				problemNote: null,
 				updatedAt: now,
 				schemaVersion: 2,
 			});

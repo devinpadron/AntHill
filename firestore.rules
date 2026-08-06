@@ -478,9 +478,14 @@ service cloud.firestore {
        * it is, not which event it belongs to.
        *
        * The key list covers TWO separate answers on one document:
-       *   status / respondedAt              "can you work this?"
-       *   acknowledgedAt / problemFlaggedAt "I see I am working this"
+       *   status / respondedAt   "can you work this?"
+       *   acknowledgedAt         "I see I am working this"
        * A worker may write either; both are theirs to state.
+       *
+       * `problemFlaggedAt` and `problemNote` are gone. A worker could once say
+       * they could not make a shift they were already on, which raised a flag
+       * without unassigning them; the feature is removed, and leaving the keys
+       * writable would let a client keep setting fields nothing reads.
        *
        * `id`, `companyId`, `eventId` and `userId` are deliberately absent, so
        * a worker cannot re-point their own response at another event or
@@ -492,8 +497,8 @@ service cloud.firestore {
                     || (isSelf(resource.data.userId)
                         && request.resource.data.diff(resource.data)
                              .affectedKeys()
-                             .hasOnly(["status","respondedAt","updatedAt","dateKey",
-                                       "acknowledgedAt","problemFlaggedAt","problemNote"]));
+                             .hasOnly(["status","respondedAt","updatedAt",
+                                       "dateKey","acknowledgedAt"]));
 
       allow delete: if v2IsManager(resource.data.companyId);
     }

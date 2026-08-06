@@ -204,23 +204,6 @@ export function CompanySettingsPage() {
 						}
 						affects={activeCount}
 					/>
-					{/*
-					 * Only offered where there is an acknowledgement to flag a
-					 * problem during. Leaving it visible under a disabled
-					 * requirement would advertise a button no worker can reach.
-					 */}
-					{requireAck && (
-						<Toggle
-							label="Workers can flag a problem with a shift"
-							description="Adds a second button beside the confirmation, so a worker can say they can't make it. It flags the shift for you to resolve and never unassigns them."
-							checked={preferences.allowAssignmentDecline}
-							busy={busy === "decline"}
-							onChange={(v) =>
-								patch("decline", { allowAssignmentDecline: v })
-							}
-							affects={activeCount}
-						/>
-					)}
 					<Toggle
 						label="Workers see event labels"
 						description="Shows the colour-coded label on an event in the app. Admins always see them."

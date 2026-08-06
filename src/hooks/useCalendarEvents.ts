@@ -60,8 +60,6 @@ export type AgendaItemData = {
 	assigned: string[];
 	uid: string;
 	labelId: string | null;
-	/** Crew who have said they cannot make it. Maintained server-side. */
-	problemCount: number;
 };
 
 export type AgendaItems = Record<string, AgendaItemData[]>;
@@ -387,7 +385,6 @@ export function useCalendarEvents({
 				assigned: event.assignedUserIds ?? [],
 				uid: event.id,
 				labelId: event.labelId,
-				problemCount: event.problemCount ?? 0,
 			});
 		}
 		for (const day of Object.keys(grouped)) {

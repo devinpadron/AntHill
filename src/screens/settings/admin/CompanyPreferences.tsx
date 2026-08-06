@@ -353,21 +353,6 @@ const CompanyPreferences = ({ navigation }) => {
 								save({ acknowledgementReminder })
 							}
 						/>
-
-						<ListRow
-							title="Let workers flag a problem"
-							subtitle="Adds a way to say they can't make a shift. Never unassigns anyone — it raises it for you."
-							icon="alert-circle-outline"
-							separator={false}
-							accessory={
-								<Toggle
-									value={!!preferences.allowAssignmentDecline}
-									onValueChange={(value) =>
-										save({ allowAssignmentDecline: value })
-									}
-								/>
-							}
-						/>
 					</>
 				)}
 			</Card>

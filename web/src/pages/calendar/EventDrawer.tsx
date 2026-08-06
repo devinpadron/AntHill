@@ -102,7 +102,6 @@ export function EventDrawer() {
 	 * questions have different answers and must not be conflated.
 	 */
 	const acked = roster.filter((row) => row.acknowledged).length;
-	const problems = roster.filter((row) => row.problem).length;
 
 	async function changeResponse(
 		targetUserId: string,
@@ -207,18 +206,6 @@ export function EventDrawer() {
 							</Text>
 						</span>
 					</div>
-
-					{problems > 0 && (
-						<div className={styles.warnBox}>
-							<Icon name="alert-circle" size="sm" />
-							<Text variant="caption" as="span">
-								{problems}{" "}
-								{problems === 1 ? "person says" : "people say"}{" "}
-								they can&rsquo;t make this. They are still
-								assigned — remove them or find cover.
-							</Text>
-						</div>
-					)}
 
 					{roster.length === 0 ? (
 						<div className={styles.warnBox}>
@@ -515,16 +502,7 @@ function RosterRowView({
 				 * it. Someone can have confirmed they were free weeks ago and
 				 * still not have seen that the shift became real.
 				 */}
-				{row.problem ? (
-					<span
-						className={styles.problem}
-						title={row.problem.note ?? undefined}
-					>
-						<Icon name="alert-circle" size="xs" />
-						can&rsquo;t make it
-						{row.problem.note ? ` — ${row.problem.note}` : ""}
-					</span>
-				) : row.acknowledged ? (
+				{row.acknowledged ? (
 					<span className={styles.acked}>
 						<Icon name="checkmark-circle" size="xs" />
 						seen it
