@@ -6,6 +6,15 @@ export type RootStackParamList = {
 	Details: { eventId: string };
 	TimeEntryDetails: { entryId: string[] | string; userId: string };
 	EmployeeList: {};
+	/*
+	 * The nudge for unanswered events lands here rather than on one event's
+	 * Details, because it covers ALL of them at once — sending someone to the
+	 * first of six would hide the other five.
+	 *
+	 * Only mounted when preferences.enableAvailability is on, which is also the
+	 * only condition under which the nudge is ever sent.
+	 */
+	Availability: {};
 	// Add other screens as needed
 };
 

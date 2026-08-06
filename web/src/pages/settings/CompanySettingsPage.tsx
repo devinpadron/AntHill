@@ -215,8 +215,8 @@ export function CompanySettingsPage() {
 				{preferences.enableAvailability && (
 					<Card title="Reply reminders">
 						<Text variant="caption" tone="secondary">
-							How long before an event a worker who has not
-							answered gets nudged.
+							How often to remind a worker who still has events
+							awaiting a reply. One reminder covers all of them.
 						</Text>
 
 						<Toggle
@@ -238,7 +238,7 @@ export function CompanySettingsPage() {
 							<>
 								<div className={styles.durationRow}>
 									<Input
-										label="Hours before"
+										label="Every (hours)"
 										type="number"
 										min={0}
 										value={String(
@@ -282,7 +282,7 @@ export function CompanySettingsPage() {
 								<div className={styles.preview}>
 									<Icon name="time-outline" size="sm" />
 									<Text variant="caption" as="span">
-										Workers are reminded{" "}
+										Unanswered events are chased every{" "}
 										<strong>
 											{preferences.availabilityReminder
 												?.hours ?? 0}
@@ -290,8 +290,8 @@ export function CompanySettingsPage() {
 											{preferences.availabilityReminder
 												?.minutes ?? 0}
 											m
-										</strong>{" "}
-										before an event they have not answered.
+										</strong>
+										, in a single reminder per worker.
 									</Text>
 								</div>
 							</>

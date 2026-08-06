@@ -125,6 +125,17 @@ export interface CompanyPreferences extends CompanyScoped {
 	canViewEventLabels: boolean;
 	enableTimeSheet: boolean;
 	enableAvailability: boolean;
+	/**
+	 * How often to re-nudge a worker who has not answered an event invitation.
+	 *
+	 * An INTERVAL, not a lead time. Both clients used to label it "hours before
+	 * an event", but nothing anywhere ever read the value — no function, no
+	 * screen — so it described a behaviour that did not exist. The
+	 * `nudgePendingResponses` function now uses it as the gap between reminders
+	 * to the same worker, and the labels say so.
+	 *
+	 * Zero is treated as unconfigured, not as "nudge on every pass".
+	 */
 	availabilityReminder: {
 		enabled: boolean;
 		hours: number;

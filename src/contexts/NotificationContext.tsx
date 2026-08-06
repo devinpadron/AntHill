@@ -54,7 +54,12 @@ const parseIds = (value: string): string[] =>
  * against the real route table instead of cast — a sender typo should be a
  * logged no-op, not a navigation crash.
  */
-const ROUTES: RouteName[] = ["Details", "TimeEntryDetails", "EmployeeList"];
+const ROUTES: RouteName[] = [
+	"Details",
+	"TimeEntryDetails",
+	"EmployeeList",
+	"Availability",
+];
 
 const asRoute = (value: string | undefined): RouteName | null =>
 	value && (ROUTES as string[]).includes(value) ? (value as RouteName) : null;
@@ -92,6 +97,16 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 				switch (data.type) {
 					case "user_left":
 					case "new_user_joined":
+						pendingNavigation.setAction(screen);
+						break;
+
+					/*
+					 * A reminder that several events are still unanswered, so
+					 * it opens the list rather than any one of them. `data`
+					 * carries pendingCount and soonestDateKey if a richer
+					 * landing is ever wanted.
+					 */
+					case "availability_nudge":
 						pendingNavigation.setAction(screen);
 						break;
 

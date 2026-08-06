@@ -523,6 +523,20 @@
 					"order": "ASCENDING"
 				}
 			]
+		},
+		{
+			"collectionGroup": "eventResponses",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "status",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "dateKey",
+					"order": "ASCENDING"
+				}
+			]
 		}
 	],
 	"fieldOverrides": []

@@ -422,7 +422,8 @@ const AvailabilityPage = ({ navigation }) => {
 								Workers are reminded every{" "}
 								{reminderHours || "24"}h{" "}
 								{reminderMinutes || "0"}m until they confirm or
-								decline.
+								decline. One reminder covers every event they
+								owe an answer on, however many that is.
 							</Text>
 						</>
 					) : (
