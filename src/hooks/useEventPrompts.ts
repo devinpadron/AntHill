@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+	subscribeEventsInRange,
 	subscribeMyResponseDocs,
 	subscribeMyUpcomingEvents,
 } from "../services/eventService";
-import { Event, EventResponse } from "../types";
+import { Event, EventResponse, FilterType } from "../types";
 import { useUser } from "../contexts/UserContext";
 import { useCompany } from "../contexts/CompanyContext";
 
@@ -45,13 +46,14 @@ function todayKey(): string {
 }
 
 export function useEventPrompts() {
-	const { companyId, userId } = useUser();
+	const { companyId, userId, membership } = useUser();
 	const { preferences } = useCompany();
 
 	const [events, setEvents] = useState<Event[]>([]);
 	const [responses, setResponses] = useState<Record<string, EventResponse>>(
 		{},
 	);
+	const [unstaffed, setUnstaffed] = useState<Event[]>([]);
 
 	const from = todayKey();
 	const enabled = Boolean(companyId && userId);
@@ -73,12 +75,53 @@ export function useEventPrompts() {
 	}, [enabled, companyId, userId, from]);
 
 	/*
+	 * Upcoming jobs with nobody on the crew yet.
+	 *
+	 * This is the set the Availability screen draws from, and the reason the
+	 * badge showed nothing before: most of those jobs are OPEN, and an open job
+	 * has no response document until somebody answers it. Counting response
+	 * documents alone therefore reported zero for any company that does not
+	 * publish to groups — which is most of them.
+	 *
+	 * Unassigned rather than merely open, so the two are one subscription, and
+	 * so a job that has since been STAFFED drops out. Otherwise a worker who
+	 * never answered an invitation would carry that badge forever, pointing at
+	 * a screen that had stopped listing the job.
+	 */
+	const restricted = membership?.visibility === "restricted";
+
+	useEffect(() => {
+		if (!enabled) {
+			setUnstaffed([]);
+			return;
+		}
+		return subscribeEventsInRange(
+			companyId!,
+			{ from, filter: FilterType.UNASSIGNED, userId },
+			setUnstaffed,
+			() => setUnstaffed([]),
+		);
+	}, [enabled, companyId, userId, from]);
+
+	/*
 	 * The subscriptions run regardless; only the COUNTS are gated on
 	 * preferences. Gating the queries instead would mean a company toggling a
 	 * setting had to remount two listeners to see a badge change.
 	 */
 	const requireAck = preferences.requireAssignmentAcknowledgement !== false;
-	const availabilityOn = Boolean(preferences.enableAvailability);
+
+	/*
+	 * The badge follows the "Chase unanswered availability" setting.
+	 *
+	 * Deliberately the same switch that turns on the push reminders rather than
+	 * a separate one: a company that has decided not to chase people about
+	 * unanswered jobs has decided not to nag them, and a permanent red count on
+	 * the tab is a nag that never goes away.
+	 */
+	const chaseOn = Boolean(
+		preferences.enableAvailability &&
+		preferences.availabilityReminder?.enabled,
+	);
 
 	/** Assigned, upcoming, and not yet confirmed as seen. */
 	const unconfirmed = useMemo(() => {
@@ -98,21 +141,45 @@ export function useEventPrompts() {
 	);
 
 	/*
-	 * Invitations still unanswered.
+	 * Jobs still awaiting an answer, matching what the Availability screen
+	 * lists: open jobs nobody has replied to, plus invitations still pending.
 	 *
 	 * Assignment is what separates the two questions, so anything I am on the
 	 * crew for is excluded — once the shift is mine, "can you work this" is no
 	 * longer the question being asked.
+	 *
+	 * Counted as a SET so the number can never exceed the list it points at.
 	 */
 	const awaitingReply = useMemo(() => {
-		if (!availabilityOn) return 0;
+		if (!chaseOn) return 0;
+
 		const assigned = new Set(events.map((event) => event.id));
-		return Object.values(responses).filter(
-			(response) =>
-				response.status === "pending" &&
-				!assigned.has(response.eventId),
-		).length;
-	}, [events, responses, availabilityOn]);
+		const ids = new Set<string>();
+
+		for (const event of unstaffed) {
+			// On the crew already: a different question entirely.
+			if (assigned.has(event.id)) continue;
+
+			/*
+			 * A response document means they were invited — or have answered
+			 * before. Targeted jobs are visible only to the invited, and a
+			 * restricted worker sees nothing else at all.
+			 */
+			const mine = responses[event.id];
+			const invited = Boolean(mine);
+			if (event.isTargeted && !invited) continue;
+			if (restricted && !invited) continue;
+
+			// Answered either way is answered; only "pending" still needs one.
+			if (mine?.status === "confirmed" || mine?.status === "declined") {
+				continue;
+			}
+
+			ids.add(event.id);
+		}
+
+		return ids.size;
+	}, [events, unstaffed, responses, restricted, chaseOn]);
 
 	return {
 		/** Assigned, upcoming, not yet confirmed. */
