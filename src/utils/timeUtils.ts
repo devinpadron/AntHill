@@ -12,6 +12,25 @@ export const formatDuration = (seconds: number): string => {
 	return `${minutes}m`;
 };
 
+/**
+ * Seconds as a running clock — `H:MM:SS`, or `MM:SS` under an hour.
+ *
+ * For a display that updates every second. `formatDuration` is the one for
+ * totals ("2h 15m"); this one keeps the seconds column, which is what makes a
+ * timer read as live rather than stuck.
+ */
+export const formatStopwatch = (totalSeconds: number): string => {
+	const safe = Math.max(0, Math.floor(totalSeconds));
+	const hours = Math.floor(safe / 3600);
+	const minutes = Math.floor((safe % 3600) / 60);
+	const seconds = safe % 60;
+
+	const mm = String(minutes).padStart(2, "0");
+	const ss = String(seconds).padStart(2, "0");
+
+	return hours > 0 ? `${hours}:${mm}:${ss}` : `${mm}:${ss}`;
+};
+
 export const calculateMultipliedValue = (
 	value: any,
 	multiplier: number,
@@ -25,22 +44,66 @@ export const calculateMultipliedValue = (
 	return result % 1 !== 0 ? result.toFixed(2) : result.toString();
 };
 
-export const getStatusBadgeColor = (status: string): string => {
+/**
+ * The set of ticked entries in a checklist field's stored response.
+ *
+ * What "ticked" looks like on disk has three shapes. `CustomFormRender` writes
+ * an array of item TEXT; older and hand-edited entries can carry an array of
+ * item IDS, or a map of `{ itemId: boolean }`. Anything comparing against only
+ * one of them renders every item as unticked — which is how a submitted
+ * checklist came back looking like a plain list of options.
+ *
+ * Shared by the reader and the editor so the two cannot disagree about whether
+ * an item is done.
+ */
+export const checklistCheckedSet = (response: unknown): Set<string> => {
+	const checked = new Set<string>();
+
+	if (Array.isArray(response)) {
+		response.forEach((entry) => {
+			if (typeof entry === "string") {
+				checked.add(entry);
+			} else if (entry && typeof entry === "object") {
+				// `[{id, text}]` — take whichever identifies it.
+				const item = entry as { id?: string; text?: string };
+				if (item.id) checked.add(item.id);
+				if (item.text) checked.add(item.text);
+			}
+		});
+	} else if (response && typeof response === "object") {
+		Object.entries(response as Record<string, unknown>).forEach(
+			([key, value]) => {
+				if (value) checked.add(key);
+			},
+		);
+	}
+
+	return checked;
+};
+
+/**
+ * A time entry's status as a semantic badge tone.
+ *
+ * Replaced a helper that returned a raw pastel hex — fine on white, unreadable
+ * on a dark surface. The tone resolves through the theme, so one mapping
+ * serves both modes.
+ */
+export const getStatusTone = (
+	status: string,
+): "neutral" | "accent" | "success" | "warning" | "danger" => {
 	switch (status) {
 		case "approved":
-			return "#d4edda"; // Green
-		case "pending_approval":
-			return "#fff3cd"; // Orange
-		case "edited":
-			return "#cce5ff"; // Yellow
+			return "success";
 		case "active":
-			return "#d1ecf1"; // Blue
+			return "accent";
 		case "paused":
-			return "#fff3cd"; // Orange
+		case "pending_approval":
+		case "edited":
+			return "warning";
 		case "rejected":
-			return "#f8d7da"; // Red
+			return "danger";
 		default:
-			return "#f8d7da"; // Grey
+			return "neutral";
 	}
 };
 

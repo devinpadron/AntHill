@@ -33,7 +33,6 @@ import {
 import { getAttachmentsForParent } from "../../services/attachmentService";
 import { getSchema } from "../../services/formSchemaService";
 import {
-	getStatusBadgeColor,
 	getStatusBadgeText,
 	calculateFieldTotals,
 } from "../../utils/timeUtils";
@@ -43,9 +42,13 @@ import ManagerActions from "../../components/time/ManagerActions";
 import EditSheet from "../../components/time/EditSheet";
 import ExportSheet from "../../components/time/ExportSheet";
 import FieldTotalsCard from "../../components/time/FieldTotalsCard";
-import { styles } from "./TimeEntryDetails.styles";
+import { Loading, Screen, ScreenHeader } from "../../components/ui";
+import { timeEntryDetailStyles } from "./TimeEntryDetails.styles";
+import { useTheme, useThemedStyles } from "../../theme";
 
 const TimeEntryDetails = ({ route, navigation }) => {
+	const theme = useTheme();
+	const styles = useThemedStyles(timeEntryDetailStyles);
 	// Extract params - handle both single ID and array of IDs
 	const { entryId, userId: passedUserId } = route.params;
 	const entryIdArray = Array.isArray(entryId) ? entryId : [entryId];
@@ -283,15 +286,18 @@ const TimeEntryDetails = ({ route, navigation }) => {
 		[timeEntries, schemasByEntry, connectedEvents],
 	);
 
-	// If still loading, show loading indicator
 	if (isLoading) {
 		return (
-			<View style={[styles.container, styles.loadingContainer]}>
-				<ActivityIndicator size="large" color="#007AFF" />
-				<Text style={styles.loadingText}>
-					Loading time entry details...
-				</Text>
-			</View>
+			<Screen
+				header={
+					<ScreenHeader
+						title="Time entry"
+						onBack={() => navigation.goBack()}
+					/>
+				}
+			>
+				<Loading label="Loading time entry" />
+			</Screen>
 		);
 	}
 
@@ -573,37 +579,46 @@ const TimeEntryDetails = ({ route, navigation }) => {
 	};
 
 	return (
-		<View style={[styles.container, { paddingTop: insets.top }]}>
-			{/* Header */}
-			<View style={styles.header}>
-				<TouchableOpacity
-					onPress={() => navigation.goBack()}
-					style={styles.backButton}
-				>
-					<Icon name="arrow-left" size={24} color="#007AFF" />
-				</TouchableOpacity>
-				<Text style={styles.headerTitle}>
-					{timeEntries.length > 1 ? "Time Entries" : "Time Entry"}
-				</Text>
-				{isAdmin && (
-					<TouchableOpacity
-						onPress={() => setExportModalVisible(true)}
-					>
-						<Icon name="export-variant" size={24} color="#007AFF" />
-					</TouchableOpacity>
-				)}
-			</View>
-
-			<ScrollView style={styles.scrollContainer}>
+		<Screen
+			header={
+				<ScreenHeader
+					title={
+						timeEntries.length > 1 ? "Time entries" : "Time entry"
+					}
+					subtitle={
+						timeEntries.length > 1
+							? `${timeEntries.length} shifts`
+							: undefined
+					}
+					onBack={() => navigation.goBack()}
+					actions={
+						isAdmin
+							? [
+									{
+										icon: "share-outline",
+										label: "Export",
+										onPress: () =>
+											setExportModalVisible(true),
+									},
+								]
+							: []
+					}
+				/>
+			}
+		>
+			<ScrollView
+				style={styles.scrollContainer}
+				automaticallyAdjustKeyboardInsets
+				keyboardShouldPersistTaps="handled"
+			>
 				{/* Summary Card */}
+				{/* Status helpers now live in timeUtils rather than being
+				    threaded through as props from each caller. */}
 				<TimeEntrySummary
-					status={timeEntries[0]?.status || "draft"}
 					employeeUser={employeeUser}
 					totalDurationSeconds={totalDurationSeconds}
 					totalDurationDecimal={totalDurationDecimal}
 					timeEntries={timeEntries}
-					getStatusBadgeColor={getStatusBadgeColor}
-					getStatusBadgeText={getStatusBadgeText}
 				/>
 
 				{/* Field Totals Card - Add this new component */}
@@ -678,7 +693,7 @@ const TimeEntryDetails = ({ route, navigation }) => {
 				employeeUser={employeeUser}
 				companyId={companyId}
 			/>
-		</View>
+		</Screen>
 	);
 };
 

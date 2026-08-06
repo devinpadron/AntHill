@@ -11,7 +11,6 @@ import {
 	Platform,
 	ScrollView,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import { useUser } from "../../../contexts/UserContext";
 
@@ -27,7 +26,9 @@ import {
 	saveChecklist as writeChecklist,
 	subscribeChecklists,
 } from "../../../services/libraryService";
-import { styles } from "./ChecklistCreator.styles";
+import { checklistStyles } from "./ChecklistCreator.styles";
+import { useTheme, useThemedStyles } from "../../../theme";
+import { SafeAreaBand } from "../../../components/ui";
 
 /*
  * What the editor holds. A draft has no companyId, timestamps or schemaVersion
@@ -37,6 +38,8 @@ import { styles } from "./ChecklistCreator.styles";
 type ChecklistDraft = Pick<Checklist, "id" | "title" | "items">;
 
 const ChecklistCreator = ({ navigation }) => {
+	const theme = useTheme();
+	const styles = useThemedStyles(checklistStyles);
 	const { companyId } = useUser();
 
 	// States for the component
@@ -237,7 +240,11 @@ const ChecklistCreator = ({ navigation }) => {
 				style={styles.removeButton}
 				onPress={() => removeChecklistItem(item.id)}
 			>
-				<Icon name="remove-circle" size={24} color="#F44336" />
+				<Icon
+					name="remove-circle"
+					size={24}
+					color={theme.colors.danger}
+				/>
 			</TouchableOpacity>
 		</View>
 	);
@@ -255,7 +262,7 @@ const ChecklistCreator = ({ navigation }) => {
 					style={styles.actionButton}
 					onPress={() => editChecklist(item)}
 				>
-					<Icon name="edit" size={20} color="#2196F3" />
+					<Icon name="edit" size={20} color={theme.colors.accent} />
 					<Text style={styles.actionText}>Edit</Text>
 				</TouchableOpacity>
 
@@ -263,7 +270,11 @@ const ChecklistCreator = ({ navigation }) => {
 					style={styles.actionButton}
 					onPress={() => duplicateChecklist(item)}
 				>
-					<Icon name="content-copy" size={20} color="#4CAF50" />
+					<Icon
+						name="content-copy"
+						size={20}
+						color={theme.colors.success}
+					/>
 					<Text style={styles.actionText}>Duplicate</Text>
 				</TouchableOpacity>
 
@@ -271,18 +282,17 @@ const ChecklistCreator = ({ navigation }) => {
 					style={styles.actionButton}
 					onPress={() => confirmDeleteChecklist(item.id)}
 				>
-					<Icon name="delete" size={20} color="#F44336" />
+					<Icon name="delete" size={20} color={theme.colors.danger} />
 					<Text style={styles.actionText}>Delete</Text>
 				</TouchableOpacity>
 			</View>
 		</View>
 	);
 
-	const insets = useSafeAreaInsets();
-
 	// Main render function
 	return (
-		<View style={[styles.container, { paddingTop: insets.top }]}>
+		<View style={styles.container}>
+			<SafeAreaBand />
 			{/* Header */}
 			<View style={styles.header}>
 				<View style={styles.headerRow}>
@@ -312,7 +322,11 @@ const ChecklistCreator = ({ navigation }) => {
 							}
 						}}
 					>
-						<Icon name="arrow-back" size={24} color="#333" />
+						<Icon
+							name="arrow-back"
+							size={24}
+							color={theme.colors.text}
+						/>
 					</TouchableOpacity>
 					<View style={styles.headerTextContainer}>
 						<Text style={styles.headerTitle}>
@@ -333,7 +347,10 @@ const ChecklistCreator = ({ navigation }) => {
 
 			{loading ? (
 				<View style={styles.loadingContainer}>
-					<ActivityIndicator size="large" color="#0000ff" />
+					<ActivityIndicator
+						size="large"
+						color={theme.colors.accent}
+					/>
 					<Text style={styles.loadingText}>
 						Loading checklists...
 					</Text>
@@ -344,7 +361,10 @@ const ChecklistCreator = ({ navigation }) => {
 					behavior={Platform.OS === "ios" ? "padding" : "height"}
 					style={{ flex: 1 }}
 				>
-					<ScrollView style={styles.editorContainer}>
+					<ScrollView
+						style={styles.editorContainer}
+						keyboardShouldPersistTaps="handled"
+					>
 						<View style={styles.formGroup}>
 							<Text style={styles.label}>Checklist Title</Text>
 							<TextInput
@@ -409,8 +429,8 @@ const ChecklistCreator = ({ navigation }) => {
 										size={24}
 										color={
 											newItemText.trim()
-												? "#4CAF50"
-												: "#ccc"
+												? theme.colors.success
+												: theme.colors.borderStrong
 										}
 									/>
 								</TouchableOpacity>
@@ -440,7 +460,7 @@ const ChecklistCreator = ({ navigation }) => {
 											<Icon
 												name="remove-circle"
 												size={24}
-												color="#F44336"
+												color={theme.colors.danger}
 											/>
 										</TouchableOpacity>
 									</View>
@@ -483,7 +503,7 @@ const ChecklistCreator = ({ navigation }) => {
 							{saving ? (
 								<ActivityIndicator
 									size="small"
-									color="#ffffff"
+									color={theme.colors.onAccent}
 								/>
 							) : (
 								<Text style={styles.saveButtonText}>
@@ -499,7 +519,11 @@ const ChecklistCreator = ({ navigation }) => {
 					<View style={styles.listContainer}>
 						{checklists.length === 0 ? (
 							<View style={styles.emptyContainer}>
-								<Icon name="checklist" size={64} color="#ccc" />
+								<Icon
+									name="checklist"
+									size={64}
+									color={theme.colors.borderStrong}
+								/>
 								<Text style={styles.emptyText}>
 									No checklists found
 								</Text>
@@ -522,7 +546,11 @@ const ChecklistCreator = ({ navigation }) => {
 							style={styles.createButton}
 							onPress={createNewChecklist}
 						>
-							<Icon name="add" size={24} color="#fff" />
+							<Icon
+								name="add"
+								size={24}
+								color={theme.colors.onAccent}
+							/>
 							<Text style={styles.createButtonText}>
 								Create New Checklist
 							</Text>

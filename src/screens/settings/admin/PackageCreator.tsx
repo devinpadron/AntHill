@@ -10,7 +10,6 @@ import {
 	ScrollView,
 	Switch,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import { useUser } from "../../../contexts/UserContext";
 
@@ -28,7 +27,9 @@ import {
 	subscribePackages,
 } from "../../../services/libraryService";
 import type { Package as PackageDoc } from "../../../types";
-import { styles } from "./PackageCreator.styles";
+import { packageStyles } from "./PackageCreator.styles";
+import { useTheme, useThemedStyles } from "../../../theme";
+import { SafeAreaBand } from "../../../components/ui";
 
 type PackageChecklist = {
 	checklistId: string;
@@ -47,8 +48,9 @@ type Package = {
 };
 
 const PackageCreator = ({ navigation }) => {
+	const theme = useTheme();
+	const styles = useThemedStyles(packageStyles);
 	const { companyId } = useUser();
-	const insets = useSafeAreaInsets();
 
 	// States
 	const [packages, setPackages] = useState<Package[]>([]);
@@ -273,7 +275,7 @@ const PackageCreator = ({ navigation }) => {
 						<Icon
 							name="check-circle"
 							size={16}
-							color="#4CAF50"
+							color={theme.colors.success}
 							style={styles.checklistIcon}
 						/>
 						<Text
@@ -298,7 +300,7 @@ const PackageCreator = ({ navigation }) => {
 					style={styles.actionButton}
 					onPress={() => editPackage(item)}
 				>
-					<Icon name="edit" size={20} color="#2196F3" />
+					<Icon name="edit" size={20} color={theme.colors.accent} />
 					<Text style={styles.actionText}>Edit</Text>
 				</TouchableOpacity>
 
@@ -306,7 +308,11 @@ const PackageCreator = ({ navigation }) => {
 					style={styles.actionButton}
 					onPress={() => duplicatePackage(item)}
 				>
-					<Icon name="content-copy" size={20} color="#4CAF50" />
+					<Icon
+						name="content-copy"
+						size={20}
+						color={theme.colors.success}
+					/>
 					<Text style={styles.actionText}>Duplicate</Text>
 				</TouchableOpacity>
 
@@ -314,7 +320,7 @@ const PackageCreator = ({ navigation }) => {
 					style={styles.actionButton}
 					onPress={() => confirmDeletePackage(item.id)}
 				>
-					<Icon name="delete" size={20} color="#F44336" />
+					<Icon name="delete" size={20} color={theme.colors.danger} />
 					<Text style={styles.actionText}>Delete</Text>
 				</TouchableOpacity>
 			</View>
@@ -323,7 +329,8 @@ const PackageCreator = ({ navigation }) => {
 
 	// Main render function
 	return (
-		<View style={[styles.container, { paddingTop: insets.top }]}>
+		<View style={styles.container}>
+			<SafeAreaBand />
 			{/* Header */}
 			<View style={styles.header}>
 				<View style={styles.headerRow}>
@@ -353,7 +360,11 @@ const PackageCreator = ({ navigation }) => {
 							}
 						}}
 					>
-						<Icon name="arrow-back" size={24} color="#333" />
+						<Icon
+							name="arrow-back"
+							size={24}
+							color={theme.colors.text}
+						/>
 					</TouchableOpacity>
 					<View style={styles.headerTextContainer}>
 						<Text style={styles.headerTitle}>
@@ -374,13 +385,20 @@ const PackageCreator = ({ navigation }) => {
 
 			{loading ? (
 				<View style={styles.loadingContainer}>
-					<ActivityIndicator size="large" color="#0000ff" />
+					<ActivityIndicator
+						size="large"
+						color={theme.colors.accent}
+					/>
 					<Text style={styles.loadingText}>Loading packages...</Text>
 				</View>
 			) : isEditing ? (
 				// Package editor
 				<View style={styles.editorContainer}>
-					<ScrollView style={{ flex: 1 }}>
+					<ScrollView
+						style={{ flex: 1 }}
+						automaticallyAdjustKeyboardInsets
+						keyboardShouldPersistTaps="handled"
+					>
 						<View style={styles.formGroup}>
 							<Text style={styles.label}>Package Title</Text>
 							<TextInput
@@ -430,7 +448,7 @@ const PackageCreator = ({ navigation }) => {
 									<Icon
 										name="error-outline"
 										size={48}
-										color="#aaa"
+										color={theme.colors.textTertiary}
 									/>
 									<Text style={styles.noChecklistsText}>
 										No checklists available
@@ -504,15 +522,15 @@ const PackageCreator = ({ navigation }) => {
 													)
 												}
 												trackColor={{
-													false: "#dddddd",
-													true: "#a5d6a7",
+													false: theme.colors.border,
+													true: theme.colors.success,
 												}}
 												thumbColor={
 													!!selectedChecklists[
 														checklist.id
 													]
-														? "#4CAF50"
-														: "#f4f3f4"
+														? theme.colors.success
+														: theme.colors.surface
 												}
 											/>
 										</TouchableOpacity>
@@ -535,7 +553,7 @@ const PackageCreator = ({ navigation }) => {
 										<Icon
 											name="check-circle"
 											size={20}
-											color="#4CAF50"
+											color={theme.colors.success}
 										/>
 										<Text
 											style={
@@ -588,7 +606,7 @@ const PackageCreator = ({ navigation }) => {
 							{saving ? (
 								<ActivityIndicator
 									size="small"
-									color="#ffffff"
+									color={theme.colors.onAccent}
 								/>
 							) : (
 								<Text style={styles.saveButtonText}>
@@ -607,7 +625,7 @@ const PackageCreator = ({ navigation }) => {
 								<Icon
 									name="inventory-2"
 									size={64}
-									color="#ccc"
+									color={theme.colors.borderStrong}
 								/>
 								<Text style={styles.emptyText}>
 									No packages found
@@ -631,7 +649,11 @@ const PackageCreator = ({ navigation }) => {
 							style={styles.createButton}
 							onPress={createNewPackage}
 						>
-							<Icon name="add" size={24} color="#fff" />
+							<Icon
+								name="add"
+								size={24}
+								color={theme.colors.onAccent}
+							/>
 							<Text style={styles.createButtonText}>
 								Create New Package
 							</Text>

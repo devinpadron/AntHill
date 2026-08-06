@@ -8,17 +8,19 @@ import {
 	StatusBar,
 } from "react-native";
 import { Dropdown } from "react-native-element-dropdown";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import LoadingScreen from "../LoadingScreen";
 import { useProfile } from "../../hooks/useProfile";
 import { showPrompt, showConfirmation } from "../../utils/alertUtils";
 import { Button } from "../../components/ui/Button";
 import { useUser } from "../../contexts/UserContext";
-import { styles } from "./ProfilePage.styles";
+import { profileStyles } from "./ProfilePage.styles";
+import { useTheme, useThemedStyles } from "../../theme";
+import { SafeAreaBand } from "../../components/ui";
 
 const ProfilePage = ({ navigation }) => {
-	const insets = useSafeAreaInsets();
+	const theme = useTheme();
+	const styles = useThemedStyles(profileStyles);
 	const {
 		isLoading,
 		userData,
@@ -214,15 +216,22 @@ const ProfilePage = ({ navigation }) => {
 	}
 
 	return (
-		<View style={[{ flex: 1, paddingTop: insets.top }, styles.container]}>
-			<StatusBar barStyle="dark-content" />
+		<View style={[{ flex: 1 }, styles.container]}>
+			<SafeAreaBand />
+			<StatusBar
+				barStyle={theme.isDark ? "light-content" : "dark-content"}
+			/>
 
 			<View style={styles.header}>
 				<TouchableOpacity
 					style={styles.backButton}
 					onPress={() => navigation.goBack()}
 				>
-					<Ionicons name="arrow-back" size={24} color="#333" />
+					<Ionicons
+						name="arrow-back"
+						size={24}
+						color={theme.colors.text}
+					/>
 				</TouchableOpacity>
 				<Text style={styles.headerTitle}>Profile</Text>
 				<View style={{ width: 40 }} />
@@ -257,7 +266,7 @@ const ProfilePage = ({ navigation }) => {
 						<Ionicons
 							name="create-outline"
 							size={20}
-							color="#2089dc"
+							color={theme.colors.accent}
 						/>
 					</TouchableOpacity>
 				</View>
@@ -268,7 +277,7 @@ const ProfilePage = ({ navigation }) => {
 						<Ionicons
 							name="mail-outline"
 							size={20}
-							color="#2089dc"
+							color={theme.colors.accent}
 							style={styles.cardIcon}
 						/>
 						<Text style={styles.cardTitle}>Email Address</Text>
@@ -294,7 +303,7 @@ const ProfilePage = ({ navigation }) => {
 						<Ionicons
 							name="call-outline"
 							size={20}
-							color="#2089dc"
+							color={theme.colors.accent}
 							style={styles.cardIcon}
 						/>
 						<Text style={styles.cardTitle}>Phone Number</Text>
@@ -322,7 +331,7 @@ const ProfilePage = ({ navigation }) => {
 						<Ionicons
 							name="business-outline"
 							size={20}
-							color="#2089dc"
+							color={theme.colors.accent}
 							style={styles.cardIcon}
 						/>
 						<Text style={styles.cardTitle}>Company</Text>
@@ -346,7 +355,7 @@ const ProfilePage = ({ navigation }) => {
 							style={styles.dropdown}
 							placeholderStyle={styles.dropdownPlaceholder}
 							selectedTextStyle={styles.dropdownSelectedText}
-							activeColor="#e6f2ff" // Highlight color when item is selected
+							activeColor={theme.colors.accentSubtle} // Highlight color when item is selected
 							containerStyle={{
 								borderRadius: 8,
 								marginTop: 4,
@@ -372,7 +381,7 @@ const ProfilePage = ({ navigation }) => {
 						<Ionicons
 							name="shield-outline"
 							size={20}
-							color="#2089dc"
+							color={theme.colors.accent}
 							style={styles.cardIcon}
 						/>
 						<Text style={styles.cardTitle}>Security</Text>
@@ -395,7 +404,7 @@ const ProfilePage = ({ navigation }) => {
 								<Ionicons
 									name="key-outline"
 									size={18}
-									color="#666"
+									color={theme.colors.textSecondary}
 									style={{ marginRight: 8 }}
 								/>
 							}
@@ -409,10 +418,15 @@ const ProfilePage = ({ navigation }) => {
 						<Ionicons
 							name="warning-outline"
 							size={20}
-							color="#d32f2f"
+							color={theme.colors.danger}
 							style={styles.cardIcon}
 						/>
-						<Text style={[styles.cardTitle, { color: "#d32f2f" }]}>
+						<Text
+							style={[
+								styles.cardTitle,
+								{ color: theme.colors.danger },
+							]}
+						>
 							Danger Zone
 						</Text>
 					</View>
@@ -434,7 +448,7 @@ const ProfilePage = ({ navigation }) => {
 								<Ionicons
 									name="trash-outline"
 									size={18}
-									color="#d32f2f"
+									color={theme.colors.danger}
 									style={{ marginRight: 8 }}
 								/>
 							}

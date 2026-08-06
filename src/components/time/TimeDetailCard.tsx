@@ -11,7 +11,7 @@ import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { format } from "date-fns";
 import {
 	formatDuration,
-	getStatusBadgeColor,
+	getStatusTone,
 	getStatusBadgeText,
 } from "../../utils/timeUtils";
 import FormFieldValue from "./FormFieldValue";
@@ -22,7 +22,9 @@ import type { TimeEntryEdit } from "../../types";
 import { useUser } from "../../contexts/UserContext";
 import { useCompanyMembers } from "../../hooks/useCompanyMembers";
 import { useCompany } from "../../contexts/CompanyContext";
-import { styles } from "./TimeDetailCard.styles";
+import { timeDetailCardStyles } from "./TimeDetailCard.styles";
+import { Badge } from "../ui";
+import { useTheme, useThemedStyles } from "../../theme";
 
 const TimeDetailCard = ({
 	entry,
@@ -36,6 +38,8 @@ const TimeDetailCard = ({
 	timeEntrySchema = null,
 	eventSchema = null,
 }) => {
+	const theme = useTheme();
+	const styles = useThemedStyles(timeDetailCardStyles);
 	// Existing state variables
 	const [editingFields, setEditingFields] = useState({});
 	const [fieldValues, setFieldValues] = useState({});
@@ -143,7 +147,10 @@ const TimeDetailCard = ({
 		if (loadingPackages) {
 			return (
 				<View style={styles.packageInfoSection}>
-					<ActivityIndicator size="small" color="#007AFF" />
+					<ActivityIndicator
+						size="small"
+						color={theme.colors.accent}
+					/>
 					<Text style={styles.packageInfoText}>
 						Loading packages...
 					</Text>
@@ -163,7 +170,7 @@ const TimeDetailCard = ({
 						<Icon
 							name="package-variant"
 							size={16}
-							color="#007AFF"
+							color={theme.colors.accent}
 						/>
 						<Text style={styles.packageName}>
 							{pkg.title || "Unnamed Package"}
@@ -251,7 +258,9 @@ const TimeDetailCard = ({
 		const isSaving = savingFields[field.id];
 
 		if (isSaving) {
-			return <ActivityIndicator size="small" color="#007AFF" />;
+			return (
+				<ActivityIndicator size="small" color={theme.colors.accent} />
+			);
 		}
 
 		if (isEditing) {
@@ -277,7 +286,11 @@ const TimeDetailCard = ({
 									saveFieldChange(field.id, field.type)
 								}
 							>
-								<Icon name="check" size={20} color="#fff" />
+								<Icon
+									name="check"
+									size={20}
+									color={theme.colors.onAccent}
+								/>
 							</TouchableOpacity>
 						</View>
 					);
@@ -298,7 +311,11 @@ const TimeDetailCard = ({
 									saveFieldChange(field.id, field.type)
 								}
 							>
-								<Icon name="check" size={20} color="#fff" />
+								<Icon
+									name="check"
+									size={20}
+									color={theme.colors.onAccent}
+								/>
 							</TouchableOpacity>
 						</View>
 					);
@@ -317,7 +334,7 @@ const TimeDetailCard = ({
 					style={styles.quickEditButton}
 					onPress={() => toggleFieldEdit(field.id, value)}
 				>
-					<Icon name="pencil" size={16} color="#007AFF" />
+					<Icon name="pencil" size={16} color={theme.colors.accent} />
 				</TouchableOpacity>
 			</View>
 		);
@@ -354,7 +371,7 @@ const TimeDetailCard = ({
 										: "checkbox-blank-outline"
 								}
 								size={24}
-								color="#007AFF"
+								color={theme.colors.accent}
 							/>
 						</TouchableOpacity>
 					)}
@@ -362,16 +379,16 @@ const TimeDetailCard = ({
 						{format(entry.clockInAt.toDate(), "EEE, MMM d, yyyy")}
 					</Text>
 				</View>
-				<View
-					style={[
-						styles.statusBadge,
-						{ backgroundColor: getStatusBadgeColor(entry.status) },
-					]}
-				>
-					<Text style={styles.statusText}>
-						{getStatusBadgeText(entry.status)}
-					</Text>
-				</View>
+				{/*
+				 * Foreground follows the tone as well as the fill. A subtle
+				 * amber background under permanently-grey text was the
+				 * lowest-contrast pairing in the app.
+				 */}
+				<Badge
+					label={getStatusBadgeText(entry.status)}
+					tone={getStatusTone(entry.status)}
+					style={styles.statusBadge}
+				/>
 			</View>
 
 			{/*
@@ -481,7 +498,7 @@ const TimeDetailCard = ({
 										<Icon
 											name="calendar-check"
 											size={18}
-											color="#007AFF"
+											color={theme.colors.accent}
 										/>
 										<Text style={styles.eventTitle}>
 											{connection.eventTitle ||
@@ -668,7 +685,11 @@ const TimeDetailCard = ({
 							style={styles.editButton}
 							onPress={() => onEditEntry(entry)}
 						>
-							<Icon name="pencil" size={16} color="#007AFF" />
+							<Icon
+								name="pencil"
+								size={16}
+								color={theme.colors.accent}
+							/>
 							<Text style={styles.editButtonText}>Edit</Text>
 						</TouchableOpacity>
 					</View>

@@ -36,6 +36,34 @@ export async function getCompany(companyId: string): Promise<Company | null> {
 	}
 }
 
+/**
+ * Several companies in one query.
+ *
+ * The switcher needs a NAME per membership, and a membership document only
+ * carries the company id — so without this it would be one read per company
+ * the user belongs to, every time the sheet opens.
+ */
+export async function getCompaniesByIds(ids: string[]): Promise<Company[]> {
+	const unique = [...new Set(ids.filter(Boolean))].slice(0, 30);
+	if (!unique.length) return [];
+
+	try {
+		const snapshot = await db
+			.collection(C.companies)
+			.where(firestore.FieldPath.documentId(), "in", unique)
+			.limit(30)
+			.get();
+
+		return snapshot.docs.map((doc) => ({
+			...(doc.data() as Company),
+			id: doc.id,
+		}));
+	} catch (e) {
+		console.error("Error getting companies by id", e);
+		return [];
+	}
+}
+
 export function subscribeCompany(
 	companyId: string,
 	onChange: (company: Company | null) => void,

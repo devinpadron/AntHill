@@ -29,7 +29,9 @@ export const DiagnosticsBadge = () => {
 		<TouchableOpacity
 			style={[styles.badge, IS_PRODUCTION_DB ? styles.prod : styles.test]}
 			onPress={() => navigation.navigate("Diagnostics")}
-			accessibilityLabel={`Connected to the ${DATABASE_LABEL} database. Opens diagnostics.`}
+			/* Long-press is the way into the design gallery. */
+			onLongPress={() => navigation.navigate("DesignGallery")}
+			accessibilityLabel={`Connected to the ${DATABASE_LABEL} database. Opens diagnostics; long-press for the design gallery.`}
 		>
 			<Text style={styles.text}>
 				v2 · {DATABASE_LABEL}

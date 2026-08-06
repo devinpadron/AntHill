@@ -10,6 +10,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
 import Constants from "expo-constants";
 import { GOOGLE_PLACES_API_KEY } from "@env";
+import { Theme, useTheme, useThemedStyles } from "../../theme";
 
 // Use .env for development, EAS environment variables for production
 const API_KEY = __DEV__
@@ -61,6 +62,8 @@ const LocationInputComponent = ({
 	setLabelText,
 	googlePlacesRef,
 }: LocationInputProps) => {
+	const theme = useTheme();
+	const styles = useThemedStyles(locationStyles);
 	const [resetKey, setResetKey] = React.useState(0);
 
 	return (
@@ -124,7 +127,7 @@ const LocationInputComponent = ({
 												: "pricetag-outline"
 										}
 										size={24}
-										color="#555"
+										color={theme.colors.textSecondary}
 									/>
 								</TouchableOpacity>
 								<TouchableOpacity
@@ -173,95 +176,96 @@ const LocationInputComponent = ({
 	);
 };
 
-const styles = StyleSheet.create({
-	inputContainer: {
-		marginBottom: 20,
-	},
-	label: {
-		fontSize: 16,
-		marginBottom: 8,
-		color: "#555",
-		fontWeight: "600",
-	},
-	locationContainer: {
-		flexDirection: "row",
-		alignItems: "flex-start",
-		gap: 10,
-		paddingTop: 10,
-	},
-	addressText: {
-		flex: 1,
-		fontSize: 14,
-		marginRight: 10,
-		flexWrap: "wrap",
-	},
-	locationButtonContainer: {
-		flexDirection: "row",
-		minWidth: 80,
-		justifyContent: "flex-end",
-		gap: 8,
-	},
-	addLocationButton: {
-		padding: 5,
-	},
-	deleteButton: {
-		padding: 5,
-	},
-	labelInputContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-		marginBottom: 5,
-		marginTop: 5,
-	},
-	labelInput: {
-		flex: 1,
-		height: 40,
-		borderColor: "#ccc",
-		borderWidth: 1,
-		borderRadius: 10,
-		paddingHorizontal: 15,
-		fontSize: 14,
-		backgroundColor: "white",
-		marginRight: 10,
-	},
-	saveLabelButton: {
-		backgroundColor: "#555",
-		paddingVertical: 8,
-		paddingHorizontal: 12,
-		borderRadius: 10,
-	},
-	saveLabelButtonText: {
-		color: "white",
-		fontSize: 14,
-		fontWeight: "600",
-	},
-	labelText: {
-		flex: 1,
-		fontSize: 14,
-		marginTop: 5,
-		marginBottom: 10,
-	},
-	placesTextInput: {
-		height: 50,
-		borderColor: "#ccc",
-		borderWidth: 1,
-		borderRadius: 10,
-		paddingHorizontal: 15,
-		fontSize: 16,
-		backgroundColor: "white",
-	},
-	placesListView: {
-		borderWidth: 1,
-		borderColor: "#ccc",
-		borderRadius: 10,
-		backgroundColor: "white",
-		marginTop: 5,
-	},
-	placesRow: {
-		padding: 13,
-		height: 44,
-	},
-});
+const locationStyles = (theme: Theme) =>
+	StyleSheet.create({
+		inputContainer: {
+			marginBottom: 20,
+		},
+		label: {
+			fontSize: 16,
+			marginBottom: 8,
+			color: theme.colors.textSecondary,
+			fontWeight: "600",
+		},
+		locationContainer: {
+			flexDirection: "row",
+			alignItems: "flex-start",
+			gap: 10,
+			paddingTop: 10,
+		},
+		addressText: {
+			flex: 1,
+			fontSize: 14,
+			marginRight: 10,
+			flexWrap: "wrap",
+		},
+		locationButtonContainer: {
+			flexDirection: "row",
+			minWidth: 80,
+			justifyContent: "flex-end",
+			gap: 8,
+		},
+		addLocationButton: {
+			padding: 5,
+		},
+		deleteButton: {
+			padding: 5,
+		},
+		labelInputContainer: {
+			flexDirection: "row",
+			alignItems: "center",
+			marginBottom: 5,
+			marginTop: 5,
+		},
+		labelInput: {
+			flex: 1,
+			height: 40,
+			borderColor: theme.colors.border,
+			borderWidth: 1,
+			borderRadius: 10,
+			paddingHorizontal: 15,
+			fontSize: 14,
+			backgroundColor: "white",
+			marginRight: 10,
+		},
+		saveLabelButton: {
+			backgroundColor: theme.colors.textSecondary,
+			paddingVertical: 8,
+			paddingHorizontal: 12,
+			borderRadius: 10,
+		},
+		saveLabelButtonText: {
+			color: "white",
+			fontSize: 14,
+			fontWeight: "600",
+		},
+		labelText: {
+			flex: 1,
+			fontSize: 14,
+			marginTop: 5,
+			marginBottom: 10,
+		},
+		placesTextInput: {
+			height: 50,
+			borderColor: theme.colors.border,
+			borderWidth: 1,
+			borderRadius: 10,
+			paddingHorizontal: 15,
+			fontSize: 16,
+			backgroundColor: "white",
+		},
+		placesListView: {
+			borderWidth: 1,
+			borderColor: theme.colors.border,
+			borderRadius: 10,
+			backgroundColor: "white",
+			marginTop: 5,
+		},
+		placesRow: {
+			padding: 13,
+			height: 44,
+		},
+	});
 
 // Export with React.memo to prevent unnecessary re-renders
 export const LocationInput = React.memo(LocationInputComponent);

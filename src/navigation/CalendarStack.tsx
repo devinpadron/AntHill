@@ -1,5 +1,6 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { stackScreenOptions } from "./stackOptions";
 import CalendarScreen from "../screens/calendar/Calendar";
 import EventDetails from "../screens/calendar/EventDetails";
 import EventSubmit from "../screens/calendar/EventSubmit";
@@ -14,27 +15,11 @@ import EventChecklists from "../screens/calendar/EventChecklists";
 const Stack = createNativeStackNavigator();
 
 const CalendarStack = () => (
-	<Stack.Navigator>
-		<Stack.Screen
-			name="Calendar"
-			component={CalendarScreen}
-			options={{ headerShown: false }}
-		/>
-		<Stack.Screen
-			name="Details"
-			component={EventDetails}
-			options={{ headerShown: false, gestureEnabled: true }}
-		/>
-		<Stack.Screen
-			name="EditEvent"
-			component={EventSubmit}
-			options={{ headerShown: false, gestureEnabled: true }}
-		/>
-		<Stack.Screen
-			name="EventChecklists"
-			component={EventChecklists}
-			options={{ headerShown: false, gestureEnabled: true }}
-		/>
+	<Stack.Navigator screenOptions={stackScreenOptions}>
+		<Stack.Screen name="Calendar" component={CalendarScreen} />
+		<Stack.Screen name="Details" component={EventDetails} />
+		<Stack.Screen name="EditEvent" component={EventSubmit} />
+		<Stack.Screen name="EventChecklists" component={EventChecklists} />
 	</Stack.Navigator>
 );
 

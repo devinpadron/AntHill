@@ -1,5 +1,6 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { stackScreenOptions } from "./stackOptions";
 import PayrollReview from "../screens/settings/admin/PayrollReview";
 import TimeEntryDetails from "../screens/timesheet/TimeEntryDetails";
 
@@ -11,17 +12,9 @@ import TimeEntryDetails from "../screens/timesheet/TimeEntryDetails";
 const Stack = createNativeStackNavigator();
 
 const PayrollReviewStack = () => (
-	<Stack.Navigator>
-		<Stack.Screen
-			name="PayrollReview"
-			component={PayrollReview}
-			options={{ headerShown: false }}
-		/>
-		<Stack.Screen
-			name="PayrollDetails"
-			component={TimeEntryDetails}
-			options={{ headerShown: false, gestureEnabled: true }}
-		/>
+	<Stack.Navigator screenOptions={stackScreenOptions}>
+		<Stack.Screen name="PayrollReview" component={PayrollReview} />
+		<Stack.Screen name="PayrollDetails" component={TimeEntryDetails} />
 	</Stack.Navigator>
 );
 

@@ -10,7 +10,6 @@ import {
 	StatusBar,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUser } from "../../../contexts/UserContext";
 import { Button } from "../../../components/ui/Button";
 import { LayoutAnimation, Platform, UIManager } from "react-native";
@@ -20,7 +19,9 @@ import {
 	saveEventLabel,
 	subscribeEventLabels,
 } from "../../../services/libraryService";
-import { styles } from "./LabelCreator.styles";
+import { labelStyles } from "./LabelCreator.styles";
+import { useTheme, useThemedStyles } from "../../../theme";
+import { SafeAreaBand } from "../../../components/ui";
 
 // Enable LayoutAnimation on Android
 if (
@@ -30,15 +31,23 @@ if (
 	UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+/*
+ * The colour a new label starts on. This is DATA — it is written to the
+ * label document and rendered as the company's own choice everywhere else —
+ * so it is deliberately not a theme token.
+ */
+const DEFAULT_LABEL_COLOR = "#2196F3";
+
 const LabelCreator = ({ navigation }) => {
-	const insets = useSafeAreaInsets();
+	const theme = useTheme();
+	const styles = useThemedStyles(labelStyles);
 	const { companyId } = useUser();
 
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [labels, setLabels] = useState([]);
 	const [labelName, setLabelName] = useState("");
-	const [selectedColor, setSelectedColor] = useState("#2196F3");
+	const [selectedColor, setSelectedColor] = useState(DEFAULT_LABEL_COLOR);
 	const [editingLabel, setEditingLabel] = useState(null);
 
 	// For ScrollView
@@ -133,7 +142,7 @@ const LabelCreator = ({ navigation }) => {
 
 			// Reset form
 			setLabelName("");
-			setSelectedColor("#2196F3");
+			setSelectedColor(DEFAULT_LABEL_COLOR);
 			setEditingLabel(null);
 		} catch (error) {
 			console.error("Error saving label:", error);
@@ -186,7 +195,7 @@ const LabelCreator = ({ navigation }) => {
 							// Reset form if editing the deleted label
 							if (editingLabel && editingLabel.id === labelId) {
 								setLabelName("");
-								setSelectedColor("#2196F3");
+								setSelectedColor(DEFAULT_LABEL_COLOR);
 								setEditingLabel(null);
 							}
 						} catch (error) {
@@ -205,19 +214,26 @@ const LabelCreator = ({ navigation }) => {
 	const handleCancelEdit = () => {
 		setEditingLabel(null);
 		setLabelName("");
-		setSelectedColor("#2196F3");
+		setSelectedColor(DEFAULT_LABEL_COLOR);
 	};
 
 	return (
-		<View style={[styles.container, { paddingTop: insets.top }]}>
-			<StatusBar barStyle="dark-content" />
+		<View style={styles.container}>
+			<SafeAreaBand />
+			<StatusBar
+				barStyle={theme.isDark ? "light-content" : "dark-content"}
+			/>
 
 			<View style={styles.header}>
 				<TouchableOpacity
 					style={styles.backButton}
 					onPress={() => navigation.goBack()}
 				>
-					<Ionicons name="arrow-back" size={24} color="#333" />
+					<Ionicons
+						name="arrow-back"
+						size={24}
+						color={theme.colors.text}
+					/>
 				</TouchableOpacity>
 				<Text style={styles.headerTitle}>Event Labels</Text>
 				<View style={{ width: 40 }} />
@@ -227,6 +243,8 @@ const LabelCreator = ({ navigation }) => {
 				ref={scrollViewRef}
 				style={styles.scrollView}
 				contentContainerStyle={styles.contentContainer}
+				automaticallyAdjustKeyboardInsets
+				keyboardShouldPersistTaps="handled"
 			>
 				{/* Label Creation/Editing Form */}
 				<View style={styles.formCard}>
@@ -234,7 +252,7 @@ const LabelCreator = ({ navigation }) => {
 						<Ionicons
 							name="pricetag-outline"
 							size={20}
-							color="#2089dc"
+							color={theme.colors.accent}
 							style={styles.formIcon}
 						/>
 						<Text style={styles.formTitle}>
@@ -319,7 +337,7 @@ const LabelCreator = ({ navigation }) => {
 						<Ionicons
 							name="list-outline"
 							size={20}
-							color="#2089dc"
+							color={theme.colors.accent}
 							style={styles.listIcon}
 						/>
 						<Text style={styles.listTitle}>Existing Labels</Text>
@@ -327,7 +345,10 @@ const LabelCreator = ({ navigation }) => {
 
 					{loading ? (
 						<View style={styles.loadingContainer}>
-							<ActivityIndicator size="large" color="#2089dc" />
+							<ActivityIndicator
+								size="large"
+								color={theme.colors.accent}
+							/>
 							<Text style={styles.loadingText}>
 								Loading labels...
 							</Text>
@@ -337,7 +358,7 @@ const LabelCreator = ({ navigation }) => {
 							<Ionicons
 								name="pricetag"
 								size={48}
-								color="#e0e0e0"
+								color={theme.colors.border}
 							/>
 							<Text style={styles.emptyText}>
 								No labels created yet
@@ -372,7 +393,7 @@ const LabelCreator = ({ navigation }) => {
 											<Ionicons
 												name="create-outline"
 												size={20}
-												color="#2089dc"
+												color={theme.colors.accent}
 											/>
 										</TouchableOpacity>
 
@@ -388,7 +409,7 @@ const LabelCreator = ({ navigation }) => {
 											<Ionicons
 												name="trash-outline"
 												size={20}
-												color="#d32f2f"
+												color={theme.colors.danger}
 											/>
 										</TouchableOpacity>
 									</View>
@@ -404,7 +425,7 @@ const LabelCreator = ({ navigation }) => {
 						<Ionicons
 							name="information-circle-outline"
 							size={24}
-							color="#666"
+							color={theme.colors.textSecondary}
 							style={styles.infoIcon}
 						/>
 						<Text style={styles.infoText}>

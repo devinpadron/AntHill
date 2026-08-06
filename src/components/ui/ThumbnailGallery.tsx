@@ -12,6 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import type { SelectableAttachment } from "./AttachmentsSelector";
 import { UploadProgressMap } from "../../contexts/UploadManagerContext";
+import { Theme, useTheme, useThemedStyles } from "../../theme";
 
 interface ThumbnailGalleryProps {
 	files: SelectableAttachment[];
@@ -30,6 +31,8 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 	onDelete,
 	onRestore,
 }) => {
+	const theme = useTheme();
+	const styles = useThemedStyles(thumbnailStyles);
 	const windowWidth = Dimensions.get("window").width;
 	const numColumns = windowWidth > 600 ? 5 : 3;
 	const thumbnailSize = (windowWidth - 60) / numColumns;
@@ -61,7 +64,11 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 		if (fileProgress.status === "error") {
 			return (
 				<View style={styles.progressOverlay}>
-					<Ionicons name="alert-circle" size={24} color="#e74c3c" />
+					<Ionicons
+						name="alert-circle"
+						size={24}
+						color={theme.colors.danger}
+					/>
 					<Text style={styles.errorText}>Error</Text>
 				</View>
 			);
@@ -91,7 +98,10 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 		if (fileProgress.status === "complete" && fileProgress.progress < 100) {
 			return (
 				<View style={styles.progressOverlay}>
-					<ActivityIndicator size="small" color="#3d7eea" />
+					<ActivityIndicator
+						size="small"
+						color={theme.colors.accent}
+					/>
 					<Text style={styles.progressText}>Processing...</Text>
 				</View>
 			);
@@ -151,7 +161,7 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 									<Ionicons
 										name="play-circle"
 										size={22}
-										color="#fff"
+										color={theme.colors.surface}
 									/>
 								</View>
 							)}
@@ -182,7 +192,11 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 											: "close-circle"
 									}
 									size={22}
-									color={isDeleting ? "#3d7eea" : "#e74c3c"}
+									color={
+										isDeleting
+											? theme.colors.accent
+											: theme.colors.danger
+									}
 								/>
 							</TouchableOpacity>
 
@@ -213,7 +227,7 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 								<Ionicons
 									name={getFileIcon(item.contentType)}
 									size={40}
-									color="#3d7eea"
+									color={theme.colors.accent}
 								/>
 							</View>
 
@@ -243,7 +257,11 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 											: "close-circle"
 									}
 									size={22}
-									color={isDeleting ? "#3d7eea" : "#e74c3c"}
+									color={
+										isDeleting
+											? theme.colors.accent
+											: theme.colors.danger
+									}
 								/>
 							</TouchableOpacity>
 
@@ -261,106 +279,107 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 	);
 };
 
-const styles = StyleSheet.create({
-	container: {
-		marginTop: 8,
-	},
-	galleryTitle: {
-		fontSize: 15,
-		marginBottom: 10,
-		color: "#555",
-		fontWeight: "500",
-	},
-	galleryContainer: {
-		flexDirection: "row",
-		flexWrap: "wrap",
-		gap: 12,
-	},
-	thumbnailContainer: {
-		borderRadius: 8,
-		overflow: "hidden",
-		borderWidth: 1,
-		borderColor: "#e0e0e0",
-		backgroundColor: "#f8f9fa",
-		position: "relative",
-	},
-	mediaThumbnail: {
-		width: "100%",
-		height: "80%",
-		backgroundColor: "#f0f0f0",
-	},
-	fileThumbnail: {
-		width: "100%",
-		height: "80%",
-		backgroundColor: "#f0f6ff",
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	thumbnailName: {
-		fontSize: 12,
-		color: "#555",
-		padding: 4,
-		textAlign: "center",
-	},
-	actionButton: {
-		position: "absolute",
-		top: 4,
-		right: 4,
-		backgroundColor: "rgba(255, 255, 255, 0.8)",
-		borderRadius: 12,
-		padding: 2,
-		zIndex: 10,
-	},
-	deleteButton: {
-		backgroundColor: "rgba(255, 255, 255, 0.8)",
-	},
-	restoreButton: {
-		backgroundColor: "rgba(255, 255, 255, 0.8)",
-	},
-	videoIndicator: {
-		position: "absolute",
-		top: "30%",
-		left: "40%",
-		backgroundColor: "rgba(0, 0, 0, 0.3)",
-		borderRadius: 20,
-		padding: 3,
-	},
-	deletedItem: {
-		opacity: 0.5,
-	},
-	progressOverlay: {
-		position: "absolute",
-		top: 0,
-		left: 0,
-		right: 0,
-		height: "80%",
-		backgroundColor: "rgba(0, 0, 0, 0.5)",
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	progressBarContainer: {
-		width: "80%",
-		height: 8,
-		backgroundColor: "rgba(255, 255, 255, 0.3)",
-		borderRadius: 4,
-		overflow: "hidden",
-	},
-	progressBar: {
-		height: "100%",
-		backgroundColor: "#3d7eea",
-	},
-	progressText: {
-		color: "#fff",
-		marginTop: 5,
-		fontSize: 12,
-		fontWeight: "bold",
-	},
-	errorText: {
-		color: "#fff",
-		marginTop: 5,
-		fontSize: 12,
-		fontWeight: "bold",
-	},
-});
+const thumbnailStyles = (theme: Theme) =>
+	StyleSheet.create({
+		container: {
+			marginTop: 8,
+		},
+		galleryTitle: {
+			fontSize: 15,
+			marginBottom: 10,
+			color: theme.colors.textSecondary,
+			fontWeight: "500",
+		},
+		galleryContainer: {
+			flexDirection: "row",
+			flexWrap: "wrap",
+			gap: 12,
+		},
+		thumbnailContainer: {
+			borderRadius: 8,
+			overflow: "hidden",
+			borderWidth: 1,
+			borderColor: theme.colors.border,
+			backgroundColor: theme.colors.surfaceSunken,
+			position: "relative",
+		},
+		mediaThumbnail: {
+			width: "100%",
+			height: "80%",
+			backgroundColor: theme.colors.border,
+		},
+		fileThumbnail: {
+			width: "100%",
+			height: "80%",
+			backgroundColor: theme.colors.accentSubtle,
+			justifyContent: "center",
+			alignItems: "center",
+		},
+		thumbnailName: {
+			fontSize: 12,
+			color: theme.colors.textSecondary,
+			padding: 4,
+			textAlign: "center",
+		},
+		actionButton: {
+			position: "absolute",
+			top: 4,
+			right: 4,
+			backgroundColor: "rgba(255, 255, 255, 0.8)",
+			borderRadius: 12,
+			padding: 2,
+			zIndex: 10,
+		},
+		deleteButton: {
+			backgroundColor: "rgba(255, 255, 255, 0.8)",
+		},
+		restoreButton: {
+			backgroundColor: "rgba(255, 255, 255, 0.8)",
+		},
+		videoIndicator: {
+			position: "absolute",
+			top: "30%",
+			left: "40%",
+			backgroundColor: "rgba(0, 0, 0, 0.3)",
+			borderRadius: 20,
+			padding: 3,
+		},
+		deletedItem: {
+			opacity: 0.5,
+		},
+		progressOverlay: {
+			position: "absolute",
+			top: 0,
+			left: 0,
+			right: 0,
+			height: "80%",
+			backgroundColor: "rgba(0, 0, 0, 0.5)",
+			justifyContent: "center",
+			alignItems: "center",
+		},
+		progressBarContainer: {
+			width: "80%",
+			height: 8,
+			backgroundColor: "rgba(255, 255, 255, 0.3)",
+			borderRadius: 4,
+			overflow: "hidden",
+		},
+		progressBar: {
+			height: "100%",
+			backgroundColor: theme.colors.accent,
+		},
+		progressText: {
+			color: theme.colors.surface,
+			marginTop: 5,
+			fontSize: 12,
+			fontWeight: "bold",
+		},
+		errorText: {
+			color: theme.colors.surface,
+			marginTop: 5,
+			fontSize: 12,
+			fontWeight: "bold",
+		},
+	});
 
 export default ThumbnailGallery;

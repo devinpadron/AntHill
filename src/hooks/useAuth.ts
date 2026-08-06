@@ -1,8 +1,9 @@
-import { useState } from "react";
-import { Alert } from "react-native";
+import { useCallback, useState } from "react";
 import auth from "@react-native-firebase/auth";
 import { getUser, updateProfile } from "../services/userService";
 import { sendResetPassword } from "../services/authService";
+import { FieldErrors, LoginField, mapLoginError } from "../utils/authUtils";
+import { toast } from "../components/ui";
 
 /*
  * Login, against the v2 schema.
@@ -14,36 +15,23 @@ export const useAuth = () => {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [loading, setLoading] = useState(false);
+	const [errors, setErrors] = useState<FieldErrors<LoginField>>({});
 
-	const handleAuthError = (error: any) => {
-		switch (error.code) {
-			case "auth/invalid-email":
-				Alert.alert("Invalid email");
-				break;
-			case "auth/wrong-password":
-				Alert.alert("Invalid password");
-				break;
-			case "auth/user-not-found":
-				Alert.alert("User not found");
-				break;
-			case "auth/invalid-credential":
-				Alert.alert("Invalid credentials");
-				break;
-			case "auth/too-many-requests":
-				Alert.alert(
-					"Too many attempts have been made",
-					"Please try again later, or reset your password",
-				);
-				break;
-			default:
-				Alert.alert("Error logging in");
-				console.error(error);
-		}
-	};
+	/** Clears the error on a field as soon as the user edits it. */
+	const clearError = useCallback((field: LoginField) => {
+		setErrors((prev) => {
+			if (!prev[field] && !prev.form) return prev;
+			const next = { ...prev };
+			delete next[field];
+			delete next.form;
+			return next;
+		});
+	}, []);
 
 	const login = async () => {
 		try {
 			setLoading(true);
+			setErrors({});
 
 			/*
 			 * Clear a stale unverified session first.
@@ -90,7 +78,7 @@ export const useAuth = () => {
 
 			return true;
 		} catch (error) {
-			handleAuthError(error);
+			setErrors(mapLoginError(error));
 			return false;
 		} finally {
 			setLoading(false);
@@ -100,13 +88,21 @@ export const useAuth = () => {
 	const resetPassword = async (resetEmail: string) => {
 		try {
 			await sendResetPassword(resetEmail);
+			/*
+			 * Deliberately does not confirm whether the address exists —
+			 * saying so would let anyone probe for registered emails.
+			 */
+			toast.success(
+				"Check your email",
+				"If that address has an account, a reset link is on its way.",
+			);
 			return true;
 		} catch (error) {
-			Alert.alert(
-				"Error",
-				"Could not send reset email. Please try again.",
-			);
 			console.error(error);
+			toast.error(
+				"Could not send the reset email",
+				"Please try again in a moment.",
+			);
 			return false;
 		}
 	};
@@ -117,6 +113,8 @@ export const useAuth = () => {
 		password,
 		setPassword,
 		loading,
+		errors,
+		clearError,
 		login,
 		resetPassword,
 	};

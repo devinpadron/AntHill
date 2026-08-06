@@ -1,12 +1,15 @@
 import React from "react";
-import {
-	View,
-	Text,
-	TouchableOpacity,
-	StyleSheet,
-	ActivityIndicator,
-} from "react-native";
-import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import { StyleSheet, View } from "react-native";
+import { Badge, Button, Card, Checkbox } from "../ui";
+import { Theme, useThemedStyles } from "../../theme";
+
+/**
+ * The manager's bulk bar over a set of time entries.
+ *
+ * Approve is the primary action and keeps the accent; reject is destructive and
+ * email is secondary — previously all three were equally loud filled buttons in
+ * three unrelated colors (`#34C759`, `#007AFF`, `#FF3B30`).
+ */
 
 interface ManagerActionsProps {
 	selectAll: boolean;
@@ -31,150 +34,88 @@ const ManagerActions = ({
 	onEmail,
 	showEmailOption = false,
 }: ManagerActionsProps) => {
+	const styles = useThemedStyles(managerStyles);
 	const hasSelection = selectedCount > 0;
 
 	return (
-		<View style={styles.managerActionsCard}>
-			<View style={styles.selectAllRow}>
-				<TouchableOpacity
-					style={styles.selectAllButton}
+		<Card style={styles.card}>
+			<View style={styles.selectRow}>
+				{/*
+				 * The checkbox takes the slack and the badge holds its width.
+				 * Without both, `Checkbox`'s own flex:1 label pushed the badge
+				 * past the card's right edge.
+				 */}
+				<Checkbox
+					checked={selectAll}
 					onPress={toggleSelectAll}
-				>
-					<Icon
-						name={
-							selectAll
-								? "checkbox-marked"
-								: "checkbox-blank-outline"
-						}
-						size={24}
-						color="#007AFF"
-					/>
-					<Text style={styles.selectAllText}>
-						{selectAll ? "Deselect All" : "Select All"}
-					</Text>
-				</TouchableOpacity>
-
-				<Text style={styles.selectedCountText}>
-					{selectedCount} of {totalCount} selected
-				</Text>
+					label={selectAll ? "Deselect all" : "Select all"}
+					style={styles.flex}
+				/>
+				<Badge
+					label={`${selectedCount} of ${totalCount}`}
+					tone={hasSelection ? "accent" : "neutral"}
+					style={styles.count}
+				/>
 			</View>
 
-			<View style={styles.managerButtonRow}>
-				<TouchableOpacity
-					style={[
-						styles.managerActionButton,
-						styles.approveButton,
-						!hasSelection && styles.disabledButton,
-					]}
+			<View style={styles.actions}>
+				<Button
+					title="Approve"
+					icon="checkmark"
 					onPress={onApprove}
 					disabled={!hasSelection || isApproving}
-				>
-					{isApproving ? (
-						<ActivityIndicator size="small" color="#fff" />
-					) : (
-						<>
-							<Icon name="check-circle" size={18} color="#fff" />
-							<Text style={styles.buttonText}>Approve</Text>
-						</>
-					)}
-				</TouchableOpacity>
+					loading={isApproving}
+					haptic="success"
+					style={styles.flex}
+				/>
 
 				{showEmailOption && (
-					<TouchableOpacity
-						style={[
-							styles.managerActionButton,
-							styles.emailButton,
-							!hasSelection && styles.disabledButton,
-						]}
+					<Button
+						title="Email"
+						icon="mail-outline"
+						variant="secondary"
 						onPress={onEmail}
 						disabled={!hasSelection || isApproving}
-					>
-						<Icon name="email-outline" size={18} color="#fff" />
-						<Text style={styles.buttonText}>Email</Text>
-					</TouchableOpacity>
+						style={styles.flex}
+					/>
 				)}
 
-				<TouchableOpacity
-					style={[
-						styles.managerActionButton,
-						styles.rejectButton,
-						!hasSelection && styles.disabledButton,
-					]}
+				<Button
+					title="Reject"
+					icon="close"
+					variant="destructive"
 					onPress={onReject}
 					disabled={!hasSelection || isApproving}
-				>
-					<Icon name="close-circle" size={18} color="#fff" />
-					<Text style={styles.buttonText}>Reject</Text>
-				</TouchableOpacity>
+					haptic="press"
+					style={styles.flex}
+				/>
 			</View>
-		</View>
+		</Card>
 	);
 };
 
-const styles = StyleSheet.create({
-	managerActionsCard: {
-		margin: 16,
-		marginTop: 0,
-		padding: 16,
-		backgroundColor: "#fff",
-		borderRadius: 12,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 4,
-		elevation: 2,
-	},
-	selectAllRow: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		marginBottom: 16,
-	},
-	selectAllButton: {
-		flexDirection: "row",
-		alignItems: "center",
-	},
-	selectAllText: {
-		marginLeft: 8,
-		fontSize: 16,
-		color: "#007AFF",
-		fontWeight: "500",
-	},
-	selectedCountText: {
-		fontSize: 14,
-		color: "#666",
-	},
-	managerButtonRow: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		gap: 10,
-	},
-	managerActionButton: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-		paddingVertical: 12,
-		paddingHorizontal: 16,
-		borderRadius: 8,
-		flex: 1,
-	},
-	approveButton: {
-		backgroundColor: "#34C759",
-	},
-	emailButton: {
-		backgroundColor: "#007AFF",
-	},
-	rejectButton: {
-		backgroundColor: "#FF3B30",
-	},
-	disabledButton: {
-		opacity: 0.5,
-	},
-	buttonText: {
-		color: "#fff",
-		fontWeight: "600",
-		marginLeft: 8,
-	},
-});
-
 export default ManagerActions;
+
+const managerStyles = (theme: Theme) =>
+	StyleSheet.create({
+		flex: {
+			flex: 1,
+		},
+		card: {
+			marginHorizontal: theme.spacing.lg,
+			marginBottom: theme.spacing.lg,
+		},
+		selectRow: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: theme.spacing.md,
+			marginBottom: theme.spacing.md,
+		},
+		count: {
+			flexShrink: 0,
+		},
+		actions: {
+			flexDirection: "row",
+			gap: theme.spacing.sm,
+		},
+	});

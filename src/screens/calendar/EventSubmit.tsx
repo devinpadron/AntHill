@@ -6,21 +6,9 @@ import React, {
 	useMemo,
 	useCallback,
 } from "react";
-import {
-	View,
-	Text,
-	TextInput,
-	TouchableOpacity,
-	Alert,
-	Platform,
-	ActivityIndicator,
-} from "react-native";
-import { KeyboardAwareFlatList } from "react-native-keyboard-aware-scroll-view";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { Alert, StyleSheet, View } from "react-native";
 import { useRoute } from "@react-navigation/native";
 import DatePicker from "react-native-date-picker";
-import DropDownPicker from "react-native-dropdown-picker";
 import moment from "moment";
 import { useEventForm } from "../../hooks/useEventForm";
 import { useCompanyMembers } from "../../hooks/useCompanyMembers";
@@ -30,26 +18,63 @@ import {
 	subscribePackages,
 } from "../../services/libraryService";
 import { getAttachmentsForParent } from "../../services/attachmentService";
-import { EventFormHeader } from "../../components/eventSubmit/EventFormHeader";
 import { LocationInput } from "../../components/eventSubmit/LocationInput";
 import { useUser } from "../../contexts/UserContext";
-import { Button } from "../../components/ui/Button";
 import AttachmentsSelector from "../../components/ui/AttachmentsSelector";
 import type { SelectableAttachment } from "../../components/ui/AttachmentsSelector";
+import {
+	Badge,
+	BadgeTone,
+	Button,
+	Card,
+	Checkbox,
+	Icon,
+	Input,
+	ListRow,
+	Loading,
+	Pressable,
+	Screen,
+	ScreenFooter,
+	ScreenHeader,
+	Text,
+	toast,
+} from "../../components/ui";
 import { useUploadManager } from "../../contexts/UploadManagerContext";
 import { useCompany } from "../../contexts/CompanyContext";
 import { useGroups } from "../../hooks/useGroups";
-import { styles } from "./EventSubmit.styles";
+import { Theme, useTheme, useThemedStyles } from "../../theme";
+
+/*
+ * Create or edit an event. The largest form in the app.
+ *
+ * Two `react-native-dropdown-picker` multi-selects are gone — one for assigned
+ * workers, one for packages. They forced a `zIndex` ladder across the whole
+ * form (3000 for workers, 2000 for packages, 1 for everything below), capped
+ * selection at 5 workers, and rendered their own white dropdown regardless of
+ * theme. Both are inline searchable lists now, which is also what the audience
+ * picker below them already did.
+ *
+ * The submit bar is sticky rather than sitting at the bottom of a long scroll,
+ * so saving never requires scrolling past six sections to find the button.
+ */
+
+const RESPONSE_TONE: Record<string, BadgeTone> = {
+	confirmed: "success",
+	pending: "warning",
+	declined: "danger",
+};
+
+/** How many rows a people list shows before asking you to search. */
+const PERSON_ROW_CAP = 12;
 
 const EventSubmit = ({ navigation }) => {
-	const insets = useSafeAreaInsets();
+	const theme = useTheme();
+	const styles = useThemedStyles(submitStyles);
 	const route = useRoute<any>();
 	const eventId = route.params?.uid;
 	const googlePlacesRef = useRef(null);
 
-	// Use our custom hook for form state management
 	const {
-		// Form state
 		title,
 		setTitle,
 		date,
@@ -66,8 +91,6 @@ const EventSubmit = ({ navigation }) => {
 		notes,
 		setNotes,
 
-		// UI state
-		openSelect,
 		openDate,
 		openStartTime,
 		openEndTime,
@@ -78,7 +101,6 @@ const EventSubmit = ({ navigation }) => {
 		labelText,
 		setLabelText,
 
-		// Methods
 		updateLocation,
 		deleteLocation,
 		setLocationLabel,
@@ -103,64 +125,26 @@ const EventSubmit = ({ navigation }) => {
 	>([]);
 	const [availablePackages, setAvailablePackages] = useState([]);
 	const [selectedPackages, setSelectedPackages] = useState([]);
-	const [ogSelectedPackages, setOgSelectedPackages] = useState([]);
 	const [loadingPackages, setLoadingPackages] = useState(false);
 
-	// Add these after your other state declarations
 	const [availableLabels, setAvailableLabels] = useState([]);
 	const [selectedLabelId, setSelectedLabelId] = useState(null);
 	const [loadingLabels, setLoadingLabels] = useState(false);
-	const [openLabelsDropdown, setOpenLabelsDropdown] = useState(false);
-	const [availableWorkers, setAvailableWorkers] = useState([]);
+
+	const [titleError, setTitleError] = useState<string>();
+	const [workerSearch, setWorkerSearch] = useState("");
+	const [personSearch, setPersonSearch] = useState("");
 
 	const { preferences } = useCompany();
 	const { groups } = useGroups(currentCompany ?? "");
-	const [personSearch, setPersonSearch] = useState("");
 
-	// Add these at the top of your component
 	const isMounted = useRef(true);
-
-	// Add at the beginning of the component
 	useEffect(() => {
 		isMounted.current = true;
 		return () => {
 			isMounted.current = false;
 		};
 	}, []);
-
-	const sortWorkersByStatus = (workers, workerStatus) => {
-		if (!workers.length) return workers;
-
-		return workers.sort((a, b) => {
-			// Get status from workerStatus map, default to "pending" if not found
-			const statusA = workerStatus
-				? workerStatus[a.value] || "pending"
-				: "pending";
-			const statusB = workerStatus
-				? workerStatus[b.value] || "pending"
-				: "pending";
-
-			// Define priority order: confirmed -> pending -> declined
-			const statusPriority = { confirmed: 0, pending: 1, declined: 2 };
-
-			// Sort by status priority first
-			const priorityDiff =
-				statusPriority[statusA] - statusPriority[statusB];
-
-			// If same priority, sort alphabetically by name
-			if (priorityDiff === 0) {
-				const nameA = a.userData
-					? `${a.userData.firstName} ${a.userData.lastName}`
-					: a.label;
-				const nameB = b.userData
-					? `${b.userData.firstName} ${b.userData.lastName}`
-					: b.label;
-				return nameA.localeCompare(nameB);
-			}
-
-			return priorityDiff;
-		});
-	};
 
 	/*
 	 * Workers.
@@ -172,12 +156,66 @@ const EventSubmit = ({ navigation }) => {
 	 */
 	const { members } = useCompanyMembers(currentCompany ?? "");
 
+	const [workerResponses, setWorkerResponses] = useState<
+		Record<string, string>
+	>({});
+
+	useEffect(() => {
+		if (!currentCompany || !eventId) return;
+		return subscribeEventResponses(
+			currentCompany,
+			eventId,
+			setWorkerResponses,
+		);
+	}, [currentCompany, eventId]);
+
+	/* Responses only exist for a saved event, and only when the flag is on. */
+	const showResponses = Boolean(eventId && preferences.enableAvailability);
+
+	/*
+	 * Assigned workers, ordered so the ones needing attention surface first:
+	 * confirmed, then pending, then declined, alphabetical within each.
+	 */
+	const orderedMembers = useMemo(() => {
+		const priority = { confirmed: 0, pending: 1, declined: 2 };
+
+		return [...members].sort((a, b) => {
+			if (showResponses) {
+				const statusA = workerResponses[a.userId] ?? "pending";
+				const statusB = workerResponses[b.userId] ?? "pending";
+				const diff = priority[statusA] - priority[statusB];
+				if (diff !== 0) return diff;
+			}
+			return a.displayName.localeCompare(b.displayName);
+		});
+	}, [members, workerResponses, showResponses]);
+
+	const selectedWorkers = useMemo(
+		() => orderedMembers.filter((m) => assignedWorkers.includes(m.userId)),
+		[orderedMembers, assignedWorkers],
+	);
+
+	const unselectedWorkers = useMemo(() => {
+		const term = workerSearch.trim().toLowerCase();
+		return orderedMembers.filter(
+			(m) =>
+				!assignedWorkers.includes(m.userId) &&
+				(!term || m.displayName.toLowerCase().includes(term)),
+		);
+	}, [orderedMembers, assignedWorkers, workerSearch]);
+
+	const toggleWorker = useCallback(
+		(id: string) =>
+			setAssignedWorkers((prev) =>
+				prev.includes(id)
+					? prev.filter((v) => v !== id)
+					: [...prev, id],
+			),
+		[setAssignedWorkers],
+	);
+
 	/*
 	 * The audience picker.
-	 *
-	 * Rendered as plain rows rather than a DropDownPicker like the assigned-
-	 * workers field: this section sits low in the form, and a dropdown overlay
-	 * here would have to win a zIndex fight with everything below it.
 	 *
 	 * Selected people are pinned above the search box so that typing a name
 	 * cannot hide someone already chosen — otherwise a manager filtering for
@@ -187,11 +225,11 @@ const EventSubmit = ({ navigation }) => {
 		audienceGroupIds.length > 0 || audienceUserIds.length > 0;
 
 	const toggleAudienceUser = useCallback(
-		(userId: string) =>
+		(id: string) =>
 			setAudienceUserIds((prev) =>
-				prev.includes(userId)
-					? prev.filter((id) => id !== userId)
-					: [...prev, userId],
+				prev.includes(id)
+					? prev.filter((v) => v !== id)
+					: [...prev, id],
 			),
 		[setAudienceUserIds],
 	);
@@ -210,8 +248,6 @@ const EventSubmit = ({ navigation }) => {
 		);
 	}, [members, audienceUserIds, personSearch]);
 
-	// Capped so a 65-person company does not render 65 rows inside a form.
-	const PERSON_ROW_CAP = 12;
 	const unselectedAudienceMembers = matchingUnselected.slice(
 		0,
 		PERSON_ROW_CAP,
@@ -220,45 +256,6 @@ const EventSubmit = ({ navigation }) => {
 		0,
 		matchingUnselected.length - PERSON_ROW_CAP,
 	);
-
-	const [workerResponses, setWorkerResponses] = useState<
-		Record<string, string>
-	>({});
-
-	useEffect(() => {
-		if (!currentCompany || !eventId) return;
-		return subscribeEventResponses(
-			currentCompany,
-			eventId,
-			setWorkerResponses,
-		);
-	}, [currentCompany, eventId]);
-
-	useEffect(() => {
-		const showStatus = Boolean(eventId && preferences.enableAvailability);
-		const statusEmoji = { confirmed: "✅", pending: "⏳", declined: "❌" };
-
-		const workers = members.map((member) => {
-			const status = workerResponses[member.userId] ?? "pending";
-			return {
-				label: showStatus
-					? `${statusEmoji[status] ?? "⏳"} ${member.displayName}`
-					: member.displayName,
-				value: member.userId,
-				status,
-				userData: {
-					firstName: member.firstName,
-					lastName: member.lastName,
-				},
-			};
-		});
-
-		setAvailableWorkers(
-			showStatus
-				? sortWorkersByStatus(workers, workerResponses)
-				: workers,
-		);
-	}, [members, workerResponses, eventId, preferences.enableAvailability]);
 
 	// Packages: one live query for the catalogue.
 	useEffect(() => {
@@ -270,87 +267,73 @@ const EventSubmit = ({ navigation }) => {
 		});
 	}, [currentCompany]);
 
-	// Add this useEffect after your other useEffects
 	useEffect(() => {
 		if (!currentCompany) return;
 
 		// Labels come from a subscription; the event's own label arrives with the
 		// event itself rather than a second read of the same document.
 		setLoadingLabels(true);
-		const unsubscribe = subscribeEventLabels(currentCompany, (next) => {
+		return subscribeEventLabels(currentCompany, (next) => {
 			setAvailableLabels(next);
 			setLoadingLabels(false);
 		});
-		return unsubscribe;
 	}, [currentCompany, eventId]);
-
-	const formatDate = (date: Date) => moment(date).format("MMM D, YYYY");
-	const formatTime = (time: Date, start: boolean = true) => {
-		if (start) return moment(time).format("h:mm A");
-		return moment(time).format("MMMM D, h:mm A");
-	};
 
 	// Load attachments if editing an event
 	useEffect(() => {
-		if (eventId) {
-			const fetchAttachments = async () => {
-				const existing = await getAttachmentsForParent(
-					currentCompany,
-					"event",
-					eventId,
-				);
+		if (!eventId) return;
 
-				setAttachments(
-					existing.map((a) => ({
-						id: a.id,
-						kind: "persisted" as const,
-						fileName: a.fileName,
-						contentType: a.contentType,
-						sizeBytes: a.sizeBytes,
-						displayUri: a.downloadUrl,
-						thumbnailUri: a.thumbnailDownloadUrl,
-					})),
-				);
-			};
+		const fetchAttachments = async () => {
+			const existing = await getAttachmentsForParent(
+				currentCompany,
+				"event",
+				eventId,
+			);
 
-			fetchAttachments();
-		}
+			setAttachments(
+				existing.map((a) => ({
+					id: a.id,
+					kind: "persisted" as const,
+					fileName: a.fileName,
+					contentType: a.contentType,
+					sizeBytes: a.sizeBytes,
+					displayUri: a.downloadUrl,
+					thumbnailUri: a.thumbnailDownloadUrl,
+				})),
+			);
+		};
+
+		fetchAttachments();
 	}, [eventId, currentCompany]);
 
-	const canSubmit = () => {
-		return true;
-	};
-
 	const handleBackPress = () => {
-		if (hasFormChanged()) {
-			Alert.alert(
-				"Discard Changes?",
-				"You have unsaved changes. Are you sure you want to go back?",
-				[
-					{
-						text: "Keep Editing",
-						style: "cancel",
-					},
-					{
-						text: "Discard",
-						style: "destructive",
-						onPress: () => navigation.goBack(),
-					},
-				],
-			);
-		} else {
+		if (!hasFormChanged()) {
 			navigation.goBack();
+			return;
 		}
+
+		Alert.alert(
+			"Discard changes?",
+			"You have unsaved changes to this event.",
+			[
+				{ text: "Keep editing", style: "cancel" },
+				{
+					text: "Discard",
+					style: "destructive",
+					onPress: () => navigation.goBack(),
+				},
+			],
+		);
 	};
 
-	const handleAttachmentSubmit = async (eventId) => {
+	const handleAttachmentSubmit = async (savedId: string) => {
 		try {
 			if (!isMounted.current) return;
 
-			if (!eventId || !currentCompany) {
-				Alert.alert(
-					"Error",
-					"Unable to save event information. Please try again.",
+			if (!savedId || !currentCompany) {
+				toast.error(
+					"Could not save attachments",
+					"The event was saved, but its files were not.",
 				);
 				return;
 			}
@@ -361,20 +344,12 @@ const EventSubmit = ({ navigation }) => {
 			 */
 			const drafts = attachments.filter((att) => att.kind === "draft");
 
-			if (drafts.length !== attachments.length) {
-				console.warn(
-					`Found ${
-						attachments.length - drafts.length
-					} invalid attachments`,
-				);
-			}
-
 			// First delete any files in the deletion queue
 			if (attachmentDeletionQueue.length > 0) {
 				await deleteAttachments(
 					currentCompany,
 					"event",
-					eventId,
+					savedId,
 					attachmentDeletionQueue.map((a: any) =>
 						typeof a === "string" ? a : a.id,
 					),
@@ -386,7 +361,7 @@ const EventSubmit = ({ navigation }) => {
 				await uploadFiles(
 					currentCompany,
 					"event",
-					eventId,
+					savedId,
 					drafts.map((d) => ({
 						id: d.id,
 						uri: d.displayUri,
@@ -405,23 +380,31 @@ const EventSubmit = ({ navigation }) => {
 				// to merge into local state here.
 			}
 
-			// Clear deletion queue
 			setAttachmentDeletionQueue([]);
 
 			// Only navigate after all operations are complete
 			if (isMounted.current) {
+				toast.success(isEditing ? "Event updated" : "Event created");
 				navigation.pop();
 			}
 		} catch (error) {
 			console.error("Error handling attachments:", error);
-			Alert.alert(
-				"Upload Error",
-				"There was an error uploading attachments. Please try again.",
+			toast.error(
+				"Could not upload attachments",
+				"The event saved, but please try the files again.",
 			);
 		}
 	};
 
 	const handleSubmit = async () => {
+		if (!title.trim()) {
+			setTitleError("Give the event a title.");
+			toast.warning("The event needs a title");
+			return;
+		}
+
+		setTitleError(undefined);
+
 		/*
 		 * Packages and the label go in with everything else. v1 called
 		 * handleSubmitData and then issued a SECOND updateEvent for these two
@@ -438,900 +421,547 @@ const EventSubmit = ({ navigation }) => {
 		if (savedId) await handleAttachmentSubmit(savedId);
 	};
 
-	// Toggle package selection
-	const togglePackageSelection = (packageId) => {
-		if (selectedPackages.includes(packageId)) {
-			setSelectedPackages(
-				selectedPackages.filter((id) => id !== packageId),
-			);
-		} else {
-			setSelectedPackages([...selectedPackages, packageId]);
-		}
-	};
+	const togglePackage = (packageId: string) =>
+		setSelectedPackages((prev) =>
+			prev.includes(packageId)
+				? prev.filter((id) => id !== packageId)
+				: [...prev, packageId],
+		);
 
-	// Add this state for dropdown control
-	const [openPackagesDropdown, setOpenPackagesDropdown] = useState(false);
+	const pickerTheme = theme.isDark ? "dark" : "light";
+
 	return (
-		<View style={[{ flex: 1, paddingTop: insets.top }, styles.container]}>
-			<KeyboardAwareFlatList
-				data={[]}
-				renderItem={null}
-				ListHeaderComponent={
+		<Screen
+			scroll
+			padded
+			keyboard="aware"
+			header={
+				<ScreenHeader
+					title={isEditing ? "Edit event" : "New event"}
+					onBack={handleBackPress}
+					actions={
+						isEditing
+							? [
+									{
+										icon: "trash-outline",
+										label: "Delete event",
+										color: "danger",
+										onPress: handleDelete,
+									},
+								]
+							: []
+					}
+				/>
+			}
+			footer={
+				<ScreenFooter safeArea>
+					<Button
+						title={isEditing ? "Save changes" : "Create event"}
+						icon="checkmark"
+						onPress={handleSubmit}
+						fullWidth
+						size="large"
+						haptic="press"
+						loading={isLoading || isUploading}
+						disabled={isUploading || isLoading}
+					/>
+				</ScreenFooter>
+			}
+		>
+			{/* What and where */}
+			<Card title="Event details" style={styles.card}>
+				<Input
+					label="Title"
+					placeholder="Rehearsal dinner, Smith wedding…"
+					value={title}
+					onChangeText={(v) => {
+						setTitle(v);
+						if (titleError) setTitleError(undefined);
+					}}
+					error={titleError}
+					containerStyle={styles.field}
+				/>
+
+				<LocationInput
+					locations={locations}
+					onLocationSelect={updateLocation}
+					onLocationDelete={deleteLocation}
+					onLabelChange={setLocationLabel}
+					editingLabelForAddress={editingLabelForAddress}
+					setEditingLabelForAddress={setEditingLabelForAddress}
+					labelText={labelText}
+					setLabelText={setLabelText}
+					googlePlacesRef={googlePlacesRef}
+				/>
+			</Card>
+
+			{/* When */}
+			<Card title="Date & time" flush style={styles.card}>
+				<ListRow
+					title="Date"
+					icon="calendar-outline"
+					value={moment(date).format("ddd, MMM D, YYYY")}
+					onPress={() => toggleDatePicker("date")}
+					chevron={false}
+				/>
+
+				<View style={styles.rowPadded}>
+					<Checkbox
+						checked={allDay}
+						onPress={toggleAllDay}
+						label="All day"
+					/>
+				</View>
+
+				{!allDay && (
 					<>
-						<EventFormHeader
-							title={
-								isEditing ? "Edit Event" : "Submit New Event"
-							}
-							onBack={handleBackPress}
+						<ListRow
+							title="Starts"
+							icon="time-outline"
+							value={moment(startTime).format("h:mm A")}
+							onPress={() => toggleDatePicker("startTime")}
+							chevron={false}
 						/>
 
-						{/* Form Container */}
-						<View style={styles.formCard}>
-							{/* Title Section */}
-							<View style={styles.sectionContainer}>
-								<Text style={styles.sectionTitle}>
-									Event Details
-								</Text>
-								<View style={styles.inputContainer}>
-									<Text style={styles.label}>Title</Text>
-									<TextInput
-										style={styles.input}
-										placeholder="Enter Title"
-										value={title}
-										onChangeText={setTitle}
-										placeholderTextColor="#A0A0A0"
-									/>
-								</View>
+						<View style={styles.rowPadded}>
+							<Checkbox
+								checked={hasEndTime}
+								onPress={toggleEndTime}
+								label="Set an end time"
+							/>
+						</View>
 
-								{/* Location Section */}
-								<LocationInput
-									locations={locations}
-									onLocationSelect={updateLocation}
-									onLocationDelete={deleteLocation}
-									onLabelChange={setLocationLabel}
-									editingLabelForAddress={
-										editingLabelForAddress
-									}
-									setEditingLabelForAddress={
-										setEditingLabelForAddress
-									}
-									labelText={labelText}
-									setLabelText={setLabelText}
-									googlePlacesRef={googlePlacesRef}
+						{hasEndTime && (
+							<ListRow
+								title="Ends"
+								icon="time-outline"
+								value={moment(endTime).format("MMM D, h:mm A")}
+								onPress={() => toggleDatePicker("endTime")}
+								chevron={false}
+								separator={false}
+							/>
+						)}
+					</>
+				)}
+
+				<DatePicker
+					modal
+					open={openDate}
+					date={date}
+					mode="date"
+					theme={pickerTheme}
+					onConfirm={(next) => {
+						toggleDatePicker("date");
+						setDate(next);
+					}}
+					onCancel={() => toggleDatePicker("date")}
+				/>
+				<DatePicker
+					modal
+					open={openStartTime}
+					date={startTime}
+					mode="time"
+					theme={pickerTheme}
+					onConfirm={(next) => {
+						toggleDatePicker("startTime");
+						setStartTime(next);
+					}}
+					onCancel={() => toggleDatePicker("startTime")}
+				/>
+				<DatePicker
+					modal
+					open={openEndTime}
+					date={endTime}
+					mode="datetime"
+					theme={pickerTheme}
+					onConfirm={(next) => {
+						toggleDatePicker("endTime");
+						setEndTime(next);
+					}}
+					onCancel={() => toggleDatePicker("endTime")}
+				/>
+			</Card>
+
+			{/* Assigned workers */}
+			<Card
+				title="Assigned workers"
+				titleAccessory={
+					assignedWorkers.length > 0 ? (
+						<Badge
+							label={`${assignedWorkers.length} assigned`}
+							tone="accent"
+						/>
+					) : undefined
+				}
+				style={styles.card}
+			>
+				{selectedWorkers.map((member) => (
+					<Checkbox
+						key={member.userId}
+						checked
+						onPress={() => toggleWorker(member.userId)}
+						label={member.displayName}
+						style={styles.personRow}
+					/>
+				))}
+
+				{members.length > 8 && (
+					<Input
+						placeholder="Search workers"
+						icon="search"
+						value={workerSearch}
+						onChangeText={setWorkerSearch}
+						autoCapitalize="none"
+						autoCorrect={false}
+						containerStyle={styles.field}
+					/>
+				)}
+
+				{unselectedWorkers.length === 0 ? (
+					<Text variant="caption" color="textTertiary">
+						{workerSearch.trim()
+							? "Nobody matches that name."
+							: "Everyone is already assigned."}
+					</Text>
+				) : (
+					unselectedWorkers.slice(0, PERSON_ROW_CAP).map((member) => {
+						const status = workerResponses[member.userId];
+
+						return (
+							<View key={member.userId} style={styles.personRow}>
+								<Checkbox
+									checked={false}
+									onPress={() => toggleWorker(member.userId)}
+									label={member.displayName}
+									style={styles.flex}
 								/>
-							</View>
-
-							{/* Date & Time Section */}
-							<View style={styles.sectionContainer}>
-								<Text style={styles.sectionTitle}>
-									Date & Time
-								</Text>
-
-								{/* Date Toggle */}
-								<View style={styles.inputContainer}>
-									<Text style={styles.label}>Date</Text>
-									<TouchableOpacity
-										onPress={() => toggleDatePicker("date")}
-										style={styles.dateButton}
-									>
-										<Text style={styles.dateButtonText}>
-											{formatDate(date)}
-										</Text>
-										<Ionicons
-											name="calendar-outline"
-											size={22}
-											color="#555"
-										/>
-									</TouchableOpacity>
-									<DatePicker
-										modal
-										open={openDate}
-										date={date}
-										mode="date"
-										onConfirm={(date) => {
-											toggleDatePicker("date");
-											setDate(date);
-										}}
-										onCancel={() => {
-											toggleDatePicker("date");
-										}}
+								{showResponses && !!status && (
+									<Badge
+										label={status}
+										tone={
+											RESPONSE_TONE[status] ?? "neutral"
+										}
+										dot
 									/>
-								</View>
-
-								<View style={styles.checkboxWrapper}>
-									<TouchableOpacity
-										onPress={toggleAllDay}
-										style={styles.checkboxContainer}
-									>
-										<View style={styles.checkbox}>
-											<Ionicons
-												name={
-													allDay
-														? "checkbox"
-														: "square-outline"
-												}
-												size={24}
-												color="#3d7eea"
-											/>
-										</View>
-										<Text style={styles.checkboxLabel}>
-											All Day
-										</Text>
-									</TouchableOpacity>
-								</View>
-
-								{!allDay && (
-									<View style={styles.timeContainer}>
-										{/* Start Time Section */}
-										<View
-											style={[
-												styles.inputContainer,
-												styles.timeField,
-											]}
-										>
-											<Text style={styles.label}>
-												Start Time
-											</Text>
-											<TouchableOpacity
-												onPress={() =>
-													toggleDatePicker(
-														"startTime",
-													)
-												}
-												style={styles.dateButton}
-											>
-												<Text
-													style={
-														styles.dateButtonText
-													}
-												>
-													{formatTime(startTime)}
-												</Text>
-												<Ionicons
-													name="time-outline"
-													size={22}
-													color="#555"
-												/>
-											</TouchableOpacity>
-											<DatePicker
-												modal
-												open={openStartTime}
-												date={startTime}
-												mode="time"
-												onConfirm={(date) => {
-													toggleDatePicker(
-														"startTime",
-													);
-													setStartTime(date);
-												}}
-												onCancel={() => {
-													toggleDatePicker(
-														"startTime",
-													);
-												}}
-											/>
-										</View>
-
-										{/* End Time Toggle */}
-										<View style={styles.checkboxWrapper}>
-											<TouchableOpacity
-												onPress={toggleEndTime}
-												style={styles.checkboxContainer}
-											>
-												<View style={styles.checkbox}>
-													<Ionicons
-														name={
-															hasEndTime
-																? "checkbox"
-																: "square-outline"
-														}
-														size={24}
-														color="#3d7eea"
-													/>
-												</View>
-												<Text
-													style={styles.checkboxLabel}
-												>
-													End Time
-												</Text>
-											</TouchableOpacity>
-										</View>
-
-										{hasEndTime && (
-											<View
-												style={[
-													styles.inputContainer,
-													styles.timeField,
-												]}
-											>
-												<Text style={styles.label}>
-													End Time
-												</Text>
-												<TouchableOpacity
-													onPress={() =>
-														toggleDatePicker(
-															"endTime",
-														)
-													}
-													style={styles.dateButton}
-												>
-													<Text
-														style={
-															styles.dateButtonText
-														}
-													>
-														{formatTime(
-															endTime,
-															false,
-														)}
-													</Text>
-													<Ionicons
-														name="time-outline"
-														size={22}
-														color="#555"
-													/>
-												</TouchableOpacity>
-												<DatePicker
-													modal
-													open={openEndTime}
-													date={endTime}
-													mode="datetime"
-													onConfirm={(date) => {
-														toggleDatePicker(
-															"endTime",
-														);
-														setEndTime(date);
-													}}
-													onCancel={() => {
-														toggleDatePicker(
-															"endTime",
-														);
-													}}
-												/>
-											</View>
-										)}
-									</View>
 								)}
 							</View>
+						);
+					})
+				)}
 
-							{/* Who gets asked about this event */}
-							{preferences.enableAvailability && (
-								<View style={styles.sectionContainer}>
-									<Text style={styles.sectionTitle}>
-										Who can see this event
-									</Text>
-									<Text style={styles.audienceHint}>
-										{isTargetedAudience
-											? "Only the people below will be asked about it."
-											: "Everyone who can see open jobs. Pick a group or specific people to send it only to them."}
-									</Text>
+				{unselectedWorkers.length > PERSON_ROW_CAP && (
+					<Text variant="caption" color="textTertiary">
+						{unselectedWorkers.length - PERSON_ROW_CAP} more —
+						search to narrow the list.
+					</Text>
+				)}
+			</Card>
 
-									<Text style={styles.audienceSectionTitle}>
-										Groups
-									</Text>
-									{groups.length === 0 ? (
-										<Text style={styles.audienceEmpty}>
-											No groups yet — create one under
-											Settings › Worker Groups.
-										</Text>
-									) : (
-										groups.map((group) => {
-											const on =
-												audienceGroupIds.includes(
-													group.id,
-												);
-											return (
-												<TouchableOpacity
-													key={group.id}
-													style={styles.audienceRow}
-													onPress={() =>
-														setAudienceGroupIds(
-															on
-																? audienceGroupIds.filter(
-																		(g) =>
-																			g !==
-																			group.id,
-																	)
-																: [
-																		...audienceGroupIds,
-																		group.id,
-																	],
-														)
-													}
-												>
-													<Ionicons
-														name={
-															on
-																? "checkbox"
-																: "square-outline"
-														}
-														size={22}
-														color={
-															on
-																? "#2078c8"
-																: "#999"
-														}
-													/>
-													<Text
-														style={
-															styles.audienceLabel
-														}
-													>
-														{group.name}
-													</Text>
-												</TouchableOpacity>
-											);
-										})
-									)}
+			{/* Who gets asked about this event */}
+			{preferences.enableAvailability && (
+				<Card
+					title="Who can see this event"
+					titleAccessory={
+						isTargetedAudience ? (
+							<Badge label="Targeted" tone="accent" />
+						) : (
+							<Badge label="Everyone" />
+						)
+					}
+					style={styles.card}
+				>
+					<Text
+						variant="caption"
+						color="textSecondary"
+						style={styles.hint}
+					>
+						{isTargetedAudience
+							? "Only the people below will be asked about it."
+							: "Everyone who can see open jobs. Pick a group or specific people to send it only to them."}
+					</Text>
 
-									{/*
-									 * Specific people, for the one-off a group
-									 * cannot express. Selected names are pinned
-									 * above the search so filtering never hides
-									 * someone you already picked.
-									 */}
-									<Text style={styles.audienceSectionTitle}>
-										Specific people
-									</Text>
+					<Text
+						variant="label"
+						color="textSecondary"
+						uppercase
+						style={styles.subheading}
+					>
+						Groups
+					</Text>
 
-									{selectedAudienceMembers.map((member) => (
-										<TouchableOpacity
-											key={member.userId}
-											style={styles.audienceRow}
-											onPress={() =>
-												toggleAudienceUser(
-													member.userId,
+					{groups.length === 0 ? (
+						<Text variant="caption" color="textTertiary">
+							No groups yet — create one under Settings › Worker
+							groups.
+						</Text>
+					) : (
+						groups.map((group) => (
+							<Checkbox
+								key={group.id}
+								checked={audienceGroupIds.includes(group.id)}
+								onPress={() =>
+									setAudienceGroupIds(
+										audienceGroupIds.includes(group.id)
+											? audienceGroupIds.filter(
+													(g) => g !== group.id,
 												)
-											}
-										>
-											<Ionicons
-												name="checkbox"
-												size={22}
-												color="#2078c8"
-											/>
-											<Text style={styles.audienceLabel}>
-												{member.displayName}
-											</Text>
-										</TouchableOpacity>
-									))}
-
-									{members.length > 8 && (
-										<TextInput
-											style={styles.audienceSearch}
-											value={personSearch}
-											onChangeText={setPersonSearch}
-											placeholder="Search people"
-											placeholderTextColor="#aaa"
-											autoCorrect={false}
-										/>
-									)}
-
-									{unselectedAudienceMembers.length === 0 ? (
-										<Text style={styles.audienceEmpty}>
-											{personSearch.trim()
-												? "Nobody matches that name."
-												: "Everyone is already selected."}
-										</Text>
-									) : (
-										unselectedAudienceMembers.map(
-											(member) => (
-												<TouchableOpacity
-													key={member.userId}
-													style={styles.audienceRow}
-													onPress={() =>
-														toggleAudienceUser(
-															member.userId,
-														)
-													}
-												>
-													<Ionicons
-														name="square-outline"
-														size={22}
-														color="#999"
-													/>
-													<Text
-														style={
-															styles.audienceLabel
-														}
-													>
-														{member.displayName}
-													</Text>
-												</TouchableOpacity>
-											),
-										)
-									)}
-
-									{hiddenPersonCount > 0 && (
-										<Text style={styles.audienceEmpty}>
-											{hiddenPersonCount} more — search to
-											narrow the list.
-										</Text>
-									)}
-								</View>
-							)}
-
-							{/* Assigned Workers Section */}
-							<View style={styles.sectionContainer}>
-								<Text style={styles.sectionTitle}>People</Text>
-								<View
-									style={[
-										styles.inputContainer,
-										{ zIndex: 3000, elevation: 3 },
-									]}
-								>
-									<Text style={styles.label}>
-										Assigned Workers
-									</Text>
-									<DropDownPicker
-										searchPlaceholder="Search workers"
-										multiple={true}
-										min={0}
-										max={5}
-										value={assignedWorkers}
-										setValue={setAssignedWorkers}
-										items={availableWorkers}
-										setItems={setAvailableWorkers}
-										open={openSelect}
-										setOpen={() =>
-											toggleDatePicker("select")
-										}
-										mode="BADGE"
-										listMode="SCROLLVIEW"
-										searchable={true}
-										maxHeight={200}
-										style={styles.dropdown}
-										dropDownContainerStyle={
-											styles.dropdownList
-										}
-										listItemContainerStyle={
-											styles.dropdownItem
-										}
-										badgeColors={["#3d7eea"]}
-										badgeTextStyle={{ color: "white" }}
-										zIndex={3000}
-										placeholder="Select workers"
-									/>
-								</View>
-							</View>
-
-							{/* Packages Section */}
-							<View
-								style={[styles.sectionContainer, { zIndex: 2 }]}
-							>
-								<Text style={styles.sectionTitle}>
-									Packages
-								</Text>
-								<View style={styles.inputContainer}>
-									<Text style={styles.label}>
-										Attach Packages
-									</Text>
-									<Text style={styles.helperText}>
-										Select packages to attach to this event
-									</Text>
-
-									{loadingPackages ? (
-										<ActivityIndicator
-											style={{ marginVertical: 20 }}
-										/>
-									) : availablePackages.length === 0 ? (
-										<View
-											style={
-												styles.emptyPackagesContainer
-											}
-										>
-											<Text
-												style={styles.emptyPackagesText}
-											>
-												No packages available
-											</Text>
-										</View>
-									) : (
-										<>
-											{/* Package Dropdown Selector */}
-											<DropDownPicker
-												open={openPackagesDropdown}
-												setOpen={
-													setOpenPackagesDropdown
-												}
-												items={availablePackages.map(
-													(pkg) => ({
-														label: pkg.title, // Just use the package title as the label
-														value: pkg.id,
-													}),
-												)}
-												value={[]} // Use null for single selection mode
-												setValue={(callback) => {
-													// Keep this empty as we handle selection manually
-												}}
-												multiple={false}
-												searchable={true}
-												searchPlaceholder="Search packages..."
-												placeholder="Select a package"
-												style={styles.dropdown}
-												dropDownContainerStyle={
-													styles.dropdownList
-												}
-												listItemContainerStyle={
-													styles.dropdownItem
-												}
-												listMode="SCROLLVIEW" // Add this to ensure scrolling works
-												maxHeight={300} // Set a reasonable max height
-												onSelectItem={(item) => {
-													if (
-														item &&
-														!selectedPackages.includes(
-															item.value,
-														)
-													) {
-														togglePackageSelection(
-															item.value,
-														);
-													}
-													setOpenPackagesDropdown(
-														false,
-													);
-												}}
-												zIndex={2000}
-											/>
-
-											{/* Display Selected Packages */}
-											{selectedPackages.length > 0 && (
-												<View
-													style={
-														styles.selectedPackagesContainer
-													}
-												>
-													<Text
-														style={
-															styles.selectedPackagesTitle
-														}
-													>
-														Selected Packages (
-														{
-															selectedPackages.length
-														}
-														)
-													</Text>
-													{availablePackages
-														.filter((pkg) =>
-															selectedPackages.includes(
-																pkg.id,
-															),
-														)
-														.map((pkg) => (
-															<View
-																key={pkg.id}
-																style={
-																	styles.packageItem
-																}
-															>
-																<View
-																	style={
-																		styles.packageItemContent
-																	}
-																>
-																	<View
-																		style={
-																			styles.packageItemHeader
-																		}
-																	>
-																		<Text
-																			style={
-																				styles.packageItemTitle
-																			}
-																		>
-																			{
-																				pkg.title
-																			}
-																		</Text>
-																		<TouchableOpacity
-																			onPress={() =>
-																				togglePackageSelection(
-																					pkg.id,
-																				)
-																			}
-																			style={
-																				styles.removePackageButton
-																			}
-																		>
-																			<Ionicons
-																				name="close-circle"
-																				size={
-																					24
-																				}
-																				color="#e74c3c"
-																			/>
-																		</TouchableOpacity>
-																	</View>
-
-																	{pkg.description ? (
-																		<Text
-																			style={
-																				styles.packageItemDescription
-																			}
-																			numberOfLines={
-																				2
-																			}
-																		>
-																			{
-																				pkg.description
-																			}
-																		</Text>
-																	) : null}
-
-																	<Text
-																		style={
-																			styles.packageItemStats
-																		}
-																	>
-																		{
-																			pkg
-																				.checklists
-																				.length
-																		}{" "}
-																		{pkg
-																			.checklists
-																			.length ===
-																		1
-																			? "checklist"
-																			: "checklists"}
-																	</Text>
-																</View>
-															</View>
-														))}
-												</View>
-											)}
-										</>
-									)}
-								</View>
-							</View>
-
-							{/* Label Section */}
-							<View
-								style={[styles.sectionContainer, { zIndex: 1 }]}
-							>
-								<Text style={styles.sectionTitle}>Label</Text>
-								<View style={styles.inputContainer}>
-									<Text style={styles.label}>
-										Event Label
-									</Text>
-									<Text style={styles.helperText}>
-										Categorize this event with a label
-									</Text>
-
-									{loadingLabels ? (
-										<ActivityIndicator
-											style={{ marginVertical: 10 }}
-										/>
-									) : availableLabels.length === 0 ? (
-										<View
-											style={styles.emptyLabelsContainer}
-										>
-											<Text
-												style={styles.emptyLabelsText}
-											>
-												No labels available
-											</Text>
-										</View>
-									) : (
-										<View
-											style={
-												styles.labelSelectorContainer
-											}
-										>
-											<View style={styles.labelsGrid}>
-												{/* Option for no label */}
-												<TouchableOpacity
-													style={[
-														styles.labelOption,
-														!selectedLabelId &&
-															styles.labelOptionSelected,
-													]}
-													onPress={() =>
-														setSelectedLabelId(null)
-													}
-												>
-													<View
-														style={
-															styles.labelColorNone
-														}
-													>
-														<Ionicons
-															name="close"
-															size={16}
-															color="#999"
-														/>
-													</View>
-													<Text
-														style={
-															styles.labelOptionText
-														}
-													>
-														None
-													</Text>
-												</TouchableOpacity>
-
-												{/* Available labels */}
-												{availableLabels.map(
-													(label) => (
-														<TouchableOpacity
-															key={label.id}
-															style={[
-																styles.labelOption,
-																selectedLabelId ===
-																	label.id &&
-																	styles.labelOptionSelected,
-															]}
-															onPress={() =>
-																setSelectedLabelId(
-																	label.id,
-																)
-															}
-														>
-															<View
-																style={[
-																	styles.labelColor,
-																	{
-																		backgroundColor:
-																			label.color,
-																	},
-																]}
-															/>
-															<Text
-																style={
-																	styles.labelOptionText
-																}
-															>
-																{label.name}
-															</Text>
-														</TouchableOpacity>
-													),
-												)}
-											</View>
-										</View>
-									)}
-
-									{/* Selected Label Preview */}
-									{selectedLabelId && (
-										<View
-											style={
-												styles.selectedLabelContainer
-											}
-										>
-											{availableLabels.map((label) => {
-												if (
-													label.id === selectedLabelId
-												) {
-													return (
-														<View
-															key={label.id}
-															style={[
-																styles.selectedLabel,
-																{
-																	backgroundColor:
-																		label.color,
-																},
-															]}
-														>
-															<Text
-																style={
-																	styles.selectedLabelText
-																}
-															>
-																{label.name}
-															</Text>
-														</View>
-													);
-												}
-												return null;
-											})}
-										</View>
-									)}
-								</View>
-							</View>
-
-							{/* Notes Section */}
-							<View
-								style={[styles.sectionContainer, { zIndex: 1 }]}
-							>
-								<Text style={styles.sectionTitle}>
-									Additional Information
-								</Text>
-								<View style={styles.inputContainer}>
-									<Text style={styles.label}>Notes</Text>
-									<TextInput
-										style={styles.notesInput}
-										placeholder="Add any additional notes about this event"
-										placeholderTextColor="#A0A0A0"
-										multiline={true}
-										numberOfLines={4}
-										value={notes}
-										onChangeText={setNotes}
-									/>
-								</View>
-
-								{/* Attachments Section */}
-								<View style={styles.attachmentsContainer}>
-									<Text style={styles.label}>
-										Attachments
-									</Text>
-									<AttachmentsSelector
-										showDocuments={true}
-										showMedia={true}
-										attachments={attachments}
-										setAttachments={setAttachments}
-										deletionQueue={attachmentDeletionQueue}
-										setDeletionQueue={
-											setAttachmentDeletionQueue
-										}
-										uploadProgress={uploadProgress}
-									/>
-								</View>
-							</View>
-						</View>
-
-						{/* Action Buttons */}
-						<View style={styles.actionButtonsContainer}>
-							<Button
-								title={
-									isEditing ? "Update Event" : "Create Event"
+											: [...audienceGroupIds, group.id],
+									)
 								}
-								onPress={() => {
-									// Validate before submitting
-									if (!title.trim()) {
-										Alert.alert(
-											"Error",
-											"Please enter a title for the event",
-										);
-										return;
-									}
-
-									handleSubmit();
-								}}
-								style={styles.submitButton}
-								textStyle={styles.submitButtonText}
-								variant="primary"
-								fullWidth
-								loading={isLoading || isUploading}
-								disabled={
-									(isEditing && !canSubmit()) ||
-									isUploading ||
-									isLoading
-								}
-								icon={
-									<Ionicons
-										name="send"
-										size={22}
-										color="white"
-									/>
-								}
+								label={group.name}
 							/>
+						))
+					)}
 
-							{isEditing && (
-								<Button
-									title="Delete Event"
-									onPress={handleDelete}
-									style={styles.deleteButton}
-									textStyle={styles.submitButtonText}
-									variant="destructive"
-									fullWidth
-									icon={
-										<Ionicons
-											name="trash-outline"
-											size={22}
-											color="white"
-										/>
-									}
-								/>
-							)}
-						</View>
-					</>
+					{/*
+					 * Specific people, for the one-off a group cannot express.
+					 * Selected names are pinned above the search so filtering
+					 * never hides someone you already picked.
+					 */}
+					<Text
+						variant="label"
+						color="textSecondary"
+						uppercase
+						style={styles.subheading}
+					>
+						Specific people
+					</Text>
+
+					{selectedAudienceMembers.map((member) => (
+						<Checkbox
+							key={member.userId}
+							checked
+							onPress={() => toggleAudienceUser(member.userId)}
+							label={member.displayName}
+						/>
+					))}
+
+					{members.length > 8 && (
+						<Input
+							placeholder="Search people"
+							icon="search"
+							value={personSearch}
+							onChangeText={setPersonSearch}
+							autoCapitalize="none"
+							autoCorrect={false}
+							containerStyle={styles.field}
+						/>
+					)}
+
+					{unselectedAudienceMembers.length === 0 ? (
+						<Text variant="caption" color="textTertiary">
+							{personSearch.trim()
+								? "Nobody matches that name."
+								: "Everyone is already selected."}
+						</Text>
+					) : (
+						unselectedAudienceMembers.map((member) => (
+							<Checkbox
+								key={member.userId}
+								checked={false}
+								onPress={() =>
+									toggleAudienceUser(member.userId)
+								}
+								label={member.displayName}
+							/>
+						))
+					)}
+
+					{hiddenPersonCount > 0 && (
+						<Text variant="caption" color="textTertiary">
+							{hiddenPersonCount} more — search to narrow the
+							list.
+						</Text>
+					)}
+				</Card>
+			)}
+
+			{/* Packages */}
+			<Card
+				title="Packages"
+				titleAccessory={
+					selectedPackages.length > 0 ? (
+						<Badge
+							label={String(selectedPackages.length)}
+							tone="accent"
+						/>
+					) : undefined
 				}
-				keyboardShouldPersistTaps="handled"
-				contentContainerStyle={styles.scrollContainer}
-			/>
-		</View>
+				style={styles.card}
+			>
+				{loadingPackages ? (
+					<Loading fill={false} size="small" />
+				) : availablePackages.length === 0 ? (
+					<Text variant="caption" color="textTertiary">
+						No packages yet — create them under Settings › Packages.
+					</Text>
+				) : (
+					availablePackages.map((pkg) => (
+						<Checkbox
+							key={pkg.id}
+							checked={selectedPackages.includes(pkg.id)}
+							onPress={() => togglePackage(pkg.id)}
+							label={pkg.title}
+							description={
+								pkg.description ||
+								`${pkg.checklists?.length ?? 0} ${
+									pkg.checklists?.length === 1
+										? "checklist"
+										: "checklists"
+								}`
+							}
+						/>
+					))
+				)}
+			</Card>
+
+			{/* Label */}
+			<Card title="Label" style={styles.card}>
+				{loadingLabels ? (
+					<Loading fill={false} size="small" />
+				) : availableLabels.length === 0 ? (
+					<Text variant="caption" color="textTertiary">
+						No labels yet — create them under Settings › Event
+						labels.
+					</Text>
+				) : (
+					<View style={styles.labelGrid}>
+						<LabelChip
+							selected={!selectedLabelId}
+							onPress={() => setSelectedLabelId(null)}
+							name="None"
+						/>
+						{availableLabels.map((label) => (
+							<LabelChip
+								key={label.id}
+								selected={selectedLabelId === label.id}
+								onPress={() => setSelectedLabelId(label.id)}
+								name={label.name}
+								color={label.color}
+							/>
+						))}
+					</View>
+				)}
+			</Card>
+
+			{/* Notes and files */}
+			<Card title="Notes & attachments" style={styles.card}>
+				<Input
+					placeholder="Anything the crew should know…"
+					multiline
+					value={notes}
+					onChangeText={setNotes}
+					containerStyle={styles.field}
+				/>
+
+				<AttachmentsSelector
+					showDocuments
+					showMedia
+					attachments={attachments}
+					setAttachments={setAttachments}
+					deletionQueue={attachmentDeletionQueue}
+					setDeletionQueue={setAttachmentDeletionQueue}
+					uploadProgress={uploadProgress}
+				/>
+			</Card>
+		</Screen>
 	);
 };
+
+/**
+ * One selectable label swatch.
+ *
+ * The dot carries the company's chosen color as-is; the chip around it is
+ * themed, so a pale label stays legible on a dark background.
+ */
+const LabelChip = ({
+	name,
+	color,
+	selected,
+	onPress,
+}: {
+	name: string;
+	color?: string;
+	selected: boolean;
+	onPress: () => void;
+}) => {
+	const styles = useThemedStyles(submitStyles);
+
+	return (
+		<Pressable
+			onPress={onPress}
+			haptic="selection"
+			accessibilityRole="radio"
+			accessibilityState={{ selected }}
+			accessibilityLabel={name}
+			style={[styles.chip, selected && styles.chipSelected]}
+		>
+			{color ? (
+				<View style={[styles.chipDot, { backgroundColor: color }]} />
+			) : (
+				<Icon name="close" size="xs" color="textTertiary" />
+			)}
+			<Text variant="label" color={selected ? "accent" : "textSecondary"}>
+				{name}
+			</Text>
+			{selected && <Icon name="checkmark" size="xs" color="accent" />}
+		</Pressable>
+	);
+};
+
+const submitStyles = (theme: Theme) =>
+	StyleSheet.create({
+		flex: {
+			flex: 1,
+		},
+		card: {
+			marginTop: theme.spacing.lg,
+		},
+		field: {
+			marginBottom: theme.spacing.lg,
+		},
+		rowPadded: {
+			paddingHorizontal: theme.spacing.lg,
+			paddingVertical: theme.spacing.xs,
+		},
+		personRow: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: theme.spacing.sm,
+		},
+		hint: {
+			marginBottom: theme.spacing.md,
+		},
+		subheading: {
+			marginTop: theme.spacing.lg,
+			marginBottom: theme.spacing.sm,
+		},
+		labelGrid: {
+			flexDirection: "row",
+			flexWrap: "wrap",
+			gap: theme.spacing.sm,
+		},
+		chip: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: theme.spacing.sm,
+			paddingHorizontal: theme.spacing.md,
+			paddingVertical: theme.spacing.sm,
+			borderRadius: theme.radius.pill,
+			borderWidth: theme.hairlineWidth,
+			borderColor: theme.colors.border,
+			backgroundColor: theme.colors.surfaceSunken,
+			minHeight: 36,
+		},
+		chipSelected: {
+			borderColor: theme.colors.accentBorder,
+			backgroundColor: theme.colors.accentSubtle,
+		},
+		chipDot: {
+			width: 12,
+			height: 12,
+			borderRadius: 6,
+		},
+	});
 
 export default EventSubmit;

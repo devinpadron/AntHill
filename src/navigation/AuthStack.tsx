@@ -1,5 +1,6 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { stackScreenOptions } from "./stackOptions";
 import LoginPage from "../screens/auth/LoginPage";
 import SignUpPage from "../screens/auth/SignUpPage";
 
@@ -13,17 +14,16 @@ import SignUpPage from "../screens/auth/SignUpPage";
 const Stack = createNativeStackNavigator();
 
 const AuthStack = () => (
-	<Stack.Navigator>
+	<Stack.Navigator screenOptions={stackScreenOptions}>
+		{/* Swiping back off Login has nowhere to go. */}
 		<Stack.Screen
 			name="Login"
 			component={LoginPage}
-			options={{ headerShown: false, gestureEnabled: false }}
+			options={{ gestureEnabled: false }}
 		/>
-		<Stack.Screen
-			name="Sign Up"
-			component={SignUpPage}
-			options={{ headerShown: true, gestureEnabled: true }}
-		/>
+		{/* Sign Up was the one route in the app with a native header; it draws
+		    its own now, like every other screen. */}
+		<Stack.Screen name="Sign Up" component={SignUpPage} />
 	</Stack.Navigator>
 );
 

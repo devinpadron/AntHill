@@ -24,7 +24,8 @@ import BottomSheet, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CustomFormRender from "./CustomFormRender";
 import { useCompany } from "../../contexts/CompanyContext";
-import { styles } from "./TimeEntrySubmitModal.styles";
+import { submitModalStyles } from "./TimeEntrySubmitModal.styles";
+import { useTheme, useThemedStyles } from "../../theme";
 import type { RenderableForm } from "./CustomFormRender";
 import {
 	blankResponsesFor,
@@ -32,6 +33,8 @@ import {
 } from "../../hooks/useSubmitFormSchemas";
 
 const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
+	const theme = useTheme();
+	const styles = useThemedStyles(submitModalStyles);
 	const [notes, setNotes] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState(null);
@@ -805,7 +808,10 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 				{isLoadingEvents ? (
 					<View style={styles.eventsCard}>
 						<View style={styles.eventsLoadingContainer}>
-							<ActivityIndicator size="small" color="#666" />
+							<ActivityIndicator
+								size="small"
+								color={theme.colors.textSecondary}
+							/>
 							<Text style={styles.loadingText}>
 								Finding related events...
 							</Text>
@@ -826,7 +832,7 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 											<Icon
 												name="calendar"
 												size={16}
-												color="#007AFF"
+												color={theme.colors.accent}
 											/>
 											<Text style={styles.eventItem}>
 												{event.title}{" "}
@@ -844,7 +850,7 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 											<Icon
 												name="close-circle"
 												size={20}
-												color="#FF3B30"
+												color={theme.colors.danger}
 											/>
 										</TouchableOpacity>
 									</View>
@@ -895,7 +901,7 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 								<Icon
 									name="plus-circle"
 									size={18}
-									color="#007AFF"
+									color={theme.colors.accent}
 								/>
 								<Text style={styles.addEventButtonText}>
 									Attach An Event
@@ -922,7 +928,7 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 											: "chevron-down"
 									}
 									size={20}
-									color="#007AFF"
+									color={theme.colors.accent}
 								/>
 							</TouchableOpacity>
 						)}
@@ -938,7 +944,9 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 											<Icon
 												name="calendar-outline"
 												size={16}
-												color="#666"
+												color={
+													theme.colors.textSecondary
+												}
 											/>
 											<Text style={styles.otherEventItem}>
 												{event.title}
@@ -952,7 +960,7 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 												<Icon
 													name="plus-circle"
 													size={20}
-													color="#4CD964"
+													color={theme.colors.success}
 												/>
 											</TouchableOpacity>
 										)}
@@ -1028,7 +1036,10 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 				{/* Add a progress indicator when uploading */}
 				{isUploading && (
 					<View style={styles.uploadProgressContainer}>
-						<ActivityIndicator size="small" color="#007AFF" />
+						<ActivityIndicator
+							size="small"
+							color={theme.colors.accent}
+						/>
 						<Text style={styles.uploadProgressText}>
 							Uploading files...{" "}
 							{Object.values(uploadProgress).length > 0

@@ -25,9 +25,12 @@ import DatePicker from "react-native-date-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useCompany } from "../../../contexts/CompanyContext";
 import { TimeEntry } from "../../../types";
-import { styles } from "./PayrollReview.styles";
+import { payrollStyles } from "./PayrollReview.styles";
+import { useTheme, useThemedStyles } from "../../../theme";
 
 const PayrollReview = ({ navigation }) => {
+	const theme = useTheme();
+	const styles = useThemedStyles(payrollStyles);
 	// UI state
 	const [isLoading, setIsLoading] = useState(true);
 	const [timeEntries, setTimeEntries] = useState([]);
@@ -272,7 +275,7 @@ const PayrollReview = ({ navigation }) => {
 					<Icon
 						name="arrow-right"
 						size={16}
-						color="#999"
+						color={theme.colors.textTertiary}
 						style={styles.arrow}
 					/>
 
@@ -325,17 +328,17 @@ const PayrollReview = ({ navigation }) => {
 	const getStatusColor = (status) => {
 		switch (status) {
 			case "pending_approval":
-				return "#FFB74D"; // Orange
+				return theme.colors.warning; // Orange
 			case "approved":
-				return "#81C784"; // Green
+				return theme.colors.success; // Green
 			case "rejected":
-				return "#E57373"; // Red
+				return theme.colors.danger; // Red
 			case "completed":
-				return "#FF8A65"; // Light Red
+				return theme.colors.danger; // Light Red
 			case "edited":
-				return "#90CAF9"; // Orange
+				return theme.colors.accent; // Orange
 			default:
-				return "#90CAF9"; // Blue
+				return theme.colors.accent; // Blue
 		}
 	};
 
@@ -346,7 +349,11 @@ const PayrollReview = ({ navigation }) => {
 					containerStyle={styles.backButton}
 					onPress={() => navigation.goBack()}
 				>
-					<Ionicons name="chevron-back" size={28} color="#000" />
+					<Ionicons
+						name="chevron-back"
+						size={28}
+						color={theme.colors.text}
+					/>
 				</TouchableOpacity>
 				<Text style={styles.headerTitle}>Payroll Review</Text>
 			</View>
@@ -358,7 +365,11 @@ const PayrollReview = ({ navigation }) => {
 						onPress={goToPrevWeek}
 						style={styles.dateNavButton}
 					>
-						<Icon name="chevron-left" size={24} color="#007AFF" />
+						<Icon
+							name="chevron-left"
+							size={24}
+							color={theme.colors.accent}
+						/>
 					</TouchableOpacity>
 
 					<TouchableOpacity
@@ -372,7 +383,11 @@ const PayrollReview = ({ navigation }) => {
 						onPress={goToNextWeek}
 						style={styles.dateNavButton}
 					>
-						<Icon name="chevron-right" size={24} color="#007AFF" />
+						<Icon
+							name="chevron-right"
+							size={24}
+							color={theme.colors.accent}
+						/>
 					</TouchableOpacity>
 				</View>
 
@@ -384,7 +399,7 @@ const PayrollReview = ({ navigation }) => {
 						<Icon
 							name="calendar"
 							size={18}
-							color="#666"
+							color={theme.colors.textSecondary}
 							style={styles.calendarIcon}
 						/>
 						<Text style={styles.dateText}>
@@ -401,7 +416,7 @@ const PayrollReview = ({ navigation }) => {
 						<Icon
 							name="calendar"
 							size={18}
-							color="#666"
+							color={theme.colors.textSecondary}
 							style={styles.calendarIcon}
 						/>
 						<Text style={styles.dateText}>
@@ -442,14 +457,21 @@ const PayrollReview = ({ navigation }) => {
 			{/* Content */}
 			{isLoading ? (
 				<View style={styles.loadingContainer}>
-					<ActivityIndicator size="large" color="#007AFF" />
+					<ActivityIndicator
+						size="large"
+						color={theme.colors.accent}
+					/>
 					<Text style={styles.loadingText}>
 						Loading time entries...
 					</Text>
 				</View>
 			) : entriesByEmployee.length === 0 ? (
 				<View style={styles.emptyContainer}>
-					<Icon name="calendar-blank" size={48} color="#ccc" />
+					<Icon
+						name="calendar-blank"
+						size={48}
+						color={theme.colors.borderStrong}
+					/>
 					<Text style={styles.emptyText}>
 						No time entries found for this period
 					</Text>
@@ -534,7 +556,7 @@ const PayrollReview = ({ navigation }) => {
 											<Icon
 												name="check-circle"
 												size={16}
-												color="#fff"
+												color={theme.colors.onAccent}
 											/>
 										</View>
 									)}
@@ -563,7 +585,7 @@ const PayrollReview = ({ navigation }) => {
 												: "chevron-down"
 										}
 										size={24}
-										color="#666"
+										color={theme.colors.textSecondary}
 									/>
 								</TouchableOpacity>
 							</View>

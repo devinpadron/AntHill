@@ -1,11 +1,9 @@
 import React, { useState } from "react";
-import { StyleSheet, Text, View, Alert } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { FormInput } from "../../components/ui/FormInput";
-import { Button } from "../../components/ui/Button";
-import { AntHill } from "../../constants/colors";
+import { StyleSheet, View } from "react-native";
+import { Button, Icon, Input, Screen, Text } from "../../components/ui";
 import { useUser } from "../../contexts/UserContext";
 import { useProfile } from "../../hooks/useProfile";
+import { Theme, useThemedStyles } from "../../theme";
 
 /*
  * Signed in, but not in any company.
@@ -21,22 +19,24 @@ import { useProfile } from "../../hooks/useProfile";
  * permission errors, and gives no way back.
  */
 const NoCompanyScreen = () => {
+	const styles = useThemedStyles(noCompanyStyles);
 	const { logout } = useUser();
 	const { joinCompany } = useProfile();
 	const [code, setCode] = useState("");
 	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState<string>();
 
 	const join = async () => {
 		const trimmed = code.trim();
 		if (!trimmed) return;
 
 		setBusy(true);
+		setError(undefined);
 		try {
 			const joined = await joinCompany(trimmed);
 			if (!joined) {
-				Alert.alert(
-					"That code did not match",
-					"Check the code with whoever invited you. Codes are case sensitive.",
+				setError(
+					"That code did not match. Check it with whoever invited you — codes are case sensitive.",
 				);
 			}
 			// On success the membership subscription sets companyId and this
@@ -47,79 +47,95 @@ const NoCompanyScreen = () => {
 	};
 
 	return (
-		<SafeAreaView style={styles.container}>
-			<Text style={styles.title}>You're not in a company yet</Text>
-			<Text style={styles.body}>
+		<Screen scroll keyboard="avoid" contentContainerStyle={styles.content}>
+			<View style={styles.iconWell}>
+				<Icon name="business-outline" size="xl" color="accent" />
+			</View>
+
+			<Text variant="title" align="center" style={styles.title}>
+				You're not in a company yet
+			</Text>
+			<Text
+				variant="body"
+				color="textSecondary"
+				align="center"
+				style={styles.body}
+			>
 				Enter the code you were given to join one. It can be a company
 				code or a group code.
 			</Text>
 
-			<FormInput
-				placeholder="Company or Group Code:"
+			<Input
+				label="Company or group code"
+				placeholder="Given to you by your manager"
+				icon="key-outline"
 				value={code}
-				onChangeText={setCode}
+				onChangeText={(v) => {
+					setCode(v);
+					setError(undefined);
+				}}
+				error={error}
+				autoCapitalize="none"
+				autoCorrect={false}
+				returnKeyType="go"
+				onSubmitEditing={join}
+				containerStyle={styles.field}
 			/>
 
 			<Button
-				title="Join"
+				title="Join company"
 				onPress={join}
 				loading={busy}
 				disabled={!code.trim() || busy}
-				style={styles.primaryButton}
-				textStyle={styles.buttonText}
-				variant="primary"
+				size="large"
 				fullWidth
+				haptic="press"
 			/>
-
-			<View style={{ height: 12 }} />
 
 			<Button
 				title="Sign out"
 				onPress={logout}
-				style={styles.textButton}
-				textStyle={styles.linkText}
 				variant="text"
+				icon="log-out-outline"
+				style={styles.signOut}
 			/>
-		</SafeAreaView>
+		</Screen>
 	);
 };
 
 export default NoCompanyScreen;
 
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: "white",
-		alignItems: "center",
-		justifyContent: "center",
-		paddingHorizontal: 24,
-	},
-	title: {
-		fontSize: 20,
-		fontWeight: "700",
-		color: AntHill.Black,
-		marginBottom: 8,
-		textAlign: "center",
-	},
-	body: {
-		fontSize: 14,
-		color: "#666",
-		lineHeight: 20,
-		textAlign: "center",
-		marginBottom: 24,
-	},
-	primaryButton: {
-		height: 48,
-		marginTop: 20,
-		borderRadius: 8,
-		width: "100%",
-		backgroundColor: AntHill.Black,
-	},
-	buttonText: { fontSize: 18, fontWeight: "600", color: AntHill.White },
-	textButton: { backgroundColor: "transparent", height: 40 },
-	linkText: {
-		fontSize: 16,
-		color: AntHill.Black,
-		textDecorationLine: "underline",
-	},
-});
+const noCompanyStyles = (theme: Theme) =>
+	StyleSheet.create({
+		content: {
+			flexGrow: 1,
+			justifyContent: "center",
+			alignItems: "center",
+			paddingHorizontal: theme.spacing.xl,
+			paddingVertical: theme.spacing["2xl"],
+		},
+		iconWell: {
+			width: 72,
+			height: 72,
+			borderRadius: theme.radius.pill,
+			alignItems: "center",
+			justifyContent: "center",
+			backgroundColor: theme.colors.accentSubtle,
+			marginBottom: theme.spacing.xl,
+		},
+		title: {
+			marginBottom: theme.spacing.sm,
+		},
+		body: {
+			maxWidth: 340,
+			marginBottom: theme.spacing.xl,
+		},
+		field: {
+			width: "100%",
+			maxWidth: 420,
+			marginBottom: theme.spacing.lg,
+		},
+		signOut: {
+			marginTop: theme.spacing.xl,
+		},
+	});

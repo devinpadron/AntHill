@@ -19,7 +19,8 @@ import CustomFormRender from "./CustomFormRender";
 import { useUploadManager } from "../../contexts/UploadManagerContext";
 import { getConnections } from "../../services/timeEntryEditService";
 import type { SelectableAttachment } from "../ui/AttachmentsSelector";
-import { styles } from "./EditSheet.styles";
+import { editSheetStyles } from "./EditSheet.styles";
+import { useTheme, useThemedStyles } from "../../theme";
 import { FormSchema, TimeEntry } from "../../types";
 
 // Update the interface for component props
@@ -57,6 +58,8 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 		},
 		ref,
 	) => {
+		const theme = useTheme();
+		const styles = useThemedStyles(editSheetStyles);
 		// Create a local ref that we know is always an object ref
 		const bottomSheetRef = React.useRef<BottomSheet>(null);
 
@@ -648,7 +651,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 									<Icon
 										name="clock-outline"
 										size={20}
-										color="#007AFF"
+										color={theme.colors.accent}
 									/>
 								</TouchableOpacity>
 								<DatePicker
@@ -691,7 +694,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 									<Icon
 										name="clock-outline"
 										size={20}
-										color="#007AFF"
+										color={theme.colors.accent}
 									/>
 								</TouchableOpacity>
 								<DatePicker
@@ -804,7 +807,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 											<Icon
 												name="calendar-check"
 												size={18}
-												color="#007AFF"
+												color={theme.colors.accent}
 											/>
 
 											{/* Editable Event Title */}
@@ -847,7 +850,9 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 													<Icon
 														name="close-circle"
 														size={20}
-														color="#FF3B30"
+														color={
+															theme.colors.danger
+														}
 													/>
 												</TouchableOpacity>
 											)}
@@ -894,7 +899,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 									<Icon
 										name="plus-circle"
 										size={18}
-										color="#007AFF"
+										color={theme.colors.accent}
 									/>
 									<Text style={styles.addEventButtonText}>
 										Add Connected Event
@@ -982,7 +987,7 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 								<Icon
 									name="delete-outline"
 									size={20}
-									color="#fff"
+									color={theme.colors.onAccent}
 								/>
 								<Text style={styles.deleteButtonText}>
 									Delete Time Entry

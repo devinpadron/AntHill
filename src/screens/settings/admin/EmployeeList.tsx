@@ -16,7 +16,6 @@ import {
 	Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUser } from "../../../contexts/UserContext";
 import { useCompanyMembers } from "../../../hooks/useCompanyMembers";
 import { useGroups } from "../../../hooks/useGroups";
@@ -25,7 +24,9 @@ import {
 	setMemberVisibility,
 } from "../../../services/groupService";
 import { showMemberActions } from "../../../utils/memberActions";
-import { styles } from "./EmployeeList.styles";
+import { employeeListStyles } from "./EmployeeList.styles";
+import { useTheme, useThemedStyles } from "../../../theme";
+import { SafeAreaBand } from "../../../components/ui";
 
 // Enable LayoutAnimation on Android
 if (
@@ -36,7 +37,8 @@ if (
 }
 
 const EmployeeList = ({ navigation }) => {
-	const insets = useSafeAreaInsets();
+	const theme = useTheme();
+	const styles = useThemedStyles(employeeListStyles);
 	const { user, role: userPrivilege, companyId, isAdmin } = useUser();
 	const { groups, namesFor: groupNamesFor } = useGroups(companyId ?? "");
 	/*
@@ -150,7 +152,7 @@ const EmployeeList = ({ navigation }) => {
 									isExpanded ? "chevron-up" : "chevron-down"
 								}
 								size={18}
-								color="#999"
+								color={theme.colors.textTertiary}
 								style={{ marginLeft: 8 }}
 							/>
 						</View>
@@ -162,7 +164,7 @@ const EmployeeList = ({ navigation }) => {
 								<Ionicons
 									name="mail-outline"
 									size={16}
-									color="#666"
+									color={theme.colors.textSecondary}
 									style={styles.detailIcon}
 								/>
 								<Text style={styles.detailText}>
@@ -174,7 +176,7 @@ const EmployeeList = ({ navigation }) => {
 								<Ionicons
 									name="call-outline"
 									size={16}
-									color="#666"
+									color={theme.colors.textSecondary}
 									style={styles.detailIcon}
 								/>
 								<Text style={styles.detailText}>
@@ -186,7 +188,7 @@ const EmployeeList = ({ navigation }) => {
 								<Ionicons
 									name="person-outline"
 									size={16}
-									color="#666"
+									color={theme.colors.textSecondary}
 									style={styles.detailIcon}
 								/>
 								<Text style={styles.detailText}>
@@ -202,7 +204,7 @@ const EmployeeList = ({ navigation }) => {
 											: "earth-outline"
 									}
 									size={16}
-									color="#666"
+									color={theme.colors.textSecondary}
 									style={styles.detailIcon}
 								/>
 								<Text style={styles.detailText}>
@@ -222,7 +224,7 @@ const EmployeeList = ({ navigation }) => {
 									<Ionicons
 										name="options-outline"
 										size={16}
-										color="#2078c8"
+										color={theme.colors.accent}
 									/>
 									<Text style={styles.accessButtonText}>
 										Job access
@@ -249,12 +251,21 @@ const EmployeeList = ({ navigation }) => {
 	const getPrivilegeColor = (privilege) => {
 		switch (privilege) {
 			case "owner":
-				return { bg: "#ffe0e0", text: "#d83030" };
+				return {
+					bg: theme.colors.dangerSubtle,
+					text: theme.colors.danger,
+				};
 			case "manager":
-				return { bg: "#e0f0ff", text: "#2078c8" };
+				return {
+					bg: theme.colors.accentSubtle,
+					text: theme.colors.accent,
+				};
 			case "user":
 			default:
-				return { bg: "#e6f7e6", text: "#4CAF50" };
+				return {
+					bg: theme.colors.successSubtle,
+					text: theme.colors.success,
+				};
 		}
 	};
 
@@ -275,15 +286,22 @@ const EmployeeList = ({ navigation }) => {
 	};
 
 	return (
-		<View style={[{ flex: 1, paddingTop: insets.top }, styles.container]}>
-			<StatusBar barStyle="dark-content" />
+		<View style={[{ flex: 1 }, styles.container]}>
+			<SafeAreaBand />
+			<StatusBar
+				barStyle={theme.isDark ? "light-content" : "dark-content"}
+			/>
 
 			<View style={styles.header}>
 				<TouchableOpacity
 					style={styles.backButton}
 					onPress={() => navigation.goBack()}
 				>
-					<Ionicons name="arrow-back" size={24} color="#333" />
+					<Ionicons
+						name="arrow-back"
+						size={24}
+						color={theme.colors.text}
+					/>
 				</TouchableOpacity>
 				<Text style={styles.headerTitle}>Employees</Text>
 				<View style={{ width: 40 }} />
@@ -306,13 +324,16 @@ const EmployeeList = ({ navigation }) => {
 				ListEmptyComponent={
 					<View style={styles.emptyContainer}>
 						{refreshing ? (
-							<ActivityIndicator size="large" color="#2089dc" />
+							<ActivityIndicator
+								size="large"
+								color={theme.colors.accent}
+							/>
 						) : (
 							<>
 								<Ionicons
 									name="people"
 									size={64}
-									color="#ccc"
+									color={theme.colors.borderStrong}
 								/>
 								<Text style={styles.emptyText}>
 									No employees found
@@ -325,8 +346,8 @@ const EmployeeList = ({ navigation }) => {
 					<RefreshControl
 						refreshing={refreshing}
 						onRefresh={refetchEmployees}
-						colors={["#2089dc"]}
-						tintColor="#2089dc"
+						colors={[theme.colors.accent]}
+						tintColor={theme.colors.accent}
 					/>
 				}
 			/>
@@ -351,6 +372,8 @@ const EmployeeList = ({ navigation }) => {
  * because it is also how you park someone without removing them.
  */
 const JobAccessModal = ({ member, groups, companyId, onClose }) => {
+	const theme = useTheme();
+	const styles = useThemedStyles(employeeListStyles);
 	const [visibility, setVisibility] = useState("open");
 	const [groupIds, setGroupIds] = useState<string[]>([]);
 	const [saving, setSaving] = useState(false);
@@ -403,7 +426,11 @@ const JobAccessModal = ({ member, groups, companyId, onClose }) => {
 							{member.firstName} {member.lastName}
 						</Text>
 						<TouchableOpacity onPress={onClose}>
-							<Ionicons name="close" size={24} color="#333" />
+							<Ionicons
+								name="close"
+								size={24}
+								color={theme.colors.text}
+							/>
 						</TouchableOpacity>
 					</View>
 
@@ -447,7 +474,11 @@ const JobAccessModal = ({ member, groups, companyId, onClose }) => {
 													: "square-outline"
 											}
 											size={22}
-											color={on ? "#2078c8" : "#999"}
+											color={
+												on
+													? theme.colors.accent
+													: theme.colors.textTertiary
+											}
 										/>
 										<Text style={styles.modalCheckLabel}>
 											{group.name}

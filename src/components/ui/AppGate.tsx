@@ -1,12 +1,13 @@
 import React from "react";
-import { View, Text, Image, StyleSheet, ActivityIndicator } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Button } from "./Button";
-import { AntHill } from "../../constants/colors";
+import { StyleSheet, View } from "react-native";
+import { Theme, useThemedStyles } from "../../theme";
 import { useAppGate } from "../../hooks/useAppGate";
 import { openAppStore } from "../../utils/versionUtils";
-
-const LOGO = require("../../assets/AntHill/Full_Black.png");
+import { Button } from "./Button";
+import { Loading } from "./Loading";
+import { Logo } from "./Logo";
+import { Screen } from "./Screen";
+import { Text } from "./Text";
 
 /**
  * Blocks the app when the backend says this build must not run.
@@ -19,6 +20,7 @@ const LOGO = require("../../assets/AntHill/Full_Black.png");
 export const AppGate: React.FC<{ children: React.ReactNode }> = ({
 	children,
 }) => {
+	const styles = useThemedStyles(gateStyles);
 	const {
 		status,
 		currentVersion,
@@ -34,9 +36,9 @@ export const AppGate: React.FC<{ children: React.ReactNode }> = ({
 
 	if (status === "loading") {
 		return (
-			<View style={styles.container}>
-				<Image source={LOGO} style={styles.logo} resizeMode="contain" />
-				<ActivityIndicator color={AntHill.Green} />
+			<View style={styles.loading}>
+				<Logo width={180} height={90} style={styles.logo} />
+				<Loading fill={false} size="small" />
 			</View>
 		);
 	}
@@ -52,15 +54,20 @@ export const AppGate: React.FC<{ children: React.ReactNode }> = ({
 	const isRetryable = isMaintenance || isSchema;
 
 	return (
-		<SafeAreaView style={styles.container}>
+		<Screen edges={["top", "bottom"]}>
 			<View style={styles.content}>
-				<Image source={LOGO} style={styles.logo} resizeMode="contain" />
+				<Logo width={180} height={90} style={styles.logo} />
 
-				<Text style={styles.title}>
-					{isRetryable ? "AntHill is updating" : "Update Required"}
+				<Text variant="title" align="center" style={styles.title}>
+					{isRetryable ? "AntHill is updating" : "Update required"}
 				</Text>
 
-				<Text style={styles.body}>
+				<Text
+					variant="body"
+					color="textSecondary"
+					align="center"
+					style={styles.body}
+				>
 					{isRetryable
 						? message ||
 							"We're making some improvements and will be back shortly. Your data is safe."
@@ -77,51 +84,41 @@ export const AppGate: React.FC<{ children: React.ReactNode }> = ({
 				</Text>
 
 				<Button
-					title={isRetryable ? "Try Again" : "Update Now"}
+					title={isRetryable ? "Try again" : "Update now"}
 					onPress={isRetryable ? recheck : openAppStore}
 					loading={isRetryable && isChecking}
+					icon={isRetryable ? "refresh" : "arrow-up-circle-outline"}
 					size="large"
 					fullWidth
-					style={styles.button}
 				/>
 			</View>
-		</SafeAreaView>
+		</Screen>
 	);
 };
 
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: AntHill.Cream,
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	content: {
-		width: "100%",
-		paddingHorizontal: 32,
-		alignItems: "center",
-	},
-	logo: {
-		width: 180,
-		height: 90,
-		marginBottom: 32,
-	},
-	title: {
-		fontSize: 24,
-		fontWeight: "600",
-		color: AntHill.Black,
-		marginBottom: 12,
-		textAlign: "center",
-	},
-	body: {
-		fontSize: 16,
-		lineHeight: 22,
-		color: AntHill.Black,
-		opacity: 0.75,
-		textAlign: "center",
-		marginBottom: 32,
-	},
-	button: {
-		backgroundColor: AntHill.Green,
-	},
-});
+const gateStyles = (theme: Theme) =>
+	StyleSheet.create({
+		loading: {
+			flex: 1,
+			alignItems: "center",
+			justifyContent: "center",
+			backgroundColor: theme.colors.bg,
+		},
+		content: {
+			flex: 1,
+			width: "100%",
+			paddingHorizontal: theme.spacing["2xl"],
+			alignItems: "center",
+			justifyContent: "center",
+		},
+		logo: {
+			marginBottom: theme.spacing["2xl"],
+		},
+		title: {
+			marginBottom: theme.spacing.md,
+		},
+		body: {
+			marginBottom: theme.spacing["2xl"],
+			maxWidth: 340,
+		},
+	});

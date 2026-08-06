@@ -16,6 +16,7 @@ import {
 } from "../../services/exportService";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { TimeEntry } from "../../types";
+import { Theme, useTheme, useThemedStyles } from "../../theme";
 
 // Export format options
 const EXPORT_FORMAT_CSV = "csv";
@@ -34,6 +35,8 @@ interface ExportSheetProps {
 }
 
 const ExportSheet = forwardRef<BottomSheet, ExportSheetProps>((props, ref) => {
+	const theme = useTheme();
+	const styles = useThemedStyles(exportSheetStyles);
 	const {
 		visible,
 		snapPoints,
@@ -185,8 +188,8 @@ const ExportSheet = forwardRef<BottomSheet, ExportSheetProps>((props, ref) => {
 								size={24}
 								color={
 									exportFormat === EXPORT_FORMAT_PDF
-										? "#007AFF"
-										: "#666"
+										? theme.colors.accent
+										: theme.colors.textSecondary
 								}
 							/>
 							<Text
@@ -213,8 +216,8 @@ const ExportSheet = forwardRef<BottomSheet, ExportSheetProps>((props, ref) => {
 								size={24}
 								color={
 									exportFormat === EXPORT_FORMAT_CSV
-										? "#007AFF"
-										: "#666"
+										? theme.colors.accent
+										: theme.colors.textSecondary
 								}
 							/>
 							<Text
@@ -241,8 +244,8 @@ const ExportSheet = forwardRef<BottomSheet, ExportSheetProps>((props, ref) => {
 								size={24}
 								color={
 									exportFormat === EXPORT_FORMAT_EXCEL
-										? "#007AFF"
-										: "#666"
+										? theme.colors.accent
+										: theme.colors.textSecondary
 								}
 							/>
 							<Text
@@ -278,7 +281,10 @@ const ExportSheet = forwardRef<BottomSheet, ExportSheetProps>((props, ref) => {
 						disabled={isExporting}
 					>
 						{isExporting ? (
-							<ActivityIndicator size="small" color="#fff" />
+							<ActivityIndicator
+								size="small"
+								color={theme.colors.onAccent}
+							/>
 						) : (
 							<Text style={styles.modalExportButtonText}>
 								Export
@@ -291,111 +297,112 @@ const ExportSheet = forwardRef<BottomSheet, ExportSheetProps>((props, ref) => {
 	);
 });
 
-const styles = StyleSheet.create({
-	sheetBackground: {
-		backgroundColor: "white",
-	},
-	sheetIndicator: {
-		backgroundColor: "#ccc",
-		width: 40,
-		height: 4,
-	},
-	sheetContent: {
-		padding: 20,
-		paddingBottom: 40,
-	},
-	modalTitle: {
-		fontSize: 18,
-		fontWeight: "600",
-		color: "#333",
-		marginBottom: 16,
-		textAlign: "center",
-	},
-	exportSummary: {
-		backgroundColor: "#f8f9fa",
-		padding: 16,
-		borderRadius: 8,
-		marginBottom: 20,
-	},
-	summaryText: {
-		fontSize: 15,
-		color: "#333",
-		marginBottom: 4,
-	},
-	dateRangeText: {
-		fontSize: 14,
-		color: "#666",
-		marginTop: 4,
-	},
-	exportOptionRow: {
-		marginBottom: 20,
-	},
-	exportOptionLabel: {
-		fontSize: 16,
-		fontWeight: "500",
-		color: "#333",
-		marginBottom: 8,
-	},
-	exportOptions: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		marginTop: 8,
-	},
-	exportOption: {
-		flex: 1,
-		paddingVertical: 12,
-		alignItems: "center",
-		borderWidth: 1,
-		borderColor: "#ddd",
-		marginHorizontal: 4,
-		borderRadius: 8,
-	},
-	selectedExportOption: {
-		borderColor: "#007AFF",
-		backgroundColor: "#f0f7ff",
-	},
-	exportOptionText: {
-		fontSize: 14,
-		color: "#666",
-		marginTop: 4,
-	},
-	selectedExportOptionText: {
-		color: "#007AFF",
-		fontWeight: "500",
-	},
-	modalButtons: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		marginTop: 16,
-	},
-	modalButton: {
-		paddingVertical: 12,
-		borderRadius: 8,
-		alignItems: "center",
-		justifyContent: "center",
-		flex: 1,
-	},
-	modalCancelButton: {
-		backgroundColor: "#f2f2f2",
-		marginRight: 8,
-	},
-	modalExportButton: {
-		backgroundColor: "#007AFF",
-		marginLeft: 8,
-	},
-	modalCancelButtonText: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#666",
-	},
-	modalExportButtonText: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#fff",
-	},
-	disabledButton: {
-		opacity: 0.5,
-	},
-});
+const exportSheetStyles = (theme: Theme) =>
+	StyleSheet.create({
+		sheetBackground: {
+			backgroundColor: theme.colors.surface,
+		},
+		sheetIndicator: {
+			backgroundColor: theme.colors.borderStrong,
+			width: 40,
+			height: 4,
+		},
+		sheetContent: {
+			padding: 20,
+			paddingBottom: 40,
+		},
+		modalTitle: {
+			fontSize: 18,
+			fontWeight: "600",
+			color: theme.colors.text,
+			marginBottom: 16,
+			textAlign: "center",
+		},
+		exportSummary: {
+			backgroundColor: theme.colors.surfaceSunken,
+			padding: 16,
+			borderRadius: 8,
+			marginBottom: 20,
+		},
+		summaryText: {
+			fontSize: 15,
+			color: theme.colors.text,
+			marginBottom: 4,
+		},
+		dateRangeText: {
+			fontSize: 14,
+			color: theme.colors.textSecondary,
+			marginTop: 4,
+		},
+		exportOptionRow: {
+			marginBottom: 20,
+		},
+		exportOptionLabel: {
+			fontSize: 16,
+			fontWeight: "500",
+			color: theme.colors.text,
+			marginBottom: 8,
+		},
+		exportOptions: {
+			flexDirection: "row",
+			justifyContent: "space-between",
+			marginTop: 8,
+		},
+		exportOption: {
+			flex: 1,
+			paddingVertical: 12,
+			alignItems: "center",
+			borderWidth: 1,
+			borderColor: theme.colors.border,
+			marginHorizontal: 4,
+			borderRadius: 8,
+		},
+		selectedExportOption: {
+			borderColor: theme.colors.accent,
+			backgroundColor: theme.colors.accentSubtle,
+		},
+		exportOptionText: {
+			fontSize: 14,
+			color: theme.colors.textSecondary,
+			marginTop: 4,
+		},
+		selectedExportOptionText: {
+			color: theme.colors.accent,
+			fontWeight: "500",
+		},
+		modalButtons: {
+			flexDirection: "row",
+			justifyContent: "space-between",
+			marginTop: 16,
+		},
+		modalButton: {
+			paddingVertical: 12,
+			borderRadius: 8,
+			alignItems: "center",
+			justifyContent: "center",
+			flex: 1,
+		},
+		modalCancelButton: {
+			backgroundColor: theme.colors.surfaceSunken,
+			marginRight: 8,
+		},
+		modalExportButton: {
+			backgroundColor: theme.colors.accent,
+			marginLeft: 8,
+		},
+		modalCancelButtonText: {
+			fontSize: 16,
+			fontWeight: "600",
+			color: theme.colors.textSecondary,
+		},
+		modalExportButtonText: {
+			fontSize: 16,
+			fontWeight: "600",
+			color: theme.colors.onAccent,
+		},
+		disabledButton: {
+			opacity: 0.5,
+		},
+	});
 
 export default ExportSheet;

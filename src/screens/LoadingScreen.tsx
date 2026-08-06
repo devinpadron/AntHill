@@ -1,27 +1,18 @@
 import React from "react";
-import { View, ActivityIndicator, StyleSheet, Text } from "react-native";
-import { AntHill } from "../constants/colors";
+import { Loading } from "../components/ui/Loading";
+import { Screen } from "../components/ui/Screen";
 
-const LoadingScreen = () => {
-	return (
-		<View style={styles.container}>
-			<ActivityIndicator size="large" color={AntHill.Black} />
-			<Text style={styles.loadingText}>Loading...</Text>
-		</View>
-	);
-};
-
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-		backgroundColor: "white",
-	},
-	loadingText: {
-		marginTop: 10,
-		fontSize: 18,
-	},
-});
+/**
+ * A full-screen spinner.
+ *
+ * Kept as a screen-shaped wrapper because several screens return it directly
+ * while their data loads. Prefer `SkeletonList` where the shape of the incoming
+ * content is known — the layout does not jump when the data lands.
+ */
+const LoadingScreen = ({ label }: { label?: string }) => (
+	<Screen>
+		<Loading label={label} />
+	</Screen>
+);
 
 export default LoadingScreen;

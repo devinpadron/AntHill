@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Alert } from "react-native";
+import { useCallback, useState } from "react";
 import auth from "@react-native-firebase/auth";
 import { capitalize } from "lodash";
 import { createUser } from "../services/userService";
@@ -7,8 +6,14 @@ import {
 	joinCompanyWithAccessCode,
 	resolveJoinCode,
 } from "../services/membershipService";
-import { validateSignupFields, handleAuthError } from "../utils/authUtils";
+import {
+	FieldErrors,
+	mapSignupError,
+	SignupField,
+	validateSignupFields,
+} from "../utils/authUtils";
 import { beginSignup, endSignup } from "../contexts/signupInProgress";
+import { toast } from "../components/ui";
 
 /*
  * Signup, against the v2 schema.
@@ -43,21 +48,35 @@ export const useSignUp = (navigation: any) => {
 	const [confPassword, setConfPassword] = useState("");
 	const [accessCode, setAccessCode] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
+	const [errors, setErrors] = useState<FieldErrors<SignupField>>({});
+
+	/** Clears a field's error as soon as the user edits it. */
+	const clearError = useCallback((field: SignupField) => {
+		setErrors((prev) => {
+			if (!prev[field] && !prev.form) return prev;
+			const next = { ...prev };
+			delete next[field];
+			delete next.form;
+			return next;
+		});
+	}, []);
 
 	const handleSignUp = async () => {
-		if (
-			!validateSignupFields(
-				firstName,
-				lastName,
-				email,
-				password,
-				confPassword,
-				accessCode,
-			)
-		) {
+		const invalid = validateSignupFields({
+			firstName,
+			lastName,
+			email,
+			password,
+			confPassword,
+			accessCode,
+		});
+
+		if (Object.keys(invalid).length > 0) {
+			setErrors(invalid);
 			return;
 		}
 
+		setErrors({});
 		setIsLoading(true);
 		// Silences UserContext's verification alert until this knows how it
 		// ended — see signupInProgress.
@@ -82,7 +101,10 @@ export const useSignUp = (navigation: any) => {
 						deleteError,
 					);
 				}
-				Alert.alert("Invalid Access Code");
+				setErrors({
+					accessCode:
+						"That code was not recognised. Codes are case sensitive.",
+				});
 				return;
 			}
 
@@ -115,14 +137,14 @@ export const useSignUp = (navigation: any) => {
 			 * actually created — the generic one cannot, because it fires for
 			 * failed signups too.
 			 */
-			Alert.alert(
+			toast.success(
 				"Account created",
 				"Check your email to verify your address, then sign in.",
 			);
 
 			navigation.pop();
 		} catch (error) {
-			handleAuthError(error);
+			setErrors(mapSignupError(error));
 		} finally {
 			/*
 			 * Sign out before leaving. THIS IS LOAD-BEARING, and not obvious.
@@ -175,6 +197,8 @@ export const useSignUp = (navigation: any) => {
 		accessCode,
 		setAccessCode,
 		isLoading,
+		errors,
+		clearError,
 		handleSignUp,
 	};
 };

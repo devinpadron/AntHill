@@ -1,434 +1,197 @@
-import React, { useEffect, useRef, useState } from "react";
-import { TouchableOpacity, View, Text, StyleSheet } from "react-native";
-import { format, differenceInSeconds } from "date-fns";
-import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import { getStatusBadgeColor } from "../../utils/timeUtils";
+import React from "react";
+import { StyleSheet, View } from "react-native";
+import { format } from "date-fns";
+import { getStatusBadgeText, getStatusTone } from "../../utils/timeUtils";
+import { useEntryElapsed } from "../../hooks/useEntryElapsed";
+import { Badge, Button, Card, Icon, Text } from "../ui";
+import { Theme, useThemedStyles } from "../../theme";
 
+/**
+ * One shift in the week's list.
+ *
+ * A live entry ticks every second; a finished one shows its stored total. The
+ * status is a themed `Badge` rather than the pastel hex `getStatusBadgeColor`
+ * used to return, and the row of label/value pairs is a compact stat strip
+ * instead of four stacked icon rows.
+ */
 const TimeEntryCard = ({ timeEntry, onPress, onSubmit }) => {
-	// Format date and times
-	const entryDate = timeEntry.clockInAt.toDate();
-	const formattedDate = format(entryDate, "EEEE, MMMM d");
-	const clockInTime = format(entryDate, "h:mm a");
+	const styles = useThemedStyles(cardStyles);
 
-	const [elapsedSeconds, setElapsedSeconds] = useState(0);
-	const [currentPauseDuration, setCurrentPauseDuration] = useState(
-		timeEntry.pausedSeconds || 0,
-	);
-	const intervalRef = useRef(null);
+	/*
+	 * Shared with the clock control on the Clock screen, so a shift in this list
+	 * and the big timer above it cannot disagree about how long it has run.
+	 */
+	const elapsed = useEntryElapsed(timeEntry);
+	const { isPaused, isLive } = elapsed;
+
+	const entryDate = timeEntry.clockInAt.toDate();
+	const formattedDate = format(entryDate, "EEE, MMM d");
+	const clockInTime = format(entryDate, "h:mm a");
 
 	const clockOutTime = timeEntry.clockOutAt
 		? format(timeEntry.clockOutAt.toDate(), "h:mm a")
-		: timeEntry.status === "paused"
+		: isPaused
 			? "Paused"
-			: "Active";
+			: "Running";
 
-	// Determine if entry can be submitted for approval
+	// Only a finished, unsubmitted entry can be sent for approval.
 	const canSubmit =
 		timeEntry.status === "completed" &&
 		timeEntry.status !== "pending_approval";
 
-	// Setup and manage timer for active entries
-	useEffect(() => {
-		// Clear any existing interval first
-		if (intervalRef.current) {
-			clearInterval(intervalRef.current);
-			intervalRef.current = null;
-		}
+	const split = (totalSeconds: number) => ({
+		hours: Math.floor(totalSeconds / 3600),
+		minutes: Math.floor((totalSeconds % 3600) / 60),
+		seconds: totalSeconds % 60,
+	});
 
-		if (timeEntry.status === "active") {
-			// Calculate initial elapsed time in seconds
-			const startDate = timeEntry.clockInAt.toDate();
+	const duration = split(elapsed.workedSeconds);
 
-			// Account for any previous pause time
-			const pauseOffset = timeEntry.pausedSeconds || 0;
+	/*
+	 * A running shift counts in seconds so it visibly moves; a finished one is
+	 * a decimal hour figure, which is what payroll reads.
+	 */
+	const durationString = isLive
+		? `${duration.hours > 0 ? `${duration.hours}h ` : ""}${
+				duration.minutes > 0 || duration.hours > 0
+					? `${duration.minutes}m `
+					: ""
+			}${duration.seconds}s`
+		: `${(duration.hours + duration.minutes / 60).toFixed(2)}h`;
 
-			const initialElapsed =
-				differenceInSeconds(new Date(), startDate) - pauseOffset;
-			setElapsedSeconds(initialElapsed);
-
-			// Update timer every second
-			intervalRef.current = setInterval(() => {
-				const currentElapsed =
-					differenceInSeconds(new Date(), startDate) - pauseOffset;
-				setElapsedSeconds(currentElapsed);
-			}, 1000);
-		} else if (timeEntry.status === "paused") {
-			// For paused entries, calculate the elapsed time up until the pause
-			if (timeEntry.pauseStartTime) {
-				const startDate = timeEntry.clockInAt.toDate();
-				const pauseDate = new Date(timeEntry.pauseStartTime);
-
-				// Account for any previous pause time
-				const pauseOffset = timeEntry.pausedSeconds || 0;
-
-				const pausedElapsed =
-					differenceInSeconds(pauseDate, startDate) - pauseOffset;
-				setElapsedSeconds(pausedElapsed);
-
-				// Initialize current pause duration
-				const basePauseDuration = timeEntry.pausedSeconds || 0;
-
-				// Set up interval to update pause duration in real-time
-				intervalRef.current = setInterval(() => {
-					const pauseStartTime = new Date(timeEntry.pauseStartTime);
-					const currentPauseSeconds = differenceInSeconds(
-						new Date(),
-						pauseStartTime,
-					);
-					setCurrentPauseDuration(
-						basePauseDuration + currentPauseSeconds,
-					);
-				}, 1000);
-			}
-		} else {
-			// For completed or other states, use the stored total
-			setCurrentPauseDuration(timeEntry.pausedSeconds || 0);
-		}
-
-		return () => {
-			if (intervalRef.current) {
-				clearInterval(intervalRef.current);
-			}
-		};
-	}, [
-		timeEntry.status,
-		timeEntry.clockInAt,
-		timeEntry.pauseStartTime,
-		timeEntry.pausedSeconds,
-	]);
-
-	// Calculate hours and minutes
-	const getDurationValues = (totalSeconds) => {
-		const hours = Math.floor(totalSeconds / 3600);
-		const minutes = Math.floor((totalSeconds % 3600) / 60);
-		const seconds = totalSeconds % 60;
-		return { hours, minutes, seconds };
-	};
-
-	// For completed entries, use the stored duration (in seconds)
-	// For active/paused entries, use the elapsed seconds
-	const duration =
-		timeEntry.status === "active" || timeEntry.status === "paused"
-			? getDurationValues(Math.max(0, elapsedSeconds))
-			: getDurationValues(timeEntry.workedSeconds || 0);
-
-	// Format duration string with seconds for active entries
-	const formatDurationString = (h, m, s, isActive, isPaused) => {
-		if (isActive) {
-			return `${h > 0 ? `${h}h ` : ""}${
-				m > 0 || h > 0 ? `${m}m ` : ""
-			}${s}s${isPaused ? " (paused)" : ""}`;
-		} else {
-			// For completed entries, don't show seconds
-			// Convert to decimal hours with one decimal place
-			const decimalHours = (h + m / 60).toFixed(2);
-			return `${decimalHours}h`;
-		}
-	};
-
-	const durationString = formatDurationString(
-		duration.hours,
-		duration.minutes,
-		duration.seconds,
-		timeEntry.status === "active" || timeEntry.status === "paused",
-		timeEntry.status === "paused",
-	);
-
-	// Status color
-	const getStatusColor = () => {
-		switch (timeEntry.status) {
-			case "active":
-				return "#007AFF"; // Blue for active
-			case "paused":
-				return "#FFEB3B"; // Yellow for paused
-			case "rejected":
-				return "#FF3B30"; // Red for rejected
-			case "approved":
-				return "#34C759";
-			case "completed":
-			case "pending_approval":
-			case "edited":
-			default:
-				return "#FFA500"; // Orange for pending
-		}
-	};
-
-	// Handler for submission button
-	const handleSubmit = (e) => {
-		e.stopPropagation(); // Prevent triggering card's onPress
-		if (onSubmit) onSubmit(timeEntry);
-	};
-
-	// Format pause duration from seconds to h:mm:ss
-	const formatPauseDuration = (totalSeconds) => {
-		const { hours, minutes, seconds } = getDurationValues(totalSeconds);
-
-		if (hours > 0) {
-			return `${hours}h ${minutes}m`;
-		} else if (minutes > 0) {
-			return `${minutes}m ${seconds}s`;
-		} else {
-			return `${seconds}s`;
-		}
+	const formatPause = (totalSeconds: number) => {
+		const { hours, minutes, seconds } = split(totalSeconds);
+		if (hours > 0) return `${hours}h ${minutes}m`;
+		if (minutes > 0) return `${minutes}m ${seconds}s`;
+		return `${seconds}s`;
 	};
 
 	return (
-		<TouchableOpacity
-			style={styles.card}
-			onPress={canSubmit && onSubmit ? handleSubmit : onPress}
-			activeOpacity={onPress ? 0.7 : 1}
-		>
-			{/* Date */}
-			<View style={styles.dateRow}>
-				<Text style={styles.date}>{formattedDate}</Text>
-				<View
-					style={[
-						styles.statusIndicator,
-						{ backgroundColor: getStatusColor() },
-					]}
+		<Card style={styles.card} onPress={onPress}>
+			<View style={styles.header}>
+				<Text variant="bodyStrong">{formattedDate}</Text>
+				<Badge
+					label={getStatusBadgeText(timeEntry.status)}
+					tone={getStatusTone(timeEntry.status)}
+					dot
 				/>
 			</View>
 
-			{/* Time information */}
-			<View style={styles.timeRow}>
+			<View style={styles.times}>
 				<View style={styles.timeBlock}>
-					<Icon
-						name="clock-time-four-outline"
-						size={16}
-						color="#666"
-						style={styles.icon}
-					/>
-					<View>
-						<Text style={styles.timeLabel}>Clock In</Text>
-						<Text style={styles.timeValue}>{clockInTime}</Text>
-					</View>
+					<Text variant="caption" color="textSecondary" uppercase>
+						In
+					</Text>
+					<Text variant="bodyStrong">{clockInTime}</Text>
 				</View>
 
-				<View style={styles.arrow}>
-					<Icon name="arrow-right" size={16} color="#999" />
-				</View>
-
-				<View style={styles.timeBlock}>
-					<Icon
-						name={
-							timeEntry.clockOutAt
-								? "clock-time-nine-outline"
-								: "clock-outline"
-						}
-						size={16}
-						color="#666"
-						style={styles.icon}
-					/>
-					<View>
-						<Text style={styles.timeLabel}>Clock Out</Text>
-						<Text
-							style={[
-								styles.timeValue,
-								timeEntry.status === "active" &&
-									styles.activeText,
-							]}
-						>
-							{clockOutTime}
-						</Text>
-					</View>
-				</View>
-			</View>
-
-			{/* Duration */}
-			<View style={styles.durationRow}>
 				<Icon
-					name="timer-outline"
-					size={16}
-					color="#666"
-					style={styles.icon}
+					name="arrow-forward"
+					size="sm"
+					color="textTertiary"
+					style={styles.arrow}
 				/>
-				<Text style={styles.durationLabel}>Duration:</Text>
-				<Text style={styles.durationValue}>{durationString}</Text>
+
+				<View style={styles.timeBlock}>
+					<Text variant="caption" color="textSecondary" uppercase>
+						Out
+					</Text>
+					<Text
+						variant="bodyStrong"
+						color={isLive ? "accent" : "text"}
+					>
+						{clockOutTime}
+					</Text>
+				</View>
+
+				<View style={styles.spacer} />
+
+				<View style={styles.timeBlockEnd}>
+					<Text variant="caption" color="textSecondary" uppercase>
+						Worked
+					</Text>
+					<Text variant="bodyStrong">{durationString}</Text>
+				</View>
 			</View>
 
-			{/* Pause Duration - show only if there's pause time or currently paused */}
-			{(timeEntry.status === "paused" || currentPauseDuration > 0) && (
-				<View style={styles.pauseRow}>
-					<Icon
-						name="pause-circle-outline"
-						size={16}
-						color="#666"
-						style={styles.icon}
-					/>
-					<Text style={styles.pauseLabel}>Paused:</Text>
-					<Text style={styles.pauseValue}>
-						{formatPauseDuration(currentPauseDuration)}
+			{(isPaused || elapsed.pausedSeconds > 0) && (
+				<View style={styles.metaRow}>
+					<Icon name="pause-circle" size="xs" color="warning" />
+					<Text variant="caption" color="textSecondary">
+						Paused for {formatPause(elapsed.pausedSeconds)}
 					</Text>
 				</View>
 			)}
 
-			{/* Event information */}
-			{timeEntry.eventTitle && (
-				<View style={styles.eventRow}>
-					<Icon
-						name="calendar-check"
-						size={16}
-						color="#007AFF"
-						style={styles.icon}
-					/>
-					<Text style={styles.eventLabel}>Event:</Text>
+			{!!timeEntry.eventTitle && (
+				<View style={styles.metaRow}>
+					<Icon name="calendar" size="xs" color="accent" />
 					<Text
-						style={styles.eventValue}
+						variant="caption"
+						color="textSecondary"
 						numberOfLines={1}
-						ellipsizeMode="tail"
+						style={styles.flex}
 					>
 						{timeEntry.eventTitle}
 					</Text>
 				</View>
 			)}
 
-			{/* Status badges and submit button */}
-			{canSubmit && onSubmit ? (
-				<View style={styles.submitButton}>
-					<Icon
-						name="check-circle-outline"
-						size={16}
-						color="#007AFF"
-						style={styles.icon}
-					/>
-					<Text style={styles.submitText}>Submit for Approval</Text>
-				</View>
-			) : null}
-		</TouchableOpacity>
+			{canSubmit && !!onSubmit && (
+				<Button
+					title="Submit for approval"
+					icon="paper-plane-outline"
+					variant="secondary"
+					size="small"
+					fullWidth
+					onPress={() => onSubmit(timeEntry)}
+					style={styles.submit}
+				/>
+			)}
+		</Card>
 	);
 };
 
-const styles = StyleSheet.create({
-	card: {
-		backgroundColor: "white",
-		borderRadius: 10,
-		padding: 16,
-		marginBottom: 12,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 2,
-		elevation: 2,
-		borderWidth: 1,
-		borderColor: "#eaeaea",
-	},
-	dateRow: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		marginBottom: 12,
-	},
-	date: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#333",
-	},
-	statusIndicator: {
-		width: 8,
-		height: 8,
-		borderRadius: 4,
-	},
-	timeRow: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		marginBottom: 12,
-	},
-	timeBlock: {
-		flexDirection: "row",
-		alignItems: "center",
-	},
-	arrow: {
-		padding: 8,
-	},
-	icon: {
-		marginRight: 6,
-	},
-	timeLabel: {
-		fontSize: 12,
-		color: "#666",
-	},
-	timeValue: {
-		fontSize: 14,
-		fontWeight: "500",
-		color: "#333",
-	},
-	activeText: {
-		fontWeight: "600",
-	},
-	durationRow: {
-		flexDirection: "row",
-		alignItems: "center",
-		marginBottom: 8,
-	},
-	durationLabel: {
-		fontSize: 14,
-		color: "#666",
-		marginRight: 6,
-	},
-	durationValue: {
-		fontSize: 15,
-		fontWeight: "600",
-		color: "#333",
-	},
-	pauseRow: {
-		flexDirection: "row",
-		alignItems: "center",
-		marginBottom: 8,
-	},
-	pauseLabel: {
-		fontSize: 14,
-		color: "#666",
-		marginRight: 6,
-	},
-	pauseValue: {
-		fontSize: 15,
-		fontWeight: "600",
-	},
-	eventRow: {
-		flexDirection: "row",
-		alignItems: "center",
-		marginBottom: 8,
-	},
-	eventLabel: {
-		fontSize: 14,
-		color: "#666",
-		marginRight: 6,
-	},
-	eventValue: {
-		fontSize: 15,
-		color: "#007AFF",
-		flex: 1,
-	},
-	// Submit button and status badge styles
-	submitButton: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-		backgroundColor: "#f0f7ff",
-		paddingVertical: 8,
-		borderRadius: 6,
-		marginTop: 12,
-	},
-	submitText: {
-		fontSize: 14,
-		fontWeight: "500",
-		color: "#007AFF",
-	},
-	statusBadge: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-		backgroundColor: "#fff8e1",
-		paddingVertical: 8,
-		borderRadius: 6,
-		marginTop: 12,
-	},
-	pendingText: {
-		fontSize: 14,
-		fontWeight: "500",
-		color: "#FFA500",
-	},
-});
-
 export default TimeEntryCard;
+
+const cardStyles = (theme: Theme) =>
+	StyleSheet.create({
+		flex: {
+			flex: 1,
+		},
+		card: {
+			marginBottom: theme.spacing.md,
+		},
+		header: {
+			flexDirection: "row",
+			alignItems: "center",
+			justifyContent: "space-between",
+			marginBottom: theme.spacing.md,
+		},
+		times: {
+			flexDirection: "row",
+			alignItems: "center",
+		},
+		timeBlock: {
+			gap: 2,
+		},
+		timeBlockEnd: {
+			alignItems: "flex-end",
+			gap: 2,
+		},
+		arrow: {
+			marginHorizontal: theme.spacing.md,
+		},
+		spacer: {
+			flex: 1,
+		},
+		metaRow: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: theme.spacing.sm,
+			marginTop: theme.spacing.md,
+		},
+		submit: {
+			marginTop: theme.spacing.lg,
+		},
+	});

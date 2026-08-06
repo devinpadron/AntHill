@@ -1,59 +1,71 @@
-import React, { useState, useEffect } from "react";
-import {
-	View,
-	Text,
-	StyleSheet,
-	TouchableOpacity,
-	ScrollView,
-	ActivityIndicator,
-	Alert,
-	Platform,
-} from "react-native";
+import React, { useEffect, useState } from "react";
+import { Platform, StyleSheet, View } from "react-native";
 import { useUser } from "../../contexts/UserContext";
 import {
 	subscribeUserSettings,
 	updateUserSettings,
 } from "../../services/userService";
 import {
-	SafeAreaView,
-	useSafeAreaInsets,
-} from "react-native-safe-area-context";
-import Icon from "react-native-vector-icons/MaterialIcons";
+	Card,
+	ListRow,
+	Screen,
+	ScreenHeader,
+	SegmentedControl,
+	SkeletonList,
+	Text,
+	toast,
+} from "../../components/ui";
+import { IconName } from "../../components/ui/Icon";
+import { Theme, ThemeMode, useThemePreference } from "../../theme";
+import { useThemedStyles } from "../../theme";
 
-// Map app options
-const mapAppOptions =
+/*
+ * Per-user preferences.
+ *
+ * Saves on change rather than behind a "Save Preferences" button and a success
+ * alert — every setting here is a single value with an obvious effect, so the
+ * write can follow the tap.
+ *
+ * This is also where appearance lives. The theme layer resolves
+ * light/dark/system app-wide; this is the only screen that sets it.
+ */
+
+const MAP_APPS: { label: string; value: string; icon: IconName }[] =
 	Platform.OS === "ios"
 		? [
-				{ label: "Apple Maps", value: "apple" },
-				{ label: "Google Maps", value: "google" },
-				{ label: "Waze", value: "waze" },
+				{ label: "Apple Maps", value: "apple", icon: "map-outline" },
+				{
+					label: "Google Maps",
+					value: "google",
+					icon: "navigate-outline",
+				},
+				{ label: "Waze", value: "waze", icon: "car-outline" },
 			]
 		: [
-				{ label: "Google Maps", value: "google" },
-				{ label: "Waze", value: "waze" },
+				{
+					label: "Google Maps",
+					value: "google",
+					icon: "navigate-outline",
+				},
+				{ label: "Waze", value: "waze", icon: "car-outline" },
 			];
 
-// Calendar filter options (for admin users)
-const calendarFilterOptions = [
-	{ label: "All Events", value: "all" },
-	{ label: "My Events", value: "my" },
+const THEME_MODES: { value: ThemeMode; label: string }[] = [
+	{ value: "light", label: "Light" },
+	{ value: "dark", label: "Dark" },
+	{ value: "system", label: "System" },
 ];
 
 const UserPreferences = ({ navigation }) => {
-	const { userId, isAdmin, companyId } = useUser();
-	/*
-	 * MUST stay above the `if (loading)` early return below. It sat after it,
-	 * so the hook count changed between renders once loading resolved —
-	 * React's "change in the order of Hooks" warning, and undefined behaviour
-	 * in the general case.
-	 */
-	const insets = useSafeAreaInsets();
+	const styles = useThemedStyles(preferenceStyles);
+	const { userId, isAdmin } = useUser();
+	const { mode, scheme, selectMode } = useThemePreference();
+
 	const [loading, setLoading] = useState(true);
-	const [saving, setSaving] = useState(false);
 	const [prefMap, setPrefMap] = useState(
 		Platform.OS === "ios" ? "apple" : "google",
 	);
-	const [prefFilter, setPrefFilter] = useState("all");
+	const [prefFilter, setPrefFilter] = useState<"all" | "my">("all");
 
 	/*
 	 * Live, from userSettings/{userId}.
@@ -77,252 +89,133 @@ const UserPreferences = ({ navigation }) => {
 		});
 	}, [userId]);
 
-	// Save preferences to Firestore
-	const savePreferences = async () => {
-		const preferences = {
-			preferredMapApp: prefMap,
-			defaultCalendarFilter: isAdmin ? prefFilter : "my",
-		};
+	const save = async (patch: Record<string, unknown>) => {
 		try {
-			setSaving(true);
-			await updateUserSettings(userId, preferences as any);
-
-			Alert.alert("Success", "Your preferences have been saved");
+			await updateUserSettings(userId, patch as any);
 		} catch (error) {
 			console.error("Error saving preferences:", error);
-			Alert.alert("Error", "Failed to save your preferences");
-		} finally {
-			setSaving(false);
+			toast.error("Could not save that", "Check your connection.");
 		}
 	};
 
-	// Option selector component
-	const PreferenceOption = ({ option, selected, onSelect }) => (
-		<TouchableOpacity
-			style={[styles.optionItem, selected && styles.selectedOption]}
-			onPress={() => onSelect(option.value)}
-		>
-			<Text
-				style={[
-					styles.optionText,
-					selected && styles.selectedOptionText,
-				]}
-			>
-				{option.label}
-			</Text>
-			{selected && (
-				<Icon
-					name="check-circle"
-					size={24}
-					color="#4CAF50"
-					style={styles.checkIcon}
-				/>
-			)}
-		</TouchableOpacity>
+	const header = (
+		<ScreenHeader title="Preferences" onBack={() => navigation.goBack()} />
 	);
 
 	if (loading) {
 		return (
-			<SafeAreaView style={styles.loadingContainer}>
-				<ActivityIndicator size="large" color="#0000ff" />
-				<Text style={styles.loadingText}>Loading preferences...</Text>
-			</SafeAreaView>
+			<Screen header={header}>
+				<SkeletonList rows={5} />
+			</Screen>
 		);
 	}
 
 	return (
-		<View style={[styles.container, { paddingTop: insets.top }]}>
-			<View style={styles.header}>
-				<View style={styles.headerRow}>
-					<TouchableOpacity
-						style={styles.backButton}
-						onPress={() => navigation.goBack()}
-					>
-						<Icon name="arrow-back" size={24} color="#333" />
-					</TouchableOpacity>
-					<View style={styles.headerTextContainer}>
-						<Text style={styles.headerTitle}>User Preferences</Text>
-						<Text style={styles.headerSubtitle}>
-							Customize your application settings
-						</Text>
-					</View>
-				</View>
-			</View>
-
-			<ScrollView>
-				<View style={styles.section}>
-					<Text style={styles.sectionTitle}>
-						Preferred Map Application
-					</Text>
-					<Text style={styles.sectionDescription}>
-						Choose which map app to use when navigating to locations
-					</Text>
-					<View style={styles.optionsContainer}>
-						{mapAppOptions.map((option) => (
-							<PreferenceOption
-								key={option.value}
-								option={option}
-								selected={prefMap === option.value}
-								onSelect={(value) => setPrefMap(value)}
-							/>
-						))}
-					</View>
-				</View>
-
-				{isAdmin && (
-					<View style={styles.section}>
-						<Text style={styles.sectionTitle}>
-							Default Calendar Filter
-						</Text>
-						<Text style={styles.sectionDescription}>
-							Set your default calendar view filter
-						</Text>
-						<View style={styles.optionsContainer}>
-							{calendarFilterOptions.map((option) => (
-								<PreferenceOption
-									key={option.value}
-									option={option}
-									selected={prefFilter === option.value}
-									onSelect={(value) => setPrefFilter(value)}
-								/>
-							))}
-						</View>
-					</View>
-				)}
-			</ScrollView>
-
-			<View style={styles.footer}>
-				<TouchableOpacity
-					style={styles.saveButton}
-					onPress={savePreferences}
-					disabled={saving}
+		<Screen scroll padded header={header}>
+			<Card title="Appearance" style={styles.card}>
+				<Text
+					variant="caption"
+					color="textSecondary"
+					style={styles.hint}
 				>
-					{saving ? (
-						<ActivityIndicator size="small" color="#ffffff" />
-					) : (
-						<Text style={styles.saveButtonText}>
-							Save Preferences
-						</Text>
-					)}
-				</TouchableOpacity>
+					{mode === "system"
+						? `Following your device, currently ${scheme}.`
+						: `Always ${mode}, whatever your device is set to.`}
+				</Text>
+
+				<SegmentedControl<ThemeMode>
+					segments={THEME_MODES}
+					value={mode}
+					onChange={selectMode}
+				/>
+			</Card>
+
+			<Card title="Maps" flush style={styles.card}>
+				<Text
+					variant="caption"
+					color="textSecondary"
+					style={styles.flushHint}
+				>
+					Which app opens when you tap an event's location.
+				</Text>
+
+				{MAP_APPS.map((option, index) => (
+					<ListRow
+						key={option.value}
+						title={option.label}
+						icon={option.icon}
+						selected={prefMap === option.value}
+						separator={index < MAP_APPS.length - 1}
+						onPress={() => {
+							setPrefMap(option.value);
+							save({ preferredMapApp: option.value });
+						}}
+					/>
+				))}
+			</Card>
+
+			{/*
+			 * Only managers have anything to choose here — a worker's calendar
+			 * is always their own schedule.
+			 */}
+			{isAdmin && (
+				<Card title="Calendar" flush style={styles.card}>
+					<Text
+						variant="caption"
+						color="textSecondary"
+						style={styles.flushHint}
+					>
+						Which events the calendar shows when you open it.
+					</Text>
+
+					<ListRow
+						title="All events"
+						subtitle="Everything on the company calendar"
+						icon="albums-outline"
+						selected={prefFilter === "all"}
+						onPress={() => {
+							setPrefFilter("all");
+							save({ defaultCalendarFilter: "all" });
+						}}
+					/>
+					<ListRow
+						title="My events"
+						subtitle="Only shifts you're scheduled on"
+						icon="person-outline"
+						selected={prefFilter === "my"}
+						separator={false}
+						onPress={() => {
+							setPrefFilter("my");
+							save({ defaultCalendarFilter: "my" });
+						}}
+					/>
+				</Card>
+			)}
+
+			<View style={styles.footnote}>
+				<Text variant="caption" color="textTertiary" align="center">
+					Changes save as you make them.
+				</Text>
 			</View>
-		</View>
+		</Screen>
 	);
 };
 
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: "#f5f5f5",
-	},
-	loadingContainer: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-		backgroundColor: "#f5f5f5",
-	},
-	loadingText: {
-		marginTop: 10,
-		fontSize: 16,
-		color: "#666",
-	},
-	header: {
-		padding: 15,
-		backgroundColor: "#fff",
-		borderBottomWidth: 1,
-		borderBottomColor: "#e0e0e0",
-	},
-	headerRow: {
-		flexDirection: "row",
-		alignItems: "center",
-	},
-	backButton: {
-		padding: 5,
-		marginRight: 10,
-	},
-	headerTextContainer: {
-		flex: 1,
-	},
-	headerTitle: {
-		fontSize: 24,
-		fontWeight: "bold",
-		color: "#333",
-	},
-	headerSubtitle: {
-		fontSize: 16,
-		color: "#666",
-		marginTop: 5,
-	},
-	section: {
-		backgroundColor: "#fff",
-		marginTop: 15,
-		padding: 20,
-		borderRadius: 8,
-		marginHorizontal: 15,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 3,
-		elevation: 2,
-	},
-	sectionTitle: {
-		fontSize: 18,
-		fontWeight: "bold",
-		color: "#333",
-	},
-	sectionDescription: {
-		fontSize: 14,
-		color: "#666",
-		marginTop: 5,
-		marginBottom: 15,
-	},
-	optionsContainer: {
-		marginTop: 10,
-	},
-	optionItem: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		padding: 15,
-		borderRadius: 8,
-		backgroundColor: "#f9f9f9",
-		marginBottom: 10,
-		borderWidth: 1,
-		borderColor: "#e0e0e0",
-	},
-	selectedOption: {
-		backgroundColor: "#e8f5e9",
-		borderColor: "#4CAF50",
-	},
-	optionText: {
-		fontSize: 16,
-		color: "#333",
-	},
-	selectedOptionText: {
-		fontWeight: "bold",
-		color: "#1B5E20",
-	},
-	checkIcon: {
-		marginLeft: 10,
-	},
-	footer: {
-		padding: 15,
-		backgroundColor: "#fff",
-		borderTopWidth: 1,
-		borderTopColor: "#e0e0e0",
-	},
-	saveButton: {
-		backgroundColor: "#2196F3",
-		borderRadius: 8,
-		padding: 15,
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	saveButtonText: {
-		color: "#fff",
-		fontSize: 16,
-		fontWeight: "bold",
-	},
-});
-
 export default UserPreferences;
+
+const preferenceStyles = (theme: Theme) =>
+	StyleSheet.create({
+		card: {
+			marginTop: theme.spacing.lg,
+		},
+		hint: {
+			marginBottom: theme.spacing.md,
+		},
+		flushHint: {
+			paddingHorizontal: theme.spacing.lg,
+			paddingBottom: theme.spacing.md,
+		},
+		footnote: {
+			marginTop: theme.spacing.xl,
+		},
+	});

@@ -1,144 +1,123 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { FieldTotal } from "../../utils/timeUtils";
+import { Card, Text } from "../ui";
+import { Theme, useThemedStyles } from "../../theme";
+
+/**
+ * Totals across a company's custom form fields.
+ *
+ * Split by where the field came from — the timesheet form or the event form —
+ * because the same label can legitimately appear in both and summing them
+ * together would be wrong.
+ */
 
 type FieldTotalsCardProps = {
 	fieldTotals: Record<string, FieldTotal>;
 };
 
-const FieldTotalsCard = ({ fieldTotals }: FieldTotalsCardProps) => {
-	// If no totals, don't render anything
-	if (!fieldTotals || Object.keys(fieldTotals).length === 0) {
-		return null;
-	}
-
-	// Separate time entry totals and event totals
-	const timeEntryTotals: Record<string, FieldTotal> = {};
-	const eventTotals: Record<string, FieldTotal> = {};
-
-	Object.entries(fieldTotals).forEach(([key, data]) => {
-		if (data.source === "event") {
-			eventTotals[key] = data;
-		} else {
-			timeEntryTotals[key] = data;
-		}
-	});
+const TotalRow = ({ data }: { data: FieldTotal }) => {
+	const styles = useThemedStyles(totalsStyles);
 
 	return (
-		<View style={styles.container}>
-			<Text style={styles.title}>Form Totals</Text>
-
-			{/* Time Entry Totals */}
-			{Object.keys(timeEntryTotals).length > 0 && (
-				<>
-					<Text style={styles.sectionTitle}>Timesheet</Text>
-					{Object.entries(timeEntryTotals).map(([fieldId, data]) => (
-						<View key={fieldId} style={styles.totalRow}>
-							<Text style={styles.fieldLabel}>{data.label}:</Text>
-							<View style={styles.valueContainer}>
-								<Text style={styles.fieldValue}>
-									{data.total.toFixed(2)} {data.unit}
-								</Text>
-
-								{data.useMultiplier &&
-									data.multipliedTotal !== undefined && (
-										<Text style={styles.multipliedValue}>
-											({data.multipliedTotal.toFixed(2)}{" "}
-											{data.unit})
-										</Text>
-									)}
-							</View>
-						</View>
-					))}
-				</>
-			)}
-
-			{/* Event Totals */}
-			{Object.keys(eventTotals).length > 0 && (
-				<>
-					<Text style={[styles.sectionTitle, { marginTop: 16 }]}>
-						Events
+		<View style={styles.row}>
+			<Text variant="body" color="textSecondary" style={styles.flex}>
+				{data.label}
+			</Text>
+			<View style={styles.values}>
+				<Text variant="bodyStrong">
+					{data.total.toFixed(2)} {data.unit}
+				</Text>
+				{/* The multiplied figure is what payroll bills against. */}
+				{data.useMultiplier && data.multipliedTotal !== undefined && (
+					<Text variant="caption" color="accent">
+						{data.multipliedTotal.toFixed(2)} {data.unit} billed
 					</Text>
-					{Object.entries(eventTotals).map(([fieldId, data]) => (
-						<View key={fieldId} style={styles.totalRow}>
-							<Text style={styles.fieldLabel}>{data.label}:</Text>
-							<View style={styles.valueContainer}>
-								<Text style={styles.fieldValue}>
-									{data.total.toFixed(2)} {data.unit}
-								</Text>
-
-								{data.useMultiplier &&
-									data.multipliedTotal !== undefined && (
-										<Text style={styles.multipliedValue}>
-											({data.multipliedTotal.toFixed(2)}{" "}
-											{data.unit})
-										</Text>
-									)}
-							</View>
-						</View>
-					))}
-				</>
-			)}
+				)}
+			</View>
 		</View>
 	);
 };
 
-const styles = StyleSheet.create({
-	container: {
-		margin: 16,
-		marginTop: 0,
-		marginBottom: 16,
-		padding: 16,
-		backgroundColor: "#fff",
-		borderRadius: 12,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 4,
-		elevation: 2,
-	},
-	title: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#333",
-		marginBottom: 12,
-	},
-	sectionTitle: {
-		fontSize: 14,
-		fontWeight: "500",
-		color: "#666",
-		marginBottom: 8,
-		paddingBottom: 4,
-		borderBottomWidth: 1,
-		borderBottomColor: "#f0f0f0",
-	},
-	totalRow: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		marginBottom: 8,
-		paddingBottom: 8,
-		borderBottomWidth: 1,
-		borderBottomColor: "#f0f0f0",
-	},
-	fieldLabel: {
-		fontSize: 15,
-		color: "#666",
-		flex: 1,
-	},
-	valueContainer: {
-		flex: 1,
-		alignItems: "flex-end",
-	},
-	fieldValue: {
-		fontSize: 15,
-		fontWeight: "500",
-		color: "#333",
-	},
-	multipliedValue: {
-		fontSize: 14,
-		color: "#007AFF",
-		marginTop: 2,
-	},
-});
+const FieldTotalsCard = ({ fieldTotals }: FieldTotalsCardProps) => {
+	const styles = useThemedStyles(totalsStyles);
+
+	if (!fieldTotals || Object.keys(fieldTotals).length === 0) {
+		return null;
+	}
+
+	const timeEntryTotals: [string, FieldTotal][] = [];
+	const eventTotals: [string, FieldTotal][] = [];
+
+	Object.entries(fieldTotals).forEach(([key, data]) => {
+		(data.source === "event" ? eventTotals : timeEntryTotals).push([
+			key,
+			data,
+		]);
+	});
+
+	return (
+		<Card title="Form totals" style={styles.card}>
+			{timeEntryTotals.length > 0 && (
+				<>
+					<Text
+						variant="label"
+						color="textSecondary"
+						uppercase
+						style={styles.section}
+					>
+						Timesheet
+					</Text>
+					{timeEntryTotals.map(([fieldId, data]) => (
+						<TotalRow key={fieldId} data={data} />
+					))}
+				</>
+			)}
+
+			{eventTotals.length > 0 && (
+				<>
+					<Text
+						variant="label"
+						color="textSecondary"
+						uppercase
+						style={styles.section}
+					>
+						Events
+					</Text>
+					{eventTotals.map(([fieldId, data]) => (
+						<TotalRow key={fieldId} data={data} />
+					))}
+				</>
+			)}
+		</Card>
+	);
+};
 
 export default FieldTotalsCard;
+
+const totalsStyles = (theme: Theme) =>
+	StyleSheet.create({
+		flex: {
+			flex: 1,
+		},
+		card: {
+			marginHorizontal: theme.spacing.lg,
+			marginBottom: theme.spacing.lg,
+		},
+		section: {
+			marginTop: theme.spacing.sm,
+			marginBottom: theme.spacing.xs,
+		},
+		row: {
+			flexDirection: "row",
+			alignItems: "flex-start",
+			justifyContent: "space-between",
+			gap: theme.spacing.md,
+			paddingVertical: theme.spacing.sm,
+			borderBottomWidth: theme.hairlineWidth,
+			borderBottomColor: theme.colors.border,
+		},
+		values: {
+			alignItems: "flex-end",
+		},
+	});

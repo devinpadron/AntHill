@@ -1,65 +1,46 @@
-import React, { useEffect, useState } from "react";
-import {
-	View,
-	Text,
-	FlatList,
-	TouchableOpacity,
-	SafeAreaView,
-	ActivityIndicator,
-	Animated,
-	Platform,
-	Modal,
-	TextInput,
-	KeyboardAvoidingView,
-	ScrollView,
-	Alert,
-	Switch,
-	Dimensions,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import React, { useMemo, useRef, useState } from "react";
+import { FlatList, StyleSheet, View } from "react-native";
+import BottomSheet from "@gorhom/bottom-sheet";
+import { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { useAvailability } from "../../hooks/useAvailability";
-import { styles } from "./AvailabilityPage.styles";
+import {
+	Badge,
+	BadgeTone,
+	Button,
+	Card,
+	EmptyState,
+	Icon,
+	Input,
+	ListRow,
+	Loading,
+	Screen,
+	ScreenHeader,
+	SegmentedControl,
+	Sheet,
+	Text,
+	toast,
+	Toggle,
+} from "../../components/ui";
+import { IconName } from "../../components/ui/Icon";
+import { Theme, useThemedStyles } from "../../theme";
 
-const { width: screenWidth } = Dimensions.get("window");
+/*
+ * The worker's inbox for events they have been asked about.
+ *
+ * The three tabs were a hand-built indicator that measured the screen with
+ * `Dimensions.get("window")` and sprang an absolutely-positioned bar across it
+ * — which meant it was wrong on rotation and on any device it had not been
+ * tuned against. They are a `SegmentedControl` now, laid out from measurement.
+ *
+ * Both full-screen `Modal`s became sheets: the reminder settings and the
+ * admin-only worker roster.
+ */
 
-const TabIndicator = ({ activeTab }) => {
-	// Animated tab indicator
-	const [translateX] = useState(new Animated.Value(0));
-
-	useEffect(() => {
-		let position = 0;
-		if (activeTab === "confirmed") position = 1;
-		if (activeTab === "declined") position = 2;
-
-		// Calculate tab width and indicator width
-		const tabWidth = (screenWidth - 32) / 3; // 32 for horizontal padding
-		const indicatorWidth = tabWidth * 0.6; // 60% of tab width
-		const centerOffset = (tabWidth - indicatorWidth) / 2;
-
-		Animated.spring(translateX, {
-			toValue: position * tabWidth + centerOffset,
-			useNativeDriver: true,
-			friction: 8,
-		}).start();
-	}, [activeTab]);
-
-	const tabWidth = (screenWidth - 32) / 3;
-	const indicatorWidth = tabWidth * 0.6;
-
-	return (
-		<Animated.View
-			style={[
-				styles.tabIndicator,
-				{
-					width: indicatorWidth,
-					transform: [{ translateX }],
-				},
-			]}
-		/>
-	);
-};
+type Tab = "unconfirmed" | "confirmed" | "declined";
 
 const AvailabilityPage = ({ navigation }) => {
+	const styles = useThemedStyles(availabilityStyles);
+
 	const {
 		isAdmin,
 		activeTab,
@@ -76,262 +57,36 @@ const AvailabilityPage = ({ navigation }) => {
 		setWorkerResponse,
 	} = useAvailability();
 
-	// Modal state stays here — it is presentation, not data.
-	const [reminderModalVisible, setReminderModalVisible] = useState(false);
+	// Sheet state stays here — it is presentation, not data.
+	const reminderSheet = useRef<BottomSheet>(null);
+	const adminSheet = useRef<BottomSheet>(null);
 	const [reminderHours, setReminderHours] = useState("24");
 	const [reminderMinutes, setReminderMinutes] = useState("0");
 	const [remindersEnabled, setRemindersEnabled] = useState(true);
-	const [adminModalVisible, setAdminModalVisible] = useState(false);
 	const [selectedEventForAdmin, setSelectedEventForAdmin] = useState(null);
 
-	const renderEventCard = ({ item }) => {
-		const getStatusColor = () => {
-			if (activeTab === "confirmed") {
-				return "#4ADE80";
-			} else if (activeTab === "declined") {
-				return "#EF4444";
-			}
-			switch (item.status) {
-				case "available":
-					return "#4ADE80";
-				case "already_on_event":
-					return "#EF4444";
-				default:
-					return "#888888";
-			}
-		};
-
-		const getStatusText = () => {
-			if (activeTab === "confirmed") {
-				return "Confirmed";
-			} else if (activeTab === "declined") {
-				return "Declined";
-			} else {
-				// Unconfirmed tab
-				switch (item.status) {
-					case "available":
-						return "Available";
-					case "already_on_event":
-						return "Already on Event";
-					default:
-						return "";
-				}
-			}
-		};
-
-		const getStatusIcon = () => {
-			if (activeTab === "confirmed") {
-				return "checkmark-circle";
-			} else if (activeTab === "declined") {
-				return "close-circle";
-			} else {
-				// Unconfirmed tab
-				switch (item.status) {
-					case "available":
-						return "checkmark-circle";
-					case "already_on_event":
-						return "calendar";
-					default:
-						return "help-circle";
-				}
-			}
-		};
-
-		const handleConfirm = () => respondToEvent(item, "confirmed");
-		const handleDecline = () => respondToEvent(item, "declined");
-		// Back to unanswered, from either the confirmed or declined tab.
-		const handleUndecline = () => respondToEvent(item, "pending");
-
-		// Show status badge on all tabs
-		const showStatusBadge = true;
-
-		// Only show colored border on the Unconfirmed tab
-		const cardStyle =
-			activeTab === "unconfirmed"
-				? [styles.eventCard, { borderLeftColor: getStatusColor() }]
-				: styles.eventCard;
-
-		return (
-			<Animated.View style={cardStyle}>
-				<TouchableOpacity
-					onPress={
-						isAdmin ? () => handleAdminEventPress(item) : undefined
-					}
-					activeOpacity={isAdmin ? 0.7 : 1}
-				>
-					<View style={styles.eventHeader}>
-						<View style={styles.dateLocationContainer}>
-							<Text style={styles.eventTitle}>{item.title}</Text>
-							<Text style={styles.eventDate}>{item.date}</Text>
-							<View style={styles.locationContainer}>
-								<Ionicons
-									name="location"
-									size={14}
-									color="#666"
-								/>
-								<Text style={styles.eventLocation}>
-									{item.location}
-								</Text>
-							</View>
-
-							{/*
-							 * Who this job went to. Only targeted jobs carry
-							 * any badge, so the absence of one reads as
-							 * "everyone" without needing its own label.
-							 */}
-							{(item.groupNames?.length > 0 ||
-								item.personNames?.length > 0) && (
-								<View style={styles.groupBadgeRow}>
-									{item.groupNames.map((name) => (
-										<View
-											key={`g-${name}`}
-											style={styles.groupBadge}
-										>
-											<Ionicons
-												name="people"
-												size={11}
-												color="#5a3ec8"
-											/>
-											<Text
-												style={styles.groupBadgeText}
-												numberOfLines={1}
-											>
-												{name}
-											</Text>
-										</View>
-									))}
-									{/*
-									 * Individually invited people, capped — a
-									 * job sent to a dozen names should not push
-									 * the date and location off the card.
-									 */}
-									{item.personNames
-										.slice(0, 2)
-										.map((name) => (
-											<View
-												key={`p-${name}`}
-												style={styles.groupBadge}
-											>
-												<Ionicons
-													name="person"
-													size={11}
-													color="#5a3ec8"
-												/>
-												<Text
-													style={
-														styles.groupBadgeText
-													}
-													numberOfLines={1}
-												>
-													{name}
-												</Text>
-											</View>
-										))}
-									{item.personNames.length > 2 && (
-										<View style={styles.groupBadge}>
-											<Text style={styles.groupBadgeText}>
-												+{item.personNames.length - 2}
-											</Text>
-										</View>
-									)}
-								</View>
-							)}
-						</View>
-
-						{/* Show status badge on all tabs */}
-						{showStatusBadge && (
-							<View
-								style={[
-									styles.statusBadge,
-									{ backgroundColor: getStatusColor() },
-								]}
-							>
-								<Ionicons
-									name={getStatusIcon()}
-									size={14}
-									color="#fff"
-									style={styles.statusIcon}
-								/>
-								<Text style={styles.statusBadgeText}>
-									{getStatusText()}
-								</Text>
-							</View>
-						)}
-					</View>
-
-					{/* Show action buttons for available and already_on_event status */}
-					{activeTab === "unconfirmed" &&
-						(item.status === "available" ||
-							item.status === "already_on_event") && (
-							<View style={styles.buttonContainer}>
-								<TouchableOpacity
-									style={styles.declineButton}
-									onPress={handleDecline}
-									activeOpacity={0.7}
-								>
-									<Ionicons
-										name="close-circle"
-										size={16}
-										color="#fff"
-									/>
-									<Text style={styles.buttonText}>
-										Decline
-									</Text>
-								</TouchableOpacity>
-								<TouchableOpacity
-									style={styles.confirmButton}
-									onPress={handleConfirm}
-									activeOpacity={0.7}
-								>
-									<Ionicons
-										name="checkmark-circle"
-										size={16}
-										color="#fff"
-									/>
-									<Text style={styles.buttonText}>
-										Confirm
-									</Text>
-								</TouchableOpacity>
-							</View>
-						)}
-
-					{/* Show Undecline button on the Declined tab */}
-					{activeTab === "declined" && (
-						<View style={styles.buttonContainer}>
-							<TouchableOpacity
-								style={styles.undeclineButton}
-								onPress={handleUndecline}
-								activeOpacity={0.7}
-							>
-								<Ionicons
-									name="refresh"
-									size={16}
-									color="#fff"
-								/>
-								<Text style={styles.buttonText}>Undecline</Text>
-							</TouchableOpacity>
-						</View>
-					)}
-				</TouchableOpacity>
-			</Animated.View>
-		);
-	};
-
-	const renderEmptyState = () => (
-		<View style={styles.emptyStateContainer}>
-			<Ionicons name="calendar-outline" size={64} color="#ccc" />
-			<Text style={styles.emptyStateTitle}>No Events Found</Text>
-			<Text style={styles.emptyStateDescription}>
-				No {activeTab} events to display at this time
-			</Text>
-		</View>
+	/*
+	 * Counts come off the unfiltered list, using the same predicates the hook
+	 * filters with — so a tab's badge and its contents cannot disagree.
+	 */
+	const counts = useMemo(
+		() => ({
+			unconfirmed: events.filter(
+				(e) => !e.confirmed && e.status !== "on_potential_event",
+			).length,
+			confirmed: events.filter((e) => e.confirmed).length,
+			declined: events.filter(
+				(e) => !e.confirmed && e.status === "on_potential_event",
+			).length,
+		}),
+		[events],
 	);
 
-	const handleReminderSettings = () => {
+	const openReminderSettings = () => {
 		setReminderHours(String(reminder?.hours ?? 24));
 		setReminderMinutes(String(reminder?.minutes ?? 0));
 		setRemindersEnabled(reminder?.enabled !== false);
-		setReminderModalVisible(true);
+		reminderSheet.current?.snapToIndex(0);
 	};
 
 	const saveReminderSettings = async () => {
@@ -340,7 +95,19 @@ const AvailabilityPage = ({ navigation }) => {
 			hours: reminderHours,
 			minutes: reminderMinutes,
 		});
-		if (saved) setReminderModalVisible(false);
+
+		if (saved) {
+			reminderSheet.current?.close();
+			toast.success("Reminder settings saved");
+		} else {
+			toast.error("Could not save those settings");
+		}
+	};
+
+	const openAdminSheet = (event) => {
+		setSelectedEventForAdmin(event);
+		adminSheet.current?.snapToIndex(0);
+		loadWorkerBuckets(event.id);
 	};
 
 	const handleAdminStatusChange = (targetUserId, newStatus) => {
@@ -352,588 +119,564 @@ const AvailabilityPage = ({ navigation }) => {
 		);
 	};
 
-	const handleAdminEventPress = (event) => {
-		setSelectedEventForAdmin(event);
-		setAdminModalVisible(true);
-		loadWorkerBuckets(event.id);
+	const respond = async (
+		item,
+		status: "pending" | "confirmed" | "declined",
+		message: string,
+	) => {
+		await respondToEvent(item, status);
+		toast.success(message);
 	};
 
-	// Update the header to include admin button
-	return (
-		<SafeAreaView style={styles.container}>
-			<View style={styles.header}>
-				<Text style={styles.title}>Availability</Text>
-				{/* Show admin button if user is admin */}
-				{isAdmin && (
-					<TouchableOpacity
-						style={styles.adminButton}
-						onPress={handleReminderSettings}
-						activeOpacity={0.7}
-					>
-						<Ionicons
-							name="notifications-outline"
-							size={20}
-							color="#4A90E2"
+	const renderEventCard = ({ item }) => {
+		/*
+		 * The status shown depends on which tab you are on: the confirmed and
+		 * declined tabs state your answer, the unconfirmed tab states whether
+		 * you are free.
+		 */
+		const status: { label: string; tone: BadgeTone; icon: IconName } =
+			activeTab === "confirmed"
+				? {
+						label: "Confirmed",
+						tone: "success",
+						icon: "checkmark-circle",
+					}
+				: activeTab === "declined"
+					? {
+							label: "Declined",
+							tone: "danger",
+							icon: "close-circle",
+						}
+					: item.status === "available"
+						? {
+								label: "Available",
+								tone: "success",
+								icon: "checkmark-circle",
+							}
+						: item.status === "already_on_event"
+							? {
+									label: "Already booked",
+									tone: "warning",
+									icon: "calendar",
+								}
+							: {
+									label: "New",
+									tone: "neutral",
+									icon: "help-circle",
+								};
+
+		const canRespond =
+			activeTab === "unconfirmed" &&
+			(item.status === "available" || item.status === "already_on_event");
+
+		return (
+			<Card
+				style={styles.card}
+				onPress={isAdmin ? () => openAdminSheet(item) : undefined}
+			>
+				<View style={styles.cardHeader}>
+					<View style={styles.cardHeading}>
+						<Text variant="heading" numberOfLines={2}>
+							{item.title}
+						</Text>
+						<Text variant="body" color="textSecondary">
+							{item.date}
+						</Text>
+					</View>
+
+					<Badge
+						label={status.label}
+						tone={status.tone}
+						icon={status.icon}
+					/>
+				</View>
+
+				{!!item.location && (
+					<View style={styles.metaRow}>
+						<Icon
+							name="location-outline"
+							size="sm"
+							color="textTertiary"
 						/>
-						<Text style={styles.adminButtonText}>Reminders</Text>
-					</TouchableOpacity>
+						<Text
+							variant="caption"
+							color="textSecondary"
+							numberOfLines={1}
+							style={styles.flex}
+						>
+							{item.location}
+						</Text>
+					</View>
 				)}
-			</View>
 
-			<View style={styles.tabOuterContainer}>
-				<View style={styles.tabContainer}>
-					<TouchableOpacity
-						style={[
-							styles.tab,
-							activeTab === "unconfirmed" && styles.activeTab,
-						]}
-						onPress={() => setActiveTab("unconfirmed")}
-						activeOpacity={0.7}
-					>
-						<Text
-							style={[
-								styles.tabText,
-								activeTab === "unconfirmed" &&
-									styles.activeTabText,
+				{/*
+				 * Who this job went to. Only targeted jobs carry any badge, so
+				 * the absence of one reads as "everyone" without needing its
+				 * own label.
+				 */}
+				{(item.groupNames?.length > 0 ||
+					item.personNames?.length > 0) && (
+					<View style={styles.audienceRow}>
+						{item.groupNames.map((name) => (
+							<Badge
+								key={`g-${name}`}
+								label={name}
+								icon="people"
+								tone="accent"
+							/>
+						))}
+						{/*
+						 * Individually invited people, capped — a job sent to a
+						 * dozen names should not push the date off the card.
+						 */}
+						{item.personNames.slice(0, 2).map((name) => (
+							<Badge
+								key={`p-${name}`}
+								label={name}
+								icon="person"
+								tone="accent"
+							/>
+						))}
+						{item.personNames.length > 2 && (
+							<Badge label={`+${item.personNames.length - 2}`} />
+						)}
+					</View>
+				)}
+
+				{canRespond && (
+					<View style={styles.actions}>
+						<Button
+							title="Decline"
+							icon="close"
+							variant="secondary"
+							onPress={() =>
+								respond(item, "declined", "Declined")
+							}
+							style={styles.flex}
+						/>
+						<Button
+							title="I'm in"
+							icon="checkmark"
+							onPress={() =>
+								respond(item, "confirmed", "You're confirmed")
+							}
+							haptic="press"
+							style={styles.flex}
+						/>
+					</View>
+				)}
+
+				{/* Back to unanswered, from either the confirmed or declined tab. */}
+				{activeTab !== "unconfirmed" && (
+					<View style={styles.actions}>
+						<Button
+							title="Change my answer"
+							icon="refresh"
+							variant="secondary"
+							onPress={() =>
+								respond(item, "pending", "Moved back to new")
+							}
+							fullWidth
+						/>
+					</View>
+				)}
+			</Card>
+		);
+	};
+
+	const emptyCopy: Record<Tab, { title: string; description: string }> = {
+		unconfirmed: {
+			title: "Nothing to answer",
+			description:
+				"When a manager publishes an event you can work, it shows up here.",
+		},
+		confirmed: {
+			title: "No confirmed events",
+			description: "Events you accept will be listed here.",
+		},
+		declined: {
+			title: "Nothing declined",
+			description: "Events you turn down will be listed here.",
+		},
+	};
+
+	return (
+		<Screen
+			header={
+				<ScreenHeader
+					variant="large"
+					title="Availability"
+					subtitle="Events you've been asked about"
+					actions={
+						isAdmin
+							? [
+									{
+										icon: "notifications-outline",
+										label: "Reminder settings",
+										onPress: openReminderSettings,
+									},
+								]
+							: []
+					}
+				>
+					<View style={styles.tabs}>
+						<SegmentedControl<Tab>
+							segments={[
+								{
+									value: "unconfirmed",
+									label: "New",
+									count: counts.unconfirmed,
+								},
+								{
+									value: "confirmed",
+									label: "Going",
+									count: counts.confirmed,
+								},
+								{
+									value: "declined",
+									label: "Declined",
+									count: counts.declined,
+								},
 							]}
-						>
-							Unconfirmed
-						</Text>
-					</TouchableOpacity>
-
-					<TouchableOpacity
-						style={[
-							styles.tab,
-							activeTab === "confirmed" && styles.activeTab,
-						]}
-						onPress={() => setActiveTab("confirmed")}
-						activeOpacity={0.7}
-					>
-						<Text
-							style={[
-								styles.tabText,
-								activeTab === "confirmed" &&
-									styles.activeTabText,
-							]}
-						>
-							Confirmed
-						</Text>
-					</TouchableOpacity>
-
-					<TouchableOpacity
-						style={[
-							styles.tab,
-							activeTab === "declined" && styles.activeTab,
-						]}
-						onPress={() => setActiveTab("declined")}
-						activeOpacity={0.7}
-					>
-						<Text
-							style={[
-								styles.tabText,
-								activeTab === "declined" &&
-									styles.activeTabText,
-							]}
-						>
-							Declined
-						</Text>
-					</TouchableOpacity>
-
-					<TabIndicator activeTab={activeTab} />
-				</View>
-			</View>
-
+							value={activeTab as Tab}
+							onChange={setActiveTab}
+						/>
+					</View>
+				</ScreenHeader>
+			}
+		>
 			{loading ? (
-				<View style={styles.loadingContainer}>
-					<ActivityIndicator size="large" color="#4A90E2" />
-					<Text style={styles.loadingText}>Loading events...</Text>
-				</View>
+				<Loading label="Loading events" />
 			) : (
 				<FlatList
 					data={filteredEvents}
 					renderItem={renderEventCard}
 					keyExtractor={(item) => item.id}
-					contentContainerStyle={styles.eventList}
+					contentContainerStyle={styles.list}
 					showsVerticalScrollIndicator={false}
-					ListEmptyComponent={renderEmptyState}
+					ListEmptyComponent={
+						<EmptyState
+							icon="calendar-outline"
+							title={emptyCopy[activeTab as Tab].title}
+							description={
+								emptyCopy[activeTab as Tab].description
+							}
+						/>
+					}
 				/>
 			)}
 
-			{/* Add the reminder modal */}
-			<Modal
-				visible={reminderModalVisible}
-				transparent={true}
-				animationType="slide"
-				onRequestClose={() => setReminderModalVisible(false)}
+			{/* Reminder settings — admin only. */}
+			<Sheet
+				ref={reminderSheet}
+				snapPoints={["62%"]}
+				title="Availability reminders"
+				onClose={() => reminderSheet.current?.close()}
 			>
-				<KeyboardAvoidingView
-					style={styles.modalOverlay}
-					behavior={Platform.OS === "ios" ? "padding" : "height"}
+				<BottomSheetScrollView
+					contentContainerStyle={styles.sheetBody}
+					keyboardShouldPersistTaps="handled"
 				>
-					<View style={styles.modalContent}>
-						<View style={styles.modalHeader}>
-							<Text style={styles.modalTitle}>
-								Set Availability Reminder
-							</Text>
-							<TouchableOpacity
-								onPress={() => setReminderModalVisible(false)}
-								style={styles.closeButton}
-							>
-								<Ionicons
-									name="close"
-									size={24}
-									color="#6B7280"
-								/>
-							</TouchableOpacity>
-						</View>
+					<Text variant="body" color="textSecondary">
+						How often workers are nudged to answer an event they
+						have not responded to.
+					</Text>
 
-						<ScrollView style={styles.modalBody}>
-							<Text style={styles.modalDescription}>
-								Configure when and how often workers should be
-								reminded to confirm their availability.
-							</Text>
-
-							{/* Toggle Switch for Reminders */}
-							<View style={styles.toggleContainer}>
-								<View style={styles.toggleLabelContainer}>
-									<Text style={styles.toggleLabel}>
-										Enable Reminders
-									</Text>
-									<Text style={styles.toggleSubLabel}>
-										Send automatic reminders to workers
-									</Text>
-								</View>
-								<Switch
+					<Card flush style={styles.sheetCard}>
+						<ListRow
+							title="Send reminders"
+							subtitle="Automatic nudges until they answer"
+							icon="notifications-outline"
+							separator={false}
+							accessory={
+								<Toggle
 									value={remindersEnabled}
 									onValueChange={setRemindersEnabled}
-									trackColor={{
-										false: "#E5E7EB",
-										true: "#93C5FD",
-									}}
-									thumbColor={
-										remindersEnabled ? "#4A90E2" : "#F3F4F6"
-									}
-									ios_backgroundColor="#E5E7EB"
+								/>
+							}
+						/>
+					</Card>
+
+					{remindersEnabled ? (
+						<>
+							<View style={styles.intervalRow}>
+								<Input
+									label="Hours"
+									value={reminderHours}
+									onChangeText={setReminderHours}
+									keyboardType="number-pad"
+									placeholder="24"
+									containerStyle={styles.flex}
+								/>
+								<Input
+									label="Minutes"
+									value={reminderMinutes}
+									onChangeText={setReminderMinutes}
+									keyboardType="number-pad"
+									placeholder="0"
+									containerStyle={styles.flex}
 								/>
 							</View>
 
-							{/* Time inputs - only show when reminders are enabled */}
-							{remindersEnabled && (
-								<>
-									<Text style={styles.sectionLabel}>
-										Reminder Frequency
-									</Text>
-									<View style={styles.timeInputContainer}>
-										<View style={styles.inputGroup}>
-											<Text style={styles.inputLabel}>
-												Hours
-											</Text>
-											<TextInput
-												style={styles.timeInput}
-												value={reminderHours}
-												onChangeText={setReminderHours}
-												keyboardType="numeric"
-												placeholder="24"
-											/>
-										</View>
-
-										<Text style={styles.timeSeparator}>
-											:
-										</Text>
-
-										<View style={styles.inputGroup}>
-											<Text style={styles.inputLabel}>
-												Minutes
-											</Text>
-											<TextInput
-												style={styles.timeInput}
-												value={reminderMinutes}
-												onChangeText={
-													setReminderMinutes
-												}
-												keyboardType="numeric"
-												placeholder="0"
-											/>
-										</View>
-									</View>
-
-									<Text style={styles.previewText}>
-										Workers will be reminded every{" "}
-										{reminderHours || "24"} hours and{" "}
-										{reminderMinutes || "0"} minutes until
-										they confirm or decline their event.
-									</Text>
-								</>
-							)}
-
-							{/* Disabled state message */}
-							{!remindersEnabled && (
-								<Text style={styles.disabledText}>
-									Reminders are disabled. Workers will not
-									receive automatic notifications to confirm
-									their availability.
-								</Text>
-							)}
-						</ScrollView>
-
-						<View style={styles.modalFooter}>
-							<TouchableOpacity
-								style={styles.cancelButton}
-								onPress={() => setReminderModalVisible(false)}
-							>
-								<Text style={styles.cancelButtonText}>
-									Cancel
-								</Text>
-							</TouchableOpacity>
-							<TouchableOpacity
-								style={styles.saveButton}
-								onPress={saveReminderSettings}
-							>
-								<Text style={styles.saveButtonText}>
-									Save Settings
-								</Text>
-							</TouchableOpacity>
-						</View>
-					</View>
-				</KeyboardAvoidingView>
-			</Modal>
-
-			{/* Admin modal for event details - new feature */}
-			<Modal
-				visible={adminModalVisible}
-				transparent={true}
-				animationType="slide"
-				onRequestClose={() => setAdminModalVisible(false)}
-			>
-				<KeyboardAvoidingView
-					style={styles.modalOverlay}
-					behavior={Platform.OS === "ios" ? "padding" : "height"}
-				>
-					<View style={styles.adminModalContent}>
-						<View style={styles.modalHeader}>
-							<Text style={styles.modalTitle}>
-								Event Worker Status
+							<Text variant="caption" color="textSecondary">
+								Workers are reminded every{" "}
+								{reminderHours || "24"}h{" "}
+								{reminderMinutes || "0"}m until they confirm or
+								decline.
 							</Text>
-							<TouchableOpacity
-								onPress={() => setAdminModalVisible(false)}
-								style={styles.closeButton}
-							>
-								<Ionicons
-									name="close"
-									size={24}
-									color="#6B7280"
-								/>
-							</TouchableOpacity>
-						</View>
+						</>
+					) : (
+						<Text variant="caption" color="textSecondary">
+							Reminders are off. Workers will not be nudged to
+							answer.
+						</Text>
+					)}
 
-						{selectedEventForAdmin && (
-							<View style={styles.eventInfoHeader}>
-								<Text style={styles.eventInfoTitle}>
-									{selectedEventForAdmin.title}
-								</Text>
-								<Text style={styles.eventInfoDate}>
-									{selectedEventForAdmin.date}
-								</Text>
-								<Text style={styles.eventInfoLocation}>
-									📍 {selectedEventForAdmin.location}
-								</Text>
-							</View>
-						)}
+					<Button
+						title="Save settings"
+						icon="checkmark"
+						onPress={saveReminderSettings}
+						fullWidth
+						haptic="press"
+						style={styles.sheetAction}
+					/>
+				</BottomSheetScrollView>
+			</Sheet>
 
-						<ScrollView style={styles.adminModalBody}>
-							{loadingWorkerDetails ? (
-								<View style={styles.loadingContainer}>
-									<ActivityIndicator
-										size="large"
-										color="#4A90E2"
-									/>
-									<Text style={styles.loadingText}>
-										Loading worker details...
-									</Text>
-								</View>
-							) : (
-								<>
-									{/* Confirmed Users */}
-									<View style={styles.workerSection}>
-										<View style={styles.sectionHeaderRow}>
-											<Ionicons
-												name="checkmark-circle"
-												size={20}
-												color="#4ADE80"
-											/>
-											<Text style={styles.sectionTitle}>
-												Confirmed (
-												{
-													eventWorkerDetails.confirmed
-														.length
-												}
-												)
-											</Text>
-										</View>
-										{eventWorkerDetails.confirmed.length >
-										0 ? (
-											eventWorkerDetails.confirmed.map(
-												(user, index) => (
-													<View
-														key={index}
-														style={
-															styles.workerItem
-														}
-													>
-														<Text
-															style={
-																styles.workerName
-															}
-														>
-															{user.firstName}{" "}
-															{user.lastName}
-														</Text>
-														<View
-															style={
-																styles.workerItemActions
-															}
-														>
-															<TouchableOpacity
-																style={
-																	styles.adminDeclineBtn
-																}
-																onPress={() =>
-																	handleAdminStatusChange(
-																		user.id,
-																		"declined",
-																	)
-																}
-															>
-																<Ionicons
-																	name="close-circle"
-																	size={14}
-																	color="#fff"
-																/>
-																<Text
-																	style={
-																		styles.adminBtnText
-																	}
-																>
-																	Decline
-																</Text>
-															</TouchableOpacity>
-														</View>
-													</View>
-												),
-											)
-										) : (
-											<Text style={styles.emptyText}>
-												No confirmed workers
-											</Text>
-										)}
-									</View>
-
-									{/* Unconfirmed Users */}
-									<View style={styles.workerSection}>
-										<View style={styles.sectionHeaderRow}>
-											<Ionicons
-												name="help-circle-outline"
-												size={20}
-												color="#F59E0B"
-											/>
-											<Text style={styles.sectionTitle}>
-												Unconfirmed (
-												{
-													eventWorkerDetails
-														.unconfirmed.length
-												}
-												)
-											</Text>
-										</View>
-										{eventWorkerDetails.unconfirmed.length >
-										0 ? (
-											eventWorkerDetails.unconfirmed.map(
-												(user, index) => (
-													<View
-														key={index}
-														style={
-															styles.workerItem
-														}
-													>
-														<Text
-															style={
-																styles.workerName
-															}
-														>
-															{user.firstName}{" "}
-															{user.lastName}
-														</Text>
-														<View
-															style={
-																styles.workerItemActions
-															}
-														>
-															<TouchableOpacity
-																style={
-																	styles.adminDeclineBtn
-																}
-																onPress={() =>
-																	handleAdminStatusChange(
-																		user.id,
-																		"declined",
-																	)
-																}
-															>
-																<Ionicons
-																	name="close-circle"
-																	size={14}
-																	color="#fff"
-																/>
-																<Text
-																	style={
-																		styles.adminBtnText
-																	}
-																>
-																	Decline
-																</Text>
-															</TouchableOpacity>
-															<TouchableOpacity
-																style={
-																	styles.adminConfirmBtn
-																}
-																onPress={() =>
-																	handleAdminStatusChange(
-																		user.id,
-																		"confirmed",
-																	)
-																}
-															>
-																<Ionicons
-																	name="checkmark-circle"
-																	size={14}
-																	color="#fff"
-																/>
-																<Text
-																	style={
-																		styles.adminBtnText
-																	}
-																>
-																	Confirm
-																</Text>
-															</TouchableOpacity>
-														</View>
-													</View>
-												),
-											)
-										) : (
-											<Text style={styles.emptyText}>
-												No unconfirmed workers
-											</Text>
-										)}
-									</View>
-
-									{/* Declined Users */}
-									<View style={styles.workerSection}>
-										<View style={styles.sectionHeaderRow}>
-											<Ionicons
-												name="close-circle-outline"
-												size={20}
-												color="#EF4444"
-											/>
-											<Text style={styles.sectionTitle}>
-												Declined (
-												{
-													eventWorkerDetails.declined
-														.length
-												}
-												)
-											</Text>
-										</View>
-										{eventWorkerDetails.declined.length >
-										0 ? (
-											eventWorkerDetails.declined.map(
-												(user, index) => (
-													<View
-														key={index}
-														style={
-															styles.workerItem
-														}
-													>
-														<Text
-															style={
-																styles.workerName
-															}
-														>
-															{user.firstName}{" "}
-															{user.lastName}
-														</Text>
-														<View
-															style={
-																styles.workerItemActions
-															}
-														>
-															<TouchableOpacity
-																style={
-																	styles.adminConfirmBtn
-																}
-																onPress={() =>
-																	handleAdminStatusChange(
-																		user.id,
-																		"confirmed",
-																	)
-																}
-															>
-																<Ionicons
-																	name="checkmark-circle"
-																	size={14}
-																	color="#fff"
-																/>
-																<Text
-																	style={
-																		styles.adminBtnText
-																	}
-																>
-																	Confirm
-																</Text>
-															</TouchableOpacity>
-														</View>
-													</View>
-												),
-											)
-										) : (
-											<Text style={styles.emptyText}>
-												No declined workers
-											</Text>
-										)}
-									</View>
-								</>
-							)}
-						</ScrollView>
-
-						<View style={styles.adminModalFooter}>
-							<TouchableOpacity
-								style={styles.closeModalButton}
-								onPress={() => setAdminModalVisible(false)}
-							>
-								<Text style={styles.closeModalButtonText}>
-									Close
-								</Text>
-							</TouchableOpacity>
-
-							<TouchableOpacity
-								style={styles.openEventButton}
-								onPress={() => {
-									setAdminModalVisible(false);
-									navigation.navigate("EventDetails", {
-										eventId: selectedEventForAdmin.id,
-									});
-								}}
-							>
-								<Text style={styles.openEventButtonText}>
-									Open Event
-								</Text>
-							</TouchableOpacity>
-						</View>
+			{/* Who has answered — admin only, opened by tapping an event. */}
+			<Sheet
+				ref={adminSheet}
+				snapPoints={["70%", "92%"]}
+				title="Who's answered"
+				onClose={() => adminSheet.current?.close()}
+			>
+				{selectedEventForAdmin && (
+					<View style={styles.adminHeader}>
+						<Text variant="heading" numberOfLines={2}>
+							{selectedEventForAdmin.title}
+						</Text>
+						<Text variant="caption" color="textSecondary">
+							{selectedEventForAdmin.date}
+							{selectedEventForAdmin.location
+								? ` · ${selectedEventForAdmin.location}`
+								: ""}
+						</Text>
 					</View>
-				</KeyboardAvoidingView>
-			</Modal>
-		</SafeAreaView>
+				)}
+
+				{loadingWorkerDetails ? (
+					<Loading label="Loading responses" />
+				) : (
+					<BottomSheetScrollView
+						contentContainerStyle={styles.sheetBody}
+					>
+						<WorkerBucket
+							title="Confirmed"
+							icon="checkmark-circle"
+							tone="success"
+							workers={eventWorkerDetails.confirmed}
+							emptyText="Nobody has confirmed yet."
+							actions={[
+								{
+									label: "Decline",
+									icon: "close",
+									status: "declined",
+								},
+							]}
+							onAction={handleAdminStatusChange}
+						/>
+
+						<WorkerBucket
+							title="Waiting"
+							icon="help-circle"
+							tone="warning"
+							workers={eventWorkerDetails.unconfirmed}
+							emptyText="Everyone has answered."
+							actions={[
+								{
+									label: "Decline",
+									icon: "close",
+									status: "declined",
+								},
+								{
+									label: "Confirm",
+									icon: "checkmark",
+									status: "confirmed",
+								},
+							]}
+							onAction={handleAdminStatusChange}
+						/>
+
+						<WorkerBucket
+							title="Declined"
+							icon="close-circle"
+							tone="danger"
+							workers={eventWorkerDetails.declined}
+							emptyText="Nobody has declined."
+							actions={[
+								{
+									label: "Confirm",
+									icon: "checkmark",
+									status: "confirmed",
+								},
+							]}
+							onAction={handleAdminStatusChange}
+						/>
+
+						<Button
+							title="Open the event"
+							icon="open-outline"
+							variant="secondary"
+							fullWidth
+							onPress={() => {
+								adminSheet.current?.close();
+								navigation.navigate("EventDetails", {
+									eventId: selectedEventForAdmin.id,
+								});
+							}}
+							style={styles.sheetAction}
+						/>
+					</BottomSheetScrollView>
+				)}
+			</Sheet>
+		</Screen>
+	);
+};
+
+/** One response bucket in the admin sheet, with its per-worker overrides. */
+const WorkerBucket = ({
+	title,
+	icon,
+	tone,
+	workers,
+	emptyText,
+	actions,
+	onAction,
+}: {
+	title: string;
+	icon: IconName;
+	tone: BadgeTone;
+	workers: any[];
+	emptyText: string;
+	actions: { label: string; icon: IconName; status: string }[];
+	onAction: (userId: string, status: string) => void;
+}) => {
+	const styles = useThemedStyles(availabilityStyles);
+
+	return (
+		<View style={styles.bucket}>
+			<View style={styles.bucketHeader}>
+				<Badge
+					label={`${title} · ${workers.length}`}
+					tone={tone}
+					icon={icon}
+				/>
+			</View>
+
+			{workers.length === 0 ? (
+				<Text variant="caption" color="textTertiary">
+					{emptyText}
+				</Text>
+			) : (
+				workers.map((user) => (
+					<View key={user.id} style={styles.workerRow}>
+						<Text variant="body" style={styles.flex}>
+							{user.firstName} {user.lastName}
+						</Text>
+						{actions.map((action) => (
+							<Button
+								key={action.status}
+								title={action.label}
+								icon={action.icon}
+								variant="secondary"
+								size="small"
+								onPress={() => onAction(user.id, action.status)}
+							/>
+						))}
+					</View>
+				))
+			)}
+		</View>
 	);
 };
 
 export default AvailabilityPage;
+
+const availabilityStyles = (theme: Theme) =>
+	StyleSheet.create({
+		flex: {
+			flex: 1,
+		},
+		tabs: {
+			paddingHorizontal: theme.spacing.lg,
+			paddingBottom: theme.spacing.md,
+		},
+		list: {
+			flexGrow: 1,
+			padding: theme.spacing.lg,
+			paddingBottom: theme.spacing["3xl"],
+		},
+		card: {
+			marginBottom: theme.spacing.md,
+		},
+		cardHeader: {
+			flexDirection: "row",
+			alignItems: "flex-start",
+			gap: theme.spacing.md,
+		},
+		cardHeading: {
+			flex: 1,
+		},
+		metaRow: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: theme.spacing.xs + 2,
+			marginTop: theme.spacing.sm,
+		},
+		audienceRow: {
+			flexDirection: "row",
+			flexWrap: "wrap",
+			gap: theme.spacing.xs,
+			marginTop: theme.spacing.md,
+		},
+		actions: {
+			flexDirection: "row",
+			gap: theme.spacing.sm,
+			marginTop: theme.spacing.lg,
+		},
+		sheetBody: {
+			padding: theme.spacing.lg,
+			paddingBottom: theme.spacing["2xl"],
+			gap: theme.spacing.md,
+		},
+		sheetCard: {
+			marginVertical: theme.spacing.xs,
+		},
+		intervalRow: {
+			flexDirection: "row",
+			gap: theme.spacing.md,
+		},
+		sheetAction: {
+			marginTop: theme.spacing.md,
+		},
+		adminHeader: {
+			paddingHorizontal: theme.spacing.lg,
+			paddingTop: theme.spacing.md,
+			paddingBottom: theme.spacing.sm,
+			borderBottomWidth: theme.hairlineWidth,
+			borderBottomColor: theme.colors.border,
+		},
+		bucket: {
+			gap: theme.spacing.sm,
+		},
+		bucketHeader: {
+			flexDirection: "row",
+			alignItems: "center",
+		},
+		workerRow: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: theme.spacing.sm,
+			paddingVertical: theme.spacing.xs,
+		},
+	});

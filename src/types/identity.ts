@@ -21,6 +21,11 @@ export interface UserSettings {
 	userId: string;
 	preferredMapApp: "apple" | "google" | "waze";
 	defaultCalendarFilter: "all" | "my";
+	/**
+	 * Appearance choice. Absent on accounts that predate it, which reads as
+	 * "system" — so the field is optional rather than defaulted on write.
+	 */
+	theme?: "light" | "dark" | "system";
 	createdAt: Timestamp;
 	updatedAt: Timestamp;
 }

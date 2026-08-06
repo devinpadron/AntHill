@@ -1,79 +1,64 @@
-import React, { useEffect, useState } from "react";
-import { View, Image, Text, StyleSheet, Animated } from "react-native";
+import React, { useEffect } from "react";
+import { StyleSheet } from "react-native";
+import Animated, {
+	useAnimatedStyle,
+	useSharedValue,
+	withTiming,
+} from "react-native-reanimated";
+import { Logo } from "../components/ui/Logo";
+import { Theme, useThemedStyles } from "../theme";
 
-interface SplashScreenProps {
-	onComplete?: () => void;
-	duration?: number;
-	logoSource?: any;
-	appName?: string;
-}
-
-const SplashScreen: React.FC<SplashScreenProps> = ({
-	onComplete,
-	duration = 2000,
-	logoSource,
-	appName = "AntHill",
-}) => {
-	const [opacity] = useState(new Animated.Value(1));
+/**
+ * The launch screen.
+ *
+ * The ONLY splash the app draws. The native launch screen is a bare colour
+ * matching this one's background (see the expo-splash-screen plugin in
+ * app.config.js), so the handoff between them is invisible and the mark appears
+ * exactly once.
+ *
+ * Deliberately quiet: the mark, and nothing else. It previously spelled out
+ * "AntHill" in 32pt beneath a logo that already says AntHill, plus a
+ * "Loading..." line — three pieces of chrome for a screen that exists for a
+ * second or two.
+ *
+ * It neither hides itself nor lifts the native launch screen (`AppGate`
+ * renders before this does, so the reveal belongs above it — see
+ * useHideNativeSplash). `AppNavigator` renders this while `initializing` is
+ * true and swaps it out when auth resolves; a self-timer would blank the screen
+ * on any launch slower than the timer.
+ */
+const SplashScreen = () => {
+	const styles = useThemedStyles(splashStyles);
+	const opacity = useSharedValue(0);
+	const scale = useSharedValue(0.96);
 
 	useEffect(() => {
-		const timer = setTimeout(() => {
-			Animated.timing(opacity, {
-				toValue: 0,
-				duration: 500,
-				useNativeDriver: true,
-			}).start(() => {
-				if (onComplete) {
-					onComplete();
-				}
-			});
-		}, duration);
+		opacity.value = withTiming(1, { duration: 320 });
+		scale.value = withTiming(1, { duration: 420 });
+	}, [opacity, scale]);
 
-		return () => clearTimeout(timer);
-	}, [duration, opacity, onComplete]);
+	const animatedStyle = useAnimatedStyle(() => ({
+		opacity: opacity.value,
+		transform: [{ scale: scale.value }],
+	}));
 
 	return (
-		<Animated.View style={[styles.container, { opacity }]}>
-			<Image
-				source={
-					logoSource || require("../assets/AntHill/Full_Black.png")
-				}
-				style={styles.logo}
-				resizeMode="contain"
-			/>
-			<Text style={styles.title}>{appName}</Text>
-			<View style={styles.loadingContainer}>
-				<Text style={styles.loadingText}>Loading...</Text>
-			</View>
+		<Animated.View style={styles.container}>
+			<Animated.View style={animatedStyle}>
+				<Logo width={200} height={110} />
+			</Animated.View>
 		</Animated.View>
 	);
 };
 
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-		backgroundColor: "#ffffff",
-	},
-	logo: {
-		width: 150,
-		height: 150,
-		marginBottom: 20,
-	},
-	title: {
-		fontSize: 32,
-		fontWeight: "bold",
-		marginBottom: 20,
-		color: "#333",
-	},
-	loadingContainer: {
-		marginTop: 20,
-	},
-	loadingText: {
-		fontSize: 16,
-		color: "#666",
-	},
-});
+const splashStyles = (theme: Theme) =>
+	StyleSheet.create({
+		container: {
+			flex: 1,
+			justifyContent: "center",
+			alignItems: "center",
+			backgroundColor: theme.colors.bg,
+		},
+	});
 
 export default SplashScreen;

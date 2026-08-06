@@ -1,153 +1,199 @@
-import React from "react";
-import { Image, StyleSheet } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { AntHill } from "../../constants/colors";
+import React, { useRef } from "react";
+import { StyleSheet, TextInput, View } from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
+import { Button, Input, Logo, Screen, Text } from "../../components/ui";
 import { showPrompt } from "../../utils/alertUtils";
 import { useAuth } from "../../hooks/useAuth";
-import { FormInput } from "../../components/ui/FormInput";
-import { Button } from "../../components/ui/Button";
+import { Theme, useThemedStyles } from "../../theme";
 
 /*
- * Login. Identical to the v1 screen apart from the hook it calls — the UI was
- * never schema-aware, only the data layer underneath it was.
+ * Login.
+ *
+ * The form is vertically centered but lives in a keyboard-aware scroll view —
+ * previously it was centered in a bare SafeAreaView with no keyboard handling
+ * at all, so on a small phone the password field went under the keyboard.
+ *
+ * Errors render under the field that caused them rather than as alerts.
  */
 const LoginPage = ({ navigation }) => {
+	const styles = useThemedStyles(loginStyles);
+	const passwordRef = useRef<TextInput>(null);
+
 	const {
 		email,
 		setEmail,
 		password,
 		setPassword,
 		loading,
+		errors,
+		clearError,
 		login,
 		resetPassword,
 	} = useAuth();
 
-	const handleLogin = async () => {
-		const success = await login();
-		// Login success is handled by UserContext navigation
-	};
-
-	const navigateToSignup = () => {
-		navigation.navigate("Sign Up");
-	};
+	// Success is handled by UserContext, which swaps the navigator.
+	const handleLogin = () => login();
 
 	const handleForgotPassword = () => {
-		const defaultEmail = email || "";
 		showPrompt(
-			"Forgot Password",
-			"Please enter your account email:",
+			"Reset your password",
+			"We'll email you a link to set a new one.",
 			[
+				{ text: "Cancel", style: "cancel" },
 				{
-					text: "Cancel",
-					style: "cancel",
-				},
-				{
-					text: "Submit",
+					text: "Send link",
 					onPress: (resetEmail) => {
-						if (resetEmail && resetEmail.trim()) {
+						if (resetEmail?.trim())
 							resetPassword(resetEmail.trim());
-						}
 					},
 				},
 			],
-			{ defaultValue: defaultEmail },
+			{ defaultValue: email || "" },
 		);
 	};
 
 	return (
-		<SafeAreaView style={styles.container}>
-			{/* Logo */}
-			<Image
-				style={styles.logo}
-				source={require("../../assets/AntHill/Full_Black.png")}
-			/>
+		<Screen scroll keyboard="avoid" contentContainerStyle={styles.content}>
+			<Animated.View
+				entering={FadeInDown.duration(400)}
+				style={styles.form}
+			>
+				<Logo width={200} height={110} style={styles.logo} />
 
-			<FormInput
-				placeholder="Email:"
-				value={email}
-				onChangeText={setEmail}
-				keyboardType="email-address"
-			/>
+				<Text variant="title" align="center" style={styles.heading}>
+					Welcome back
+				</Text>
+				<Text
+					variant="body"
+					color="textSecondary"
+					align="center"
+					style={styles.subheading}
+				>
+					Sign in to see your schedule.
+				</Text>
 
-			<FormInput
-				placeholder="Password:"
-				value={password}
-				onChangeText={setPassword}
-				secureTextEntry={true}
-			/>
+				<Input
+					label="Email"
+					placeholder="you@example.com"
+					icon="mail-outline"
+					value={email}
+					onChangeText={(v) => {
+						setEmail(v);
+						clearError("email");
+					}}
+					error={errors.email}
+					keyboardType="email-address"
+					autoCapitalize="none"
+					autoComplete="email"
+					autoCorrect={false}
+					returnKeyType="next"
+					onSubmitEditing={() => passwordRef.current?.focus()}
+					containerStyle={styles.field}
+				/>
 
-			<Button
-				title="Login"
-				onPress={handleLogin}
-				loading={loading}
-				style={styles.primaryButton}
-				textStyle={styles.buttonText}
-				variant="primary"
-				fullWidth
-			/>
+				<Input
+					ref={passwordRef}
+					label="Password"
+					placeholder="Your password"
+					icon="lock-closed-outline"
+					password
+					value={password}
+					onChangeText={(v) => {
+						setPassword(v);
+						clearError("password");
+					}}
+					error={errors.password}
+					autoComplete="current-password"
+					returnKeyType="go"
+					onSubmitEditing={handleLogin}
+					containerStyle={styles.field}
+				/>
 
-			<Button
-				title="Signup"
-				onPress={navigateToSignup}
-				style={styles.secondaryButton}
-				textStyle={styles.buttonText}
-				variant="secondary"
-			/>
+				{/* Errors Firebase will not attribute to one field. */}
+				{!!errors.form && (
+					<View style={styles.formError}>
+						<Text variant="caption" color="danger" align="center">
+							{errors.form}
+						</Text>
+					</View>
+				)}
 
-			<Button
-				title="Forgot Password"
-				onPress={handleForgotPassword}
-				style={styles.textButton}
-				textStyle={styles.linkText}
-				variant="text"
-			/>
-		</SafeAreaView>
+				<Button
+					title="Sign in"
+					onPress={handleLogin}
+					loading={loading}
+					disabled={!email.trim() || !password}
+					size="large"
+					fullWidth
+					haptic="press"
+					style={styles.submit}
+				/>
+
+				<Button
+					title="Forgot your password?"
+					onPress={handleForgotPassword}
+					variant="text"
+					style={styles.link}
+				/>
+			</Animated.View>
+
+			<View style={styles.footer}>
+				<Text variant="body" color="textSecondary">
+					New here?
+				</Text>
+				<Button
+					title="Create an account"
+					onPress={() => navigation.navigate("Sign Up")}
+					variant="text"
+				/>
+			</View>
+		</Screen>
 	);
 };
 
 export default LoginPage;
 
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: "white",
-		alignItems: "center",
-		justifyContent: "center",
-		paddingHorizontal: 20, // Add padding to prevent buttons stretching too wide
-	},
-	logo: {
-		width: 200,
-		height: 150,
-		resizeMode: "contain",
-		marginBottom: 40,
-	},
-	primaryButton: {
-		height: 48,
-		marginTop: 40,
-		borderRadius: 8,
-		width: "100%",
-		backgroundColor: AntHill.Black,
-	},
-	secondaryButton: {
-		height: 48,
-		marginTop: 16,
-		borderRadius: 8,
-		width: "100%",
-		backgroundColor: AntHill.Black,
-	},
-	textButton: {
-		backgroundColor: "transparent",
-		marginTop: 20,
-		height: 40,
-	},
-	buttonText: {
-		fontSize: 18,
-		fontWeight: "600",
-		color: AntHill.White,
-	},
-	linkText: {
-		fontSize: 16,
-		color: AntHill.Black,
-		textDecorationLine: "underline",
-	},
-});
+const loginStyles = (theme: Theme) =>
+	StyleSheet.create({
+		content: {
+			flexGrow: 1,
+			justifyContent: "center",
+			paddingHorizontal: theme.spacing.xl,
+			paddingVertical: theme.spacing["2xl"],
+		},
+		form: {
+			width: "100%",
+			maxWidth: 420,
+			alignSelf: "center",
+		},
+		logo: {
+			alignSelf: "center",
+			marginBottom: theme.spacing.xl,
+		},
+		heading: {
+			marginBottom: theme.spacing.xs,
+		},
+		subheading: {
+			marginBottom: theme.spacing.xl,
+		},
+		field: {
+			marginBottom: theme.spacing.lg,
+		},
+		formError: {
+			marginBottom: theme.spacing.md,
+		},
+		submit: {
+			marginTop: theme.spacing.xs,
+		},
+		link: {
+			alignSelf: "center",
+			marginTop: theme.spacing.md,
+		},
+		footer: {
+			flexDirection: "row",
+			alignItems: "center",
+			justifyContent: "center",
+			marginTop: theme.spacing.xl,
+			gap: theme.spacing.xs,
+		},
+	});

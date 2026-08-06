@@ -1,5 +1,6 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { stackScreenOptions } from "./stackOptions";
 import Settings from "../screens/settings/Settings";
 import ProfilePage from "../screens/settings/ProfilePage";
 import EmployeeList from "../screens/settings/admin/EmployeeList";
@@ -22,62 +23,21 @@ import PayrollReviewStack from "./PayrollReviewStack";
 const Stack = createNativeStackNavigator();
 
 const SettingStack = () => (
-	<Stack.Navigator>
-		<Stack.Screen
-			name="Settings"
-			component={Settings}
-			options={{ headerShown: false, gestureEnabled: true }}
-		/>
-		<Stack.Screen
-			name="Profile"
-			component={ProfilePage}
-			options={{ headerShown: false, gestureEnabled: true }}
-		/>
-		<Stack.Screen
-			name="EmployeeList"
-			component={EmployeeList}
-			options={{ headerShown: false, gestureEnabled: true }}
-		/>
-		<Stack.Screen
-			name="PayrollReview"
-			component={PayrollReviewStack}
-			options={{ headerShown: false, gestureEnabled: true }}
-		/>
-		<Stack.Screen
-			name="CompanyCustomForm"
-			component={CompanyCustomForm}
-			options={{ headerShown: false, gestureEnabled: true }}
-		/>
+	<Stack.Navigator screenOptions={stackScreenOptions}>
+		<Stack.Screen name="Settings" component={Settings} />
+		<Stack.Screen name="Profile" component={ProfilePage} />
+		<Stack.Screen name="EmployeeList" component={EmployeeList} />
+		<Stack.Screen name="PayrollReview" component={PayrollReviewStack} />
+		<Stack.Screen name="CompanyCustomForm" component={CompanyCustomForm} />
 		<Stack.Screen
 			name="CompanyPreferences"
 			component={CompanyPreferences}
-			options={{ headerShown: false, gestureEnabled: true }}
 		/>
-		<Stack.Screen
-			name="UserPreferences"
-			component={UserPreferences}
-			options={{ headerShown: false, gestureEnabled: true }}
-		/>
-		<Stack.Screen
-			name="ChecklistCreator"
-			component={ChecklistCreator}
-			options={{ headerShown: false, gestureEnabled: true }}
-		/>
-		<Stack.Screen
-			name="PackageCreator"
-			component={PackageCreator}
-			options={{ headerShown: false, gestureEnabled: true }}
-		/>
-		<Stack.Screen
-			name="LabelCreator"
-			component={LabelCreator}
-			options={{ headerShown: false, gestureEnabled: true }}
-		/>
-		<Stack.Screen
-			name="WorkerGroups"
-			component={WorkerGroups}
-			options={{ headerShown: false, gestureEnabled: true }}
-		/>
+		<Stack.Screen name="UserPreferences" component={UserPreferences} />
+		<Stack.Screen name="ChecklistCreator" component={ChecklistCreator} />
+		<Stack.Screen name="PackageCreator" component={PackageCreator} />
+		<Stack.Screen name="LabelCreator" component={LabelCreator} />
+		<Stack.Screen name="WorkerGroups" component={WorkerGroups} />
 	</Stack.Navigator>
 );
 

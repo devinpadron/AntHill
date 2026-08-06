@@ -17,7 +17,7 @@ import { useCompanyMembers } from "../../hooks/useCompanyMembers";
 import { useTimeTracking } from "../../hooks/useTimeTracking";
 import { useFormSchema } from "../../hooks/useFormSchema";
 import { FilterType } from "../../types/enums/FilterType";
-import { AntHill } from "../../constants/colors";
+import { Theme, useTheme, useThemedStyles } from "../../theme";
 import {
 	DATABASE_ID,
 	DATABASE_LABEL,
@@ -43,14 +43,18 @@ const Row = ({
 	label: string;
 	value: string | number | null | undefined;
 	bad?: boolean;
-}) => (
-	<View style={styles.row}>
-		<Text style={styles.label}>{label}</Text>
-		<Text style={[styles.value, bad && styles.bad]}>
-			{value === null || value === undefined ? "—" : String(value)}
-		</Text>
-	</View>
-);
+}) => {
+	const styles = useThemedStyles(diagnosticsStyles);
+
+	return (
+		<View style={styles.row}>
+			<Text style={styles.label}>{label}</Text>
+			<Text style={[styles.value, bad && styles.bad]}>
+				{value === null || value === undefined ? "—" : String(value)}
+			</Text>
+		</View>
+	);
+};
 
 const Section = ({
 	title,
@@ -58,14 +62,20 @@ const Section = ({
 }: {
 	title: string;
 	children: React.ReactNode;
-}) => (
-	<View style={styles.section}>
-		<Text style={styles.heading}>{title}</Text>
-		{children}
-	</View>
-);
+}) => {
+	const styles = useThemedStyles(diagnosticsStyles);
+
+	return (
+		<View style={styles.section}>
+			<Text style={styles.heading}>{title}</Text>
+			{children}
+		</View>
+	);
+};
 
 export const DiagnosticsScreen = ({ navigation }: { navigation: any }) => {
+	const theme = useTheme();
+	const styles = useThemedStyles(diagnosticsStyles);
 	const {
 		user,
 		userId,
@@ -378,105 +388,106 @@ export const DiagnosticsScreen = ({ navigation }: { navigation: any }) => {
 	);
 };
 
-const styles = StyleSheet.create({
-	container: { flex: 1, backgroundColor: AntHill.Cream },
-	content: { padding: 16, paddingBottom: 48 },
-	dbBanner: {
-		borderRadius: 8,
-		paddingVertical: 10,
-		paddingHorizontal: 12,
-		marginBottom: 14,
-		alignItems: "center",
-	},
-	/*
-	 * test is a byte-for-byte copy of production, so the contents cannot tell
-	 * you which one you are on. This banner is the only thing that can.
-	 */
-	dbBannerTest: { backgroundColor: "#2F3B16" },
-	dbBannerProd: { backgroundColor: "#B3261E" },
-	dbBannerText: { color: "#fff", fontSize: 14, fontWeight: "700" },
-	dbBannerSub: {
-		color: "#fff",
-		fontSize: 11,
-		opacity: 0.85,
-		marginTop: 2,
-	},
-	title: {
-		fontSize: 20,
-		fontWeight: "700",
-		color: AntHill.Black,
-		marginBottom: 16,
-	},
-	section: {
-		backgroundColor: "#fff",
-		borderRadius: 10,
-		padding: 12,
-		marginBottom: 12,
-	},
-	heading: {
-		fontSize: 15,
-		fontWeight: "600",
-		color: AntHill.Green,
-		marginBottom: 8,
-	},
-	row: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		paddingVertical: 3,
-	},
-	label: { fontSize: 13, color: "#666", flex: 1 },
-	value: {
-		fontSize: 13,
-		color: AntHill.Black,
-		flex: 1,
-		textAlign: "right",
-		fontWeight: "500",
-	},
-	bad: { color: "#c0392b", fontWeight: "700" },
-	filters: { flexDirection: "row", marginBottom: 8 },
-	chip: {
-		paddingHorizontal: 10,
-		paddingVertical: 5,
-		borderRadius: 14,
-		backgroundColor: "#eee",
-		marginRight: 6,
-	},
-	chipOn: { backgroundColor: AntHill.Green },
-	chipText: { fontSize: 12, color: "#444" },
-	chipOnText: { fontSize: 12, color: "#fff", fontWeight: "600" },
-	input: {
-		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		paddingVertical: 10,
-		marginBottom: 10,
-		fontSize: 15,
-	},
-	button: {
-		backgroundColor: AntHill.Green,
-		borderRadius: 8,
-		paddingVertical: 12,
-		alignItems: "center",
-	},
-	buttonText: { color: "#fff", fontWeight: "600", fontSize: 15 },
-	errorText: { color: "#c0392b", fontSize: 12, marginTop: 10 },
-	signOut: { backgroundColor: "#999", marginBottom: 12 },
-	openCalendar: { marginBottom: 10 },
-	floatingBack: {
-		position: "absolute",
-		bottom: 30,
-		alignSelf: "center",
-		backgroundColor: AntHill.Black,
-		paddingHorizontal: 18,
-		paddingVertical: 10,
-		borderRadius: 20,
-	},
-	note: {
-		fontSize: 12,
-		color: "#666",
-		lineHeight: 17,
-		marginTop: 4,
-		textAlign: "center",
-	},
-});
+const diagnosticsStyles = (theme: Theme) =>
+	StyleSheet.create({
+		container: { flex: 1, backgroundColor: theme.colors.bg },
+		content: { padding: 16, paddingBottom: 48 },
+		dbBanner: {
+			borderRadius: 8,
+			paddingVertical: 10,
+			paddingHorizontal: 12,
+			marginBottom: 14,
+			alignItems: "center",
+		},
+		/*
+		 * test is a byte-for-byte copy of production, so the contents cannot tell
+		 * you which one you are on. This banner is the only thing that can.
+		 */
+		dbBannerTest: { backgroundColor: "#2F3B16" },
+		dbBannerProd: { backgroundColor: "#B3261E" },
+		dbBannerText: { color: "#fff", fontSize: 14, fontWeight: "700" },
+		dbBannerSub: {
+			color: "#fff",
+			fontSize: 11,
+			opacity: 0.85,
+			marginTop: 2,
+		},
+		title: {
+			fontSize: 20,
+			fontWeight: "700",
+			color: theme.colors.text,
+			marginBottom: 16,
+		},
+		section: {
+			backgroundColor: "#fff",
+			borderRadius: 10,
+			padding: 12,
+			marginBottom: 12,
+		},
+		heading: {
+			fontSize: 15,
+			fontWeight: "600",
+			color: theme.colors.accent,
+			marginBottom: 8,
+		},
+		row: {
+			flexDirection: "row",
+			justifyContent: "space-between",
+			paddingVertical: 3,
+		},
+		label: { fontSize: 13, color: "#666", flex: 1 },
+		value: {
+			fontSize: 13,
+			color: theme.colors.text,
+			flex: 1,
+			textAlign: "right",
+			fontWeight: "500",
+		},
+		bad: { color: "#c0392b", fontWeight: "700" },
+		filters: { flexDirection: "row", marginBottom: 8 },
+		chip: {
+			paddingHorizontal: 10,
+			paddingVertical: 5,
+			borderRadius: 14,
+			backgroundColor: "#eee",
+			marginRight: 6,
+		},
+		chipOn: { backgroundColor: theme.colors.accent },
+		chipText: { fontSize: 12, color: "#444" },
+		chipOnText: { fontSize: 12, color: "#fff", fontWeight: "600" },
+		input: {
+			borderWidth: 1,
+			borderColor: "#ddd",
+			borderRadius: 8,
+			paddingHorizontal: 12,
+			paddingVertical: 10,
+			marginBottom: 10,
+			fontSize: 15,
+		},
+		button: {
+			backgroundColor: theme.colors.accent,
+			borderRadius: 8,
+			paddingVertical: 12,
+			alignItems: "center",
+		},
+		buttonText: { color: "#fff", fontWeight: "600", fontSize: 15 },
+		errorText: { color: "#c0392b", fontSize: 12, marginTop: 10 },
+		signOut: { backgroundColor: "#999", marginBottom: 12 },
+		openCalendar: { marginBottom: 10 },
+		floatingBack: {
+			position: "absolute",
+			bottom: 30,
+			alignSelf: "center",
+			backgroundColor: theme.colors.text,
+			paddingHorizontal: 18,
+			paddingVertical: 10,
+			borderRadius: 20,
+		},
+		note: {
+			fontSize: 12,
+			color: "#666",
+			lineHeight: 17,
+			marginTop: 4,
+			textAlign: "center",
+		},
+	});

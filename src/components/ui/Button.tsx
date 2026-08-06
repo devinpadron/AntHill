@@ -1,14 +1,31 @@
 import React from "react";
 import {
-	TouchableOpacity,
-	Text,
-	StyleSheet,
 	ActivityIndicator,
-	View,
 	StyleProp,
-	ViewStyle,
+	StyleSheet,
 	TextStyle,
+	View,
+	ViewStyle,
 } from "react-native";
+import { Theme, useTheme, useThemedStyles } from "../../theme";
+import { Haptic } from "../../theme/haptics";
+import { ColorTokens } from "../../theme/themes";
+import { Icon, IconName } from "./Icon";
+import { Pressable } from "./Pressable";
+import { Text } from "./Text";
+
+/**
+ * The button.
+ *
+ * The prop shape is unchanged from the version this replaces, so existing call
+ * sites keep working; what changed is that every value now comes from tokens.
+ * Previously the primary color was a hardcoded `#2089dc` that did not appear in
+ * the palette, which is why LoginPage had to override `style`, `textStyle`,
+ * background and radius just to get a brand-colored button.
+ *
+ * `icon` also accepts an Ionicons name now, so the common case no longer needs
+ * a caller-constructed element with its own hardcoded size and color.
+ */
 
 export type ButtonVariant =
 	"primary" | "secondary" | "outline" | "text" | "destructive";
@@ -21,12 +38,32 @@ type ButtonProps = {
 	size?: ButtonSize;
 	disabled?: boolean;
 	loading?: boolean;
-	icon?: React.ReactNode;
+	/** An Ionicons name, or a ready-made element for the rare custom case. */
+	icon?: IconName | React.ReactNode;
 	iconPosition?: "left" | "right" | "center";
 	fullWidth?: boolean;
 	style?: StyleProp<ViewStyle>;
 	textStyle?: StyleProp<TextStyle>;
 	selected?: boolean;
+	haptic?: Haptic | null;
+	/** Spoken by a screen reader when there is no title. */
+	accessibilityLabel?: string;
+	testID?: string;
+};
+
+/** Foreground color per variant — used by the label, icon and spinner alike. */
+const FOREGROUND: Record<ButtonVariant, keyof ColorTokens> = {
+	primary: "onAccent",
+	secondary: "text",
+	outline: "accent",
+	text: "accent",
+	destructive: "textInverse",
+};
+
+const TEXT_VARIANT: Record<ButtonSize, "label" | "bodyStrong" | "heading"> = {
+	small: "label",
+	medium: "bodyStrong",
+	large: "heading",
 };
 
 export const Button: React.FC<ButtonProps> = ({
@@ -42,179 +79,149 @@ export const Button: React.FC<ButtonProps> = ({
 	style,
 	textStyle,
 	selected = false,
+	haptic = "tap",
+	accessibilityLabel,
+	testID,
 }) => {
-	// Determine the styles based on props
-	const buttonStyles = [
-		styles.button,
-		styles[`${variant}Button`],
-		styles[`${size}Button`],
-		disabled && styles.disabledButton,
-		selected && styles.selectedButton,
-		fullWidth && styles.fullWidth,
-		style,
-	];
+	const theme = useTheme();
+	const styles = useThemedStyles(buttonStyles);
 
-	const textStyles = [
-		styles.text,
-		styles[`${variant}Text`],
-		styles[`${size}Text`],
-		disabled && styles.disabledText,
-		selected && styles[`${variant}SelectedText`],
-		textStyle,
-	];
+	const foreground: keyof ColorTokens = disabled
+		? "textTertiary"
+		: FOREGROUND[variant];
+
+	const glyph =
+		typeof icon === "string" ? (
+			<Icon
+				name={icon as IconName}
+				size={size === "small" ? "sm" : "md"}
+				color={foreground}
+			/>
+		) : (
+			icon
+		);
 
 	return (
-		<TouchableOpacity
-			style={buttonStyles}
+		<Pressable
 			onPress={onPress}
 			disabled={disabled || loading}
-			activeOpacity={0.7}
+			haptic={disabled || loading ? null : haptic}
+			testID={testID}
+			accessibilityLabel={accessibilityLabel ?? title}
+			style={[
+				styles.base,
+				styles[`${variant}Variant`],
+				styles[`${size}Size`],
+				selected && styles.selected,
+				disabled && styles.disabled,
+				fullWidth && styles.fullWidth,
+				style,
+			]}
 		>
 			{loading ? (
 				<ActivityIndicator
 					size="small"
-					color={variant === "primary" ? "#fff" : "#2089dc"}
+					color={theme.colors[foreground]}
 				/>
 			) : (
-				<View style={styles.contentContainer}>
-					{icon && iconPosition === "left" && (
-						<View style={styles.iconLeft}>{icon}</View>
+				<View style={styles.content}>
+					{!!glyph && iconPosition === "left" && (
+						<View style={title ? styles.iconLeft : undefined}>
+							{glyph}
+						</View>
 					)}
-					{title && <Text style={textStyles}>{title}</Text>}
-					{icon && iconPosition === "center" && (
-						<View style={styles.iconCenter}>{icon}</View>
+					{!!title && (
+						<Text
+							variant={TEXT_VARIANT[size]}
+							color={foreground}
+							style={textStyle}
+						>
+							{title}
+						</Text>
 					)}
-					{icon && iconPosition === "right" && (
-						<View style={styles.iconRight}>{icon}</View>
+					{!!glyph && iconPosition === "center" && glyph}
+					{!!glyph && iconPosition === "right" && (
+						<View style={title ? styles.iconRight : undefined}>
+							{glyph}
+						</View>
 					)}
 				</View>
 			)}
-		</TouchableOpacity>
+		</Pressable>
 	);
 };
 
-const styles = StyleSheet.create({
-	button: {
-		borderRadius: 8,
-		justifyContent: "center",
-		alignItems: "center",
-		flexDirection: "row",
-	},
-	primaryButton: {
-		backgroundColor: "#2089dc",
-		borderWidth: 0,
-	},
-	secondaryButton: {
-		backgroundColor: "#e1e8ee",
-		borderWidth: 0,
-	},
-	outlineButton: {
-		backgroundColor: "transparent",
-		borderWidth: 1,
-		borderColor: "#2089dc",
-	},
-	textButton: {
-		backgroundColor: "transparent",
-		borderWidth: 0,
-		paddingHorizontal: 0,
-	},
-	smallButton: {
-		paddingVertical: 6,
-		paddingHorizontal: 12,
-	},
-	mediumButton: {
-		paddingVertical: 10,
-		paddingHorizontal: 16,
-	},
-	largeButton: {
-		paddingVertical: 14,
-		paddingHorizontal: 20,
-	},
-	disabledButton: {
-		backgroundColor: "#e1e8ee",
-		borderColor: "#c4c4c4",
-	},
-	selectedButton: {
-		backgroundColor: "#e0e0e0",
-		borderColor: "#2089dc",
-	},
-	fullWidth: {
-		width: "100%",
-	},
-	text: {
-		textAlign: "center",
-		fontWeight: "500",
-		fontSize: 16,
-	},
-	primaryText: {
-		color: "#ffffff",
-	},
-	secondaryText: {
-		color: "#1c1c1c",
-	},
-	outlineText: {
-		color: "#2089dc",
-	},
-	textText: {
-		color: "#2089dc",
-	},
-	smallText: {
-		fontSize: 14,
-	},
-	mediumText: {
-		fontSize: 16,
-	},
-	largeText: {
-		fontSize: 18,
-	},
-	disabledText: {
-		color: "#999999",
-	},
-	primarySelectedText: {
-		color: "#ffffff",
-	},
-	secondarySelectedText: {
-		color: "#1c1c1c",
-	},
-	outlineSelectedText: {
-		color: "#2089dc",
-	},
-	textSelectedText: {
-		color: "#2089dc",
-		fontWeight: "bold",
-	},
-	contentContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	iconLeft: {
-		marginRight: 8,
-	},
-	iconRight: {
-		marginLeft: 8,
-	},
-	iconCenter: {
-		alignContent: "center",
-		justifyContent: "center",
-	},
-	destructiveButton: {
-		backgroundColor: "#f44336", // Red color
-		borderWidth: 0,
-	},
-	destructiveText: {
-		color: "#ffffff", // White text on red background
-	},
-	destructiveSelectedText: {
-		color: "#ffffff",
-		fontWeight: "bold",
-	},
-	disabledDestructiveButton: {
-		backgroundColor: "#ffcdd2", // Lighter red when disabled
-		opacity: 0.7,
-	},
-	disabledDestructiveText: {
-		color: "#ffffff",
-		opacity: 0.7,
-	},
-});
+const buttonStyles = (theme: Theme) =>
+	StyleSheet.create({
+		base: {
+			flexDirection: "row",
+			alignItems: "center",
+			justifyContent: "center",
+			borderRadius: theme.radius.md,
+			borderWidth: theme.hairlineWidth,
+			borderColor: "transparent",
+			minHeight: theme.hitTarget,
+		},
+
+		primaryVariant: {
+			backgroundColor: theme.colors.accent,
+		},
+		secondaryVariant: {
+			backgroundColor: theme.colors.surfaceSunken,
+		},
+		outlineVariant: {
+			backgroundColor: "transparent",
+			borderColor: theme.colors.accentBorder,
+		},
+		textVariant: {
+			backgroundColor: "transparent",
+			minHeight: 0,
+		},
+		destructiveVariant: {
+			backgroundColor: theme.colors.danger,
+		},
+
+		smallSize: {
+			paddingVertical: theme.spacing.sm,
+			paddingHorizontal: theme.spacing.md,
+			minHeight: 36,
+		},
+		mediumSize: {
+			paddingVertical: theme.spacing.md,
+			paddingHorizontal: theme.spacing.lg,
+		},
+		largeSize: {
+			paddingVertical: theme.spacing.lg,
+			paddingHorizontal: theme.spacing.xl,
+			minHeight: 52,
+		},
+
+		selected: {
+			backgroundColor: theme.colors.accentSubtle,
+			borderColor: theme.colors.accentBorder,
+		},
+		/*
+		 * Disabled flattens to the sunken surface for every variant — including
+		 * destructive, whose disabled styles existed in the old version but
+		 * were never reachable by its style-composition logic.
+		 */
+		disabled: {
+			backgroundColor: theme.colors.surfaceSunken,
+			borderColor: "transparent",
+		},
+		fullWidth: {
+			width: "100%",
+		},
+
+		content: {
+			flexDirection: "row",
+			alignItems: "center",
+			justifyContent: "center",
+		},
+		iconLeft: {
+			marginRight: theme.spacing.sm,
+		},
+		iconRight: {
+			marginLeft: theme.spacing.sm,
+		},
+	});

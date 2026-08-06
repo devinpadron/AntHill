@@ -21,6 +21,7 @@ import ThumbnailGallery from "./ThumbnailGallery";
  * but upload and delete can.
  */
 import { UploadProgressMap } from "../../contexts/UploadManagerContext";
+import { Theme, useTheme, useThemedStyles } from "../../theme";
 
 export type SelectableAttachment = {
 	id: string;
@@ -59,6 +60,8 @@ const AttachmentsSelector: React.FC<AttachmentsSelectorProps> = ({
 	setDeletionQueue,
 	uploadProgress = {},
 }) => {
+	const theme = useTheme();
+	const styles = useThemedStyles(selectorStyles);
 	// Loading states
 	const [loadingDocuments, setLoadingDocuments] = useState(false);
 	const [loadingMedia, setLoadingMedia] = useState(false);
@@ -231,12 +234,15 @@ const AttachmentsSelector: React.FC<AttachmentsSelectorProps> = ({
 						disabled={loadingDocuments}
 					>
 						{loadingDocuments ? (
-							<ActivityIndicator size="small" color="#3d7eea" />
+							<ActivityIndicator
+								size="small"
+								color={theme.colors.accent}
+							/>
 						) : (
 							<Ionicons
 								name="document-outline"
 								size={22}
-								color="#3d7eea"
+								color={theme.colors.accent}
 							/>
 						)}
 						<Text style={styles.attachButtonText}>
@@ -252,12 +258,15 @@ const AttachmentsSelector: React.FC<AttachmentsSelectorProps> = ({
 						disabled={loadingMedia}
 					>
 						{loadingMedia ? (
-							<ActivityIndicator size="small" color="#3d7eea" />
+							<ActivityIndicator
+								size="small"
+								color={theme.colors.accent}
+							/>
 						) : (
 							<Ionicons
 								name="image-outline"
 								size={22}
-								color="#3d7eea"
+								color={theme.colors.accent}
 							/>
 						)}
 						<Text style={styles.attachButtonText}>
@@ -279,32 +288,33 @@ const AttachmentsSelector: React.FC<AttachmentsSelectorProps> = ({
 	);
 };
 
-const styles = StyleSheet.create({
-	container: {
-		marginTop: 8,
-	},
-	buttonsContainer: {
-		flexDirection: "row",
-		flexWrap: "wrap",
-		marginBottom: 12,
-		gap: 10,
-	},
-	attachButton: {
-		flexDirection: "row",
-		alignItems: "center",
-		backgroundColor: "#f0f6ff",
-		paddingVertical: 10,
-		paddingHorizontal: 16,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: "#d0e0ff",
-		minWidth: 140,
-	},
-	attachButtonText: {
-		color: "#3d7eea",
-		marginLeft: 8,
-		fontWeight: "500",
-	},
-});
+const selectorStyles = (theme: Theme) =>
+	StyleSheet.create({
+		container: {
+			marginTop: 8,
+		},
+		buttonsContainer: {
+			flexDirection: "row",
+			flexWrap: "wrap",
+			marginBottom: 12,
+			gap: 10,
+		},
+		attachButton: {
+			flexDirection: "row",
+			alignItems: "center",
+			backgroundColor: theme.colors.accentSubtle,
+			paddingVertical: 10,
+			paddingHorizontal: 16,
+			borderRadius: 8,
+			borderWidth: 1,
+			borderColor: theme.colors.accentBorder,
+			minWidth: 140,
+		},
+		attachButtonText: {
+			color: theme.colors.accent,
+			marginLeft: 8,
+			fontWeight: "500",
+		},
+	});
 
 export default AttachmentsSelector;

@@ -1,11 +1,24 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, TouchableOpacity, StyleSheet } from "react-native";
-import { ArrowLeft, Filter, PlusCircle } from "react-native-feather";
-import { Button } from "../ui/Button";
+import React from "react";
+import { StyleSheet, View } from "react-native";
+import Animated, {
+	useAnimatedStyle,
+	withTiming,
+} from "react-native-reanimated";
+import { FAB, FABStack, useFloatingOffset } from "../ui";
+import { Theme, useTheme, useThemedStyles } from "../../theme";
+
+/**
+ * The calendar's floating actions.
+ *
+ * They fade out while a sheet is open, so the sheet is not competing with two
+ * buttons hovering over it. The fade runs on the UI thread now rather than
+ * through `Animated` on the JS thread, and both buttons share one stack instead
+ * of each absolutely positioning itself with its own hardcoded offsets.
+ */
 
 type FloatingActionButtonsProps = {
 	isAdmin: boolean;
-	selectedDate: string;
+	selectedDate: string | null;
 	today: string;
 	isBottomSheetVisible: boolean;
 	onAddEvent: () => void;
@@ -16,135 +29,66 @@ type FloatingActionButtonsProps = {
 export const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({
 	isAdmin,
 	selectedDate,
-	today,
 	isBottomSheetVisible,
 	onAddEvent,
 	onFilterPress,
 	onTodayPress,
 }) => {
-	const showTodayButton = useMemo(() => {
-		return selectedDate !== null;
-	}, [selectedDate, today]);
+	const theme = useTheme();
+	const styles = useThemedStyles(fabStyles);
+	/* Same offset the FABStack opposite it uses, so the two line up. */
+	const bottom = useFloatingOffset();
 
-	const fabOpacity = useRef(new Animated.Value(1)).current;
+	/* Only meaningful once the user has pinned the list to a specific day. */
+	const showTodayButton = selectedDate !== null;
 
-	useEffect(() => {
-		if (isBottomSheetVisible) {
-			Animated.timing(fabOpacity, {
-				toValue: 0,
-				duration: 200,
-				useNativeDriver: true,
-			}).start();
-		} else {
-			Animated.timing(fabOpacity, {
-				toValue: 1,
-				duration: 200,
-				useNativeDriver: true,
-			}).start();
-		}
-	}, [isBottomSheetVisible]);
+	const fadeStyle = useAnimatedStyle(() => ({
+		opacity: withTiming(isBottomSheetVisible ? 0 : 1, {
+			duration: theme.motion.duration.base,
+		}),
+	}));
+
+	if (!isAdmin && !showTodayButton) return null;
 
 	return (
-		<>
-			{isAdmin && (
-				<>
-					<Animated.View
-						style={{ opacity: fabOpacity }}
-						pointerEvents={isBottomSheetVisible ? "none" : "auto"}
-					>
-						<TouchableOpacity
-							style={styles.addEventButton}
-							onPress={onAddEvent}
-						>
-							<PlusCircle stroke="black" width={24} height={24} />
-						</TouchableOpacity>
-					</Animated.View>
-					<Animated.View
-						style={{ opacity: fabOpacity }}
-						pointerEvents={isBottomSheetVisible ? "none" : "auto"}
-					>
-						<TouchableOpacity
-							style={styles.filterButton}
-							onPress={onFilterPress}
-						>
-							<Filter stroke="black" width={24} height={24} />
-						</TouchableOpacity>
-					</Animated.View>
-				</>
+		<Animated.View
+			style={[styles.layer, fadeStyle]}
+			pointerEvents={isBottomSheetVisible ? "none" : "box-none"}
+		>
+			{showTodayButton && (
+				<View style={[styles.leading, { bottom }]}>
+					<FAB
+						icon="arrow-undo-outline"
+						onPress={onTodayPress}
+						label="Back to all dates"
+						variant="secondary"
+						extended
+					/>
+				</View>
 			)}
 
-			{/* Today Button - Only show when not on today's date */}
-			{showTodayButton && (
-				<Animated.View
-					style={{ opacity: fabOpacity }}
-					pointerEvents={isBottomSheetVisible ? "none" : "auto"}
-				>
-					<Button
-						onPress={onTodayPress}
-						style={styles.todayButton}
-						textStyle={styles.todayButtonText}
-						variant="outline"
-						size="small"
-						icon={
-							<ArrowLeft
-								stroke="#2089dc"
-								width={20}
-								height={20}
-							/>
-						}
-						iconPosition="center"
+			{isAdmin && (
+				<FABStack>
+					<FAB
+						icon="funnel-outline"
+						onPress={onFilterPress}
+						label="Filter events"
+						variant="secondary"
 					/>
-				</Animated.View>
+					<FAB icon="add" onPress={onAddEvent} label="New event" />
+				</FABStack>
 			)}
-		</>
+		</Animated.View>
 	);
 };
 
-const styles = StyleSheet.create({
-	filterButton: {
-		position: "absolute",
-		bottom: 10,
-		right: 70,
-		zIndex: 999,
-		padding: 12,
-		backgroundColor: "white",
-		borderRadius: 30,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.25,
-		shadowRadius: 3.84,
-		elevation: 8,
-	},
-	addEventButton: {
-		position: "absolute",
-		bottom: 10,
-		right: 10,
-		zIndex: 999,
-		padding: 12,
-		backgroundColor: "white",
-		borderRadius: 30,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.25,
-		shadowRadius: 3.84,
-		elevation: 8,
-	},
-	todayButton: {
-		position: "absolute",
-		bottom: 10,
-		left: 10,
-		zIndex: 999,
-		backgroundColor: "white",
-		borderRadius: 30,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.25,
-		shadowRadius: 3.84,
-		elevation: 8,
-	},
-	todayButtonText: {
-		fontSize: 14,
-		fontWeight: "600",
-		color: "#2089dc",
-	},
-});
+const fabStyles = (theme: Theme) =>
+	StyleSheet.create({
+		layer: {
+			...StyleSheet.absoluteFillObject,
+		},
+		leading: {
+			position: "absolute",
+			left: theme.spacing.lg,
+		},
+	});

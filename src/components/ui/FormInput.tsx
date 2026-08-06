@@ -1,6 +1,13 @@
 import React from "react";
-import { TextInput, StyleSheet } from "react-native";
-import { AntHill } from "../../constants/colors";
+import { Input } from "./Input";
+
+/**
+ * Deprecated. Use `Input`.
+ *
+ * Kept as a shim so the three auth screens keep compiling until Phase 3
+ * rewrites them; it will be deleted with its last caller. The old version
+ * hardcoded `width: 350`, which overflowed the container on a small phone.
+ */
 
 type FormInputProps = {
 	placeholder: string;
@@ -19,31 +26,15 @@ export const FormInput = ({
 	secureTextEntry = false,
 	keyboardType = "default",
 	autoCapitalize = "none",
-}: FormInputProps) => {
-	return (
-		<TextInput
-			style={styles.textInput}
-			placeholder={placeholder}
-			onChangeText={onChangeText}
-			value={value}
-			secureTextEntry={secureTextEntry}
-			autoCapitalize={autoCapitalize}
-			autoCorrect={false}
-			keyboardType={keyboardType}
-		/>
-	);
-};
-
-const styles = StyleSheet.create({
-	textInput: {
-		width: 350,
-		height: 40,
-		color: AntHill.Black,
-		margin: 10,
-		padding: 5,
-		fontSize: 16,
-		borderColor: AntHill.Black,
-		borderWidth: 1,
-		borderRadius: 5,
-	},
-});
+}: FormInputProps) => (
+	<Input
+		placeholder={placeholder}
+		value={value}
+		onChangeText={onChangeText}
+		password={secureTextEntry}
+		keyboardType={keyboardType}
+		autoCapitalize={autoCapitalize}
+		autoCorrect={false}
+		containerStyle={{ width: "100%" }}
+	/>
+);

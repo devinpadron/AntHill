@@ -1,31 +1,30 @@
-import React, { useCallback, useMemo, useState } from "react";
-import {
-	FlatList,
-	RefreshControl,
-	StatusBar,
-	StyleSheet,
-	Text,
-	TouchableOpacity,
-	View,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import React, { useCallback, useMemo, useRef, useState } from "react";
+import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import moment from "moment";
 import { CalendarList } from "react-native-calendars";
-import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
+import BottomSheet from "@gorhom/bottom-sheet";
 import { useUser } from "../../contexts/UserContext";
 import { useCompany } from "../../contexts/CompanyContext";
 import { useCalendarEvents } from "../../hooks/useCalendarEvents";
 import { FilterType } from "../../types";
-import LoadingScreen from "../../screens/LoadingScreen";
+import {
+	Badge,
+	Card,
+	EmptyState,
+	Loading,
+	Pressable,
+	ScreenHeader,
+	Sheet,
+	Text,
+} from "../ui";
+import { Theme, useTheme, useThemedStyles } from "../../theme";
+import { calendarTheme } from "./calendarTheme";
 
 /*
  * The schedule list.
  *
  * Data comes from useCalendarEvents, which queries a bounded date window
  * server-side. v1 pulled the whole Events collection and filtered in JS.
- *
- * Presentation is deliberately unchanged — same layout, same styles — so that
- * anything that looks different is a data bug, not a restyle.
  */
 
 type Props = {
@@ -60,6 +59,8 @@ type Row =
 	| { kind: "day"; date: string; entries: Entry[] };
 
 export default function Timesheet(props: Props) {
+	const theme = useTheme();
+	const styles = useThemedStyles(timesheetStyles);
 	const { userId, companyId, user } = useUser();
 	const { company } = useCompany();
 
@@ -160,366 +161,345 @@ export default function Timesheet(props: Props) {
 		[rows],
 	);
 
+	const sheetRef = useRef<BottomSheet>(null);
 	const [calOpen, setCalOpen] = useState(false);
-	const [calIndex, setCalIndex] = useState(-1);
 
-	const toggleCalendar = (close?: number) => {
+	const openCalendar = () => {
 		if (props.locked) return;
-		if (calOpen || close === 0) {
-			setCalOpen(false);
-			setCalIndex(-1);
-			props.onCalClose();
-		} else {
-			setCalIndex(1);
-			setCalOpen(true);
-			props.onCalOpen();
-		}
+		sheetRef.current?.snapToIndex(0);
+		setCalOpen(true);
+		props.onCalOpen();
+	};
+
+	const closeCalendar = () => {
+		sheetRef.current?.close();
+		setCalOpen(false);
+		props.onCalClose();
 	};
 
 	const renderDateColumn = (dateLabel: string) => {
 		const date = moment(dateLabel, "MMMM D, YYYY");
+		const isPast = date.isBefore(moment().startOf("day"));
+		const isToday = date.isSame(moment(), "day");
+
 		return (
-			<View
-				style={[
-					styles.sectionHeader,
-					date.isBefore(moment().startOf("day")) && { opacity: 0.5 },
-				]}
-			>
-				<View style={styles.dateNumberContainer}>
-					<View style={styles.dateTextContainer}>
-						<Text style={styles.dateMonth}>
-							{date.format("MMM")}
-						</Text>
-					</View>
-					<Text style={styles.dateNumber}>{date.format("D")}</Text>
-					<View style={styles.dateTextContainer}>
-						<Text style={styles.dateDay}>{date.format("ddd")}</Text>
-					</View>
-				</View>
-				<View style={styles.headerSpacer} />
+			<View style={[styles.dateColumn, isPast && styles.past]}>
+				<Text variant="caption" color="textSecondary" uppercase>
+					{date.format("MMM")}
+				</Text>
+				<Text
+					variant="display"
+					color={isToday ? "accent" : "text"}
+					style={styles.dateNumber}
+				>
+					{date.format("D")}
+				</Text>
+				<Text
+					variant="caption"
+					color={isToday ? "accent" : "textTertiary"}
+					uppercase
+				>
+					{date.format("ddd")}
+				</Text>
 			</View>
 		);
 	};
 
-	const renderEntry = (entry: Entry) => (
-		<TouchableOpacity
-			onPress={() =>
-				props.navigation.navigate("Details", { eventId: entry.id })
-			}
-		>
-			<View
-				style={[
-					styles.entryCard,
-					moment(entry.date).isBefore(moment().startOf("day")) && {
-						opacity: 0.5,
-					},
-				]}
+	const renderEntry = (entry: Entry) => {
+		const isPast = moment(entry.date).isBefore(moment().startOf("day"));
+
+		return (
+			<Pressable
+				key={entry.id}
+				onPress={() =>
+					props.navigation.navigate("Details", { eventId: entry.id })
+				}
+				scaleOnPress={false}
+				haptic="tap"
+				accessibilityLabel={`${entry.title}, ${entry.description || "all day"}`}
+				style={[styles.entryCard, isPast && styles.past]}
 			>
-				{entry.label && (
-					<View
-						style={[
-							styles.labelIndicator,
-							{ backgroundColor: entry.label },
-						]}
-					/>
-				)}
+				{/*
+				 * The label's own color, straight from the company's EventLabels —
+				 * the one place a non-token color is correct, because the company
+				 * chose it.
+				 */}
+				<View
+					style={[
+						styles.labelStripe,
+						{
+							backgroundColor:
+								entry.label ?? theme.colors.borderStrong,
+						},
+					]}
+				/>
+
 				<View style={styles.entryContent}>
-					<Text
-						style={styles.projectName}
-						numberOfLines={2}
-						ellipsizeMode="tail"
-					>
+					<Text variant="bodyStrong" numberOfLines={2}>
 						{entry.title}
 					</Text>
-					{entry.description ? (
-						<Text style={styles.entryDescription}>
-							{entry.description}
-						</Text>
-					) : null}
-					{entry.hours > 0 && (
-						<Text style={styles.hoursValue}>{entry.hours} hrs</Text>
-					)}
-				</View>
-			</View>
-		</TouchableOpacity>
-	);
 
-	if (isLoading && !rows.length) return <LoadingScreen />;
+					<View style={styles.entryMeta}>
+						<Text variant="caption" color="textSecondary">
+							{entry.isAllDay
+								? "All day"
+								: entry.description || "No time set"}
+						</Text>
+						{entry.hours > 0 && (
+							<>
+								<Text variant="caption" color="textTertiary">
+									·
+								</Text>
+								<Text variant="caption" color="accent">
+									{entry.hours} hrs
+								</Text>
+							</>
+						)}
+					</View>
+				</View>
+			</Pressable>
+		);
+	};
 
 	const firstName = user?.firstName ?? "";
 	const possessive = firstName.endsWith("s") ? "'" : "'s";
 
 	return (
 		<View style={styles.container}>
-			<StatusBar barStyle="dark-content" />
-
-			<View style={styles.header}>
-				<View>
-					<Text style={styles.headerTitle}>
-						{company?.name || "Company"}
-					</Text>
-					<Text style={styles.headerTitle}>
-						{firstName}
-						{possessive} Schedule
-					</Text>
+			<ScreenHeader
+				variant="large"
+				title={
+					firstName
+						? `${firstName}${possessive} schedule`
+						: "Schedule"
+				}
+				subtitle={company?.name || undefined}
+				actions={[
+					{
+						icon: calOpen ? "close" : "calendar-outline",
+						label: calOpen ? "Close calendar" : "Pick a date",
+						onPress: calOpen ? closeCalendar : openCalendar,
+					},
+				]}
+			>
+				<View style={styles.headerMeta}>
 					{totalEvents > 0 && (
-						<View style={styles.eventCountContainer}>
-							<Text style={styles.eventCountText}>
-								{totalEvents}{" "}
-								{totalEvents === 1 ? "event" : "events"}
-							</Text>
-						</View>
+						<Badge
+							label={`${totalEvents} ${totalEvents === 1 ? "event" : "events"}`}
+							tone="accent"
+						/>
+					)}
+					{hasLoadedPast && (
+						<Badge label="Including past" tone="neutral" />
+					)}
+					{!!props.selectedDate && (
+						<Badge
+							label={moment(props.selectedDate).format("MMM D")}
+							tone="accent"
+							variant="solid"
+							icon="funnel"
+						/>
 					)}
 				</View>
-				<TouchableOpacity
-					style={styles.headerButton}
-					onPress={() => toggleCalendar()}
-				>
-					<Ionicons name="calendar" size={24} color="#007AFF" />
-				</TouchableOpacity>
-			</View>
+			</ScreenHeader>
 
 			{/* A failed query is shown rather than swallowed. v1 returned [] on
 			    error, so a missing index looked like an empty schedule. */}
-			{error && (
-				<View style={styles.errorBanner}>
-					<Text style={styles.errorText}>
-						Could not load events: {error.message}
+			{!!error && (
+				<Card style={styles.errorCard}>
+					<Text variant="label" color="danger">
+						Could not load events
 					</Text>
-				</View>
+					<Text variant="caption" color="textSecondary">
+						{error.message}
+					</Text>
+				</Card>
 			)}
 
-			{hasLoadedPast && (
-				<View style={styles.pastEventsIndicator}>
-					<Text style={styles.pastEventsText}>
-						Showing past events
-					</Text>
-				</View>
-			)}
+			{isLoading && !rows.length ? (
+				<Loading label="Loading your schedule" />
+			) : (
+				<FlatList
+					data={rows}
+					keyExtractor={(item, index) => item.date + index}
+					refreshControl={
+						props.selectedDate === null ? (
+							<RefreshControl
+								refreshing={refreshing}
+								onRefresh={onRefresh}
+								title="Pull to load earlier events"
+								tintColor={theme.colors.accent}
+								titleColor={theme.colors.textSecondary}
+							/>
+						) : undefined
+					}
+					ListEmptyComponent={
+						error ? null : (
+							<EmptyState
+								icon="calendar-outline"
+								title={
+									props.selectedDate
+										? "Nothing on this day"
+										: "No scheduled events"
+								}
+								description={
+									props.selectedDate
+										? "Pick another date, or clear the filter to see everything."
+										: "Events you're scheduled on will appear here. Pull down to load earlier ones."
+								}
+							/>
+						)
+					}
+					renderItem={({ item, index }) => {
+						if (item.kind === "year") {
+							return (
+								<View style={styles.yearHeader}>
+									<View style={styles.yearLine} />
+									<Text
+										variant="label"
+										color="textSecondary"
+										style={styles.yearText}
+									>
+										{item.year}
+									</Text>
+									<View style={styles.yearLine} />
+								</View>
+							);
+						}
 
-			{!error && rows.length === 0 && (
-				<View style={styles.pastEventsIndicator}>
-					<Text style={styles.pastEventsText}>
-						No scheduled events
-					</Text>
-				</View>
-			)}
+						const next =
+							index < rows.length - 1 ? rows[index + 1] : null;
 
-			<FlatList
-				data={rows}
-				keyExtractor={(item, index) => item.date + index}
-				refreshControl={
-					props.selectedDate === null ? (
-						<RefreshControl
-							refreshing={refreshing}
-							onRefresh={onRefresh}
-							title="Pull to load earlier events"
-							tintColor="#007AFF"
-						/>
-					) : undefined
-				}
-				renderItem={({ item, index }) => {
-					if (item.kind === "year") {
 						return (
-							<View style={styles.yearHeader}>
-								<View style={styles.yearLine} />
-								<Text style={styles.yearText}>{item.year}</Text>
-								<View style={styles.yearLine} />
+							<View style={styles.section}>
+								<View style={styles.dateRow}>
+									{renderDateColumn(item.date)}
+									<View style={styles.entriesContainer}>
+										{item.entries.map(renderEntry)}
+									</View>
+								</View>
+								{next?.kind !== "year" && (
+									<View style={styles.sectionDivider} />
+								)}
 							</View>
 						);
-					}
+					}}
+					contentContainerStyle={styles.listContent}
+					showsVerticalScrollIndicator={false}
+				/>
+			)}
 
-					const next =
-						index < rows.length - 1 ? rows[index + 1] : null;
-
-					return (
-						<View style={styles.section}>
-							<View style={styles.dateRow}>
-								{renderDateColumn(item.date)}
-								<View style={styles.entriesContainer}>
-									{item.entries.map((entry) => (
-										<View key={entry.id}>
-											{renderEntry(entry)}
-										</View>
-									))}
-								</View>
-							</View>
-							{next?.kind !== "year" && (
-								<View style={styles.sectionDivider} />
-							)}
-						</View>
-					);
-				}}
-				contentContainerStyle={styles.listContent}
-			/>
-
-			<BottomSheet
-				snapPoints={["50%", "90%"]}
-				enablePanDownToClose
-				index={calIndex}
-				onClose={() => toggleCalendar(0)}
+			<Sheet
+				ref={sheetRef}
+				snapPoints={["58%", "92%"]}
+				title="Jump to a date"
+				onClose={closeCalendar}
 			>
-				<BottomSheetView style={styles.modalContainer}>
-					<CalendarList
-						markedDates={markedDates}
-						date={props.selectedDate ?? undefined}
-						pastScrollRange={50}
-						futureScrollRange={50}
-						scrollEnabled
-						onDayPress={(day) => {
-							toggleCalendar();
-							props.setSelectedDate(day.dateString);
-						}}
-						theme={{
-							calendarBackground: "#fff",
-							textSectionTitleColor: "#b6c1cd",
-							selectedDayBackgroundColor: "#007AFF",
-							selectedDayTextColor: "#ffffff",
-							todayTextColor: "#007AFF",
-							dayTextColor: "#2d4150",
-							textDisabledColor: "#d9e1e8",
-							dotColor: "#007AFF",
-							selectedDotColor: "#ffffff",
-							arrowColor: "#007AFF",
-							monthTextColor: "#2d4150",
-							indicatorColor: "#007AFF",
-							textDayFontWeight: "300",
-							textMonthFontWeight: "bold",
-							textDayHeaderFontWeight: "300",
-						}}
-					/>
-				</BottomSheetView>
-			</BottomSheet>
+				<CalendarList
+					markedDates={markedDates}
+					date={props.selectedDate ?? undefined}
+					pastScrollRange={50}
+					futureScrollRange={50}
+					scrollEnabled
+					onDayPress={(day) => {
+						closeCalendar();
+						props.setSelectedDate(day.dateString);
+					}}
+					theme={calendarTheme(theme)}
+				/>
+			</Sheet>
 		</View>
 	);
 }
 
-const styles = StyleSheet.create({
-	container: { flex: 1, backgroundColor: "#F7F7F9" },
-	header: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		backgroundColor: "#F7F7F9",
-	},
-	headerTitle: { fontSize: 18, fontWeight: "bold", color: "#333" },
-	headerButton: { padding: 8 },
-	listContent: { paddingBottom: 20 },
-	section: { marginVertical: 4 },
-	sectionHeader: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingHorizontal: 16,
-		marginBottom: 8,
-	},
-	entriesContainer: {
-		paddingLeft: 0,
-		paddingRight: 12,
-		marginBottom: 0,
-		width: "75%",
-	},
-	entryCard: {
-		backgroundColor: "white",
-		borderRadius: 10,
-		marginBottom: 8,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 2,
-		elevation: 2,
-		flexDirection: "row",
-		overflow: "hidden",
-	},
-	dateNumberContainer: {
-		width: 50,
-		alignItems: "center",
-		flexDirection: "column",
-	},
-	dateNumber: {
-		fontSize: 32,
-		fontWeight: "300",
-		color: "#333",
-		marginBottom: 2,
-	},
-	dateTextContainer: { flexDirection: "row", alignItems: "center" },
-	dateDay: { fontSize: 14, color: "#666", marginRight: 4 },
-	dateMonth: { fontSize: 14, color: "#666", fontWeight: "500" },
-	projectName: {
-		fontSize: 16,
-		fontWeight: "500",
-		color: "#333",
-		marginBottom: 0,
-	},
-	entryDescription: {
-		fontSize: 14,
-		color: "#666",
-		marginBottom: 0,
-		marginTop: 6,
-	},
-	hoursValue: {
-		fontSize: 14,
-		color: "#007AFF",
-		fontWeight: "500",
-		marginTop: 4,
-	},
-	sectionDivider: {
-		height: 1,
-		backgroundColor: "#E0E0E0",
-		marginLeft: 16,
-		marginRight: 16,
-		marginTop: 8,
-		marginBottom: 12,
-	},
-	headerSpacer: { flex: 1 },
-	dateRow: { flexDirection: "row" },
-	modalContainer: {
-		flex: 1,
-		backgroundColor: "rgba(0,0,0,0.5)",
-		justifyContent: "flex-end",
-	},
-	pastEventsIndicator: {
-		backgroundColor: "#FFFBE5",
-		padding: 10,
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		borderRadius: 8,
-		margin: 16,
-		marginBottom: 0,
-	},
-	pastEventsText: { fontSize: 14, color: "#987B30" },
-	errorBanner: {
-		backgroundColor: "#FDECEA",
-		padding: 10,
-		borderRadius: 8,
-		margin: 16,
-		marginBottom: 0,
-	},
-	errorText: { fontSize: 13, color: "#B3261E" },
-	labelIndicator: { width: 5, height: "100%" },
-	entryContent: { flex: 1, padding: 12 },
-	yearHeader: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingHorizontal: 20,
-		marginVertical: 16,
-	},
-	yearLine: { flex: 1, height: 1, backgroundColor: "#C7C7CC" },
-	yearText: {
-		fontSize: 18,
-		fontWeight: "600",
-		color: "#3C3C43",
-		marginHorizontal: 12,
-	},
-	eventCountContainer: {
-		backgroundColor: "#E9F0FF",
-		paddingHorizontal: 8,
-		paddingVertical: 4,
-		borderRadius: 12,
-		alignSelf: "flex-start",
-		marginTop: 4,
-	},
-	eventCountText: { fontSize: 12, color: "#007AFF", fontWeight: "500" },
-});
+const timesheetStyles = (theme: Theme) =>
+	StyleSheet.create({
+		container: {
+			flex: 1,
+			backgroundColor: theme.colors.bg,
+		},
+		headerMeta: {
+			flexDirection: "row",
+			alignItems: "center",
+			flexWrap: "wrap",
+			gap: theme.spacing.sm,
+			paddingHorizontal: theme.spacing.lg,
+			paddingBottom: theme.spacing.md,
+		},
+		errorCard: {
+			margin: theme.spacing.lg,
+			marginBottom: 0,
+			backgroundColor: theme.colors.dangerSubtle,
+			borderColor: "transparent",
+		},
+		listContent: {
+			flexGrow: 1,
+			paddingTop: theme.spacing.lg,
+			paddingBottom: theme.spacing["3xl"] * 2,
+		},
+		section: {
+			marginBottom: theme.spacing.xs,
+		},
+		dateRow: {
+			flexDirection: "row",
+			paddingHorizontal: theme.spacing.lg,
+		},
+		/* Past days recede rather than disappear — they are still tappable. */
+		past: {
+			opacity: 0.55,
+		},
+		dateColumn: {
+			width: 52,
+			alignItems: "center",
+			paddingTop: theme.spacing.xs,
+		},
+		dateNumber: {
+			marginVertical: -2,
+		},
+		entriesContainer: {
+			flex: 1,
+			marginLeft: theme.spacing.md,
+		},
+		entryCard: {
+			flexDirection: "row",
+			backgroundColor: theme.colors.surface,
+			borderRadius: theme.radius.md,
+			borderWidth: theme.hairlineWidth,
+			borderColor: theme.colors.border,
+			marginBottom: theme.spacing.sm,
+			overflow: "hidden",
+		},
+		labelStripe: {
+			width: 4,
+		},
+		entryContent: {
+			flex: 1,
+			padding: theme.spacing.md,
+		},
+		entryMeta: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: theme.spacing.xs + 2,
+			marginTop: theme.spacing.xs,
+		},
+		sectionDivider: {
+			height: theme.hairlineWidth,
+			backgroundColor: theme.colors.border,
+			marginHorizontal: theme.spacing.lg,
+			marginVertical: theme.spacing.md,
+		},
+		yearHeader: {
+			flexDirection: "row",
+			alignItems: "center",
+			paddingHorizontal: theme.spacing.xl,
+			marginVertical: theme.spacing.lg,
+		},
+		yearLine: {
+			flex: 1,
+			height: theme.hairlineWidth,
+			backgroundColor: theme.colors.border,
+		},
+		yearText: {
+			marginHorizontal: theme.spacing.md,
+		},
+	});

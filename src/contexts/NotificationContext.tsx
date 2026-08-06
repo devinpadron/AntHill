@@ -8,7 +8,7 @@ import React, {
 	useState,
 } from "react";
 import messaging from "@react-native-firebase/messaging";
-import { Notifier, NotifierComponents } from "react-native-notifier";
+import { toast } from "../components/ui";
 import { addPushToken, setActiveCompany } from "../services/userService";
 import {
 	pendingNavigation,
@@ -175,15 +175,16 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 			const { title, body } = message.notification ?? {};
 			if (!title && !body) return;
 
-			Notifier.showNotification({
-				title: title ?? "",
-				description: body ?? "",
-				Component: NotifierComponents.Notification,
-				onPress: () =>
-					handleNotificationNavigation(
-						(message.data ?? {}) as Record<string, string>,
-					),
-			});
+			/*
+			 * The themed banner, not `NotifierComponents.Notification` — the
+			 * library's default is a white card with black text regardless of
+			 * theme, which is unreadable in dark mode.
+			 */
+			toast.info(title ?? "", body ?? undefined, () =>
+				handleNotificationNavigation(
+					(message.data ?? {}) as Record<string, string>,
+				),
+			);
 		});
 	}, [handleNotificationNavigation]);
 

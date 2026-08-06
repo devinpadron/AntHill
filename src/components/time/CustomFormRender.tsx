@@ -7,8 +7,10 @@ import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import AttachmentsSelector from "../ui/AttachmentsSelector";
 import { useUser } from "../../contexts/UserContext";
 import { getChecklistsByIds } from "../../services/libraryService";
+import { checklistCheckedSet } from "../../utils/timeUtils";
 import { UploadProgressMap } from "../../contexts/UploadManagerContext";
-import { styles } from "./CustomFormRender.styles";
+import { customFormStyles } from "./CustomFormRender.styles";
+import { useTheme, useThemedStyles } from "../../theme";
 import { FormField, FormFieldType } from "../../types";
 
 /**
@@ -82,6 +84,8 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 	deletionQueue = [],
 	setDeletionQueue,
 }) => {
+	const theme = useTheme();
+	const styles = useThemedStyles(customFormStyles);
 	if (!customForm) return null;
 
 	const [multiSelect, setMultiSelect] = useState([]);
@@ -229,7 +233,7 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 										: "checkbox-blank-outline"
 								}
 								size={24}
-								color="#3d7eea"
+								color={theme.colors.accent}
 							/>
 						</View>
 						<Text style={styles.checkboxLabel}>
@@ -347,8 +351,8 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 								`Select ${field.label.toLowerCase()}`
 							}
 							mode="BADGE"
-							badgeColors={["#3d7eea"]}
-							badgeTextStyle={{ color: "white" }}
+							badgeColors={[theme.colors.accent]}
+							badgeTextStyle={{ color: theme.colors.onAccent }}
 							listMode="SCROLLVIEW" // Change to modal for better selection experience
 							modalProps={{
 								animationType: "fade",
@@ -362,7 +366,7 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 							disableBorderRadius={false}
 							itemSeparator={true}
 							itemSeparatorStyle={{
-								backgroundColor: "#f0f0f0",
+								backgroundColor: theme.colors.border,
 							}}
 							maxHeight={300}
 							// Debounce selection for smoother experience
@@ -412,7 +416,11 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 									)
 								: field.placeholder || "Select date"}
 						</Text>
-						<Icon name="calendar" size={22} color="#666" />
+						<Icon
+							name="calendar"
+							size={22}
+							color={theme.colors.textSecondary}
+						/>
 
 						{field.showPicker && (
 							<DatePicker
@@ -483,7 +491,11 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 									)
 								: field.placeholder || "Select time"}
 						</Text>
-						<Icon name="clock-outline" size={22} color="#666" />
+						<Icon
+							name="clock-outline"
+							size={22}
+							color={theme.colors.textSecondary}
+						/>
 
 						{field.showPicker && (
 							<DatePicker
@@ -562,9 +574,16 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 					<View style={styles.checklistContainer}>
 						{(checklistItemsByField[field.id] || []).map(
 							(option, index) => {
-								const checkedItems =
-									formResponses[field.id] || [];
-								const isChecked = checkedItems.includes(option);
+								/*
+								 * Normalised, so a response written in an older
+								 * shape still reads as ticked. Saving always
+								 * writes item TEXT, which converges the format.
+								 */
+								const checked = checklistCheckedSet(
+									formResponses[field.id],
+								);
+								const checkedItems = [...checked];
+								const isChecked = checked.has(option);
 								return (
 									<TouchableOpacity
 										key={index}
@@ -598,7 +617,7 @@ const CustomFormRender: React.FC<CustomFormRenderProps> = ({
 														: "checkbox-blank-outline"
 												}
 												size={24}
-												color="#3d7eea"
+												color={theme.colors.accent}
 											/>
 										</View>
 										<Text style={styles.checklistLabel}>

@@ -1,53 +1,60 @@
-// Time Entry Screen Component
 import React, { useCallback, useMemo, useState } from "react";
-import {
-	View,
-	Text,
-	TouchableOpacity,
-	FlatList,
-	SafeAreaView,
-	Alert,
-	ActivityIndicator,
-	RefreshControl,
-	Modal,
-	Platform,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from "date-fns";
 import { useFocusEffect } from "@react-navigation/native";
 import DatePicker from "react-native-date-picker";
 import TimeEntryCard from "../../components/time/TimeEntryCard";
 import TimeEntrySubmitModal from "../../components/time/TimeEntrySubmitModal";
 import { useTimeTracking } from "../../hooks/useTimeTracking";
+import { useEntryElapsed } from "../../hooks/useEntryElapsed";
+import { formatDuration, formatStopwatch } from "../../utils/timeUtils";
 import { submitForApproval } from "../../services/timeEntryService";
 import { setConnections } from "../../services/timeEntryEditService";
 import { useUser } from "../../contexts/UserContext";
 import { useCompany } from "../../contexts/CompanyContext";
-import { styles } from "./TimeEntryScreen.styles";
+import {
+	Badge,
+	Button,
+	Card,
+	EmptyState,
+	Icon,
+	IconButton,
+	Screen,
+	ScreenHeader,
+	Text,
+	toast,
+} from "../../components/ui";
+import { Theme, useTheme, useThemedStyles } from "../../theme";
 
-// Time Entry Screen Component
+/*
+ * The clock.
+ *
+ * The clock control is the anchor of the screen rather than one of five equal
+ * sections — it is the only thing most workers open this tab to do.
+ *
+ * The safe area is handled once, by `Screen`. This screen previously wrapped
+ * itself in RN's `SafeAreaView` AND applied `paddingTop: insets.top`, so the
+ * top inset was counted twice on iOS.
+ */
+
 const TimeEntryScreen = ({ navigation }) => {
-	const insets = useSafeAreaInsets();
+	const theme = useTheme();
+	const styles = useThemedStyles(clockStyles);
 	const { userId, companyId } = useUser();
 	const { preferences, timeZone } = useCompany();
 
-	// Date-related states
-	const [currentStartDate, setCurrentStartDate] = useState(() => {
-		const weekStartsOn = preferences?.workWeekStarts === "sunday" ? 0 : 1;
-		return startOfWeek(new Date(), { weekStartsOn });
-	});
+	const weekStartsOn = preferences?.workWeekStarts === "sunday" ? 0 : 1;
 
-	const [currentEndDate, setCurrentEndDate] = useState(() => {
-		const weekStartsOn = preferences?.workWeekStarts === "sunday" ? 0 : 1;
-		return endOfWeek(new Date(), { weekStartsOn });
-	});
+	const [currentStartDate, setCurrentStartDate] = useState(() =>
+		startOfWeek(new Date(), { weekStartsOn }),
+	);
+	const [currentEndDate, setCurrentEndDate] = useState(() =>
+		endOfWeek(new Date(), { weekStartsOn }),
+	);
 
-	// Date picker visibility states
 	const [showStartDatePicker, setShowStartDatePicker] = useState(false);
 	const [showEndDatePicker, setShowEndDatePicker] = useState(false);
 
-	// Week navigation functions
 	const goToPrevWeek = () => {
 		setCurrentStartDate((prev) => subWeeks(prev, 1));
 		setCurrentEndDate((prev) => subWeeks(prev, 1));
@@ -59,30 +66,28 @@ const TimeEntryScreen = ({ navigation }) => {
 	};
 
 	const goToCurrentWeek = () => {
-		const weekStartsOn = preferences?.workWeekStarts === "sunday" ? 0 : 1;
 		setCurrentStartDate(startOfWeek(new Date(), { weekStartsOn }));
 		setCurrentEndDate(endOfWeek(new Date(), { weekStartsOn }));
 	};
 
-	// Date picker handlers
-	const handleStartDateChange = (date) => {
+	const handleStartDateChange = (date: Date) => {
 		setShowStartDatePicker(false);
 		if (date > currentEndDate) {
-			Alert.alert(
-				"Invalid Date Range",
-				"Start date cannot be after end date",
+			toast.warning(
+				"That range is backwards",
+				"The start date cannot be after the end date.",
 			);
 			return;
 		}
 		setCurrentStartDate(date);
 	};
 
-	const handleEndDateChange = (date) => {
+	const handleEndDateChange = (date: Date) => {
 		setShowEndDatePicker(false);
 		if (date < currentStartDate) {
-			Alert.alert(
-				"Invalid Date Range",
-				"End date cannot be before start date",
+			toast.warning(
+				"That range is backwards",
+				"The end date cannot be before the start date.",
 			);
 			return;
 		}
@@ -101,12 +106,10 @@ const TimeEntryScreen = ({ navigation }) => {
 		[currentStartDate, currentEndDate],
 	);
 
-	// Time tracking hook
 	const {
 		entries: timeEntries,
 		activeEntry: activeTimeEntry,
 		isLoading,
-		isActive: isClockedIn,
 		isPaused,
 		isBusy: isPausingOrResuming,
 		clockIn,
@@ -117,19 +120,14 @@ const TimeEntryScreen = ({ navigation }) => {
 		weeklyStats,
 	} = useTimeTracking(companyId ?? "", userId, timeZone, range);
 
-	// Modal and UI state
 	const [refreshing, setRefreshing] = useState(false);
 	const [submitModalVisible, setSubmitModalVisible] = useState(false);
 	const [selectedTimeEntry, setSelectedTimeEntry] = useState(null);
 
-	// Data fetching
 	useFocusEffect(
 		useCallback(() => {
 			fetchTimeEntries();
 			setSubmitModalVisible(false);
-			return () => {
-				// Optional cleanup
-			};
 		}, [currentStartDate, currentEndDate, fetchTimeEntries]),
 	);
 
@@ -139,14 +137,19 @@ const TimeEntryScreen = ({ navigation }) => {
 			await fetchTimeEntries();
 		} catch (error) {
 			console.error("Error refreshing time entries:", error);
+			toast.error("Could not refresh", "Check your connection.");
 		} finally {
 			setRefreshing(false);
 		}
 	};
 
-	// Time entry actions
-	const handleClockOut = async () => {
-		// Show submit modal immediately with active time entry
+	const handleClockIn = async () => {
+		await clockIn();
+		toast.success("Clocked in");
+	};
+
+	const handleClockOut = () => {
+		// The submit sheet clocks out as part of submitting.
 		setSelectedTimeEntry(activeTimeEntry);
 		setSubmitModalVisible(true);
 	};
@@ -183,287 +186,198 @@ const TimeEntryScreen = ({ navigation }) => {
 			await setConnections(companyId, timeEntryId, entry.connections);
 		}
 
+		toast.success("Sent for approval");
 		fetchTimeEntries();
 	};
 
-	const openSubmitModal = (timeEntry) => {
-		setSelectedTimeEntry(timeEntry);
-		setSubmitModalVisible(true);
-	};
+	const isThisWeek =
+		format(currentStartDate, "yyyy-MM-dd") ===
+		format(startOfWeek(new Date(), { weekStartsOn }), "yyyy-MM-dd");
 
-	const viewTimeEntryDetails = (entryId) => {
-		navigation.navigate("TimeEntryDetails", { entryId, userId });
-	};
-
-	const renderTimeEntry = ({ item }) => {
-		return (
-			<TimeEntryCard
-				timeEntry={item}
-				onPress={() => viewTimeEntryDetails(item.id)}
-				onSubmit={
-					item.status === "pending_approval" ? null : openSubmitModal
-				}
-			/>
-		);
-	};
+	const pickerTheme = theme.isDark ? "dark" : "light";
 
 	return (
-		<SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
-			{/* 1. Date Range Selection */}
-			<View>
-				<View style={styles.dateControls}>
-					<TouchableOpacity
-						onPress={goToPrevWeek}
-						style={styles.dateNavButton}
-					>
-						<Icon name="chevron-left" size={24} color="#007AFF" />
-					</TouchableOpacity>
-
-					<TouchableOpacity
-						onPress={goToCurrentWeek}
-						style={styles.currentWeekButton}
-					>
-						<Text style={styles.currentWeekText}>Current Week</Text>
-					</TouchableOpacity>
-
-					<TouchableOpacity
-						onPress={goToNextWeek}
-						style={styles.dateNavButton}
-					>
-						<Icon name="chevron-right" size={24} color="#007AFF" />
-					</TouchableOpacity>
-				</View>
-
-				<View style={styles.dateRange}>
-					<TouchableOpacity
-						onPress={() => setShowStartDatePicker(true)}
-						style={styles.dateButton}
-					>
-						<Icon
-							name="calendar"
-							size={18}
-							color="#666"
-							style={styles.calendarIcon}
-						/>
-						<Text style={styles.dateText}>
-							{format(currentStartDate, "MMM d, yyyy")}
-						</Text>
-					</TouchableOpacity>
-
-					<Text style={styles.dateRangeSeparator}>to</Text>
-
-					<TouchableOpacity
-						onPress={() => setShowEndDatePicker(true)}
-						style={styles.dateButton}
-					>
-						<Icon
-							name="calendar"
-							size={18}
-							color="#666"
-							style={styles.calendarIcon}
-						/>
-						<Text style={styles.dateText}>
-							{format(currentEndDate, "MMM d, yyyy")}
-						</Text>
-					</TouchableOpacity>
-				</View>
-			</View>
-
-			{/* 2. Date Range Summary */}
-			<View style={styles.summaryCard}>
-				<Text style={styles.summaryTitle}>Summary</Text>
-				<View style={styles.summaryStats}>
-					<View style={styles.statItem}>
-						<Text style={styles.statValue}>
-							{weeklyStats.hours}h {weeklyStats.minutes}m
-							{weeklyStats.seconds > 0 &&
-								` ${weeklyStats.seconds}s`}
-						</Text>
-						<Text style={styles.statLabel}>Total Hours</Text>
-					</View>
-					<View style={styles.divider} />
-					<View style={styles.statItem}>
-						<Text style={styles.statValue}>
-							{weeklyStats.count}
-						</Text>
-						<Text style={styles.statLabel}>Shifts</Text>
-					</View>
-				</View>
-			</View>
-
-			{/* 3. Clock In/Out Section */}
-			<View style={styles.clockSection}>
-				{activeTimeEntry ? (
-					<>
-						<View style={styles.activeClockStatus}>
-							<Icon
-								name={
-									isPaused ? "pause-circle" : "clock-outline"
-								}
-								size={24}
-								color={isPaused ? "#FFA500" : "#ff9500"}
-								style={styles.clockIcon}
-							/>
-							<Text
-								style={[
-									styles.clockedInText,
-									isPaused && styles.pausedText,
-								]}
-							>
-								{isPaused ? "Timer paused" : "Clocked in at"}{" "}
-								{format(
-									activeTimeEntry.clockInAt.toDate(),
-									"h:mm a",
-								)}
-							</Text>
-						</View>
-
-						<View style={styles.buttonRow}>
-							{isPausingOrResuming ? (
-								<TouchableOpacity
-									style={[
-										styles.clockButton,
-										styles.loadingButton,
-									]}
-									disabled={true}
-								>
-									<ActivityIndicator
-										size="small"
-										color="white"
-										style={styles.buttonIcon}
-									/>
-									<Text style={styles.clockButtonText}>
-										{isPaused
-											? "RESUMING..."
-											: "PAUSING..."}
-									</Text>
-								</TouchableOpacity>
-							) : isPaused ? (
-								<TouchableOpacity
-									style={[
-										styles.clockButton,
-										styles.resumeButton,
-									]}
-									onPress={resumeTimer}
-								>
-									<Icon
-										name="play"
-										size={18}
-										color="white"
-										style={styles.buttonIcon}
-									/>
-									<Text style={styles.clockButtonText}>
-										RESUME
-									</Text>
-								</TouchableOpacity>
-							) : (
-								<TouchableOpacity
-									style={[
-										styles.clockButton,
-										styles.pauseButton,
-									]}
-									onPress={pauseTimer}
-								>
-									<Icon
-										name="pause"
-										size={18}
-										color="white"
-										style={styles.buttonIcon}
-									/>
-									<Text style={styles.clockButtonText}>
-										PAUSE
-									</Text>
-								</TouchableOpacity>
-							)}
-
-							<TouchableOpacity
-								style={[
-									styles.clockButton,
-									styles.clockOutButton,
-								]}
-								onPress={handleClockOut}
-								disabled={isPausingOrResuming}
-							>
-								<Icon
-									name="logout-variant"
-									size={18}
-									color="white"
-									style={styles.buttonIcon}
-								/>
-								<Text style={styles.clockButtonText}>
-									CLOCK OUT
-								</Text>
-							</TouchableOpacity>
-						</View>
-					</>
-				) : (
-					<>
-						<View style={styles.notClockedIn}>
-							<Icon
-								name="clock-outline"
-								size={24}
-								color="#999"
-								style={styles.clockIcon}
-							/>
-							<Text style={styles.notClockedInText}>
-								Not clocked in
-							</Text>
-						</View>
-						<TouchableOpacity
-							style={[styles.clockButton, styles.clockInButton]}
-							onPress={clockIn}
-						>
-							<Icon
-								name="login-variant"
-								size={18}
-								color="white"
-								style={styles.buttonIcon}
-							/>
-							<Text style={styles.clockButtonText}>CLOCK IN</Text>
-						</TouchableOpacity>
-					</>
-				)}
-			</View>
-
-			{/* 4. Time Entries List */}
-			<View style={styles.entriesSection}>
-				<TouchableOpacity
-					style={styles.sectionTitleButton}
-					onPress={() =>
-						navigation.navigate("TimeEntryDetails", {
-							entryId: timeEntries.map((e) => e.id),
-							userId,
-						})
-					}
+		<Screen
+			header={
+				<ScreenHeader
+					variant="large"
+					title="Clock"
+					subtitle={`${format(currentStartDate, "MMM d")} – ${format(
+						currentEndDate,
+						"MMM d, yyyy",
+					)}`}
 				>
-					<Text style={styles.sectionTitle}>Time Entries</Text>
-					<Icon name="chevron-right" size={20} color="#007AFF" />
-				</TouchableOpacity>
-				<FlatList
-					data={timeEntries}
-					keyExtractor={(item) => item.id}
-					renderItem={renderTimeEntry}
-					ListEmptyComponent={
-						<View style={styles.emptyContainer}>
-							<Text style={styles.emptyText}>
-								No time entries found for this week
-							</Text>
-						</View>
-					}
-					refreshControl={
-						<RefreshControl
-							refreshing={refreshing}
-							onRefresh={onRefresh}
-							colors={["#007AFF"]}
-							tintColor="#007AFF"
-							title="Refreshing..."
-							titleColor="#999"
+					<View style={styles.weekBar}>
+						<IconButton
+							name="chevron-back"
+							onPress={goToPrevWeek}
+							label="Previous week"
+							size="sm"
+							variant="soft"
 						/>
-					}
-				/>
-			</View>
 
-			{/* 5. Time Entry Submission Modal */}
+						<View style={styles.weekDates}>
+							<Button
+								title={format(currentStartDate, "MMM d")}
+								variant="text"
+								size="small"
+								onPress={() => setShowStartDatePicker(true)}
+							/>
+							<Text variant="caption" color="textTertiary">
+								to
+							</Text>
+							<Button
+								title={format(currentEndDate, "MMM d")}
+								variant="text"
+								size="small"
+								onPress={() => setShowEndDatePicker(true)}
+							/>
+						</View>
+
+						<IconButton
+							name="chevron-forward"
+							onPress={goToNextWeek}
+							label="Next week"
+							size="sm"
+							variant="soft"
+						/>
+					</View>
+
+					{!isThisWeek && (
+						<View style={styles.jumpBack}>
+							<Button
+								title="Back to this week"
+								icon="today-outline"
+								variant="secondary"
+								size="small"
+								onPress={goToCurrentWeek}
+							/>
+						</View>
+					)}
+				</ScreenHeader>
+			}
+		>
+			<FlatList
+				data={timeEntries}
+				keyExtractor={(item) => item.id}
+				renderItem={({ item }) => (
+					<TimeEntryCard
+						timeEntry={item}
+						onPress={() =>
+							navigation.navigate("TimeEntryDetails", {
+								entryId: item.id,
+								userId,
+							})
+						}
+						onSubmit={
+							item.status === "pending_approval"
+								? null
+								: (entry) => {
+										setSelectedTimeEntry(entry);
+										setSubmitModalVisible(true);
+									}
+						}
+					/>
+				)}
+				contentContainerStyle={styles.list}
+				showsVerticalScrollIndicator={false}
+				ListHeaderComponent={
+					<>
+						{/* The clock. The reason this tab exists. */}
+						<ClockControl
+							activeEntry={activeTimeEntry}
+							isPaused={isPaused}
+							isBusy={isPausingOrResuming}
+							onClockIn={handleClockIn}
+							onClockOut={handleClockOut}
+							onPause={pauseTimer}
+							onResume={resumeTimer}
+						/>
+
+						<Card style={styles.summary}>
+							<View style={styles.summaryRow}>
+								<View style={styles.stat}>
+									<Text variant="title">
+										{weeklyStats.hours}h{" "}
+										{weeklyStats.minutes}m
+									</Text>
+									<Text
+										variant="caption"
+										color="textSecondary"
+										uppercase
+									>
+										Total
+									</Text>
+								</View>
+
+								<View style={styles.statDivider} />
+
+								<View style={styles.stat}>
+									<Text variant="title">
+										{weeklyStats.count}
+									</Text>
+									<Text
+										variant="caption"
+										color="textSecondary"
+										uppercase
+									>
+										Shifts
+									</Text>
+								</View>
+							</View>
+						</Card>
+
+						{timeEntries.length > 0 && (
+							<View style={styles.listHeading}>
+								<Text
+									variant="label"
+									color="textSecondary"
+									uppercase
+								>
+									This period
+								</Text>
+								<Button
+									title="View all"
+									icon="chevron-forward"
+									iconPosition="right"
+									variant="text"
+									size="small"
+									onPress={() =>
+										navigation.navigate(
+											"TimeEntryDetails",
+											{
+												entryId: timeEntries.map(
+													(e) => e.id,
+												),
+												userId,
+											},
+										)
+									}
+								/>
+							</View>
+						)}
+					</>
+				}
+				ListEmptyComponent={
+					isLoading ? null : (
+						<EmptyState
+							icon="time-outline"
+							title="No shifts this period"
+							description="Clock in above to start one, or pick a different week."
+							compact
+						/>
+					)
+				}
+				refreshControl={
+					<RefreshControl
+						refreshing={refreshing}
+						onRefresh={onRefresh}
+						tintColor={theme.colors.accent}
+						titleColor={theme.colors.textSecondary}
+					/>
+				}
+			/>
+
 			<TimeEntrySubmitModal
 				visible={submitModalVisible}
 				timeEntry={selectedTimeEntry}
@@ -471,10 +385,10 @@ const TimeEntryScreen = ({ navigation }) => {
 				onSubmit={handleSubmitTimeEntry}
 			/>
 
-			{/* Date Pickers */}
 			<DatePicker
 				modal
 				mode="date"
+				theme={pickerTheme}
 				open={showStartDatePicker}
 				date={currentStartDate}
 				onConfirm={handleStartDateChange}
@@ -484,15 +398,221 @@ const TimeEntryScreen = ({ navigation }) => {
 			<DatePicker
 				modal
 				mode="date"
+				theme={pickerTheme}
 				open={showEndDatePicker}
 				date={currentEndDate}
 				onConfirm={handleEndDateChange}
 				onCancel={() => setShowEndDatePicker(false)}
 			/>
-		</SafeAreaView>
+		</Screen>
 	);
 };
 
-// Add these new styles to your existing StyleSheet
+/**
+ * The clock in / out control.
+ *
+ * One card whose whole appearance follows the timer's state, rather than the
+ * previous three-way branch of differently-styled `TouchableOpacity` rows. The
+ * paused color is one `warning` token — the old version used `#ff9500` and
+ * `#FFA500` for the same state two lines apart.
+ */
+const ClockControl = ({
+	activeEntry,
+	isPaused,
+	isBusy,
+	onClockIn,
+	onClockOut,
+	onPause,
+	onResume,
+}) => {
+	const styles = useThemedStyles(clockStyles);
+	const elapsed = useEntryElapsed(activeEntry);
+
+	if (!activeEntry) {
+		return (
+			<Card style={styles.clockCard}>
+				<View style={styles.clockStatus}>
+					<Icon name="time-outline" size="lg" color="textTertiary" />
+					<Text variant="heading" color="textSecondary">
+						Not clocked in
+					</Text>
+				</View>
+
+				<Button
+					title="Clock in"
+					icon="play"
+					onPress={onClockIn}
+					size="large"
+					fullWidth
+					haptic="success"
+				/>
+			</Card>
+		);
+	}
+
+	return (
+		<Card
+			style={[
+				styles.clockCard,
+				isPaused ? styles.clockPaused : styles.clockRunning,
+			]}
+		>
+			<View style={styles.clockStatus}>
+				<Icon
+					name={isPaused ? "pause-circle" : "ellipse"}
+					size="lg"
+					color={isPaused ? "warning" : "success"}
+				/>
+				<View style={styles.flex}>
+					<Text variant="heading">
+						{isPaused ? "Paused" : "On the clock"}
+					</Text>
+					<Text variant="caption" color="textSecondary">
+						Since {format(activeEntry.clockInAt.toDate(), "h:mm a")}
+					</Text>
+				</View>
+				<Badge
+					label={isPaused ? "Paused" : "Running"}
+					tone={isPaused ? "warning" : "success"}
+					dot
+				/>
+			</View>
+
+			{/*
+			 * The running total, the reason most people open this tab.
+			 *
+			 * It stops moving while paused — the number is paid time, not time
+			 * since clock-in — so the pause total sits underneath to explain
+			 * why it is holding still.
+			 */}
+			<View style={styles.timerBlock}>
+				<Text
+					variant="display"
+					color={isPaused ? "textSecondary" : "text"}
+					style={styles.timer}
+					accessibilityLabel={`Clocked in for ${formatDuration(
+						elapsed.workedSeconds,
+					)}`}
+				>
+					{formatStopwatch(elapsed.workedSeconds)}
+				</Text>
+
+				{elapsed.pausedSeconds > 0 && (
+					<Text variant="caption" color="warning">
+						{formatStopwatch(elapsed.pausedSeconds)} paused
+					</Text>
+				)}
+			</View>
+
+			<View style={styles.clockActions}>
+				<Button
+					title={isPaused ? "Resume" : "Pause"}
+					icon={isPaused ? "play" : "pause"}
+					variant="secondary"
+					onPress={isPaused ? onResume : onPause}
+					loading={isBusy}
+					disabled={isBusy}
+					style={styles.flex}
+				/>
+				<Button
+					title="Clock out"
+					icon="stop"
+					onPress={onClockOut}
+					disabled={isBusy}
+					haptic="press"
+					style={styles.flex}
+				/>
+			</View>
+		</Card>
+	);
+};
 
 export default TimeEntryScreen;
+
+const clockStyles = (theme: Theme) =>
+	StyleSheet.create({
+		flex: {
+			flex: 1,
+		},
+		weekBar: {
+			flexDirection: "row",
+			alignItems: "center",
+			justifyContent: "space-between",
+			paddingHorizontal: theme.spacing.lg,
+			paddingBottom: theme.spacing.sm,
+		},
+		weekDates: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: theme.spacing.xs,
+		},
+		jumpBack: {
+			flexDirection: "row",
+			justifyContent: "center",
+			paddingBottom: theme.spacing.md,
+		},
+		list: {
+			flexGrow: 1,
+			padding: theme.spacing.lg,
+			paddingBottom: theme.spacing["3xl"],
+		},
+		clockCard: {
+			gap: theme.spacing.lg,
+		},
+		timerBlock: {
+			alignItems: "center",
+			gap: theme.spacing.xs,
+		},
+		timer: {
+			/*
+			 * Tabular figures, so the digits do not jiggle the layout as they
+			 * change once a second.
+			 */
+			fontVariant: ["tabular-nums"],
+			fontSize: 44,
+			lineHeight: 50,
+			letterSpacing: -1,
+		},
+		/* A left edge that states the timer's state at a glance. */
+		clockRunning: {
+			borderLeftWidth: 3,
+			borderLeftColor: theme.colors.success,
+		},
+		clockPaused: {
+			borderLeftWidth: 3,
+			borderLeftColor: theme.colors.warning,
+		},
+		clockStatus: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: theme.spacing.md,
+		},
+		clockActions: {
+			flexDirection: "row",
+			gap: theme.spacing.sm,
+		},
+		summary: {
+			marginTop: theme.spacing.lg,
+		},
+		summaryRow: {
+			flexDirection: "row",
+			alignItems: "center",
+		},
+		stat: {
+			flex: 1,
+			alignItems: "center",
+			gap: 2,
+		},
+		statDivider: {
+			width: theme.hairlineWidth,
+			alignSelf: "stretch",
+			backgroundColor: theme.colors.border,
+		},
+		listHeading: {
+			flexDirection: "row",
+			alignItems: "center",
+			justifyContent: "space-between",
+			marginTop: theme.spacing.xl,
+			marginBottom: theme.spacing.sm,
+		},
+	});

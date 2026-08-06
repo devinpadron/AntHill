@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import moment from "moment";
+import { Screen } from "../../components/ui";
 import { useUser } from "../../contexts/UserContext";
 import { useCompanyMembers } from "../../hooks/useCompanyMembers";
 import { useBottomSheetController } from "../../hooks/useBottomSheetController";
@@ -28,7 +28,6 @@ const CalendarScreen = ({ navigation }: { navigation: any }) => {
 
 	const [selectedDate, setSelectedDate] = useState<string | null>(null);
 	const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-	const [openSelect, setOpenSelect] = useState(false);
 	const [showAllSelectedOnly, setShowAllSelectedOnly] = useState(false);
 	const [showExactSelectedOnly, setShowExactSelectedOnly] = useState(false);
 	const [calendarOpen, setCalendarOpen] = useState(false);
@@ -61,10 +60,8 @@ const CalendarScreen = ({ navigation }: { navigation: any }) => {
 		closeBottomSheet();
 	};
 
-	const checkSelectOpen = () => {
-		setOpenSelect(!openSelect);
-		if (!openSelect) bottomSheetRef.current?.snapToIndex(1);
-	};
+	// Gives the worker list the taller snap point once search takes the keyboard.
+	const expandSheet = () => bottomSheetRef.current?.snapToIndex(1);
 
 	// The panel expects {label, value} options. In v1 it had to build these by
 	// fanning out a profile read per member.
@@ -73,12 +70,12 @@ const CalendarScreen = ({ navigation }: { navigation: any }) => {
 		[members],
 	);
 
-	const insets = useSafeAreaInsets();
-
 	if (isLoading || isAdmin === null) return <LoadingScreen />;
 
+	// Timesheet renders the ScreenHeader itself, so the notch band is declared
+	// here rather than inferred from a `header` prop.
 	return (
-		<View style={[styles.root, { paddingTop: insets.top }]}>
+		<Screen topBand="surface">
 			<View style={styles.container}>
 				{user ? (
 					<Timesheet
@@ -107,16 +104,13 @@ const CalendarScreen = ({ navigation }: { navigation: any }) => {
 					selectedUsers={selectedUsers}
 					setSelectedUsers={setSelectedUsers}
 					availableWorkers={availableWorkers}
-					setAvailableWorkers={() => {}}
-					openSelect={openSelect}
-					checkSelectOpen={checkSelectOpen}
+					expandSheet={expandSheet}
 					showAllSelectedOnly={showAllSelectedOnly}
 					setShowAllSelectedOnly={setShowAllSelectedOnly}
 					showExactSelectedOnly={showExactSelectedOnly}
 					setShowExactSelectedOnly={setShowExactSelectedOnly}
 					setFilterType={setFilterType}
 					isAdmin={isAdmin}
-					companyId={companyId}
 				/>
 			</View>
 
@@ -131,12 +125,11 @@ const CalendarScreen = ({ navigation }: { navigation: any }) => {
 				onFilterPress={handleToggleBottomSheet}
 				onTodayPress={() => setSelectedDate(null)}
 			/>
-		</View>
+		</Screen>
 	);
 };
 
 const styles = StyleSheet.create({
-	root: { flex: 1, backgroundColor: "#f2f7f7" },
 	container: { flex: 1 },
 });
 

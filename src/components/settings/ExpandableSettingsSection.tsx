@@ -1,21 +1,25 @@
 import React, { useState } from "react";
-import {
-	View,
-	Text,
-	StyleSheet,
-	TouchableOpacity,
-	LayoutAnimation,
-	Platform,
-	UIManager,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { StyleSheet, View } from "react-native";
+import Animated, {
+	FadeIn,
+	FadeOut,
+	LinearTransition,
+	useAnimatedStyle,
+	withTiming,
+} from "react-native-reanimated";
+import { Icon, Pressable, Text } from "../ui";
+import { Theme, useTheme, useThemedStyles } from "../../theme";
 
-// Enable LayoutAnimation for Android
-if (Platform.OS === "android") {
-	if (UIManager.setLayoutAnimationEnabledExperimental) {
-		UIManager.setLayoutAnimationEnabledExperimental(true);
-	}
-}
+/**
+ * An accordion group of settings rows.
+ *
+ * Reanimated drives the expand now — the previous version needed
+ * `LayoutAnimation` plus an Android `UIManager.setLayoutAnimationEnabled`
+ * opt-in at module scope, which is a global side effect for one component.
+ *
+ * The chevron rotates rather than swapping glyphs, so the transition reads as
+ * one control moving rather than two icons cross-fading.
+ */
 
 type ExpandableSettingsSectionProps = {
 	title: string;
@@ -26,54 +30,68 @@ type ExpandableSettingsSectionProps = {
 export const ExpandableSettingsSection: React.FC<
 	ExpandableSettingsSectionProps
 > = ({ title, children, initiallyExpanded = false }) => {
+	const theme = useTheme();
+	const styles = useThemedStyles(sectionStyles);
 	const [expanded, setExpanded] = useState(initiallyExpanded);
 
-	const toggleExpand = () => {
-		LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-		setExpanded(!expanded);
-	};
+	const chevronStyle = useAnimatedStyle(() => ({
+		transform: [
+			{
+				rotate: withTiming(expanded ? "180deg" : "0deg", {
+					duration: theme.motion.duration.base,
+				}),
+			},
+		],
+	}));
 
 	return (
-		<View style={styles.container}>
-			<TouchableOpacity
-				style={styles.headerContainer}
-				onPress={toggleExpand}
-				activeOpacity={0.7}
+		<Animated.View layout={LinearTransition.duration(200)}>
+			<Pressable
+				onPress={() => setExpanded((v) => !v)}
+				haptic="selection"
+				scaleOnPress={false}
+				accessibilityRole="button"
+				accessibilityState={{ expanded }}
+				accessibilityLabel={title}
+				style={styles.header}
 			>
-				<Text style={styles.headerTitle}>{title}</Text>
-				<Ionicons
-					name={expanded ? "chevron-up" : "chevron-down"}
-					size={20}
-					color="#888"
-				/>
-			</TouchableOpacity>
+				<Text variant="body" style={styles.flex}>
+					{title}
+				</Text>
+				<Animated.View style={chevronStyle}>
+					<Icon name="chevron-down" size="sm" color="textTertiary" />
+				</Animated.View>
+			</Pressable>
 
 			{expanded && (
-				<View style={styles.contentContainer}>{children}</View>
+				<Animated.View
+					entering={FadeIn.duration(160)}
+					exiting={FadeOut.duration(120)}
+				>
+					<View style={styles.divider} />
+					{children}
+				</Animated.View>
 			)}
-		</View>
+		</Animated.View>
 	);
 };
 
-const styles = StyleSheet.create({
-	container: {
-		backgroundColor: "white",
-		borderBottomWidth: 1,
-		borderBottomColor: "#e0e0e0",
-	},
-	headerContainer: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		paddingVertical: 15,
-		paddingHorizontal: 16,
-	},
-	headerTitle: {
-		fontSize: 16,
-		fontWeight: "500",
-		color: "#333",
-	},
-	contentContainer: {
-		paddingLeft: 8,
-	},
-});
+const sectionStyles = (theme: Theme) =>
+	StyleSheet.create({
+		flex: {
+			flex: 1,
+		},
+		header: {
+			flexDirection: "row",
+			alignItems: "center",
+			minHeight: theme.hitTarget + 8,
+			paddingHorizontal: theme.spacing.lg,
+			paddingVertical: theme.spacing.md,
+			backgroundColor: theme.colors.surface,
+		},
+		divider: {
+			height: theme.hairlineWidth,
+			backgroundColor: theme.colors.border,
+			marginLeft: theme.spacing.lg,
+		},
+	});

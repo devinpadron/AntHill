@@ -26,6 +26,7 @@ import { useEvent } from "expo";
 import WebView from "react-native-webview";
 import { ImageZoom } from "@likashefqet/react-native-image-zoom";
 import { PanGestureHandler, State } from "react-native-gesture-handler";
+import { Theme, useTheme, useThemedStyles } from "../../theme";
 
 interface AttachmentGalleryProps {
 	attachments: Attachment[];
@@ -34,6 +35,8 @@ interface AttachmentGalleryProps {
 const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 	attachments,
 }) => {
+	const theme = useTheme();
+	const styles = useThemedStyles(galleryStyles);
 	const [modalVisible, setModalVisible] = useState(false);
 	const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
 	const [savingMedia, setSavingMedia] = useState(false);
@@ -110,6 +113,11 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 
 	// Helper to get file color based on mime type
 	const getFileColor = (mimeType: string) => {
+		/*
+		 * Fixed, not themed: these identify a FILE TYPE, the same way a
+		 * desktop icon does. Recolouring them per theme would break the
+		 * association a user has already learned.
+		 */
 		if (mimeType.includes("pdf")) return "#E74C3C";
 		if (mimeType.includes("word") || mimeType.includes("msword"))
 			return "#3498DB";
@@ -284,7 +292,11 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 			/>
 			{item.contentType.startsWith("video/") && (
 				<View style={styles.videoIndicator}>
-					<Ionicons name="play-circle" size={28} color="#FFFFFF" />
+					<Ionicons
+						name="play-circle"
+						size={28}
+						color={theme.colors.surface}
+					/>
 				</View>
 			)}
 		</TouchableOpacity>
@@ -422,7 +434,11 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 							onPress={() => setModalVisible(false)}
 							style={styles.closeButton}
 						>
-							<Ionicons name="close" size={28} color="#FFFFFF" />
+							<Ionicons
+								name="close"
+								size={28}
+								color={theme.colors.surface}
+							/>
 						</TouchableOpacity>
 						<Text style={styles.carouselTitle} numberOfLines={1}>
 							{mediaAttachments[selectedMediaIndex]?.fileName}
@@ -440,13 +456,13 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 								{savingMedia ? (
 									<ActivityIndicator
 										size="small"
-										color="#FFFFFF"
+										color={theme.colors.surface}
 									/>
 								) : (
 									<Ionicons
 										name="download-outline"
 										size={24}
-										color="#FFFFFF"
+										color={theme.colors.surface}
 									/>
 								)}
 							</TouchableOpacity>
@@ -462,13 +478,13 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 								{sharingMedia ? (
 									<ActivityIndicator
 										size="small"
-										color="#FFFFFF"
+										color={theme.colors.surface}
 									/>
 								) : (
 									<Ionicons
 										name="share-outline"
 										size={24}
-										color="#FFFFFF"
+										color={theme.colors.surface}
 									/>
 								)}
 							</TouchableOpacity>
@@ -547,7 +563,7 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 							<Ionicons
 								name="chevron-back"
 								size={30}
-								color="#FFFFFF"
+								color={theme.colors.surface}
 							/>
 						</TouchableOpacity>
 						<Text style={styles.pageIndicator}>
@@ -560,7 +576,7 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 							<Ionicons
 								name="chevron-forward"
 								size={30}
-								color="#FFFFFF"
+								color={theme.colors.surface}
 							/>
 						</TouchableOpacity>
 					</View>
@@ -588,7 +604,11 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 							onPress={() => setDocumentViewerVisible(false)}
 							style={styles.closeButton}
 						>
-							<Ionicons name="close" size={28} color="#333" />
+							<Ionicons
+								name="close"
+								size={28}
+								color={theme.colors.text}
+							/>
 						</TouchableOpacity>
 						<Text
 							style={styles.documentViewerTitle}
@@ -604,13 +624,13 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 							{sharingMedia ? (
 								<ActivityIndicator
 									size="small"
-									color="#3d7eea"
+									color={theme.colors.accent}
 								/>
 							) : (
 								<Ionicons
 									name="share-outline"
 									size={24}
-									color="#3d7eea"
+									color={theme.colors.accent}
 								/>
 							)}
 						</TouchableOpacity>
@@ -621,7 +641,7 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 							<View style={styles.documentLoadingContainer}>
 								<ActivityIndicator
 									size="large"
-									color="#3d7eea"
+									color={theme.colors.accent}
 								/>
 								<Text style={styles.documentLoadingText}>
 									Loading document...
@@ -743,207 +763,208 @@ interface Styles {
 	carouselItemContainer: ViewStyle; // Add this line
 }
 
-const styles = StyleSheet.create<Styles>({
-	container: {
-		marginVertical: 10,
-	},
-	section: {
-		marginBottom: 16,
-	},
-	sectionTitle: {
-		fontSize: 16,
-		fontWeight: "600",
-		marginBottom: 8,
-		color: "#333",
-		paddingHorizontal: 8,
-	},
-	gridContainer: {
-		flexDirection: "row",
-		flexWrap: "wrap",
-		justifyContent: "center",
-		paddingHorizontal: 4,
-	},
-	itemContainer: {
-		margin: 4,
-		borderRadius: 8,
-		overflow: "hidden",
-		backgroundColor: "#FFFFFF",
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.2,
-		shadowRadius: 2,
-		elevation: 2,
-	},
-	mediaPreview: {
-		width: "100%",
-		height: "100%",
-		backgroundColor: "#F5F5F5",
-	},
-	documentPreview: {
-		width: "100%",
-		height: "70%",
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	videoIndicator: {
-		position: "absolute",
-		top: "50%",
-		left: "50%",
-		transform: [{ translateX: -14 }, { translateY: -14 }],
-		backgroundColor: "rgba(0, 0, 0, 0.3)",
-		borderRadius: 20,
-		padding: 3,
-	},
-	itemDetails: {
-		padding: 6,
-		height: "30%",
-		justifyContent: "space-between",
-	},
-	itemName: {
-		fontSize: 12,
-		color: "#333",
-		fontWeight: "500",
-	},
-	itemSize: {
-		fontSize: 10,
-		color: "#666",
-	},
-	carouselContainer: {
-		flex: 1,
-		backgroundColor: "#000000",
-	},
-	carouselHeader: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		backgroundColor: "rgba(0, 0, 0, 0.7)",
-		justifyContent: "space-between",
-	},
-	closeButton: {
-		padding: 4,
-	},
-	carouselTitle: {
-		color: "#FFFFFF",
-		fontSize: 16,
-		fontWeight: "500",
-		flex: 1,
-		marginHorizontal: 12,
-	},
-	carouselActions: {
-		flexDirection: "row",
-	},
-	actionButton: {
-		padding: 8,
-		marginLeft: 12,
-	},
-	carouselContent: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	fullImage: {
-		width: "100%",
-		height: "100%",
-	},
-	videoPlayer: {
-		width: "100%",
-		height: "100%",
-	},
-	carouselNavigation: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		paddingHorizontal: 16,
-		paddingVertical: 16,
-		backgroundColor: "rgba(0, 0, 0, 0.7)",
-	},
-	navButton: {
-		padding: 8,
-	},
-	pageIndicator: {
-		color: "#FFFFFF",
-		fontSize: 14,
-	},
-	videoContainer: {
-		position: "relative",
-		width: "100%",
-		height: "100%",
-	},
-	thumbnailOverlay: {
-		position: "absolute",
-		top: 0,
-		left: 0,
-		right: 0,
-		bottom: 0,
-		zIndex: 10,
-	},
-	videoThumbnail: {
-		width: "100%",
-		height: "100%",
-		backgroundColor: "#000",
-	},
-	playButtonOverlay: {
-		position: "absolute",
-		top: 0,
-		left: 0,
-		right: 0,
-		bottom: 0,
-		justifyContent: "center",
-		alignItems: "center",
-		backgroundColor: "rgba(0,0,0,0.3)",
-	},
-	documentViewerContainer: {
-		flex: 1,
-		backgroundColor: "#FFFFFF",
-	},
-	documentViewerHeader: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		backgroundColor: "#F8F8F8",
-		borderBottomWidth: 1,
-		borderBottomColor: "#E0E0E0",
-		justifyContent: "space-between",
-	},
-	documentViewerTitle: {
-		color: "#333333",
-		fontSize: 16,
-		fontWeight: "500",
-		flex: 1,
-		marginHorizontal: 12,
-	},
-	documentViewerContent: {
-		flex: 1,
-		position: "relative",
-	},
-	webView: {
-		flex: 1,
-		backgroundColor: "#F8F8F8",
-	},
-	documentLoadingContainer: {
-		position: "absolute",
-		top: 0,
-		left: 0,
-		right: 0,
-		bottom: 0,
-		justifyContent: "center",
-		alignItems: "center",
-		backgroundColor: "#FFFFFF",
-		zIndex: 10,
-	},
-	documentLoadingText: {
-		marginTop: 12,
-		fontSize: 14,
-		color: "#555555",
-	},
-	carouselItemContainer: {
-		width: Dimensions.get("window").width,
-		height: "100%",
-		justifyContent: "center",
-		alignItems: "center",
-	}, // Add this line
-});
+const galleryStyles = (theme: Theme) =>
+	StyleSheet.create<Styles>({
+		container: {
+			marginVertical: 10,
+		},
+		section: {
+			marginBottom: 16,
+		},
+		sectionTitle: {
+			fontSize: 16,
+			fontWeight: "600",
+			marginBottom: 8,
+			color: theme.colors.text,
+			paddingHorizontal: 8,
+		},
+		gridContainer: {
+			flexDirection: "row",
+			flexWrap: "wrap",
+			justifyContent: "center",
+			paddingHorizontal: 4,
+		},
+		itemContainer: {
+			margin: 4,
+			borderRadius: 8,
+			overflow: "hidden",
+			backgroundColor: theme.colors.surface,
+			shadowColor: theme.colors.shadow,
+			shadowOffset: { width: 0, height: 1 },
+			shadowOpacity: 0.2,
+			shadowRadius: 2,
+			elevation: 2,
+		},
+		mediaPreview: {
+			width: "100%",
+			height: "100%",
+			backgroundColor: theme.colors.surfaceSunken,
+		},
+		documentPreview: {
+			width: "100%",
+			height: "70%",
+			justifyContent: "center",
+			alignItems: "center",
+		},
+		videoIndicator: {
+			position: "absolute",
+			top: "50%",
+			left: "50%",
+			transform: [{ translateX: -14 }, { translateY: -14 }],
+			backgroundColor: "rgba(0, 0, 0, 0.3)",
+			borderRadius: 20,
+			padding: 3,
+		},
+		itemDetails: {
+			padding: 6,
+			height: "30%",
+			justifyContent: "space-between",
+		},
+		itemName: {
+			fontSize: 12,
+			color: theme.colors.text,
+			fontWeight: "500",
+		},
+		itemSize: {
+			fontSize: 10,
+			color: theme.colors.textSecondary,
+		},
+		carouselContainer: {
+			flex: 1,
+			backgroundColor: theme.colors.shadow,
+		},
+		carouselHeader: {
+			flexDirection: "row",
+			alignItems: "center",
+			paddingHorizontal: 16,
+			paddingVertical: 12,
+			backgroundColor: "rgba(0, 0, 0, 0.7)",
+			justifyContent: "space-between",
+		},
+		closeButton: {
+			padding: 4,
+		},
+		carouselTitle: {
+			color: theme.colors.surface,
+			fontSize: 16,
+			fontWeight: "500",
+			flex: 1,
+			marginHorizontal: 12,
+		},
+		carouselActions: {
+			flexDirection: "row",
+		},
+		actionButton: {
+			padding: 8,
+			marginLeft: 12,
+		},
+		carouselContent: {
+			flex: 1,
+			justifyContent: "center",
+			alignItems: "center",
+		},
+		fullImage: {
+			width: "100%",
+			height: "100%",
+		},
+		videoPlayer: {
+			width: "100%",
+			height: "100%",
+		},
+		carouselNavigation: {
+			flexDirection: "row",
+			justifyContent: "space-between",
+			alignItems: "center",
+			paddingHorizontal: 16,
+			paddingVertical: 16,
+			backgroundColor: "rgba(0, 0, 0, 0.7)",
+		},
+		navButton: {
+			padding: 8,
+		},
+		pageIndicator: {
+			color: theme.colors.surface,
+			fontSize: 14,
+		},
+		videoContainer: {
+			position: "relative",
+			width: "100%",
+			height: "100%",
+		},
+		thumbnailOverlay: {
+			position: "absolute",
+			top: 0,
+			left: 0,
+			right: 0,
+			bottom: 0,
+			zIndex: 10,
+		},
+		videoThumbnail: {
+			width: "100%",
+			height: "100%",
+			backgroundColor: theme.colors.text,
+		},
+		playButtonOverlay: {
+			position: "absolute",
+			top: 0,
+			left: 0,
+			right: 0,
+			bottom: 0,
+			justifyContent: "center",
+			alignItems: "center",
+			backgroundColor: "rgba(0,0,0,0.3)",
+		},
+		documentViewerContainer: {
+			flex: 1,
+			backgroundColor: theme.colors.surface,
+		},
+		documentViewerHeader: {
+			flexDirection: "row",
+			alignItems: "center",
+			paddingHorizontal: 16,
+			paddingVertical: 12,
+			backgroundColor: theme.colors.surfaceSunken,
+			borderBottomWidth: 1,
+			borderBottomColor: theme.colors.border,
+			justifyContent: "space-between",
+		},
+		documentViewerTitle: {
+			color: theme.colors.text,
+			fontSize: 16,
+			fontWeight: "500",
+			flex: 1,
+			marginHorizontal: 12,
+		},
+		documentViewerContent: {
+			flex: 1,
+			position: "relative",
+		},
+		webView: {
+			flex: 1,
+			backgroundColor: theme.colors.surfaceSunken,
+		},
+		documentLoadingContainer: {
+			position: "absolute",
+			top: 0,
+			left: 0,
+			right: 0,
+			bottom: 0,
+			justifyContent: "center",
+			alignItems: "center",
+			backgroundColor: theme.colors.surface,
+			zIndex: 10,
+		},
+		documentLoadingText: {
+			marginTop: 12,
+			fontSize: 14,
+			color: theme.colors.textSecondary,
+		},
+		carouselItemContainer: {
+			width: Dimensions.get("window").width,
+			height: "100%",
+			justifyContent: "center",
+			alignItems: "center",
+		}, // Add this line
+	});
 
 export default AttachmentGallery;

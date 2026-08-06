@@ -1,83 +1,115 @@
-import { Alert } from "react-native";
-import { capitalize, lowerCase } from "lodash";
+/**
+ * Auth validation and error mapping.
+ *
+ * These used to raise `Alert.alert` themselves, which meant a single empty
+ * field became a modal the user had to dismiss before they could see which
+ * field it was. They return errors now, and the screens render them under the
+ * offending input.
+ */
 
-export const validateSignupFields = (
-	firstName: string,
-	lastName: string,
-	email: string,
-	password: string,
-	confirmPassword: string,
-	accessCode: string,
-) => {
-	if (!firstName.trim()) {
-		Alert.alert("First name is required.");
-		return false;
-	}
-	if (!lastName.trim()) {
-		Alert.alert("Last name is required.");
-		return false;
-	}
-	if (!email.trim()) {
-		Alert.alert("Email is required.");
-		return false;
-	}
-	if (!password) {
-		Alert.alert("Password is required.");
-		return false;
-	}
-	if (password !== confirmPassword) {
-		Alert.alert("Passwords do not match.");
-		return false;
+/** Which field an error belongs under. `form` is a message for the whole page. */
+export type SignupField =
+	| "firstName"
+	| "lastName"
+	| "email"
+	| "password"
+	| "confPassword"
+	| "accessCode"
+	| "form";
+
+export type LoginField = "email" | "password" | "form";
+
+export type FieldErrors<T extends string> = Partial<Record<T, string>>;
+
+/*
+ * At least 8 characters, with an upper, a lower, a digit and a symbol.
+ * Unchanged from the previous rule — only how it is reported changed.
+ */
+const STRONG_PASSWORD =
+	/^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$/;
+
+/**
+ * Validates the signup form.
+ *
+ * Returns every problem at once rather than stopping at the first, so the user
+ * fixes the form in one pass instead of discovering the next requirement after
+ * each attempt.
+ */
+export const validateSignupFields = (fields: {
+	firstName: string;
+	lastName: string;
+	email: string;
+	password: string;
+	confPassword: string;
+	accessCode: string;
+}): FieldErrors<SignupField> => {
+	const errors: FieldErrors<SignupField> = {};
+
+	if (!fields.firstName.trim()) errors.firstName = "Required.";
+	if (!fields.lastName.trim()) errors.lastName = "Required.";
+	if (!fields.email.trim()) errors.email = "Required.";
+
+	if (!fields.password) {
+		errors.password = "Required.";
+	} else if (!STRONG_PASSWORD.test(fields.password)) {
+		errors.password =
+			"Use at least 8 characters, with an uppercase and a lowercase letter, a number and a symbol.";
 	}
 
-	// Strong password validation
-	const passwordRegex = new RegExp(
-		"^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$",
-	);
-	if (!passwordRegex.test(password)) {
-		Alert.alert(
-			"Weak password",
-			"Your password must include at least:\n\n8 characters\n1 uppercase character\n1 lowercase character\n1 number\n1 special character",
-		);
-		return false;
+	if (fields.password && fields.confPassword !== fields.password) {
+		errors.confPassword = "Passwords do not match.";
 	}
 
-	// Access code is required
-	if (!accessCode.trim()) {
-		Alert.alert("Company code is required.");
-		return false;
+	if (!fields.accessCode.trim()) {
+		errors.accessCode = "Ask whoever invited you for your code.";
 	}
 
-	return true;
+	return errors;
 };
 
-export const formatUserData = (
-	firstName: string,
-	lastName: string,
-	email: string,
-	companyId: string,
-	userId: string,
-) => {
-	return {
-		firstName: capitalize(firstName),
-		lastName: capitalize(lastName),
-		email: lowerCase(email),
-		loggedInCompany: companyId,
-		companies: [companyId],
-		id: userId,
-	};
-};
-
-export const handleAuthError = (error: any) => {
-	switch (error.code) {
+/** Maps a Firebase Auth error onto the field it belongs to. */
+export const mapSignupError = (error: any): FieldErrors<SignupField> => {
+	switch (error?.code) {
 		case "auth/email-already-in-use":
-			Alert.alert("That email address is already in use!");
-			break;
+			return { email: "That email already has an account." };
 		case "auth/invalid-email":
-			Alert.alert("That email address is invalid!");
-			break;
+			return { email: "That does not look like an email address." };
+		case "auth/weak-password":
+			return { password: "That password is too weak." };
+		case "auth/network-request-failed":
+			return { form: "No connection. Check your network and try again." };
 		default:
-			Alert.alert("Error", error.message);
 			console.error(error);
+			return {
+				form:
+					error?.message ?? "Something went wrong. Please try again.",
+			};
+	}
+};
+
+/** The same, for the login form. */
+export const mapLoginError = (error: any): FieldErrors<LoginField> => {
+	switch (error?.code) {
+		case "auth/invalid-email":
+			return { email: "That does not look like an email address." };
+		case "auth/user-not-found":
+			return { email: "No account with that email." };
+		case "auth/wrong-password":
+			return { password: "Incorrect password." };
+		/*
+		 * Firebase collapses a wrong email and a wrong password into this one
+		 * code, so it deliberately does not blame a specific field.
+		 */
+		case "auth/invalid-credential":
+			return { form: "That email and password do not match." };
+		case "auth/too-many-requests":
+			return {
+				form: "Too many attempts. Try again later, or reset your password.",
+			};
+		case "auth/network-request-failed":
+			return { form: "No connection. Check your network and try again." };
+		default:
+			console.error(error);
+			return { form: "Could not sign in. Please try again." };
 	}
 };

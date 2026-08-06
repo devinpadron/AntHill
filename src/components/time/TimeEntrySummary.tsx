@@ -1,147 +1,117 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { format } from "date-fns";
-import { formatDuration } from "../../utils/timeUtils";
+import {
+	formatDuration,
+	getStatusBadgeText,
+	getStatusTone,
+} from "../../utils/timeUtils";
+import { Badge, Card, Text } from "../ui";
+import { Theme, useThemedStyles } from "../../theme";
 
+/**
+ * The header block over a time-entry detail view.
+ *
+ * Total hours lead, because that is what both the worker and the approver are
+ * actually here to check.
+ *
+ * The status colour helpers used to be passed in as props by every caller;
+ * they come from `timeUtils` directly now, so a badge cannot differ between the
+ * two screens that render this.
+ */
 const TimeEntrySummary = ({
 	employeeUser,
 	totalDurationSeconds,
 	totalDurationDecimal,
 	timeEntries,
-	status,
-	getStatusBadgeColor,
-	getStatusBadgeText,
 }) => {
+	const styles = useThemedStyles(summaryStyles);
+
+	/*
+	 * `a?.x + " " + a?.y` yields the STRING "undefined undefined" when the
+	 * object is absent — which is truthy, so a `|| "Unknown"` fallback on the
+	 * concatenation never fired.
+	 */
+	const employeeName =
+		[employeeUser?.firstName, employeeUser?.lastName]
+			.filter(Boolean)
+			.join(" ") || "Unknown";
+
+	const dateRange =
+		timeEntries.length === 0
+			? "—"
+			: timeEntries.length === 1
+				? format(timeEntries[0].clockInAt.toDate(), "MMM d, yyyy")
+				: `${format(
+						timeEntries[0].clockInAt.toDate(),
+						"MMM d",
+					)} – ${format(
+						timeEntries[timeEntries.length - 1].clockInAt.toDate(),
+						"MMM d, yyyy",
+					)}`;
+
 	return (
-		<View style={styles.summaryCard}>
-			<View style={styles.summaryRow}>
-				<Text style={styles.summaryLabel}>Employee:</Text>
-				<Text style={styles.summaryValue}>
-					{/*
-					 * `a?.x + " " + a?.y` yields the STRING "undefined
-					 * undefined" when the object is absent — which is truthy,
-					 * so the `|| "Unknown"` fallback never fired.
-					 */}
-					{[employeeUser?.firstName, employeeUser?.lastName]
-						.filter(Boolean)
-						.join(" ") || "Unknown"}
+		<Card style={styles.card}>
+			<View style={styles.hero}>
+				<Text variant="display">
+					{formatDuration(totalDurationSeconds)}
+				</Text>
+				<Text variant="caption" color="textSecondary">
+					{totalDurationDecimal} decimal hours
 				</Text>
 			</View>
 
-			<View style={[styles.summaryRow, styles.totalSummaryRow]}>
-				<Text style={styles.summaryLabel}>Total Duration:</Text>
-				<Text style={[styles.summaryValue, styles.totalValue]}>
-					{formatDuration(totalDurationSeconds)} (
-					{totalDurationDecimal} hrs)
+			<View style={styles.row}>
+				<Text variant="body" color="textSecondary">
+					Employee
 				</Text>
+				<Text variant="bodyStrong">{employeeName}</Text>
 			</View>
 
-			<View style={styles.summaryRow}>
-				<Text style={styles.summaryLabel}>Status:</Text>
-				<View style={styles.statusContainer}>
-					{timeEntries.length === 1 ? (
-						<View
-							style={[
-								styles.statusBadge,
-								{
-									backgroundColor: getStatusBadgeColor(
-										timeEntries[0].status,
-									),
-								},
-							]}
-						>
-							<Text style={styles.statusText}>
-								{getStatusBadgeText(timeEntries[0].status)}
-							</Text>
-						</View>
-					) : (
-						<Text style={styles.statusText}>Multiple</Text>
-					)}
-				</View>
+			<View style={styles.row}>
+				<Text variant="body" color="textSecondary">
+					Dates
+				</Text>
+				<Text variant="bodyStrong">{dateRange}</Text>
 			</View>
 
-			<View style={styles.summaryRow}>
-				<Text style={styles.summaryLabel}>Date Range:</Text>
-				<Text style={styles.summaryValue}>
-					{timeEntries.length > 0
-						? `${format(
-								timeEntries[0].clockInAt.toDate(),
-								"MMM d, yyyy",
-							)}
-              ${
-					timeEntries.length > 1
-						? " - " +
-							format(
-								timeEntries[
-									timeEntries.length - 1
-								].clockInAt.toDate(),
-								"MMM d, yyyy",
-							)
-						: ""
-				}`
-						: "N/A"}
+			<View style={styles.row}>
+				<Text variant="body" color="textSecondary">
+					Status
 				</Text>
+				{timeEntries.length === 1 ? (
+					<Badge
+						label={getStatusBadgeText(timeEntries[0].status)}
+						tone={getStatusTone(timeEntries[0].status)}
+						dot
+					/>
+				) : (
+					<Badge label={`${timeEntries.length} entries`} />
+				)}
 			</View>
-		</View>
+		</Card>
 	);
 };
 
-const styles = StyleSheet.create({
-	summaryCard: {
-		margin: 16,
-		padding: 16,
-		backgroundColor: "#fff",
-		borderRadius: 12,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 4,
-		elevation: 2,
-	},
-	summaryRow: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		marginBottom: 12,
-		alignItems: "center",
-	},
-	totalSummaryRow: {
-		marginTop: 8,
-		paddingTop: 8,
-		borderTopWidth: 1,
-		borderTopColor: "#f0f0f0",
-	},
-	summaryLabel: {
-		fontSize: 16,
-		color: "#666",
-		fontWeight: "500",
-	},
-	summaryValue: {
-		fontSize: 14,
-		color: "#333",
-		fontWeight: "500",
-		textAlign: "right",
-		flex: 1,
-	},
-	totalValue: {
-		fontWeight: "600",
-		color: "#007AFF",
-		fontSize: 15,
-	},
-	statusContainer: {
-		flexDirection: "row",
-		justifyContent: "flex-end",
-	},
-	statusBadge: {
-		paddingHorizontal: 8,
-		paddingVertical: 3,
-		borderRadius: 12,
-		backgroundColor: "#e0e0e0",
-	},
-	statusText: {
-		fontSize: 12,
-		fontWeight: "600",
-		color: "#555",
-	},
-});
-
 export default TimeEntrySummary;
+
+const summaryStyles = (theme: Theme) =>
+	StyleSheet.create({
+		card: {
+			margin: theme.spacing.lg,
+		},
+		hero: {
+			alignItems: "center",
+			paddingBottom: theme.spacing.lg,
+			marginBottom: theme.spacing.md,
+			borderBottomWidth: theme.hairlineWidth,
+			borderBottomColor: theme.colors.border,
+		},
+		row: {
+			flexDirection: "row",
+			alignItems: "center",
+			justifyContent: "space-between",
+			gap: theme.spacing.md,
+			paddingVertical: theme.spacing.xs,
+		},
+	});

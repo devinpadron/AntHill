@@ -1,15 +1,28 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { format } from "date-fns";
-import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import AttachmentGallery from "../ui/AttachmentGallery";
-import { calculateMultipliedValue } from "../../utils/timeUtils";
+import {
+	calculateMultipliedValue,
+	checklistCheckedSet,
+} from "../../utils/timeUtils";
 import { useUser } from "../../contexts/UserContext";
 import { getChecklistsByIds } from "../../services/libraryService";
+import { Icon, Text } from "../ui";
+import { Theme, useThemedStyles } from "../../theme";
 
+/**
+ * Renders one submitted value from a company-defined form.
+ *
+ * Read-only counterpart to `CustomFormRender`: the schema decides what a field
+ * is, and this decides how its answer reads back.
+ */
 const FormFieldValue = ({ field, response, attachments = [] }) => {
+	const styles = useThemedStyles(valueStyles);
 	const { companyId } = useUser();
-	const [checklistItems, setChecklistItems] = useState<string[]>([]);
+	const [checklistItems, setChecklistItems] = useState<
+		{ id?: string; text: string }[]
+	>([]);
 
 	useEffect(() => {
 		const loadChecklistItems = async () => {
@@ -27,142 +40,163 @@ const FormFieldValue = ({ field, response, attachments = [] }) => {
 			]);
 			const checklist = byId[field.checklistId];
 
+			/*
+			 * Both halves are kept. The response may identify a ticked item by
+			 * either its text or its id depending on when it was written, so
+			 * matching needs both.
+			 */
 			setChecklistItems(
-				(checklist?.items ?? [])
-					.map((item) => item.text)
-					.filter((text) => text && text.trim().length > 0),
+				(checklist?.items ?? []).filter(
+					(item) => item?.text && item.text.trim().length > 0,
+				),
 			);
 		};
 
 		loadChecklistItems();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [companyId, field?.checklistId]);
+
+	const empty = (
+		<Text variant="body" color="textTertiary">
+			—
+		</Text>
+	);
+
 	if (field.type === "number" && field.useMultiplier && field.multiplier) {
 		return (
 			<View>
-				<Text style={styles.formFieldValue}>{response} </Text>
-				<Text style={styles.multiplierValue}>
-					({calculateMultipliedValue(response, field.multiplier)}{" "}
-					{field.unit || ""})
+				<Text variant="body">{response}</Text>
+				<Text variant="caption" color="accent">
+					{calculateMultipliedValue(response, field.multiplier)}{" "}
+					{field.unit || ""}
 				</Text>
 			</View>
 		);
-	} else if (field.type === "checkbox") {
+	}
+
+	if (field.type === "checkbox") {
 		return (
-			<Text style={styles.formFieldValue}>{response ? "Yes" : "No"}</Text>
+			<View style={styles.inlineRow}>
+				<Icon
+					name={response ? "checkmark-circle" : "close-circle"}
+					size="sm"
+					color={response ? "success" : "textTertiary"}
+				/>
+				<Text variant="body">{response ? "Yes" : "No"}</Text>
+			</View>
 		);
-	} else if (field.type === "checklist") {
-		const checkedItems = Array.isArray(response) ? response : [];
-		const allItems = checklistItems;
+	}
 
-		if (!allItems || allItems.length === 0) {
-			// If no master list, show checked items as a simple list
-			return (
-				<Text style={styles.formFieldValue}>
-					{checkedItems.length > 0 ? checkedItems.join(", ") : "N/A"}
-				</Text>
-			);
-		}
+	if (field.type === "checklist") {
+		const checked = checklistCheckedSet(response);
+
+		const isChecked = (item: { id?: string; text: string }) =>
+			(!!item.id && checked.has(item.id)) || checked.has(item.text);
+
+		/*
+		 * No master list — the checklist document was deleted, or the field
+		 * carries no checklistId. Show what WAS ticked, still ticked, rather
+		 * than a comma-separated line that says nothing about state.
+		 */
+		const items: { id?: string; text: string }[] = checklistItems.length
+			? checklistItems
+			: [...checked].map((text) => ({ text }));
+
+		if (!items.length) return empty;
+
+		const doneCount = items.filter(isChecked).length;
 
 		return (
-			<View style={styles.checklistContainer}>
-				{allItems.map((item, index) => {
-					const isChecked = checkedItems.includes(item);
+			<View style={styles.checklist}>
+				<Text variant="caption" color="textSecondary">
+					{doneCount} of {items.length} complete
+				</Text>
+
+				{items.map((item, index) => {
+					const done = isChecked(item);
+
 					return (
-						<View key={index} style={styles.checklistItem}>
+						<View
+							key={item.id ?? index}
+							style={styles.checklistItem}
+						>
 							<Icon
-								name={
-									isChecked
-										? "check-circle"
-										: "circle-outline"
-								}
-								size={20}
-								color={isChecked ? "#34c759" : "#ccc"}
+								name={done ? "checkbox" : "square-outline"}
+								size="sm"
+								color={done ? "success" : "textTertiary"}
 							/>
 							<Text
-								style={[
-									styles.checklistItemText,
-									isChecked &&
-										styles.checklistItemTextChecked,
-								]}
+								variant="body"
+								color={done ? "text" : "textTertiary"}
+								style={[styles.flex, done && styles.done]}
 							>
-								{item}
+								{item.text}
 							</Text>
 						</View>
 					);
 				})}
 			</View>
 		);
-	} else if (field.type === "multiSelect") {
-		return (
-			<Text style={styles.formFieldValue}>
-				{Array.isArray(response) && response.length > 0
-					? response.join(", ")
-					: "N/A"}
-			</Text>
+	}
+
+	if (field.type === "multiSelect") {
+		return Array.isArray(response) && response.length > 0 ? (
+			<Text variant="body">{response.join(", ")}</Text>
+		) : (
+			empty
 		);
-	} else if (field.type === "date" && response) {
+	}
+
+	if (field.type === "date" && response) {
 		return (
-			<Text style={styles.formFieldValue}>
+			<Text variant="body">
 				{format(new Date(response), "MMM d, yyyy")}
 			</Text>
 		);
-	} else if (field.type === "time" && response) {
+	}
+
+	if (field.type === "time" && response) {
 		return (
-			<Text style={styles.formFieldValue}>
-				{format(new Date(response), "h:mm a")}
-			</Text>
+			<Text variant="body">{format(new Date(response), "h:mm a")}</Text>
 		);
-	} else if (
-		(field.type === "document" || field.type === "media") &&
-		response
-	) {
-		return (
-			<View>
-				{Array.isArray(response) && response.length > 0 ? (
-					<AttachmentGallery attachments={attachments} />
-				) : (
-					<Text style={styles.formFieldValue}>No files uploaded</Text>
-				)}
-			</View>
-		);
-	} else {
-		return (
-			<Text style={styles.formFieldValue}>
-				{response ? response : "N/A"}
+	}
+
+	if ((field.type === "document" || field.type === "media") && response) {
+		return Array.isArray(response) && response.length > 0 ? (
+			<AttachmentGallery attachments={attachments} />
+		) : (
+			<Text variant="body" color="textTertiary">
+				No files uploaded
 			</Text>
 		);
 	}
+
+	return response ? <Text variant="body">{response}</Text> : empty;
 };
 
-const styles = StyleSheet.create({
-	formFieldValue: {
-		fontSize: 15,
-		color: "#333",
-	},
-	multiplierValue: {
-		fontSize: 14,
-		color: "#007AFF",
-	},
-	checklistContainer: {
-		gap: 8,
-		marginTop: 4,
-	},
-	checklistItem: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingVertical: 2,
-	},
-	checklistItemText: {
-		fontSize: 15,
-		color: "#666",
-		marginLeft: 8,
-		flex: 1,
-	},
-	checklistItemTextChecked: {
-		color: "#333",
-		fontWeight: "500",
-	},
-});
-
 export default FormFieldValue;
+
+const valueStyles = (theme: Theme) =>
+	StyleSheet.create({
+		flex: {
+			flex: 1,
+		},
+		inlineRow: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: theme.spacing.sm,
+		},
+		checklist: {
+			gap: theme.spacing.sm,
+			marginTop: theme.spacing.xs,
+		},
+		done: {
+			/* Reads as struck off a list rather than merely dimmed. */
+			textDecorationLine: "line-through",
+		},
+		checklistItem: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: theme.spacing.sm,
+		},
+	});

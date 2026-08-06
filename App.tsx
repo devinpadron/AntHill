@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { NotifierWrapper } from "react-native-notifier";
@@ -17,6 +17,15 @@ import { UploadManagerProvider } from "./src/contexts/UploadManagerContext";
 import { NotificationProvider } from "./src/contexts/NotificationContext";
 import { recordAppLaunch } from "./src/services/userService";
 import { DiagnosticsNavigator } from "./src/navigation/DiagnosticsNavigator";
+import { CompanySwitcherProvider } from "./src/components/company/CompanySwitcher";
+import { useHideNativeSplash } from "./src/hooks/useHideNativeSplash";
+import { DatabaseBadge } from "./src/components/dev/DatabaseBadge";
+import {
+	ThemeProvider,
+	ThemeSync,
+	navigationThemeFor,
+	useTheme,
+} from "./src/theme";
 
 /*
  * Dev-only diagnostics harness.
@@ -26,19 +35,26 @@ import { DiagnosticsNavigator } from "./src/navigation/DiagnosticsNavigator";
  * real app. Deliberately omits AppGate and NotificationProvider: it exists to
  * inspect the data path, and pushes would only add moving parts.
  */
-const DiagnosticsApp = () => (
-	<GestureHandlerRootView style={{ flex: 1 }}>
-		<SafeAreaProvider>
-			<UploadManagerProvider>
-				<UserProvider>
-					<CompanyProvider>
-						<DiagnosticsNavigator />
-					</CompanyProvider>
-				</UserProvider>
-			</UploadManagerProvider>
-		</SafeAreaProvider>
-	</GestureHandlerRootView>
-);
+const DiagnosticsApp = () => {
+	useHideNativeSplash();
+
+	return (
+		<GestureHandlerRootView style={{ flex: 1 }}>
+			<SafeAreaProvider>
+				<ThemeProvider>
+					<UploadManagerProvider>
+						<UserProvider>
+							<ThemeSync />
+							<CompanyProvider>
+								<DiagnosticsNavigator />
+							</CompanyProvider>
+						</UserProvider>
+					</UploadManagerProvider>
+				</ThemeProvider>
+			</SafeAreaProvider>
+		</GestureHandlerRootView>
+	);
+};
 
 // Records which build this user is on, so update adoption can be measured
 // before a forced cutover. Best-effort and non-blocking.
@@ -55,7 +71,11 @@ const LaunchTelemetry = () => {
 };
 
 /*
- * The app.
+ * Everything below the theme.
+ *
+ * Split out of MainApp only because it needs `useTheme()`, which has to be read
+ * beneath ThemeProvider — the navigator is themed from our tokens so pushes do
+ * not flash a white card in dark mode.
  *
  * Provider order matters in two places. NotificationProvider sits INSIDE
  * NavigationContainer because push handling navigates. AppGate wraps
@@ -66,6 +86,53 @@ const LaunchTelemetry = () => {
  * `useUser().companyId` itself, so there is no window where the user has
  * loaded but the active company has not been told about it.
  */
+const ThemedApp: React.FC = () => {
+	const theme = useTheme();
+
+	// Lifts the launch screen once this tree has painted a themed frame.
+	useHideNativeSplash();
+
+	/*
+	 * Memoized on the theme itself. Rebuilding this object on every render
+	 * handed NavigationContainer a new `theme` prop each time, making it
+	 * re-apply its colours for renders where nothing about the theme moved.
+	 */
+	const navigationTheme = useMemo(() => navigationThemeFor(theme), [theme]);
+
+	return (
+		<AppGate>
+			<UploadManagerProvider>
+				<UserProvider>
+					{/* Applies the account's saved appearance choice. */}
+					<ThemeSync />
+					<CompanyProvider>
+						<NavigationContainer
+							ref={navigationRef}
+							theme={navigationTheme}
+							onReady={() => {
+								pendingNavigation.executeIfReady();
+							}}
+						>
+							<NotificationProvider>
+								<NotifierWrapper>
+									<LaunchTelemetry />
+									{/* Renders the switcher sheet over the navigator. */}
+									<CompanySwitcherProvider>
+										<AppNavigator />
+										{/* Dev-only; renders null in a release build. */}
+										<DatabaseBadge />
+									</CompanySwitcherProvider>
+								</NotifierWrapper>
+							</NotificationProvider>
+						</NavigationContainer>
+					</CompanyProvider>
+				</UserProvider>
+			</UploadManagerProvider>
+		</AppGate>
+	);
+};
+
+/** The app. */
 const MainApp: React.FC = () => {
 	/*
 	 * A push can arrive before the navigator mounts, in which case the route is
@@ -91,27 +158,9 @@ const MainApp: React.FC = () => {
 	return (
 		<GestureHandlerRootView style={{ flex: 1 }}>
 			<SafeAreaProvider>
-				<AppGate>
-					<UploadManagerProvider>
-						<UserProvider>
-							<CompanyProvider>
-								<NavigationContainer
-									ref={navigationRef}
-									onReady={() => {
-										pendingNavigation.executeIfReady();
-									}}
-								>
-									<NotificationProvider>
-										<NotifierWrapper>
-											<LaunchTelemetry />
-											<AppNavigator />
-										</NotifierWrapper>
-									</NotificationProvider>
-								</NavigationContainer>
-							</CompanyProvider>
-						</UserProvider>
-					</UploadManagerProvider>
-				</AppGate>
+				<ThemeProvider>
+					<ThemedApp />
+				</ThemeProvider>
 			</SafeAreaProvider>
 		</GestureHandlerRootView>
 	);

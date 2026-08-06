@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { DiagnosticsScreen } from "../screens/dev/DiagnosticsScreen";
 import { AppNavigator } from "./AppNavigator";
 import { DiagnosticsBadge } from "../screens/dev/DiagnosticsBadge";
+import { DesignGallery } from "../screens/dev/DesignGallery";
 
 /*
  * Dev harness entry point.
@@ -37,6 +38,12 @@ export const DiagnosticsNavigator = () => (
 				name="Diagnostics"
 				component={DiagnosticsScreen}
 				options={{ presentation: "modal", title: "v2 diagnostics" }}
+			/>
+			{/* Every design primitive on one screen, for checking both themes. */}
+			<Stack.Screen
+				name="DesignGallery"
+				component={DesignGallery}
+				options={{ headerShown: false }}
 			/>
 		</Stack.Navigator>
 	</NavigationContainer>

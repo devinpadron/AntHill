@@ -4,7 +4,6 @@ import {
 	Text,
 	FlatList,
 	StyleSheet,
-	StatusBar,
 	TouchableOpacity,
 	TextInput,
 	Alert,
@@ -13,7 +12,6 @@ import {
 	Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUser } from "../../../contexts/UserContext";
 import { useGroups } from "../../../hooks/useGroups";
 import { useCompanyMembers } from "../../../hooks/useCompanyMembers";
@@ -24,6 +22,8 @@ import {
 	renameGroup,
 	setGroupJoinCode,
 } from "../../../services/groupService";
+import { Theme, useTheme, useThemedStyles } from "../../../theme";
+import { SafeAreaBand } from "../../../components/ui";
 
 /*
  * Worker groups.
@@ -39,7 +39,8 @@ import {
  */
 
 const WorkerGroups = ({ navigation }) => {
-	const insets = useSafeAreaInsets();
+	const theme = useTheme();
+	const styles = useThemedStyles(workerGroupStyles);
 	const { companyId } = useUser();
 	const { groups, isLoading } = useGroups(companyId ?? "");
 	const { members } = useCompanyMembers(companyId ?? "");
@@ -241,7 +242,7 @@ const WorkerGroups = ({ navigation }) => {
 						<Ionicons
 							name="pencil-outline"
 							size={18}
-							color="#2078c8"
+							color={theme.colors.accent}
 						/>
 					</TouchableOpacity>
 					<TouchableOpacity
@@ -252,7 +253,7 @@ const WorkerGroups = ({ navigation }) => {
 						<Ionicons
 							name="trash-outline"
 							size={18}
-							color="#d83030"
+							color={theme.colors.danger}
 						/>
 					</TouchableOpacity>
 				</View>
@@ -284,7 +285,7 @@ const WorkerGroups = ({ navigation }) => {
 							<Ionicons
 								name="information-circle-outline"
 								size={18}
-								color="#8a8aa0"
+								color={theme.colors.textTertiary}
 							/>
 						</TouchableOpacity>
 						<TouchableOpacity
@@ -302,7 +303,7 @@ const WorkerGroups = ({ navigation }) => {
 							<Text
 								style={[
 									styles.codeActionText,
-									{ color: "#d83030" },
+									{ color: theme.colors.danger },
 								]}
 							>
 								Off
@@ -323,7 +324,7 @@ const WorkerGroups = ({ navigation }) => {
 							<Ionicons
 								name="information-circle-outline"
 								size={18}
-								color="#8a8aa0"
+								color={theme.colors.textTertiary}
 							/>
 						</TouchableOpacity>
 						<TouchableOpacity
@@ -351,17 +352,19 @@ const WorkerGroups = ({ navigation }) => {
 			style={{ flex: 1 }}
 			behavior={Platform.OS === "ios" ? "padding" : undefined}
 		>
-			<View
-				style={[{ flex: 1, paddingTop: insets.top }, styles.container]}
-			>
-				<StatusBar barStyle="dark-content" />
+			<View style={[{ flex: 1 }, styles.container]}>
+				<SafeAreaBand />
 
 				<View style={styles.header}>
 					<TouchableOpacity
 						style={styles.backButton}
 						onPress={() => navigation.goBack()}
 					>
-						<Ionicons name="arrow-back" size={24} color="#333" />
+						<Ionicons
+							name="arrow-back"
+							size={24}
+							color={theme.colors.text}
+						/>
 					</TouchableOpacity>
 					<Text style={styles.headerTitle}>Worker groups</Text>
 					<View style={{ width: 40 }} />
@@ -378,7 +381,7 @@ const WorkerGroups = ({ navigation }) => {
 						value={newName}
 						onChangeText={setNewName}
 						placeholder="New group name"
-						placeholderTextColor="#aaa"
+						placeholderTextColor={theme.colors.textTertiary}
 						returnKeyType="done"
 						onSubmitEditing={add}
 					/>
@@ -390,7 +393,11 @@ const WorkerGroups = ({ navigation }) => {
 						onPress={add}
 						disabled={!newName.trim() || busy}
 					>
-						<Ionicons name="add" size={22} color="#fff" />
+						<Ionicons
+							name="add"
+							size={22}
+							color={theme.colors.surface}
+						/>
 					</TouchableOpacity>
 				</View>
 
@@ -404,14 +411,14 @@ const WorkerGroups = ({ navigation }) => {
 							{isLoading ? (
 								<ActivityIndicator
 									size="large"
-									color="#2089dc"
+									color={theme.colors.accent}
 								/>
 							) : (
 								<>
 									<Ionicons
 										name="people-outline"
 										size={56}
-										color="#ccc"
+										color={theme.colors.borderStrong}
 									/>
 									<Text style={styles.emptyText}>
 										No groups yet
@@ -431,101 +438,122 @@ const WorkerGroups = ({ navigation }) => {
 	);
 };
 
-const styles = StyleSheet.create({
-	container: { flex: 1, backgroundColor: "#f8f9fa" },
-	header: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		backgroundColor: "#fff",
-		borderBottomWidth: StyleSheet.hairlineWidth,
-		borderBottomColor: "#e5e5e5",
-	},
-	backButton: { width: 40 },
-	headerTitle: { fontSize: 17, fontWeight: "700", color: "#222" },
-	blurb: {
-		fontSize: 13,
-		color: "#777",
-		lineHeight: 19,
-		paddingHorizontal: 16,
-		paddingTop: 14,
-	},
-	addRow: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingHorizontal: 16,
-		paddingVertical: 14,
-	},
-	input: {
-		flex: 1,
-		backgroundColor: "#fff",
-		borderRadius: 10,
-		paddingHorizontal: 14,
-		paddingVertical: 12,
-		fontSize: 15,
-		color: "#222",
-		borderWidth: StyleSheet.hairlineWidth,
-		borderColor: "#ddd",
-	},
-	addButton: {
-		width: 44,
-		height: 44,
-		borderRadius: 10,
-		backgroundColor: "#2078c8",
-		alignItems: "center",
-		justifyContent: "center",
-		marginLeft: 10,
-	},
-	listContent: { paddingHorizontal: 16, paddingBottom: 32 },
-	card: {
-		backgroundColor: "#fff",
-		borderRadius: 10,
-		marginBottom: 10,
-		overflow: "hidden",
-	},
-	row: {
-		flexDirection: "row",
-		alignItems: "center",
-		padding: 14,
-	},
-	codePanel: {
-		flexDirection: "row",
-		alignItems: "center",
-		backgroundColor: "#f6f7fb",
-		paddingHorizontal: 14,
-		paddingVertical: 10,
-	},
-	codeValue: {
-		fontSize: 17,
-		fontWeight: "700",
-		color: "#2b2b45",
-		letterSpacing: 2,
-	},
-	codeMeta: { fontSize: 11, color: "#888", marginTop: 2 },
-	codeHint: { flex: 1, fontSize: 12, color: "#888", paddingRight: 8 },
-	codeAction: { paddingHorizontal: 8, paddingVertical: 6 },
-	codeInfo: { paddingHorizontal: 4, paddingVertical: 6 },
-	codeActionText: { fontSize: 12, fontWeight: "700", color: "#2078c8" },
-	rowMain: { flex: 1, paddingRight: 8 },
-	rowName: { fontSize: 16, fontWeight: "600", color: "#222" },
-	rowMeta: { fontSize: 13, color: "#888", marginTop: 2 },
-	rowAction: { padding: 8, marginLeft: 4 },
-	empty: { alignItems: "center", paddingTop: 60, paddingHorizontal: 24 },
-	emptyText: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#999",
-		marginTop: 12,
-	},
-	emptyHint: {
-		fontSize: 13,
-		color: "#aaa",
-		textAlign: "center",
-		marginTop: 6,
-		lineHeight: 19,
-	},
-});
-
+const workerGroupStyles = (theme: Theme) =>
+	StyleSheet.create({
+		container: { flex: 1, backgroundColor: theme.colors.bg },
+		header: {
+			flexDirection: "row",
+			alignItems: "center",
+			justifyContent: "space-between",
+			paddingHorizontal: 16,
+			paddingVertical: 12,
+			backgroundColor: theme.colors.surface,
+			borderBottomWidth: StyleSheet.hairlineWidth,
+			borderBottomColor: theme.colors.border,
+		},
+		backButton: { width: 40 },
+		headerTitle: {
+			fontSize: 17,
+			fontWeight: "700",
+			color: theme.colors.text,
+		},
+		blurb: {
+			fontSize: 13,
+			color: theme.colors.textSecondary,
+			lineHeight: 19,
+			paddingHorizontal: 16,
+			paddingTop: 14,
+		},
+		addRow: {
+			flexDirection: "row",
+			alignItems: "center",
+			paddingHorizontal: 16,
+			paddingVertical: 14,
+		},
+		input: {
+			flex: 1,
+			backgroundColor: theme.colors.surface,
+			borderRadius: 10,
+			paddingHorizontal: 14,
+			paddingVertical: 12,
+			fontSize: 15,
+			color: theme.colors.text,
+			borderWidth: StyleSheet.hairlineWidth,
+			borderColor: theme.colors.border,
+		},
+		addButton: {
+			width: 44,
+			height: 44,
+			borderRadius: 10,
+			backgroundColor: theme.colors.accent,
+			alignItems: "center",
+			justifyContent: "center",
+			marginLeft: 10,
+		},
+		listContent: { paddingHorizontal: 16, paddingBottom: 32 },
+		card: {
+			backgroundColor: theme.colors.surface,
+			borderRadius: 10,
+			marginBottom: 10,
+			overflow: "hidden",
+		},
+		row: {
+			flexDirection: "row",
+			alignItems: "center",
+			padding: 14,
+		},
+		codePanel: {
+			flexDirection: "row",
+			alignItems: "center",
+			backgroundColor: theme.colors.surfaceSunken,
+			paddingHorizontal: 14,
+			paddingVertical: 10,
+		},
+		codeValue: {
+			fontSize: 17,
+			fontWeight: "700",
+			color: theme.colors.text,
+			letterSpacing: 2,
+		},
+		codeMeta: {
+			fontSize: 11,
+			color: theme.colors.textTertiary,
+			marginTop: 2,
+		},
+		codeHint: {
+			flex: 1,
+			fontSize: 12,
+			color: theme.colors.textTertiary,
+			paddingRight: 8,
+		},
+		codeAction: { paddingHorizontal: 8, paddingVertical: 6 },
+		codeInfo: { paddingHorizontal: 4, paddingVertical: 6 },
+		codeActionText: {
+			fontSize: 12,
+			fontWeight: "700",
+			color: theme.colors.accent,
+		},
+		rowMain: { flex: 1, paddingRight: 8 },
+		rowName: { fontSize: 16, fontWeight: "600", color: theme.colors.text },
+		rowMeta: {
+			fontSize: 13,
+			color: theme.colors.textTertiary,
+			marginTop: 2,
+		},
+		rowAction: { padding: 8, marginLeft: 4 },
+		empty: { alignItems: "center", paddingTop: 60, paddingHorizontal: 24 },
+		emptyText: {
+			fontSize: 16,
+			fontWeight: "600",
+			color: theme.colors.textTertiary,
+			marginTop: 12,
+		},
+		emptyHint: {
+			fontSize: 13,
+			color: theme.colors.textTertiary,
+			textAlign: "center",
+			marginTop: 6,
+			lineHeight: 19,
+		},
+	});
 export default WorkerGroups;

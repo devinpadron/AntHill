@@ -10,15 +10,16 @@ import {
 	ActivityIndicator,
 	Platform,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import DropDownPicker from "react-native-dropdown-picker";
 import DraggableFlatList from "react-native-draggable-flatlist";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { RouteProp, useRoute } from "@react-navigation/native";
 import { useFormSchemaEditor } from "../../../hooks/useFormSchemaEditor";
-import { styles } from "./CompanyCustomForm.styles";
+import { customFormStyles } from "./CompanyCustomForm.styles";
+import { useTheme, useThemedStyles } from "../../../theme";
 import { FormFieldType } from "../../../types";
+import { SafeAreaBand } from "../../../components/ui";
 
 const FIELD_TYPES = [
 	{ label: "Text Input", value: "text" },
@@ -43,9 +44,10 @@ type CompanyCustomFormRouteProp = RouteProp<
 >;
 
 const CompanyCustomForm = ({ navigation }) => {
+	const theme = useTheme();
+	const styles = useThemedStyles(customFormStyles);
 	const route = useRoute<CompanyCustomFormRouteProp>();
 	const isEventForm = route.params?.isEventForm || false;
-	const insets = useSafeAreaInsets();
 
 	const {
 		draft: customForm,
@@ -135,28 +137,40 @@ const CompanyCustomForm = ({ navigation }) => {
 	if (isLoading) {
 		return (
 			<View style={[styles.container, styles.centered]}>
-				<ActivityIndicator size="large" color="#007AFF" />
+				<ActivityIndicator size="large" color={theme.colors.accent} />
 			</View>
 		);
 	}
 
 	return (
-		<View style={[styles.container, { paddingTop: insets.top }]}>
+		<View style={styles.container}>
+			<SafeAreaBand />
 			<View style={styles.header}>
 				<TouchableOpacity onPress={() => navigation.goBack()}>
-					<Ionicons name="arrow-back" size={24} color="#333" />
+					<Ionicons
+						name="arrow-back"
+						size={24}
+						color={theme.colors.text}
+					/>
 				</TouchableOpacity>
 				<Text style={styles.headerTitle}>Custom Time Entry Forms</Text>
 				<TouchableOpacity onPress={saveForm} disabled={isSaving}>
 					{isSaving ? (
-						<ActivityIndicator size="small" color="#007AFF" />
+						<ActivityIndicator
+							size="small"
+							color={theme.colors.accent}
+						/>
 					) : (
 						<Text style={styles.saveButton}>Save</Text>
 					)}
 				</TouchableOpacity>
 			</View>
 
-			<ScrollView style={styles.content}>
+			<ScrollView
+				style={styles.content}
+				automaticallyAdjustKeyboardInsets
+				keyboardShouldPersistTaps="handled"
+			>
 				<View style={styles.formControl}>
 					<Text style={styles.label}>Form Title</Text>
 					<TextInput
@@ -189,7 +203,10 @@ const CompanyCustomForm = ({ navigation }) => {
 						<Switch
 							value={customForm.isEnabled}
 							onValueChange={toggleFormEnabled}
-							trackColor={{ false: "#767577", true: "#007AFF" }}
+							trackColor={{
+								false: theme.colors.switchTrack,
+								true: theme.colors.accent,
+							}}
 						/>
 					</View>
 					<Text style={styles.helperText}>
@@ -207,7 +224,7 @@ const CompanyCustomForm = ({ navigation }) => {
 							<Ionicons
 								name="document-text-outline"
 								size={48}
-								color="#ccc"
+								color={theme.colors.borderStrong}
 							/>
 							<Text style={styles.emptyStateText}>
 								No fields added yet. Use the button below to add
@@ -283,7 +300,7 @@ const CompanyCustomForm = ({ navigation }) => {
 												<Ionicons
 													name="trash-outline"
 													size={22}
-													color="#FF3B30"
+													color={theme.colors.danger}
 												/>
 											</TouchableOpacity>
 
@@ -293,7 +310,10 @@ const CompanyCustomForm = ({ navigation }) => {
 												<Ionicons
 													name="menu"
 													size={22}
-													color="#777"
+													color={
+														theme.colors
+															.textSecondary
+													}
 												/>
 											</TouchableOpacity>
 										</View>
@@ -307,7 +327,11 @@ const CompanyCustomForm = ({ navigation }) => {
 						style={styles.addButton}
 						onPress={addField}
 					>
-						<Ionicons name="add-circle" size={24} color="#007AFF" />
+						<Ionicons
+							name="add-circle"
+							size={24}
+							color={theme.colors.accent}
+						/>
 						<Text style={styles.addButtonText}>Add New Field</Text>
 					</TouchableOpacity>
 				</View>
@@ -323,7 +347,7 @@ const CompanyCustomForm = ({ navigation }) => {
 								<Ionicons
 									name="close-circle"
 									size={24}
-									color="#999"
+									color={theme.colors.textTertiary}
 								/>
 							</TouchableOpacity>
 						</View>
@@ -470,8 +494,8 @@ const CompanyCustomForm = ({ navigation }) => {
 									})
 								}
 								trackColor={{
-									false: "#767577",
-									true: "#007AFF",
+									false: theme.colors.switchTrack,
+									true: theme.colors.accent,
 								}}
 							/>
 						</View>
@@ -511,7 +535,7 @@ const CompanyCustomForm = ({ navigation }) => {
 														: "radio-button-off"
 												}
 												size={20}
-												color="#007AFF"
+												color={theme.colors.accent}
 											/>
 											<Text style={{ marginLeft: 6 }}>
 												At least one
@@ -538,7 +562,7 @@ const CompanyCustomForm = ({ navigation }) => {
 														: "radio-button-off"
 												}
 												size={20}
-												color="#007AFF"
+												color={theme.colors.accent}
 											/>
 											<Text style={{ marginLeft: 6 }}>
 												All items
@@ -566,7 +590,9 @@ const CompanyCustomForm = ({ navigation }) => {
 											<Ionicons
 												name="information-circle-outline"
 												size={20}
-												color="#777"
+												color={
+													theme.colors.textSecondary
+												}
 											/>
 										</TouchableOpacity>
 									</View>
@@ -579,8 +605,8 @@ const CompanyCustomForm = ({ navigation }) => {
 											})
 										}
 										trackColor={{
-											false: "#767577",
-											true: "#007AFF",
+											false: theme.colors.switchTrack,
+											true: theme.colors.accent,
 										}}
 									/>
 								</View>
@@ -602,7 +628,9 @@ const CompanyCustomForm = ({ navigation }) => {
 											<Ionicons
 												name="information-circle-outline"
 												size={20}
-												color="#777"
+												color={
+													theme.colors.textSecondary
+												}
 											/>
 										</TouchableOpacity>
 									</View>
@@ -617,8 +645,8 @@ const CompanyCustomForm = ({ navigation }) => {
 											})
 										}
 										trackColor={{
-											false: "#767577",
-											true: "#007AFF",
+											false: theme.colors.switchTrack,
+											true: theme.colors.accent,
 										}}
 									/>
 								</View>
@@ -726,7 +754,7 @@ const CompanyCustomForm = ({ navigation }) => {
 										<Ionicons
 											name="information-circle-outline"
 											size={20}
-											color="#777"
+											color={theme.colors.textSecondary}
 										/>
 									</TouchableOpacity>
 								</View>
@@ -741,8 +769,8 @@ const CompanyCustomForm = ({ navigation }) => {
 										})
 									}
 									trackColor={{
-										false: "#767577",
-										true: "#007AFF",
+										false: theme.colors.switchTrack,
+										true: theme.colors.accent,
 									}}
 								/>
 							</View>
@@ -860,7 +888,9 @@ const CompanyCustomForm = ({ navigation }) => {
 											<Ionicons
 												name="square-outline"
 												size={24}
-												color="#777"
+												color={
+													theme.colors.textSecondary
+												}
 											/>
 											<Text
 												style={
@@ -884,7 +914,9 @@ const CompanyCustomForm = ({ navigation }) => {
 											<Ionicons
 												name="chevron-down"
 												size={20}
-												color="#777"
+												color={
+													theme.colors.textSecondary
+												}
 											/>
 										</View>
 									)}
@@ -900,7 +932,9 @@ const CompanyCustomForm = ({ navigation }) => {
 											<Ionicons
 												name="chevron-down"
 												size={20}
-												color="#777"
+												color={
+													theme.colors.textSecondary
+												}
 											/>
 										</View>
 									)}
@@ -915,7 +949,9 @@ const CompanyCustomForm = ({ navigation }) => {
 											<Ionicons
 												name="calendar"
 												size={20}
-												color="#777"
+												color={
+													theme.colors.textSecondary
+												}
 											/>
 										</View>
 									)}
@@ -930,7 +966,9 @@ const CompanyCustomForm = ({ navigation }) => {
 											<Ionicons
 												name="time"
 												size={20}
-												color="#777"
+												color={
+													theme.colors.textSecondary
+												}
 											/>
 										</View>
 									)}
@@ -943,7 +981,10 @@ const CompanyCustomForm = ({ navigation }) => {
 												<Icon
 													name="file-upload-outline"
 													size={24}
-													color="#555"
+													color={
+														theme.colors
+															.textSecondary
+													}
 												/>
 												<Text
 													style={
@@ -965,7 +1006,10 @@ const CompanyCustomForm = ({ navigation }) => {
 												<Icon
 													name="image-plus"
 													size={24}
-													color="#555"
+													color={
+														theme.colors
+															.textSecondary
+													}
 												/>
 												<Text
 													style={

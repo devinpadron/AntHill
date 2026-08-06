@@ -1,5 +1,6 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { stackScreenOptions } from "./stackOptions";
 import TimeEntryScreen from "../screens/timesheet/TimeEntryScreen";
 import TimeEntryDetails from "../screens/timesheet/TimeEntryDetails";
 
@@ -8,17 +9,9 @@ import TimeEntryDetails from "../screens/timesheet/TimeEntryDetails";
 const Stack = createNativeStackNavigator();
 
 const ClockStack = () => (
-	<Stack.Navigator>
-		<Stack.Screen
-			name="TimeEntryScreen"
-			component={TimeEntryScreen}
-			options={{ headerShown: false }}
-		/>
-		<Stack.Screen
-			name="TimeEntryDetails"
-			component={TimeEntryDetails}
-			options={{ headerShown: false, gestureEnabled: true }}
-		/>
+	<Stack.Navigator screenOptions={stackScreenOptions}>
+		<Stack.Screen name="TimeEntryScreen" component={TimeEntryScreen} />
+		<Stack.Screen name="TimeEntryDetails" component={TimeEntryDetails} />
 	</Stack.Navigator>
 );
 
