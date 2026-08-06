@@ -321,15 +321,20 @@ service cloud.firestore {
                       || v2JoinedViaValidCode()
                     );
       allow update: if v2IsManager(resource.data.companyId)
-                    // A member may keep their own denormalized profile fresh,
-                    // but never their own role, status, visibility or groups.
-                    // hasOnly is what enforces that: the segmentation fields
-                    // are absent from this list, so a worker cannot widen
-                    // their own access.
+                    // A member may keep their own denormalized profile fresh
+                    // and choose which pushes they get, but never their own
+                    // role, status, visibility or groups. hasOnly is what
+                    // enforces that: the segmentation fields are absent from
+                    // this list, so a worker cannot widen their own access.
+                    //
+                    // `notifications` is a preference, not a permission —
+                    // muting yourself grants nothing. It lives here rather than
+                    // on userSettings so a manager can see who has gone quiet,
+                    // which reading userSettings would not allow.
                     || (isSelf(resource.data.userId)
                         && request.resource.data.diff(resource.data)
                              .affectedKeys()
-                             .hasOnly(["firstName","lastName","email","phone","updatedAt"]));
+                             .hasOnly(["firstName","lastName","email","phone","notifications","updatedAt"]));
       allow delete: if false;   // removal is a status change, not a delete
     }
 

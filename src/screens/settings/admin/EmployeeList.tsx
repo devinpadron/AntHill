@@ -24,6 +24,11 @@ import {
 	setMemberVisibility,
 } from "../../../services/groupService";
 import { showMemberActions } from "../../../utils/memberActions";
+import {
+	NOTIFICATION_CHANNELS,
+	NotificationPreferences,
+	notificationPrefs,
+} from "../../../types";
 import { employeeListStyles } from "./EmployeeList.styles";
 import { useTheme, useThemedStyles } from "../../../theme";
 import { SafeAreaBand } from "../../../components/ui";
@@ -34,6 +39,28 @@ if (
 	UIManager.setLayoutAnimationEnabledExperimental
 ) {
 	UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+/*
+ * A one-line summary of someone's push settings.
+ *
+ * Named categories rather than a count, because "2 of 4 off" tells a manager
+ * nothing about whether this person will see tomorrow's assignment.
+ */
+const CHANNEL_LABELS: Record<string, string> = {
+	events: "shifts",
+	availability: "availability",
+	timesheets: "timesheets",
+	team: "team activity",
+};
+
+function describeNotifications(prefs: NotificationPreferences): string {
+	if (!prefs.enabled) return "Notifications off — will not be alerted";
+
+	const muted = NOTIFICATION_CHANNELS.filter((channel) => !prefs[channel]);
+	if (muted.length === 0) return "All notifications on";
+
+	return `Muted: ${muted.map((c) => CHANNEL_LABELS[c]).join(", ")}`;
 }
 
 const EmployeeList = ({ navigation }) => {
@@ -64,6 +91,9 @@ const EmployeeList = ({ navigation }) => {
 				// existed; the migration backfills both explicitly.
 				visibility: m.visibility ?? "open",
 				groupIds: m.groupIds ?? [],
+				// Absent on every membership written before the setting
+				// existed, and absent means ON — see notificationPrefs.
+				notifications: notificationPrefs(m),
 			})),
 		[members],
 	);
@@ -213,6 +243,35 @@ const EmployeeList = ({ navigation }) => {
 											? `Invited jobs only · ${groupNamesFor(item.groupIds).join(", ")}`
 											: "Invited jobs only · no groups yet"
 										: "Sees all open jobs"}
+								</Text>
+							</View>
+
+							{/*
+							 * Which pushes this person receives, read-only.
+							 *
+							 * A manager chasing someone who never replies needs
+							 * to know whether they are ignoring the app or
+							 * simply not being told — those look identical from
+							 * the outside. Read-only on purpose: silencing
+							 * someone else's phone is not a manager's call.
+							 */}
+							<View style={styles.detailRow}>
+								<Ionicons
+									name={
+										item.notifications.enabled
+											? "notifications-outline"
+											: "notifications-off-outline"
+									}
+									size={16}
+									color={
+										item.notifications.enabled
+											? theme.colors.textSecondary
+											: theme.colors.warning
+									}
+									style={styles.detailIcon}
+								/>
+								<Text style={styles.detailText}>
+									{describeNotifications(item.notifications)}
 								</Text>
 							</View>
 

@@ -1,6 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { useUser } from "../../contexts/UserContext";
+import { useCompany } from "../../contexts/CompanyContext";
+import {
+	setNotificationPreferences,
+	subscribeMembership,
+} from "../../services/membershipService";
+import {
+	Membership,
+	NotificationChannel,
+	NotificationPreferences,
+	notificationPrefs,
+} from "../../types";
 import {
 	subscribeUserSettings,
 	updateUserSettings,
@@ -14,6 +25,7 @@ import {
 	SkeletonList,
 	Text,
 	toast,
+	Toggle,
 } from "../../components/ui";
 import { IconName } from "../../components/ui/Icon";
 import { Theme, ThemeMode, useThemePreference } from "../../theme";
@@ -56,10 +68,85 @@ const THEME_MODES: { value: ThemeMode; label: string }[] = [
 	{ value: "system", label: "System" },
 ];
 
+/*
+ * One row per category the Cloud Functions actually send. Adding a row here
+ * without a matching channel in the functions' CHANNEL_BY_TYPE map produces a
+ * switch that silences nothing.
+ */
+const NOTIFICATION_ROWS: {
+	channel: NotificationChannel;
+	title: string;
+	subtitle: string;
+	icon: IconName;
+	adminOnly?: boolean;
+}[] = [
+	{
+		channel: "events",
+		title: "My shifts",
+		subtitle: "Assigned, removed, or details changed",
+		icon: "calendar-outline",
+	},
+	{
+		channel: "availability",
+		title: "Availability requests",
+		subtitle: "New events to reply to, and reminders",
+		icon: "hand-left-outline",
+	},
+	{
+		channel: "timesheets",
+		title: "Timesheet decisions",
+		subtitle: "When your hours are approved or rejected",
+		icon: "time-outline",
+	},
+	{
+		channel: "team",
+		title: "Team activity",
+		subtitle: "People joining or leaving, and availability replies",
+		icon: "people-outline",
+		adminOnly: true,
+	},
+];
+
 const UserPreferences = ({ navigation }) => {
 	const styles = useThemedStyles(preferenceStyles);
-	const { userId, isAdmin } = useUser();
+	const { userId, companyId, isAdmin } = useUser();
+	const { company } = useCompany();
 	const { mode, scheme, selectMode } = useThemePreference();
+
+	/*
+	 * Live from the membership, so a manager toggling someone's access or the
+	 * same account changing this on another device is reflected here.
+	 *
+	 * `notificationPrefs` fills every gap with ON, which is what makes an
+	 * account that predates this feature show all switches on rather than all
+	 * off — the field is simply absent on every existing membership.
+	 */
+	const [membership, setMembership] = useState<Membership | null>(null);
+	const notifications = notificationPrefs(membership);
+
+	useEffect(() => {
+		if (!companyId || !userId) return;
+		return subscribeMembership(companyId, userId, setMembership);
+	}, [companyId, userId]);
+
+	const saveNotifications = async (
+		patch: Partial<NotificationPreferences>,
+	) => {
+		const next = { ...notifications, ...patch };
+		// Optimistic: the toggle must move under the thumb, not after a round
+		// trip. The subscription overwrites this with the server's value.
+		setMembership((prev) =>
+			prev ? { ...prev, notifications: next } : prev,
+		);
+		try {
+			await setNotificationPreferences(companyId, userId, next);
+		} catch (error) {
+			console.error("Error saving notification preferences:", error);
+			toast.error("Could not save that", "Check your connection.");
+		}
+	};
+
+	const rows = NOTIFICATION_ROWS.filter((row) => isAdmin || !row.adminOnly);
 
 	const [loading, setLoading] = useState(true);
 	const [prefMap, setPrefMap] = useState(
@@ -152,6 +239,66 @@ const UserPreferences = ({ navigation }) => {
 						}}
 					/>
 				))}
+			</Card>
+
+			{/*
+			 * Push preferences.
+			 *
+			 * Per company, not per account: these live on the membership, so a
+			 * user who works for two caterers can be reachable by one and quiet
+			 * for the other. The subtitle says so rather than leaving someone to
+			 * discover it.
+			 */}
+			<Card title="Notifications" flush style={styles.card}>
+				<Text
+					variant="caption"
+					color="textSecondary"
+					style={styles.flushHint}
+				>
+					{company?.name
+						? `What ${company.name} can notify you about. Your other companies are set separately.`
+						: "What this company can notify you about."}
+				</Text>
+
+				<ListRow
+					title="Push notifications"
+					subtitle={
+						notifications.enabled
+							? "On — choose what you hear about below"
+							: "Off — nothing will be sent"
+					}
+					icon="notifications-outline"
+					separator={notifications.enabled}
+					accessory={
+						<Toggle
+							value={notifications.enabled}
+							onValueChange={(value) =>
+								saveNotifications({ enabled: value })
+							}
+						/>
+					}
+				/>
+
+				{notifications.enabled &&
+					rows.map((row, index) => (
+						<ListRow
+							key={row.channel}
+							title={row.title}
+							subtitle={row.subtitle}
+							icon={row.icon}
+							separator={index < rows.length - 1}
+							accessory={
+								<Toggle
+									value={notifications[row.channel]}
+									onValueChange={(value) =>
+										saveNotifications({
+											[row.channel]: value,
+										})
+									}
+								/>
+							}
+						/>
+					))}
 			</Card>
 
 			{/*

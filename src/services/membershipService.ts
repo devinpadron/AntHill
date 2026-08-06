@@ -2,7 +2,11 @@ import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
 import firestore from "@react-native-firebase/firestore";
 import db from "../lib/db";
 import { C, membershipId } from "../constants/paths";
-import { Membership, WorkerVisibility } from "../types";
+import {
+	Membership,
+	NotificationPreferences,
+	WorkerVisibility,
+} from "../types";
 import { Role } from "../types";
 import { lookupJoinCode } from "./groupService";
 
@@ -314,6 +318,33 @@ export async function changeMemberRole(
 			});
 	} catch (e) {
 		console.error("Error changing member role", e);
+		throw e;
+	}
+}
+
+/**
+ * Which pushes this member gets.
+ *
+ * Written by the member themselves from personal settings. The security rules
+ * allow `notifications` in a self-update alongside the profile fields — role,
+ * status, visibility and groups are still manager-only, so this cannot be used
+ * to widen anyone's access.
+ */
+export async function setNotificationPreferences(
+	companyId: string,
+	userId: string,
+	preferences: NotificationPreferences,
+): Promise<void> {
+	try {
+		await db
+			.collection(C.memberships)
+			.doc(membershipId(companyId, userId))
+			.update({
+				notifications: preferences,
+				updatedAt: firestore.FieldValue.serverTimestamp(),
+			});
+	} catch (e) {
+		console.error("Error saving notification preferences", e);
 		throw e;
 	}
 }

@@ -39,6 +39,65 @@ export interface Company extends BaseDoc {
 }
 
 /**
+ * Which pushes a worker wants, per company.
+ *
+ * ON THE MEMBERSHIP, not on userSettings, for three reasons. Managers already
+ * read memberships, so "who has notifications off" needs no new rule and no new
+ * query. The Cloud Functions have a companyId in every notification payload
+ * they build, so one lookup answers the question at the point of sending. And
+ * someone who works for two caterers can be reachable by one and not the other,
+ * which a single global switch cannot express.
+ *
+ * EVERY FIELD DEFAULTS TO TRUE, and the whole object is optional — an absent
+ * `notifications` means "all on", which is what every existing membership has.
+ * Read it through `notificationPrefs()` rather than directly so that stays true.
+ */
+export interface NotificationPreferences {
+	/** Master switch. Off silences every category below. */
+	enabled: boolean;
+	/** Assigned to, removed from, or changes to an event you work. */
+	events: boolean;
+	/** Open events to reply to, and reminders that you have not. */
+	availability: boolean;
+	/** Your timesheets being approved or rejected. */
+	timesheets: boolean;
+	/** Manager-facing: people joining or leaving, and availability replies. */
+	team: boolean;
+}
+
+export const NOTIFICATION_CHANNELS = [
+	"events",
+	"availability",
+	"timesheets",
+	"team",
+] as const;
+
+export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
+
+export const defaultNotificationPreferences: NotificationPreferences = {
+	enabled: true,
+	events: true,
+	availability: true,
+	timesheets: true,
+	team: true,
+};
+
+/**
+ * A membership's preferences, with every gap filled in as ON.
+ *
+ * The single place that turns "absent" into "all on". Reading
+ * `membership.notifications.events` directly is undefined for every account
+ * that predates this, and `undefined` is falsy — which would silently mute
+ * the entire existing user base.
+ */
+export const notificationPrefs = (
+	membership: Pick<Membership, "notifications"> | null | undefined,
+): NotificationPreferences => ({
+	...defaultNotificationPreferences,
+	...(membership?.notifications ?? {}),
+});
+
+/**
  * memberships/{companyId}_{userId}
  *
  * Replaces BOTH halves of v1's bidirectional membership (`Users.companies[]`
@@ -69,6 +128,11 @@ export interface Membership extends BaseDoc, CompanyScoped {
 	visibility: WorkerVisibility;
 	/** Groups this worker belongs to. Managers publish events to groups. */
 	groupIds: string[];
+	/**
+	 * Push preferences. Absent on every membership written before this existed,
+	 * and absent means ALL ON — see NotificationPreferences.
+	 */
+	notifications?: NotificationPreferences;
 	/**
 	 * The group join code this membership was created with, if any.
 	 *
