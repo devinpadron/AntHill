@@ -55,6 +55,25 @@ const HomeTabs = () => {
 	const insets = useSafeAreaInsets();
 	const { unconfirmedCount, awaitingReply } = useEventPrompts();
 
+	/*
+	 * ONE badge style for every tab.
+	 *
+	 * These were briefly different colours — danger on Calendar, accent on
+	 * Availability — on the reasoning that a shift already promised on your
+	 * behalf is more serious than an invitation you have not answered. True,
+	 * but it does not survive contact with a tab bar: two badges of different
+	 * colours side by side read as two different KINDS of thing, and a user
+	 * has to learn a colour code to find out they both mean "open this".
+	 *
+	 * Red, because that is what an unread count is everywhere else on a phone.
+	 * Defined once so the next edit to one cannot desync the other.
+	 */
+	const badgeStyle = {
+		backgroundColor: theme.colors.danger,
+		color: theme.colors.textInverse,
+		fontSize: 11,
+	};
+
 	return (
 		<Tab.Navigator
 			screenOptions={{
@@ -95,11 +114,7 @@ const HomeTabs = () => {
 					 * renders a dot for 0.
 					 */
 					tabBarBadge: unconfirmedCount || undefined,
-					tabBarBadgeStyle: {
-						backgroundColor: theme.colors.danger,
-						color: theme.colors.textInverse,
-						fontSize: 11,
-					},
+					tabBarBadgeStyle: badgeStyle,
 				}}
 			/>
 			{preferences.enableAvailability && (
@@ -110,18 +125,9 @@ const HomeTabs = () => {
 					options={{
 						tabBarAccessibilityLabel: "Availability",
 						tabBarIcon: icon("people", "people-outline"),
-						/*
-						 * Invitations still unanswered. Accent rather than the
-						 * Calendar badge's danger red: an unanswered invitation
-						 * is work waiting, while an unconfirmed shift is
-						 * something already promised on your behalf.
-						 */
+						/* Invitations still unanswered. */
 						tabBarBadge: awaitingReply || undefined,
-						tabBarBadgeStyle: {
-							backgroundColor: theme.colors.accent,
-							color: theme.colors.onAccent,
-							fontSize: 11,
-						},
+						tabBarBadgeStyle: badgeStyle,
 					}}
 				/>
 			)}
