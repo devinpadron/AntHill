@@ -143,6 +143,7 @@ export const editSheetStyles = (theme: Theme) =>
 			color: theme.colors.text,
 		},
 		modalInput: {
+			color: theme.colors.text,
 			height: 44,
 			borderWidth: 1,
 			borderColor: theme.colors.border,
@@ -153,6 +154,7 @@ export const editSheetStyles = (theme: Theme) =>
 			backgroundColor: theme.colors.surface,
 		},
 		modalTextArea: {
+			color: theme.colors.text,
 			minHeight: 100,
 			borderWidth: 1,
 			borderColor: theme.colors.border,
@@ -174,6 +176,7 @@ export const editSheetStyles = (theme: Theme) =>
 			marginBottom: 8,
 		},
 		formInput: {
+			color: theme.colors.text,
 			height: 44,
 			borderWidth: 1,
 			borderColor: theme.colors.border,
@@ -299,6 +302,7 @@ export const editSheetStyles = (theme: Theme) =>
 			marginRight: 16,
 		},
 		pauseDurationInput: {
+			color: theme.colors.text,
 			width: 50,
 			height: 44,
 			borderWidth: 1,

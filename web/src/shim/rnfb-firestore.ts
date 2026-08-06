@@ -9,6 +9,7 @@ import {
 	startAfter as mStartAfter,
 	getDoc,
 	getDocs,
+	getCountFromServer,
 	onSnapshot as mOnSnapshot,
 	setDoc,
 	updateDoc,
@@ -162,6 +163,19 @@ export class Q {
 		return new QuerySnap(await getDocs(this._q));
 	}
 
+	/**
+	 * Aggregate count, in RNFirebase's two-step shape: `query.count().get()`
+	 * resolving to something whose `.data().count` is the number.
+	 *
+	 * Billed per index entry read rather than per document, so it is the only
+	 * affordable way to total a collection the client is not going to fetch.
+	 * Any `limit()` already applied is ignored by the server, which is what
+	 * callers want — a count of the whole matching set, not of one page.
+	 */
+	count(): AggregateQ {
+		return new AggregateQ(this._q);
+	}
+
 	onSnapshot(
 		onNext: (snapshot: QuerySnap) => void,
 		onError?: (error: FirestoreError) => void,
@@ -171,6 +185,16 @@ export class Q {
 			(snapshot) => onNext(new QuerySnap(snapshot)),
 			onError ?? (() => {}),
 		);
+	}
+}
+
+export class AggregateQ {
+	constructor(readonly _q: MQueryType<DocumentData>) {}
+
+	async get(): Promise<{ data: () => { count: number } }> {
+		const snapshot = await getCountFromServer(this._q);
+		const { count } = snapshot.data();
+		return { data: () => ({ count }) };
 	}
 }
 

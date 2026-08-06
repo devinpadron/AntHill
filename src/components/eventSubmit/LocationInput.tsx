@@ -85,10 +85,22 @@ const LocationInputComponent = ({
 						key: API_KEY,
 						language: "en",
 					}}
+					/*
+					 * Every surface this widget draws has to be named
+					 * explicitly. Its defaults are a hardcoded white input on a
+					 * white dropdown with black text — which is why it was the
+					 * one field in the event form that stayed white in dark
+					 * mode.
+					 */
 					styles={{
 						textInput: styles.placesTextInput,
 						listView: styles.placesListView,
 						row: styles.placesRow,
+						description: styles.placesDescription,
+						separator: styles.placesSeparator,
+					}}
+					textInputProps={{
+						placeholderTextColor: theme.colors.textTertiary,
 					}}
 					fetchDetails={true}
 					enablePoweredByContainer={false}
@@ -137,7 +149,7 @@ const LocationInputComponent = ({
 									<Ionicons
 										name="trash-outline"
 										size={24}
-										color="red"
+										color={theme.colors.danger}
 									/>
 								</TouchableOpacity>
 							</View>
@@ -198,6 +210,7 @@ const locationStyles = (theme: Theme) =>
 			fontSize: 14,
 			marginRight: 10,
 			flexWrap: "wrap",
+			color: theme.colors.text,
 		},
 		locationButtonContainer: {
 			flexDirection: "row",
@@ -225,17 +238,18 @@ const locationStyles = (theme: Theme) =>
 			borderRadius: 10,
 			paddingHorizontal: 15,
 			fontSize: 14,
-			backgroundColor: "white",
+			backgroundColor: theme.colors.surface,
+			color: theme.colors.text,
 			marginRight: 10,
 		},
 		saveLabelButton: {
-			backgroundColor: theme.colors.textSecondary,
+			backgroundColor: theme.colors.accent,
 			paddingVertical: 8,
 			paddingHorizontal: 12,
 			borderRadius: 10,
 		},
 		saveLabelButtonText: {
-			color: "white",
+			color: theme.colors.onAccent,
 			fontSize: 14,
 			fontWeight: "600",
 		},
@@ -244,6 +258,7 @@ const locationStyles = (theme: Theme) =>
 			fontSize: 14,
 			marginTop: 5,
 			marginBottom: 10,
+			color: theme.colors.textSecondary,
 		},
 		placesTextInput: {
 			height: 50,
@@ -252,18 +267,27 @@ const locationStyles = (theme: Theme) =>
 			borderRadius: 10,
 			paddingHorizontal: 15,
 			fontSize: 16,
-			backgroundColor: "white",
+			backgroundColor: theme.colors.surface,
+			color: theme.colors.text,
 		},
 		placesListView: {
 			borderWidth: 1,
 			borderColor: theme.colors.border,
 			borderRadius: 10,
-			backgroundColor: "white",
+			backgroundColor: theme.colors.surface,
 			marginTop: 5,
 		},
 		placesRow: {
 			padding: 13,
 			height: 44,
+			backgroundColor: theme.colors.surface,
+		},
+		placesDescription: {
+			color: theme.colors.text,
+		},
+		placesSeparator: {
+			height: theme.hairlineWidth,
+			backgroundColor: theme.colors.border,
 		},
 	});
 

@@ -19,7 +19,17 @@ import { getMembersInGroups } from "./groupService";
 /** Firestore caps array-contains-any at 30 values. */
 export const MAX_SELECTED_USERS = 30;
 
-const DEFAULT_LIMIT = 300;
+/**
+ * Most events any one query returns.
+ *
+ * Exported because the cap is not invisible to callers: results are ordered by
+ * `dateKey` ASCENDING, so hitting it drops the LATEST events in the window, not
+ * the least relevant ones. A UI that widens its date range needs to be able to
+ * tell "nothing more is scheduled" from "more is scheduled than we fetched".
+ */
+export const EVENT_QUERY_LIMIT = 300;
+
+const DEFAULT_LIMIT = EVENT_QUERY_LIMIT;
 
 const toEvent = (doc: FirebaseFirestoreTypes.DocumentSnapshot): Event => ({
 	...(doc.data() as Event),
@@ -74,30 +84,41 @@ function toPersisted(input: EventWriteInput): Record<string, unknown> {
 export type EventWindow = {
 	/** Inclusive "YYYY-MM-DD". */
 	from: string;
-	/** Inclusive "YYYY-MM-DD". */
-	to: string;
+	/**
+	 * Inclusive "YYYY-MM-DD". OMIT for an open-ended forward range.
+	 *
+	 * A grid has to know both edges of what it is drawing. A list paging
+	 * forward does not, and giving it a `to` is what makes a schedule appear to
+	 * stop on an arbitrary date — page size, not a date, is what should bound
+	 * an infinite list.
+	 */
+	to?: string;
 	filter: FilterType;
 	/** Required for FilterType.MY. */
 	userId?: string;
 	/** Required for FilterType.SPECIFIC. */
 	selectedUsers?: string[];
 	limit?: number;
+	/** Page cursor — the last document of the previous page. */
+	startAfter?: FirebaseFirestoreTypes.DocumentSnapshot;
 };
 
 /**
- * Builds the query for a filter. One shape per FilterType, each backed by a
- * composite index declared in firestore.indexes.json.
+ * The filter clauses only — no ordering, cursor or limit.
  *
- * Returns null when the filter cannot match anything (SPECIFIC with nobody
- * selected), so callers can skip the round trip entirely — v1 fetched
- * everything and then returned [].
+ * Split out because `count()` needs exactly this and nothing else: Firestore
+ * APPLIES a `limit()` to an aggregation, so counting through `buildQuery` would
+ * answer "how big is one page" rather than "how many are there".
+ *
+ * One shape per FilterType, each backed by a composite index declared in
+ * firestore.indexes.json. Returns null when the filter cannot match anything
+ * (SPECIFIC with nobody selected), so callers can skip the round trip entirely
+ * — v1 fetched everything and then returned [].
  */
-function buildQuery(
+function buildFilteredQuery(
 	companyId: string,
 	window: EventWindow,
 ): FirebaseFirestoreTypes.Query | null {
-	const limit = window.limit ?? DEFAULT_LIMIT;
-
 	let query: FirebaseFirestoreTypes.Query = db
 		.collection(C.events)
 		.where("companyId", "==", companyId);
@@ -137,11 +158,24 @@ function buildQuery(
 			break;
 	}
 
-	return query
-		.where("dateKey", ">=", window.from)
-		.where("dateKey", "<=", window.to)
-		.orderBy("dateKey")
-		.limit(limit);
+	query = query.where("dateKey", ">=", window.from);
+	if (window.to) query = query.where("dateKey", "<=", window.to);
+
+	return query;
+}
+
+/** One ordered, cursored, limited page. */
+function buildQuery(
+	companyId: string,
+	window: EventWindow,
+): FirebaseFirestoreTypes.Query | null {
+	const filtered = buildFilteredQuery(companyId, window);
+	if (!filtered) return null;
+
+	let query = filtered.orderBy("dateKey");
+	if (window.startAfter) query = query.startAfter(window.startAfter);
+
+	return query.limit(window.limit ?? DEFAULT_LIMIT);
 }
 
 /**
@@ -182,19 +216,30 @@ export function refineSelection(
 export function subscribeEventsInRange(
 	companyId: string,
 	window: EventWindow,
-	onChange: (events: Event[]) => void,
+	/**
+	 * `cursor` is the last document of this page, for callers paging past it.
+	 * Additive second argument — existing callers ignore it.
+	 */
+	onChange: (
+		events: Event[],
+		cursor: FirebaseFirestoreTypes.DocumentSnapshot | null,
+	) => void,
 	onError?: (error: Error) => void,
 ): () => void {
 	if (!companyId) return () => {};
 
 	const query = buildQuery(companyId, window);
 	if (!query) {
-		onChange([]);
+		onChange([], null);
 		return () => {};
 	}
 
 	return query.onSnapshot(
-		(snapshot) => onChange(snapshot.docs.map(toEvent)),
+		(snapshot) =>
+			onChange(
+				snapshot.docs.map(toEvent),
+				snapshot.docs[snapshot.docs.length - 1] ?? null,
+			),
 		(error) => {
 			// A missing composite index surfaces as failed-precondition, and the
 			// console's creation URL is in the message. v1 swallowed this and
@@ -203,6 +248,83 @@ export function subscribeEventsInRange(
 			onError?.(error);
 		},
 	);
+}
+
+/**
+ * An opaque page cursor.
+ *
+ * Aliased here so callers can hold one without importing Firestore themselves —
+ * `tools/check-layering.sh` rule 1 forbids hooks and screens from reaching the
+ * SDK, and a type-only import is still an import.
+ */
+export type EventCursor = FirebaseFirestoreTypes.DocumentSnapshot;
+
+export type EventPage = {
+	events: Event[];
+	/** Feed back as `window.startAfter` to fetch the next page. */
+	cursor: FirebaseFirestoreTypes.DocumentSnapshot | null;
+	/**
+	 * A full page came back, so there is probably another. False is definitive;
+	 * true is a "keep going", not a promise — the next page may be empty when
+	 * the total is an exact multiple of the page size.
+	 */
+	hasMore: boolean;
+};
+
+/**
+ * One page of events, with the cursor to continue from.
+ *
+ * The unit of an infinite list. Callers accumulate pages themselves rather than
+ * re-running a widening query, which re-read and re-rendered everything already
+ * on screen every time the range grew.
+ */
+export async function getEventPage(
+	companyId: string,
+	window: EventWindow,
+): Promise<EventPage> {
+	const query = buildQuery(companyId, window);
+	if (!query) return { events: [], cursor: null, hasMore: false };
+
+	const size = window.limit ?? DEFAULT_LIMIT;
+
+	try {
+		const snapshot = await query.get();
+		return {
+			events: snapshot.docs.map(toEvent),
+			cursor: snapshot.docs[snapshot.docs.length - 1] ?? null,
+			hasMore: snapshot.docs.length === size,
+		};
+	} catch (e) {
+		console.error("Error getting event page", e);
+		return { events: [], cursor: null, hasMore: false };
+	}
+}
+
+/**
+ * How many events match, without reading them.
+ *
+ * Billed per index entry rather than per document, so a schedule of any size
+ * can be totalled for roughly the price of one read. This is what lets a
+ * counter say how many events there ARE rather than how many happen to be
+ * loaded.
+ *
+ * Returns null on failure, which callers must distinguish from 0 — showing
+ * "0 events" because an aggregation failed is worse than showing nothing.
+ */
+export async function countEventsInRange(
+	companyId: string,
+	window: EventWindow,
+): Promise<number | null> {
+	const query = buildFilteredQuery(companyId, window);
+	if (!query) return 0;
+
+	try {
+		const snapshot = await query.count().get();
+		return snapshot.data().count;
+	} catch (e) {
+		console.error("Error counting events", e);
+		return null;
+	}
 }
 
 export async function getEventsInRange(

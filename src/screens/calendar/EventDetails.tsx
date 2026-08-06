@@ -131,6 +131,16 @@ const EventDetails = ({ navigation }) => {
 		0,
 	);
 
+	/** Package ids whose description the reader has asked to see. */
+	const [shownDescriptions, setShownDescriptions] = useState<string[]>([]);
+
+	const toggleDescription = (packageId: string) =>
+		setShownDescriptions((prev) =>
+			prev.includes(packageId)
+				? prev.filter((id) => id !== packageId)
+				: [...prev, packageId],
+		);
+
 	const finishEditingNotes = () => {
 		saveNotes();
 		setIsEditingNotes(false);
@@ -333,6 +343,35 @@ const EventDetails = ({ navigation }) => {
 									{pkg.title}
 								</Text>
 
+								{/*
+								 * Descriptions are opt-in — some companies write
+								 * a paragraph per package, and printing four of
+								 * them buried the checklists underneath.
+								 */}
+								{!!pkg.description && (
+									<IconButton
+										name={
+											shownDescriptions.includes(pkg.id)
+												? "information-circle"
+												: "information-circle-outline"
+										}
+										label={
+											shownDescriptions.includes(pkg.id)
+												? `Hide what ${pkg.title} includes`
+												: `What ${pkg.title} includes`
+										}
+										size="sm"
+										color={
+											shownDescriptions.includes(pkg.id)
+												? "accent"
+												: "textTertiary"
+										}
+										onPress={() =>
+											toggleDescription(pkg.id)
+										}
+									/>
+								)}
+
 								{!!pkg.checklists?.length && (
 									<Button
 										title={String(pkg.checklists.length)}
@@ -359,15 +398,16 @@ const EventDetails = ({ navigation }) => {
 								)}
 							</View>
 
-							{!!pkg.description && (
-								<Text
-									variant="caption"
-									color="textSecondary"
-									style={styles.packageDescription}
-								>
-									{pkg.description}
-								</Text>
-							)}
+							{!!pkg.description &&
+								shownDescriptions.includes(pkg.id) && (
+									<Text
+										variant="caption"
+										color="textSecondary"
+										style={styles.packageDescription}
+									>
+										{pkg.description}
+									</Text>
+								)}
 
 							{/* A preview, not the list — the button opens it. */}
 							{!!pkg.checklists?.length && (

@@ -508,23 +508,98 @@ const TimeEntryDetails = ({ route, navigation }) => {
 		);
 	};
 
+	/*
+	 * The audit summary.
+	 *
+	 * "Updated field: f_mh2k91_x7q9" told a manager reading the history nothing
+	 * — the id is an implementation detail of the form editor, and nobody has
+	 * ever seen it on screen. The question is what they answered, so the
+	 * question is what gets recorded, with the value it replaced.
+	 *
+	 * Same shape as the web portal's useEntryEdits, so one entry's history reads
+	 * the same however it was edited.
+	 */
+	const labelFor = (schema, fieldId) =>
+		schema?.fields?.find((f) => f.id === fieldId)?.label || fieldId;
+
+	const displayValue = (value) =>
+		value === null || value === undefined || value === ""
+			? "—"
+			: String(value);
+
 	// Add this function to handle individual field updates
 	const handleFieldUpdate = async (entryId, fieldId, value) => {
 		try {
-			// For entry fields
-			if (!fieldId.includes("_")) {
-				// Update a single field in the form responses
+			const { timeEntrySchema, eventSchema } =
+				schemasByEntry[entryId] ?? {};
+
+			/*
+			 * Which form the key belongs to is decided by looking it UP, not by
+			 * looking for an underscore.
+			 *
+			 * `fieldId.includes("_")` used to make that call, on the assumption
+			 * that only a connection's key was compound. Every field the web
+			 * portal's form editor creates is `f_<base36>_<rand>`, so a
+			 * portal-made time-entry field took the connection branch, matched
+			 * no connection, and quick edit died with "Connected event not
+			 * found".
+			 */
+			const entryField = (timeEntrySchema?.fields ?? []).find(
+				(f) => f.id === fieldId,
+			);
+
+			/*
+			 * Connections are their own documents now, so one field change is
+			 * one targeted write. v1 rebuilt the entire connectedEvents array on
+			 * the parent entry.
+			 *
+			 * Resolved by PREFIX, never by splitting on "_": a connection the
+			 * worker typed in rather than linking gets the id
+			 * `custom_<timestamp>_<index>`, so splitting took the first segment
+			 * — "custom" — and nothing matched.
+			 */
+			const connection = entryField
+				? null
+				: (await getConnections(entryId)).find((c) =>
+						fieldId.startsWith(`${c.id}_`),
+					);
+
+			if (connection) {
+				const eventFieldId = fieldId.slice(connection.id.length + 1);
+				const before = connection.formResponses?.[eventFieldId];
+
+				await updateConnectionResponses(entryId, connection.id, {
+					...(connection.formResponses ?? {}),
+					[eventFieldId]: value,
+				});
+
+				const eventName =
+					connection.customTitle ||
+					connection.eventTitleSnapshot ||
+					"event";
+
+				await appendEdit(companyId, entryId, {
+					summary: `${eventName} — ${labelFor(eventSchema, eventFieldId)}: ${displayValue(before)} → ${displayValue(value)}`,
+					actorUserId: currentUserId,
+					actorDisplayName:
+						membersById[currentUserId]?.displayName ?? "",
+				});
+			} else {
+				/*
+				 * Falls through to here when the schema did not load either, so
+				 * an entry field is still editable with a degraded summary
+				 * rather than throwing.
+				 */
 				const entry = timeEntries.find((e) => e.id === entryId);
 				if (!entry) throw new Error("Entry not found");
 
-				const updatedFormResponses = {
-					...entry.formResponses,
-					[fieldId]: value,
-				};
+				const before = entry.formResponses?.[fieldId];
 
-				// Update the time entry with just the form responses
 				await updateTimeEntry(entryId, {
-					formResponses: updatedFormResponses,
+					formResponses: {
+						...entry.formResponses,
+						[fieldId]: value,
+					},
 				});
 
 				/*
@@ -534,49 +609,7 @@ const TimeEntryDetails = ({ route, navigation }) => {
 				 * renderer actually read.
 				 */
 				await appendEdit(companyId, entryId, {
-					summary: `Updated field: ${fieldId}`,
-					actorUserId: currentUserId,
-					actorDisplayName:
-						membersById[currentUserId]?.displayName ?? "",
-				});
-			}
-			// For connected event fields
-			else {
-				/*
-				 * Connections are their own documents now, so one field change
-				 * is one targeted write. v1 rebuilt the entire connectedEvents
-				 * array on the parent entry.
-				 */
-				const connections = await getConnections(entryId);
-
-				/*
-				 * Resolved by PREFIX, never by splitting on "_".
-				 *
-				 * Both halves of this key can contain underscores. A connection
-				 * the worker typed in rather than linking gets the id
-				 * `custom_<timestamp>_<index>`, and a field created in the web
-				 * portal's form editor gets `f_<base36>_<rand>`. Splitting took
-				 * the first segment — "custom" — and no connection matched, so
-				 * editing an event form on a self-made connection always failed
-				 * with "Connected event not found".
-				 *
-				 * Matching the known ids against the key has no such ambiguity.
-				 */
-				const connection = connections.find((c) =>
-					fieldId.startsWith(`${c.id}_`),
-				);
-				if (!connection) {
-					throw new Error("Connected event not found");
-				}
-				const eventFieldId = fieldId.slice(connection.id.length + 1);
-
-				await updateConnectionResponses(entryId, connection.id, {
-					...(connection.formResponses ?? {}),
-					[eventFieldId]: value,
-				});
-
-				await appendEdit(companyId, entryId, {
-					summary: `Updated event field: ${eventFieldId}`,
+					summary: `${labelFor(timeEntrySchema, fieldId)}: ${displayValue(before)} → ${displayValue(value)}`,
 					actorUserId: currentUserId,
 					actorDisplayName:
 						membersById[currentUserId]?.displayName ?? "",

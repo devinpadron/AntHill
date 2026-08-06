@@ -169,13 +169,9 @@ export function FieldEditor({
 					 * It used to gate whether a field could be corrected from
 					 * the payroll screen, which meant a manager could fix one
 					 * figure and not the one beside it for reasons invisible on
-					 * screen. Every field is now editable in place, so the flag
-					 * has nothing left to decide.
-					 *
-					 * `quickEditPayroll` still exists on the schema and is
-					 * carried through untouched when publishing, because the
-					 * MOBILE app still reads it to decide the same thing. It is
-					 * set from the app's own form editor.
+					 * screen. Both clients now make every field editable in
+					 * place, so the flag has been removed from FormField
+					 * entirely.
 					 */}
 
 					{numeric && (

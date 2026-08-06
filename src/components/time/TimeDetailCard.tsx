@@ -1,12 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import {
-	View,
-	Text,
-	TouchableOpacity,
-	TextInput,
-	ActivityIndicator,
-	Alert,
-} from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { format } from "date-fns";
 import {
@@ -15,6 +8,7 @@ import {
 	getStatusBadgeText,
 } from "../../utils/timeUtils";
 import FormFieldValue from "./FormFieldValue";
+import { QuickField } from "./QuickField";
 import { getPackagesByIds } from "../../services/libraryService";
 import { getEvent } from "../../services/eventService";
 import { getEdits } from "../../services/timeEntryEditService";
@@ -41,9 +35,32 @@ const TimeDetailCard = ({
 	const theme = useTheme();
 	const styles = useThemedStyles(timeDetailCardStyles);
 	// Existing state variables
-	const [editingFields, setEditingFields] = useState({});
-	const [fieldValues, setFieldValues] = useState({});
-	const [savingFields, setSavingFields] = useState({});
+	/*
+	 * Persist one answer. `fieldId` is the plain field id for the entry's own
+	 * form, or `${connection.id}_${field.id}` for a connected event's.
+	 *
+	 * The screen tells them apart by looking the id up in the time-entry schema
+	 * first, then matching known connection ids as a PREFIX — NOT by hunting for
+	 * an underscore. Both halves of the key can contain them: connections the
+	 * worker typed in are `custom_<ts>_<i>`, and portal-made fields are
+	 * `f_<base36>_<rand>`.
+	 */
+	const saveField = useCallback(
+		(fieldId, next) => onFieldUpdate(entry.id, fieldId, next),
+		[entry.id, onFieldUpdate],
+	);
+
+	/*
+	 * Which fields an admin may correct in place.
+	 *
+	 * Text and numbers only. Checklists, selections and files need pickers
+	 * rather than a keyboard and stay read-only here — the edit sheet handles
+	 * those. `quickEditPayroll` used to gate this per field; it no longer does,
+	 * so a manager is never left wondering why one figure is editable and the
+	 * one beside it is not.
+	 */
+	const isQuickEditable = (field) =>
+		["text", "number", "currency", "quantity"].includes(field.type);
 	const { companyId } = useUser();
 	const { byUserId: membersById } = useCompanyMembers(companyId ?? "");
 	const { preferences } = useCompany();
@@ -178,164 +195,6 @@ const TimeDetailCard = ({
 						</Text>
 					</View>
 				))}
-			</View>
-		);
-	};
-
-	// Helper to toggle edit mode for a field
-	const toggleFieldEdit = useCallback(
-		(fieldId, currentValue) => {
-			setEditingFields((prev) => ({
-				...prev,
-				[fieldId]: !prev[fieldId],
-			}));
-
-			if (!editingFields[fieldId]) {
-				// Starting to edit - store current value
-				setFieldValues((prev) => ({
-					...prev,
-					[fieldId]: currentValue,
-				}));
-			}
-		},
-		[editingFields],
-	);
-
-	// Update field value as user types
-	const updateFieldValue = useCallback((fieldId, value) => {
-		setFieldValues((prev) => ({
-			...prev,
-			[fieldId]: value,
-		}));
-	}, []);
-
-	// Save field change
-	const saveFieldChange = useCallback(
-		async (fieldId, fieldType) => {
-			try {
-				// Mark field as saving
-				setSavingFields((prev) => ({
-					...prev,
-					[fieldId]: true,
-				}));
-
-				// Process value based on field type
-				let processedValue = fieldValues[fieldId];
-				if (
-					fieldType === "number" ||
-					fieldType === "currency" ||
-					fieldType === "quantity"
-				) {
-					processedValue = parseFloat(processedValue);
-					if (isNaN(processedValue)) {
-						throw new Error("Please enter a valid number");
-					}
-				}
-
-				// Call the update function from props
-				await onFieldUpdate(entry.id, fieldId, processedValue);
-
-				// Exit edit mode
-				setEditingFields((prev) => ({
-					...prev,
-					[fieldId]: false,
-				}));
-			} catch (error) {
-				Alert.alert("Error", error.message || "Failed to update field");
-			} finally {
-				setSavingFields((prev) => ({
-					...prev,
-					[fieldId]: false,
-				}));
-			}
-		},
-		[entry.id, fieldValues, onFieldUpdate],
-	);
-
-	// Render an editable field
-	const renderEditableField = (field, value) => {
-		const isEditing = editingFields[field.id];
-		const isSaving = savingFields[field.id];
-
-		if (isSaving) {
-			return (
-				<ActivityIndicator size="small" color={theme.colors.accent} />
-			);
-		}
-
-		if (isEditing) {
-			// Render appropriate input based on field type
-			switch (field.type) {
-				case "number":
-				case "currency":
-				case "quantity":
-					return (
-						<View style={styles.editableFieldContainer}>
-							<TextInput
-								style={styles.editableInput}
-								value={String(fieldValues[field.id] || "")}
-								onChangeText={(text) =>
-									updateFieldValue(field.id, text)
-								}
-								keyboardType="numeric"
-								autoFocus
-							/>
-							<TouchableOpacity
-								style={styles.saveButton}
-								onPress={() =>
-									saveFieldChange(field.id, field.type)
-								}
-							>
-								<Icon
-									name="check"
-									size={20}
-									color={theme.colors.onAccent}
-								/>
-							</TouchableOpacity>
-						</View>
-					);
-				default:
-					return (
-						<View style={styles.editableFieldContainer}>
-							<TextInput
-								style={styles.editableInput}
-								value={String(fieldValues[field.id] || "")}
-								onChangeText={(text) =>
-									updateFieldValue(field.id, text)
-								}
-								autoFocus
-							/>
-							<TouchableOpacity
-								style={styles.saveButton}
-								onPress={() =>
-									saveFieldChange(field.id, field.type)
-								}
-							>
-								<Icon
-									name="check"
-									size={20}
-									color={theme.colors.onAccent}
-								/>
-							</TouchableOpacity>
-						</View>
-					);
-			}
-		}
-
-		// Display current value with edit icon
-		return (
-			<View style={styles.quickEditContainer}>
-				<FormFieldValue
-					field={field}
-					response={value}
-					attachments={attachmentMap[entry.id] || []}
-				/>
-				<TouchableOpacity
-					style={styles.quickEditButton}
-					onPress={() => toggleFieldEdit(field.id, value)}
-				>
-					<Icon name="pencil" size={16} color={theme.colors.accent} />
-				</TouchableOpacity>
 			</View>
 		);
 	};
@@ -590,15 +449,26 @@ const TimeDetailCard = ({
 																	}
 																</Text>
 
-																{field.quickEditPayroll &&
-																isAdmin ? (
-																	renderEditableField(
-																		{
-																			...field,
-																			id: fieldKey,
-																		},
-																		response,
-																	)
+																{isAdmin &&
+																isQuickEditable(
+																	field,
+																) ? (
+																	<QuickField
+																		field={
+																			field
+																		}
+																		value={
+																			response
+																		}
+																		onSave={(
+																			next,
+																		) =>
+																			saveField(
+																				fieldKey,
+																				next,
+																			)
+																		}
+																	/>
 																) : (
 																	<FormFieldValue
 																		field={
@@ -645,8 +515,14 @@ const TimeDetailCard = ({
 										{field.label}
 									</Text>
 
-									{field.quickEditPayroll && isAdmin ? (
-										renderEditableField(field, response)
+									{isAdmin && isQuickEditable(field) ? (
+										<QuickField
+											field={field}
+											value={response}
+											onSave={(next) =>
+												saveField(field.id, next)
+											}
+										/>
 									) : (
 										<FormFieldValue
 											field={field}

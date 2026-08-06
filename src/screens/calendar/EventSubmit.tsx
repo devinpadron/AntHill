@@ -29,6 +29,7 @@ import {
 	Card,
 	Checkbox,
 	Icon,
+	IconButton,
 	Input,
 	ListRow,
 	Loading,
@@ -428,6 +429,24 @@ const EventSubmit = ({ navigation }) => {
 				: [...prev, packageId],
 		);
 
+	/*
+	 * Package descriptions are opt-in.
+	 *
+	 * They used to print in full under every checkbox. Some companies write a
+	 * paragraph, so choosing between four packages meant scrolling past four
+	 * paragraphs — the list of things to pick got buried in the explanation of
+	 * what they are. The info button is per package, so you read the one you are
+	 * unsure about.
+	 */
+	const [shownDescriptions, setShownDescriptions] = useState<string[]>([]);
+
+	const toggleDescription = (packageId: string) =>
+		setShownDescriptions((prev) =>
+			prev.includes(packageId)
+				? prev.filter((id) => id !== packageId)
+				: [...prev, packageId],
+		);
+
 	const pickerTheme = theme.isDark ? "dark" : "light";
 
 	return (
@@ -796,22 +815,63 @@ const EventSubmit = ({ navigation }) => {
 						No packages yet — create them under Settings › Packages.
 					</Text>
 				) : (
-					availablePackages.map((pkg) => (
-						<Checkbox
-							key={pkg.id}
-							checked={selectedPackages.includes(pkg.id)}
-							onPress={() => togglePackage(pkg.id)}
-							label={pkg.title}
-							description={
-								pkg.description ||
-								`${pkg.checklists?.length ?? 0} ${
-									pkg.checklists?.length === 1
-										? "checklist"
-										: "checklists"
-								}`
-							}
-						/>
-					))
+					availablePackages.map((pkg) => {
+						const count = pkg.checklists?.length ?? 0;
+						const showing = shownDescriptions.includes(pkg.id);
+
+						return (
+							<View key={pkg.id}>
+								<View style={styles.packageRow}>
+									<Checkbox
+										checked={selectedPackages.includes(
+											pkg.id,
+										)}
+										onPress={() => togglePackage(pkg.id)}
+										label={pkg.title}
+										description={`${count} ${
+											count === 1
+												? "checklist"
+												: "checklists"
+										}`}
+										style={styles.packageCheckbox}
+									/>
+									{!!pkg.description && (
+										<IconButton
+											name={
+												showing
+													? "information-circle"
+													: "information-circle-outline"
+											}
+											label={
+												showing
+													? `Hide what ${pkg.title} includes`
+													: `What ${pkg.title} includes`
+											}
+											size="sm"
+											color={
+												showing
+													? "accent"
+													: "textTertiary"
+											}
+											onPress={() =>
+												toggleDescription(pkg.id)
+											}
+										/>
+									)}
+								</View>
+
+								{showing && !!pkg.description && (
+									<Text
+										variant="caption"
+										color="textSecondary"
+										style={styles.packageDescription}
+									>
+										{pkg.description}
+									</Text>
+								)}
+							</View>
+						);
+					})
 				)}
 			</Card>
 
@@ -916,6 +976,19 @@ const submitStyles = (theme: Theme) =>
 		},
 		card: {
 			marginTop: theme.spacing.lg,
+		},
+		packageRow: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: theme.spacing.xs,
+		},
+		packageCheckbox: {
+			flex: 1,
+		},
+		packageDescription: {
+			paddingLeft: theme.spacing.xl + theme.spacing.sm,
+			paddingRight: theme.spacing.md,
+			paddingBottom: theme.spacing.sm,
 		},
 		field: {
 			marginBottom: theme.spacing.lg,

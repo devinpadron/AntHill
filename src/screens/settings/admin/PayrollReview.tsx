@@ -30,6 +30,9 @@ import { useTheme, useThemedStyles } from "../../../theme";
 
 const PayrollReview = ({ navigation }) => {
 	const theme = useTheme();
+	/* react-native-date-picker defaults to "auto", which follows the SYSTEM
+	   scheme — so a user who forces dark in-app got a light picker. */
+	const pickerTheme = theme.isDark ? "dark" : "light";
 	const styles = useThemedStyles(payrollStyles);
 	// UI state
 	const [isLoading, setIsLoading] = useState(true);
@@ -429,6 +432,7 @@ const PayrollReview = ({ navigation }) => {
 				<DatePicker
 					modal
 					mode="date"
+					theme={pickerTheme}
 					open={showStartDatePicker}
 					onConfirm={handleStartDateConfirm}
 					onCancel={() => setShowStartDatePicker(false)}
@@ -438,6 +442,7 @@ const PayrollReview = ({ navigation }) => {
 				<DatePicker
 					modal
 					mode="date"
+					theme={pickerTheme}
 					open={showEndDatePicker}
 					onConfirm={handleEndDateConfirm}
 					onCancel={() => setShowEndDatePicker(false)}

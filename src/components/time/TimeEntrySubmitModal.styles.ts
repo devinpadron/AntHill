@@ -27,6 +27,7 @@ export const submitModalStyles = (theme: Theme) =>
 			borderBottomColor: theme.colors.border,
 		},
 		modalTitle: {
+			color: theme.colors.text,
 			fontSize: 18,
 			fontWeight: "600",
 		},
@@ -219,6 +220,7 @@ export const submitModalStyles = (theme: Theme) =>
 			paddingTop: 8,
 		},
 		addEventInput: {
+			color: theme.colors.text,
 			borderWidth: 1,
 			borderColor: theme.colors.border,
 			borderRadius: 8,
@@ -252,6 +254,7 @@ export const submitModalStyles = (theme: Theme) =>
 			marginBottom: 16,
 		},
 		eventFormsTitle: {
+			color: theme.colors.text,
 			fontSize: 15,
 			fontWeight: "600",
 			marginBottom: 8,

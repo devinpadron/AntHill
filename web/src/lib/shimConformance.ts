@@ -585,6 +585,59 @@ export async function runShimConformance(
 	);
 
 	results.push(
+		await step("query.count().get() aggregate", async () => {
+			/*
+			 * The counter behind useCalendarEvents' "N events upcoming". A
+			 * different modular entry point (getCountFromServer) than every
+			 * other read, wrapped to look like RNFirebase's two-step
+			 * `count().get()` — so nothing else in the suite exercises it.
+			 */
+			const a = scratchLabel(companyId, "count");
+			const b = scratchLabel(companyId, "count");
+			await probe("seed two labels", () =>
+				Promise.all([a.ref.set(a.seed), b.ref.set(b.seed)]),
+			);
+
+			const scoped = db
+				.collection(C.eventLabels)
+				.where("companyId", "==", companyId);
+
+			const total = (
+				await probe("count().get()", () => scoped.count().get())
+			).data().count;
+
+			if (typeof total !== "number") {
+				throw new Error(`count returned ${typeof total}, not a number`);
+			}
+			if (total < 2) {
+				throw new Error(`count said ${total}, but 2 were just seeded`);
+			}
+
+			/*
+			 * Firestore APPLIES limit() to an aggregation. eventService relies
+			 * on that being true — it builds the count query WITHOUT the page
+			 * limit precisely so the total is not capped at one page.
+			 */
+			const capped = (
+				await probe("count() honours limit", () =>
+					scoped.limit(1).count().get(),
+				)
+			).data().count;
+			if (capped !== 1) {
+				throw new Error(
+					`limit(1).count() returned ${capped}, expected 1 — ` +
+						"eventService.buildCountQuery assumes limits apply",
+				);
+			}
+
+			await probe("cleanup deletes", () =>
+				Promise.all([a.ref.delete(), b.ref.delete()]),
+			);
+			return `counted ${total}, limit respected`;
+		}),
+	);
+
+	results.push(
 		await step("runTransaction: get + set + update + delete", async () => {
 			const target = scratchLabel(companyId, "tx_target");
 			const doomed = scratchLabel(companyId, "tx_doomed");
