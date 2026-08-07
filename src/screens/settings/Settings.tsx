@@ -65,6 +65,13 @@ const Settings = ({ navigation }: any) => {
 					subtitle="Appearance, maps and defaults"
 					icon="options-outline"
 					onPress={() => navigation.push("UserPreferences")}
+				/>
+				{/* Everyone's own numbers — deliberately outside the admin block. */}
+				<ListRow
+					title="Statistics"
+					subtitle="Your hours, shifts and records"
+					icon="stats-chart-outline"
+					onPress={() => navigation.push("Statistics")}
 					separator={false}
 				/>
 			</Section>

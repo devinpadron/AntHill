@@ -6,6 +6,7 @@ import ProfilePage from "../screens/settings/ProfilePage";
 import EmployeeList from "../screens/settings/admin/EmployeeList";
 import CompanyPreferences from "../screens/settings/admin/CompanyPreferences";
 import UserPreferences from "../screens/settings/UserPreferences";
+import Statistics from "../screens/settings/Statistics";
 import CompanyCustomForm from "../screens/settings/admin/CompanyCustomForm";
 import ChecklistCreator from "../screens/settings/admin/ChecklistCreator";
 import PackageCreator from "../screens/settings/admin/PackageCreator";
@@ -34,6 +35,7 @@ const SettingStack = () => (
 			component={CompanyPreferences}
 		/>
 		<Stack.Screen name="UserPreferences" component={UserPreferences} />
+		<Stack.Screen name="Statistics" component={Statistics} />
 		<Stack.Screen name="ChecklistCreator" component={ChecklistCreator} />
 		<Stack.Screen name="PackageCreator" component={PackageCreator} />
 		<Stack.Screen name="LabelCreator" component={LabelCreator} />

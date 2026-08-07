@@ -31,6 +31,18 @@ export const EVENT_QUERY_LIMIT = 300;
 
 const DEFAULT_LIMIT = EVENT_QUERY_LIMIT;
 
+/** Per-round-trip size and overall ceiling for `getMyEventHistory`. */
+const SWEEP_PAGE_SIZE = 200;
+const MAX_HISTORY = 2000;
+
+/**
+ * The lower bound of a "since the beginning" range.
+ *
+ * A `dateKey` range needs both edges to use the composite index, and every real
+ * event sorts after this.
+ */
+const EPOCH_DATE_KEY = "1970-01-01";
+
 const toEvent = (doc: FirebaseFirestoreTypes.DocumentSnapshot): Event => ({
 	...(doc.data() as Event),
 	id: doc.id,
@@ -99,6 +111,18 @@ export type EventWindow = {
 	/** Required for FilterType.SPECIFIC. */
 	selectedUsers?: string[];
 	limit?: number;
+	/**
+	 * Which way `dateKey` runs. Defaults to ascending, which is what a schedule
+	 * paging forward wants. Descending is for reading a history backwards, where
+	 * a capped sweep must give up the OLDEST records rather than the newest.
+	 *
+	 * DESCENDING NEEDS ITS OWN COMPOSITE INDEX. Firestore does not serve a
+	 * descending order-by off the ascending index, equality filters
+	 * notwithstanding — it answers FAILED_PRECONDITION. Only the MY shape is
+	 * declared descending in firestore.indexes.json; asking for `desc` on any
+	 * other filter will fail until an index for it is added there too.
+	 */
+	direction?: "asc" | "desc";
 	/** Page cursor — the last document of the previous page. */
 	startAfter?: FirebaseFirestoreTypes.DocumentSnapshot;
 };
@@ -172,7 +196,7 @@ function buildQuery(
 	const filtered = buildFilteredQuery(companyId, window);
 	if (!filtered) return null;
 
-	let query = filtered.orderBy("dateKey");
+	let query = filtered.orderBy("dateKey", window.direction ?? "asc");
 	if (window.startAfter) query = query.startAfter(window.startAfter);
 
 	return query.limit(window.limit ?? DEFAULT_LIMIT);
@@ -1140,6 +1164,51 @@ export function subscribeMyResponseDocs(
 			(error) =>
 				console.error("Error subscribing to my response docs", error),
 		);
+}
+
+/**
+ * Every past event a user was assigned to, newest first.
+ *
+ * The backwards counterpart to `subscribeMyUpcomingEvents` — every other
+ * "my events" path here runs `dateKey >= from` with no upper bound, because
+ * everything else in the app is about what is coming. Statistics is the one
+ * place that looks the other way.
+ *
+ * Bounded like `getAllTimeEntries`: a `.limit()` per round trip and a ceiling
+ * on the sweep. Descending order means the cap sheds the oldest events.
+ */
+export async function getMyEventHistory(
+	companyId: string,
+	userId: string,
+	throughDateKey: string,
+): Promise<{ events: Event[]; truncated: boolean }> {
+	if (!companyId || !userId) return { events: [], truncated: false };
+
+	const events: Event[] = [];
+	let cursor: EventCursor | undefined;
+
+	while (events.length < MAX_HISTORY) {
+		const page = await getEventPage(companyId, {
+			filter: FilterType.MY,
+			userId,
+			from: EPOCH_DATE_KEY,
+			to: throughDateKey,
+			direction: "desc",
+			limit: SWEEP_PAGE_SIZE,
+			startAfter: cursor,
+		});
+
+		events.push(...page.events);
+
+		// getEventPage swallows its own errors and returns an empty page, so
+		// "no cursor" covers both the end of the collection and a failed read.
+		if (!page.hasMore || !page.cursor) {
+			return { events, truncated: false };
+		}
+		cursor = page.cursor;
+	}
+
+	return { events: events.slice(0, MAX_HISTORY), truncated: true };
 }
 
 /** Upcoming events a user is assigned to. Replaces availabilityService. */

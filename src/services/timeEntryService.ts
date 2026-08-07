@@ -20,6 +20,10 @@ import { TimeEntry, TimeEntryStatus } from "../types";
 const DEFAULT_LIMIT = 100;
 const ACTIVE_STATUSES: TimeEntryStatus[] = ["active", "paused"];
 
+/** Per-round-trip size and overall ceiling for `getAllTimeEntries`. */
+const SWEEP_PAGE_SIZE = 200;
+const MAX_HISTORY = 2000;
+
 const toEntry = (doc: FirebaseFirestoreTypes.DocumentSnapshot): TimeEntry => ({
 	...(doc.data() as TimeEntry),
 	id: doc.id,
@@ -231,6 +235,54 @@ export async function getTimeEntries(
 	} catch (e) {
 		console.error("Error getting time entries", e);
 		return { entries: [], cursor: null };
+	}
+}
+
+/**
+ * Every entry matching `options`, paged internally.
+ *
+ * For the places that need a whole history rather than a screenful — the
+ * statistics page totals a user's entire time at a company, which no single
+ * bounded query can answer.
+ *
+ * Still bounded: each round trip carries its own `.limit()`, and the sweep
+ * stops at MAX_HISTORY. `truncated` says the cap was hit, so a caller can
+ * qualify the figure rather than present a partial total as complete. The
+ * underlying query orders by `dateKey` DESC, so a truncated sweep drops the
+ * OLDEST records, which is the right end to lose.
+ */
+export async function getAllTimeEntries(
+	companyId: string,
+	options: EntryQuery = {},
+): Promise<{ entries: TimeEntry[]; truncated: boolean }> {
+	if (!companyId) return { entries: [], truncated: false };
+
+	const entries: TimeEntry[] = [];
+	let cursor: FirebaseFirestoreTypes.DocumentSnapshot | undefined;
+
+	try {
+		while (entries.length < MAX_HISTORY) {
+			const snapshot = await buildEntryQuery(companyId, {
+				...options,
+				limit: SWEEP_PAGE_SIZE,
+				startAfter: cursor,
+			}).get();
+
+			entries.push(...snapshot.docs.map(toEntry));
+
+			// A short page is the end of the collection, not a coincidence.
+			if (snapshot.docs.length < SWEEP_PAGE_SIZE) {
+				return { entries, truncated: false };
+			}
+			cursor = snapshot.docs[snapshot.docs.length - 1];
+		}
+
+		return { entries: entries.slice(0, MAX_HISTORY), truncated: true };
+	} catch (e) {
+		console.error("Error sweeping time entries", e);
+		// Partial beats empty here — a total over most of the history is still
+		// worth showing, as long as it is labelled truncated.
+		return { entries, truncated: entries.length > 0 };
 	}
 }
 
