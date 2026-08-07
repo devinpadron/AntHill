@@ -11,6 +11,16 @@ import { differenceInSeconds } from "date-fns";
  * The two clocks move independently: worked time freezes the moment a shift is
  * paused, while the paused total keeps climbing. Reading `workedSeconds` off
  * the wall clock during a pause would silently pay the worker for their break.
+ *
+ * That freeze did not actually work. This read `entry.pauseStartTime`, a name
+ * from the old schema that nothing has ever written — the field is
+ * `pauseStartedAt`. It was always undefined, so the pause start fell back to
+ * "now" on every tick: worked time kept climbing through the break and the
+ * paused total never moved. It drives the big timer on the clock screen and
+ * every card in the list, so both were wrong for every paused shift.
+ *
+ * check-layering.sh rule 4 catches exactly this class of mistake and did not
+ * list this name. It does now.
  */
 
 type ElapsedEntry = {
@@ -18,8 +28,8 @@ type ElapsedEntry = {
 	clockInAt?: { toDate: () => Date };
 	/** Seconds banked across pauses ALREADY ended. */
 	pausedSeconds?: number;
-	/** When the current pause began, if there is one. */
-	pauseStartTime?: string | number | Date;
+	/** When the current pause began, if there is one. A Firestore Timestamp. */
+	pauseStartedAt?: { toDate: () => Date } | null;
 	workedSeconds?: number;
 };
 
@@ -81,8 +91,13 @@ export const useEntryElapsed = (entry: ElapsedEntry | null): Elapsed => {
 		}
 
 		if (isPaused) {
-			const pauseStart = entry.pauseStartTime
-				? new Date(entry.pauseStartTime)
+			/*
+			 * .toDate(), never `new Date(timestamp)` — that yields an Invalid
+			 * Date that only throws somewhere else entirely, which is what
+			 * check-layering.sh rule 5 exists to prevent.
+			 */
+			const pauseStart = entry.pauseStartedAt
+				? entry.pauseStartedAt.toDate()
 				: new Date(now);
 
 			return {

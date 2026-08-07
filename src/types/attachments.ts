@@ -36,9 +36,35 @@ export interface Attachment extends CompanyScoped {
 	 * objects would invalidate all of them for no benefit.
 	 */
 	storagePath: string;
-	downloadUrl: string;
+	/**
+	 * NULL until the bytes have actually landed in Storage.
+	 *
+	 * The metadata document is written FIRST, before the upload — see
+	 * `uploadState`. Anything rendering an attachment must handle null and fall
+	 * back to `localUri`.
+	 */
+	downloadUrl: string | null;
 	thumbnailStoragePath: string | null;
 	thumbnailDownloadUrl: string | null;
+
+	/**
+	 * Where the file is in its journey to Storage.
+	 *
+	 * Firestore queues its own writes offline; Firebase Storage does not, so
+	 * uploads go through a persisted queue (src/lib/uploadQueue.ts) and this is
+	 * how a document says which stage it is at. The document is created
+	 * "pending" the moment the user picks the file, which is what lets a form
+	 * reference it immediately and lets the gallery show it while it waits.
+	 *
+	 * Optional because every record written before this field existed is,
+	 * definitionally, already uploaded — readers treat a missing value as
+	 * "uploaded" rather than backfilling 32 documents.
+	 */
+	uploadState?: "pending" | "uploaded" | "failed";
+	/** The on-device copy, while the upload is pending. Null once uploaded. */
+	localUri?: string | null;
+	/** Why the upload gave up, when uploadState is "failed". */
+	uploadError?: string | null;
 
 	/** Set by the reconciliation sweep; drives its resumability. */
 	storageVerifiedAt: Timestamp | null;

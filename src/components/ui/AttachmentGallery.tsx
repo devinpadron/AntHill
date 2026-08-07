@@ -32,6 +32,28 @@ interface AttachmentGalleryProps {
 	attachments: Attachment[];
 }
 
+/**
+ * Where to actually load an attachment from.
+ *
+ * `downloadUrl` is NULL until the bytes reach Storage. Since uploads now go
+ * through a persisted queue, that window can be a whole shift — so an
+ * attachment taken offline must render from the staged copy on disk, or the
+ * user photographs something and sees a broken tile until they get signal.
+ *
+ * Every read of `downloadUrl` in this file goes through here. Reading it
+ * directly is how `.startsWith("http")` throws on a pending attachment.
+ */
+const sourceUriFor = (item: Attachment): string =>
+	item.downloadUrl ?? item.localUri ?? "";
+
+/** A preview for a video, falling back to the file itself. */
+const previewUriFor = (item: Attachment): string =>
+	item.thumbnailDownloadUrl ?? sourceUriFor(item);
+
+/** The bytes have not landed in Storage yet. */
+const isPending = (item: Attachment): boolean =>
+	item.uploadState === "pending" && !item.downloadUrl;
+
 const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 	attachments,
 }) => {
@@ -79,7 +101,7 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 		if (modalVisible && mediaAttachments.length > 0) {
 			const selectedMedia = mediaAttachments[selectedMediaIndex];
 			if (selectedMedia.contentType.startsWith("video/")) {
-				setCurrentVideoUrl(selectedMedia.downloadUrl);
+				setCurrentVideoUrl(sourceUriFor(selectedMedia));
 			} else {
 				// Stop video if switching to an image
 				setCurrentVideoUrl(null);
@@ -146,8 +168,13 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 				return;
 			}
 
-			// Download the file if it's a remote URL
-			let localUri = mediaItem.downloadUrl;
+			// Download the file if it's a remote URL. A pending upload has no
+			// downloadUrl yet, so this resolves to the staged local copy.
+			let localUri = sourceUriFor(mediaItem);
+			if (!localUri) {
+				alert("That file is still uploading.");
+				return;
+			}
 			if (localUri.startsWith("http")) {
 				const fileExt = mediaItem.contentType.split("/")[1];
 				const downloadResult = await FileSystem.downloadAsync(
@@ -182,8 +209,13 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 				return;
 			}
 
-			// Download the file if it's a remote URL
-			let localUri = mediaItem.downloadUrl;
+			// Download the file if it's a remote URL. A pending upload has no
+			// downloadUrl yet, so this resolves to the staged local copy.
+			let localUri = sourceUriFor(mediaItem);
+			if (!localUri) {
+				alert("That file is still uploading.");
+				return;
+			}
 			if (localUri.startsWith("http")) {
 				const fileExt = mediaItem.contentType.split("/")[1];
 				const downloadResult = await FileSystem.downloadAsync(
@@ -281,11 +313,9 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 		>
 			<Image
 				source={{
-					uri:
-						item.contentType.startsWith("video/") &&
-						item.thumbnailDownloadUrl
-							? item.thumbnailDownloadUrl
-							: item.downloadUrl,
+					uri: item.contentType.startsWith("video/")
+						? previewUriFor(item)
+						: sourceUriFor(item),
 				}}
 				style={styles.mediaPreview}
 				resizeMode="cover"
@@ -295,6 +325,21 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 					<Ionicons
 						name="play-circle"
 						size={28}
+						color={theme.colors.surface}
+					/>
+				</View>
+			)}
+			{/*
+			 * The file is on the phone but not yet on the server. Shown, not
+			 * hidden: a worker who photographed something needs to know it is
+			 * still waiting to go up, and the tile is otherwise indistinguishable
+			 * from an uploaded one.
+			 */}
+			{isPending(item) && (
+				<View style={styles.pendingIndicator}>
+					<Ionicons
+						name="cloud-upload-outline"
+						size={14}
 						color={theme.colors.surface}
 					/>
 				</View>
@@ -343,11 +388,7 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 						// Show thumbnail for videos not in view
 						<View style={styles.videoContainer}>
 							<Image
-								source={{
-									uri:
-										item.thumbnailDownloadUrl ||
-										item.downloadUrl,
-								}}
+								source={{ uri: previewUriFor(item) }}
 								style={styles.videoThumbnail}
 								resizeMode="contain"
 							/>
@@ -362,7 +403,7 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 					) : (
 						// Show image
 						<ImageZoom
-							uri={item.downloadUrl}
+							uri={sourceUriFor(item)}
 							style={styles.fullImage}
 							isDoubleTapEnabled={true}
 						/>
@@ -589,7 +630,7 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 	const renderDocumentViewer = () => {
 		if (!selectedDocument) return null;
 
-		const documentUrl = selectedDocument.downloadUrl;
+		const documentUrl = sourceUriFor(selectedDocument);
 
 		return (
 			<Modal
@@ -734,6 +775,7 @@ interface Styles {
 	mediaPreview: ImageStyle;
 	documentPreview: ViewStyle;
 	videoIndicator: ViewStyle;
+	pendingIndicator: ViewStyle;
 	itemDetails: ViewStyle;
 	itemName: TextStyle;
 	itemSize: TextStyle;
@@ -813,6 +855,14 @@ const galleryStyles = (theme: Theme) =>
 			transform: [{ translateX: -14 }, { translateY: -14 }],
 			backgroundColor: "rgba(0, 0, 0, 0.3)",
 			borderRadius: 20,
+			padding: 3,
+		},
+		pendingIndicator: {
+			position: "absolute",
+			top: 4,
+			right: 4,
+			backgroundColor: "rgba(0, 0, 0, 0.45)",
+			borderRadius: 10,
 			padding: 3,
 		},
 		itemDetails: {

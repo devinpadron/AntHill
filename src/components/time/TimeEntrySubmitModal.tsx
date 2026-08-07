@@ -609,10 +609,18 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 								];
 
 								/*
-								 * uploadFiles returns the ids it persisted, so a
+								 * uploadFiles returns the ids it RECORDED, so a
 								 * form answer becomes a REFERENCE rather than an
 								 * inlined copy of the file object — which is what
 								 * v1 embedded in formResponses.
+								 *
+								 * "Recorded", not "uploaded": the attachment
+								 * document is written before the bytes leave the
+								 * device, so every id is valid immediately even
+								 * with no signal. This filter used to silently
+								 * drop any file whose upload had not finished,
+								 * which is how a photo taken at a venue vanished
+								 * from the form it was attached to.
 								 */
 								const updatedFiles = fieldFiles
 									.map((file) => file.id)
@@ -629,7 +637,8 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 								...(updatedFullFormResponses[fieldId] || []),
 							];
 
-							// Same as above: store ids, not file objects.
+							// Same as above: store ids, not file objects, and
+							// every id is valid whether or not it has uploaded.
 							const updatedFiles = fieldFiles
 								.map((file) => file.id)
 								.filter((id) => uploadedFiles.includes(id));

@@ -63,6 +63,91 @@ export async function createAttachment(
 		});
 }
 
+/*
+ * The pending-upload lifecycle: create the document, then send the bytes.
+ *
+ * Storage has no offline queue, so uploads go through a persisted one
+ * (src/lib/uploadQueue.ts) and can take minutes, hours, or a whole shift. The
+ * metadata is written FIRST rather than after, which sounds backwards and is
+ * the point:
+ *
+ *   - the id becomes a valid reference immediately, so a submitted form can
+ *     cite the photo it just took. Deferring it meant every attachment silently
+ *     vanished from the form it belonged to, since TimeEntrySubmitModal filters
+ *     its answers down to the ids that came back.
+ *   - Firestore queues THIS write offline for free, so the record survives.
+ *   - the gallery can render the local file while the upload waits.
+ *
+ * It inverts the failure mode, which is the real win. Bytes-first left Storage
+ * objects with no document pointing at them — invisible, and only findable by
+ * the reconciliation sweep. Document-first leaves a document with no object,
+ * which the schema already models (storageVerifiedAt, storageBroken) and which
+ * the user can actually see and retry.
+ */
+
+export type PendingAttachmentInput = Omit<
+	Attachment,
+	| "companyId"
+	| "createdAt"
+	| "schemaVersion"
+	| "storageVerifiedAt"
+	| "downloadUrl"
+	| "thumbnailDownloadUrl"
+	| "uploadState"
+> & { localUri: string };
+
+/** Records a file the user has picked, before a byte has moved. Not awaited. */
+export function createPendingAttachment(
+	companyId: string,
+	input: PendingAttachmentInput,
+): Promise<void> {
+	return db
+		.collection(C.attachments)
+		.doc(input.id)
+		.set({
+			...input,
+			companyId,
+			downloadUrl: null,
+			thumbnailDownloadUrl: null,
+			uploadState: "pending",
+			uploadError: null,
+			storageVerifiedAt: null,
+			createdAt: firestore.FieldValue.serverTimestamp(),
+			schemaVersion: 2,
+		});
+}
+
+/** The bytes landed. Patches in the URLs and drops the local copy's path. */
+export function markAttachmentUploaded(
+	attachmentId: string,
+	urls: { downloadUrl: string; thumbnailDownloadUrl: string | null },
+): Promise<void> {
+	return db.collection(C.attachments).doc(attachmentId).update({
+		downloadUrl: urls.downloadUrl,
+		thumbnailDownloadUrl: urls.thumbnailDownloadUrl,
+		uploadState: "uploaded",
+		uploadError: null,
+		localUri: null,
+	});
+}
+
+/**
+ * The upload gave up for good.
+ *
+ * Only for PERMANENT failures — out of attempts, staged file gone, rules
+ * refusal. A transient network error leaves the item "pending" so the queue
+ * retries it; marking those failed would turn every tunnel into a lost photo.
+ */
+export function markAttachmentUploadFailed(
+	attachmentId: string,
+	reason: string,
+): Promise<void> {
+	return db
+		.collection(C.attachments)
+		.doc(attachmentId)
+		.update({ uploadState: "failed", uploadError: reason });
+}
+
 export async function getAttachmentsForParent(
 	companyId: string,
 	parentType: AttachmentParentType,

@@ -8,7 +8,7 @@ import {
 	resumeEntry,
 	subscribeActiveEntry,
 } from "../services/timeEntryService";
-import { TimeEntry } from "../types";
+import { SnapshotSync, TimeEntry, UNKNOWN_SYNC } from "../types";
 
 /*
  * Clock in / out and the entry list.
@@ -16,9 +16,30 @@ import { TimeEntry } from "../types";
  * The active entry is a live subscription; the list is paginated. v1 fetched
  * every matching entry with no bound, and kept `isPaused` in the fetch effect's
  * dependency array, so every pause and resume triggered a full refetch.
+ *
+ * The clock actions are FIRE AND FORGET. timeEntryService's writes return once
+ * the entry is on local disk rather than when the server acknowledges it, which
+ * is what lets a worker clock out in a basement. Two consequences here:
+ *
+ *   - `isBusy` is a tap debounce, nothing more. It used to wrap the awaited
+ *     write, so offline it latched true forever and the pause and resume
+ *     buttons stayed disabled for the rest of the shift.
+ *   - `isSyncing` is the honest signal for "not on the server yet", and it comes
+ *     from Firestore's own metadata, so it survives a force-quit. It must drive
+ *     an indicator only. Never disable a control on it — being unsynced is the
+ *     normal state on a job site.
  */
 
 const PAGE_SIZE = 50;
+
+/**
+ * How long a tap locks the clock controls.
+ *
+ * Long enough to swallow a double tap, short enough to be invisible. The real
+ * guard against opening two entries is that `activeEntry` arrives from the
+ * cached snapshot within a tick and the buttons switch on that.
+ */
+const TAP_DEBOUNCE_MS = 400;
 
 export function useTimeTracking(
 	companyId: string,
@@ -28,6 +49,7 @@ export function useTimeTracking(
 	range?: { from: string; to: string },
 ) {
 	const [activeEntry, setActiveEntry] = useState<TimeEntry | null>(null);
+	const [sync, setSync] = useState<SnapshotSync>(UNKNOWN_SYNC);
 	const [entries, setEntries] = useState<TimeEntry[]>([]);
 	/*
 	 * The paging cursor lives in a ref, not state.
@@ -47,9 +69,13 @@ export function useTimeTracking(
 	useEffect(() => {
 		if (!companyId || !userId) {
 			setActiveEntry(null);
+			setSync(UNKNOWN_SYNC);
 			return;
 		}
-		return subscribeActiveEntry(companyId, userId, setActiveEntry);
+		return subscribeActiveEntry(companyId, userId, (entry, nextSync) => {
+			setActiveEntry(entry);
+			setSync(nextSync);
+		});
 	}, [companyId, userId]);
 
 	const loadPage = useCallback(
@@ -80,45 +106,58 @@ export function useTimeTracking(
 		// Keyed on identity and the window; paging state must not retrigger.
 	}, [companyId, userId, range?.from, range?.to]);
 
-	/** Serializes clock actions so a double tap cannot open two entries. */
-	const guard = useCallback(
-		async (action: () => Promise<unknown>) => {
-			if (isBusy) return;
-			setIsBusy(true);
-			try {
-				await action();
-			} catch (e) {
-				console.error("Time tracking action failed", e);
-				throw e;
-			} finally {
+	/*
+	 * Swallows a double tap. Not a network gate.
+	 *
+	 * The flag lives in a ref as well as state: as state alone it was a
+	 * dependency of `guard`, which rebuilt `actions` on every flip. It is
+	 * cleared on a timer rather than in a `finally`, so it is structurally
+	 * incapable of outliving one tap however the action behaves.
+	 */
+	const busyRef = useRef(false);
+
+	const guard = useCallback((action: () => void) => {
+		if (busyRef.current) return;
+		busyRef.current = true;
+		setIsBusy(true);
+
+		try {
+			action();
+		} catch (e) {
+			// The writes queue locally, so reaching here means a programming
+			// error rather than a network one. Surfaced for the screen to toast.
+			console.error("Time tracking action failed", e);
+			throw e;
+		} finally {
+			setTimeout(() => {
+				busyRef.current = false;
 				setIsBusy(false);
-			}
-		},
-		[isBusy],
-	);
+			}, TAP_DEBOUNCE_MS);
+		}
+	}, []);
 
 	const actions = useMemo(
 		() => ({
 			clockIn: () => guard(() => clockIn(companyId, userId, timeZone)),
+			/*
+			 * No refetch here. The completed entry reaches the list through the
+			 * range query on the next focus, and offline a get() would block on
+			 * the SDK's server timeout before falling back to cache.
+			 */
 			clockOut: () =>
-				guard(async () => {
-					if (activeEntry) await clockOut(activeEntry.id);
-					await loadPage(true);
+				guard(() => {
+					if (activeEntry) clockOut(activeEntry);
 				}),
 			pause: () =>
-				guard(() =>
-					activeEntry
-						? pauseEntry(activeEntry.id)
-						: Promise.resolve(),
-				),
+				guard(() => {
+					if (activeEntry) pauseEntry(activeEntry.id);
+				}),
 			resume: () =>
-				guard(() =>
-					activeEntry
-						? resumeEntry(activeEntry.id)
-						: Promise.resolve(),
-				),
+				guard(() => {
+					if (activeEntry) resumeEntry(activeEntry);
+				}),
 		}),
-		[guard, companyId, userId, timeZone, activeEntry, loadPage],
+		[guard, companyId, userId, timeZone, activeEntry],
 	);
 
 	const isPaused = activeEntry?.status === "paused";
@@ -172,6 +211,13 @@ export function useTimeTracking(
 		isActive,
 		isPaused,
 		isBusy,
+		/*
+		 * There are local changes the server has not acknowledged. Drives an
+		 * indicator; must never disable a control — see the note at the top.
+		 */
+		isSyncing: sync.hasPendingWrites,
+		/** Showing cached data. Normal offline, and briefly on every cold start. */
+		isFromCache: sync.fromCache,
 		isLoading,
 		elapsedSeconds,
 		weeklyStats,

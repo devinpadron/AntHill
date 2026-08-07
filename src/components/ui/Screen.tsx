@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { OfflineBanner } from "./OfflineBanner";
 import { Theme, useTheme, useThemedStyles } from "../../theme";
 
 /**
@@ -299,6 +300,13 @@ export const Screen: React.FC<ScreenProps> = ({
 			)}
 
 			{header}
+			{/*
+			 * Below the header so it does not displace the title, above the
+			 * content so it never covers anything. Renders nothing when online,
+			 * and only one Screen is mounted at a time — so this is the app's
+			 * single offline indicator rather than one per screen.
+			 */}
+			<OfflineBanner />
 			{body}
 		</View>
 	);

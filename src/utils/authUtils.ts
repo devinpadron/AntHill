@@ -113,3 +113,53 @@ export const mapLoginError = (error: any): FieldErrors<LoginField> => {
 			return { form: "Could not sign in. Please try again." };
 	}
 };
+
+/*
+ * Classifying an auth failure: did the network fail, or did the server refuse?
+ *
+ * UserContext used to treat those identically. Every throw out of
+ * onAuthStateChanged — including `authUser.reload()` failing because the phone
+ * was in a basement — ran the same branch that handles a revoked account, so a
+ * moment of bad signal logged the user out of an app whose data was sitting
+ * right there in the Firestore cache. Worse, it was unrecoverable: the effect
+ * mounts once, Firebase Auth itself never signed out, and logging back in
+ * needs the network the user does not have.
+ *
+ * So the two cases have to be told apart. These live here because this file
+ * already owns Firebase Auth's error codes.
+ */
+
+/** A transport failure. Says nothing about whether the session is still valid. */
+export const isNetworkAuthError = (error: any): boolean => {
+	const code = error?.code;
+	return (
+		code === "auth/network-request-failed" ||
+		code === "auth/timeout" ||
+		/*
+		 * Firebase's catch-all. It covers genuine backend faults as well as
+		 * transport ones, and it is not evidence the session was revoked — the
+		 * server would say so specifically. Treated as network so we fail open.
+		 */
+		code === "auth/internal-error"
+	);
+};
+
+/**
+ * The server positively rejected this session. Sign out, even offline.
+ *
+ * Deliberately a closed list. Anything unrecognised is NOT authoritative and
+ * the caller keeps the session — matching appConfigService, which fails open to
+ * permissive defaults rather than locking people out on an unexpected error.
+ */
+export const isAuthoritativeRejection = (error: any): boolean => {
+	switch (error?.code) {
+		case "auth/user-token-expired":
+		case "auth/user-disabled":
+		case "auth/user-not-found":
+		case "auth/invalid-user-token":
+		case "auth/requires-recent-login":
+			return true;
+		default:
+			return false;
+	}
+};

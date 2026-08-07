@@ -9,6 +9,10 @@ import {
 	startAfter as mStartAfter,
 	getDoc,
 	getDocs,
+	getDocFromCache,
+	getDocsFromCache,
+	getDocFromServer,
+	getDocsFromServer,
 	getCountFromServer,
 	onSnapshot as mOnSnapshot,
 	setDoc,
@@ -37,6 +41,7 @@ import {
 	type OrderByDirection,
 	type FirestoreError,
 	type FieldPath as MFieldPath,
+	type SnapshotMetadata,
 } from "firebase/firestore";
 import type { FirebaseApp } from "firebase/app";
 
@@ -68,10 +73,41 @@ import type { FirebaseApp } from "firebase/app";
  * into the modular SDK: batch/transaction writes, and startAfter cursors.
  *
  * SCOPE. This covers what the services actually use and nothing more — no
- * .add(), no collectionGroup(), no .metadata, no GetOptions. If a service grows
- * a new call, add it here; do not work around it at the call site, because the
- * mobile app has to keep running the same line of code.
+ * .add(), no collectionGroup(). If a service grows a new call, add it here; do
+ * not work around it at the call site, because the mobile app has to keep
+ * running the same line of code.
+ *
+ * `.metadata`, GetOptions and the options-first onSnapshot WERE outside that
+ * scope and are now in it, because the offline work needs all three:
+ *   - metadata.fromCache / .hasPendingWrites is how a screen tells a local
+ *     write from an acknowledged one (src/types/sync.ts);
+ *   - get({source:"cache"}) is how appConfigService avoids blocking a cold
+ *     offline launch for ~10s on a server timeout;
+ *   - onSnapshot({includeMetadataChanges:true}, ...) is REQUIRED for the first
+ *     of those to ever go back to false — an acknowledgement does not change
+ *     the document, so without it no further snapshot is raised.
+ * They matter less in a browser (the web SDK defaults to memory persistence)
+ * but the services are shared source, so the shape has to exist.
  */
+
+/* ----------------------------------------------------------------- options */
+
+/** RNFirebase's GetOptions. `default` tries the server, then falls back. */
+export type GetOptions = { source?: "default" | "server" | "cache" };
+
+/** RNFirebase's SnapshotListenOptions. */
+export type ListenOptions = { includeMetadataChanges?: boolean };
+
+/**
+ * True when the first argument is an options bag rather than a callback.
+ *
+ * RNFirebase overloads onSnapshot on argument TYPE, not arity, so this has to
+ * discriminate by shape — `typeof x === "function"` is the only reliable test,
+ * since an options object and a callback can both be the sole argument.
+ */
+function isListenOptions(value: unknown): value is ListenOptions {
+	return typeof value === "object" && value !== null;
+}
 
 /* ------------------------------------------------------------- snapshots */
 
@@ -84,6 +120,11 @@ export class DocSnap {
 
 	get ref(): DocRef {
 		return new DocRef(this._s.ref);
+	}
+
+	/** fromCache / hasPendingWrites. See src/types/sync.ts. */
+	get metadata(): SnapshotMetadata {
+		return this._s.metadata;
 	}
 
 	/** A METHOD, matching RNFirebase v23. See the note at the top of the file. */
@@ -113,6 +154,11 @@ export class QuerySnap {
 
 	get size() {
 		return this._s.size;
+	}
+
+	/** fromCache / hasPendingWrites for the query as a whole. */
+	get metadata(): SnapshotMetadata {
+		return this._s.metadata;
 	}
 
 	forEach(fn: (doc: DocSnap) => void): void {
@@ -159,7 +205,20 @@ export class Q {
 		return new Q(mQuery(this._q, mStartAfter(cursor)));
 	}
 
-	async get(): Promise<QuerySnap> {
+	/**
+	 * `source` selects the cache or the server explicitly.
+	 *
+	 * A cache-only read REJECTS when nothing is cached (rather than returning
+	 * empty), so callers treat a rejection as a miss and fall through to the
+	 * network — see appConfigService.
+	 */
+	async get(options?: GetOptions): Promise<QuerySnap> {
+		if (options?.source === "cache") {
+			return new QuerySnap(await getDocsFromCache(this._q));
+		}
+		if (options?.source === "server") {
+			return new QuerySnap(await getDocsFromServer(this._q));
+		}
 		return new QuerySnap(await getDocs(this._q));
 	}
 
@@ -179,12 +238,29 @@ export class Q {
 	onSnapshot(
 		onNext: (snapshot: QuerySnap) => void,
 		onError?: (error: FirestoreError) => void,
+	): () => void;
+	onSnapshot(
+		options: ListenOptions,
+		onNext: (snapshot: QuerySnap) => void,
+		onError?: (error: FirestoreError) => void,
+	): () => void;
+	onSnapshot(
+		a: ListenOptions | ((snapshot: QuerySnap) => void),
+		b?: ((snapshot: QuerySnap) => void) | ((error: FirestoreError) => void),
+		c?: (error: FirestoreError) => void,
 	): () => void {
-		return mOnSnapshot(
-			this._q,
-			(snapshot) => onNext(new QuerySnap(snapshot)),
-			onError ?? (() => {}),
-		);
+		const options = isListenOptions(a) ? a : undefined;
+		const onNext = (options ? b : a) as (snapshot: QuerySnap) => void;
+		const onError = ((options ? c : b) ?? (() => {})) as (
+			error: FirestoreError,
+		) => void;
+
+		const forward = (snapshot: MQuerySnap<DocumentData>) =>
+			onNext(new QuerySnap(snapshot));
+
+		return options
+			? mOnSnapshot(this._q, options, forward, onError)
+			: mOnSnapshot(this._q, forward, onError);
 	}
 }
 
@@ -216,7 +292,14 @@ export class DocRef {
 		return new CollRef(mCollection(this._r, collectionPath));
 	}
 
-	async get(): Promise<DocSnap> {
+	/** See Q.get — a cache-only read rejects on a miss rather than returning empty. */
+	async get(options?: GetOptions): Promise<DocSnap> {
+		if (options?.source === "cache") {
+			return new DocSnap(await getDocFromCache(this._r));
+		}
+		if (options?.source === "server") {
+			return new DocSnap(await getDocFromServer(this._r));
+		}
 		return new DocSnap(await getDoc(this._r));
 	}
 
@@ -237,12 +320,29 @@ export class DocRef {
 	onSnapshot(
 		onNext: (snapshot: DocSnap) => void,
 		onError?: (error: FirestoreError) => void,
+	): () => void;
+	onSnapshot(
+		options: ListenOptions,
+		onNext: (snapshot: DocSnap) => void,
+		onError?: (error: FirestoreError) => void,
+	): () => void;
+	onSnapshot(
+		a: ListenOptions | ((snapshot: DocSnap) => void),
+		b?: ((snapshot: DocSnap) => void) | ((error: FirestoreError) => void),
+		c?: (error: FirestoreError) => void,
 	): () => void {
-		return mOnSnapshot(
-			this._r,
-			(snapshot) => onNext(new DocSnap(snapshot)),
-			onError ?? (() => {}),
-		);
+		const options = isListenOptions(a) ? a : undefined;
+		const onNext = (options ? b : a) as (snapshot: DocSnap) => void;
+		const onError = ((options ? c : b) ?? (() => {})) as (
+			error: FirestoreError,
+		) => void;
+
+		const forward = (snapshot: MDocSnap<DocumentData>) =>
+			onNext(new DocSnap(snapshot));
+
+		return options
+			? mOnSnapshot(this._r, options, forward, onError)
+			: mOnSnapshot(this._r, forward, onError);
 	}
 }
 

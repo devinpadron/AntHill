@@ -277,6 +277,69 @@ export async function runShimConformance(
 	);
 
 	results.push(
+		await step("snapshot.metadata on a document and a query", async () => {
+			// The offline work reads fromCache / hasPendingWrites to tell a
+			// local write from an acknowledged one (src/types/sync.ts). Both
+			// must be plain booleans, not undefined — an undefined
+			// hasPendingWrites reads as falsy and would silently mean "synced".
+			const doc = await db.collection(C.companies).doc(companyId).get();
+			const query = await db
+				.collection(C.companies)
+				.where(firestore.FieldPath.documentId(), "in", [companyId])
+				.limit(1)
+				.get();
+
+			for (const [label, meta] of [
+				["doc", doc.metadata],
+				["query", query.metadata],
+			] as const) {
+				if (typeof meta?.fromCache !== "boolean") {
+					throw new Error(
+						`${label}.metadata.fromCache is not a boolean`,
+					);
+				}
+				if (typeof meta?.hasPendingWrites !== "boolean") {
+					throw new Error(
+						`${label}.metadata.hasPendingWrites is not a boolean`,
+					);
+				}
+			}
+			return `doc.fromCache=${doc.metadata.fromCache}, query.fromCache=${query.metadata.fromCache}`;
+		}),
+	);
+
+	results.push(
+		await step("get({ source }) and onSnapshot with options", async () => {
+			// appConfigService reads cache-first to avoid blocking a cold
+			// offline launch on a server timeout; a cache MISS must reject
+			// rather than resolve empty, because the caller distinguishes them.
+			const ref = db.collection(C.companies).doc(companyId);
+			await ref.get({ source: "server" });
+
+			const cached = await ref.get({ source: "cache" }).catch(() => null);
+
+			// The options-first overload must not be mistaken for a callback.
+			const seen = await new Promise<boolean>((resolve) => {
+				const unsubscribe = ref.onSnapshot(
+					{ includeMetadataChanges: true },
+					(snapshot) => {
+						unsubscribe();
+						resolve(snapshot.exists());
+					},
+					() => {
+						unsubscribe();
+						resolve(false);
+					},
+				);
+			});
+
+			if (!seen)
+				throw new Error("options-first onSnapshot delivered nothing");
+			return `cache ${cached ? "hit" : "miss"}, options-first onSnapshot ok`;
+		}),
+	);
+
+	results.push(
 		await step(
 			"FieldPath.documentId() in a where(..., 'in', ...)",
 			async () => {

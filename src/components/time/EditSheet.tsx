@@ -454,7 +454,16 @@ const EditSheet = forwardRef<BottomSheetMethods, EditSheetProps>(
 								...(formResponses[fieldId] || []),
 							];
 
-							// Answers hold attachment ids, not file objects.
+							/*
+							 * Answers hold attachment ids, not file objects.
+							 *
+							 * uploadFiles returns every id it recorded, not only
+							 * the ones whose bytes have landed — the attachment
+							 * document is written before the upload, so the
+							 * reference is valid straight away. This filter used
+							 * to drop files that had not finished uploading,
+							 * which offline meant all of them.
+							 */
 							const updatedFiles = fieldFiles
 								.map((file) => file.id)
 								.filter((id) => uploadedFiles.includes(id));

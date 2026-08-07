@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { registerKvStore } from "./src/lib/kvStore";
 import { NotifierWrapper } from "react-native-notifier";
 import { NavigationContainer } from "@react-navigation/native";
 import {
@@ -26,6 +28,27 @@ import {
 	navigationThemeFor,
 	useTheme,
 } from "./src/theme";
+
+/*
+ * The key-value backend for shared code (the upload queue, the SWR cache).
+ *
+ * REGISTERED HERE, NOT IN index.js. `main` in package.json points at
+ * node_modules/expo/AppEntry.js, which imports THIS file directly — index.js is
+ * never evaluated, so a registration there never runs and the first
+ * uploadQueue read throws "No KvStore registered".
+ *
+ * Module scope, so it lands before any provider mounts. Nothing calls kv() at
+ * import time — only inside effects and handlers — so this is early enough.
+ *
+ * src/services may not import AsyncStorage itself: the web portal compiles
+ * those files and has no such dependency. See src/lib/kvStore.ts.
+ */
+registerKvStore({
+	getItem: (key) => AsyncStorage.getItem(key),
+	setItem: (key, value) => AsyncStorage.setItem(key, value),
+	removeItem: (key) => AsyncStorage.removeItem(key),
+	getAllKeys: () => AsyncStorage.getAllKeys(),
+});
 
 /*
  * Dev-only diagnostics harness.

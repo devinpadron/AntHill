@@ -1,5 +1,16 @@
-import type { Timestamp as MTimestamp } from "firebase/firestore";
-import type { DocSnap, QuerySnap, Q, DocRef, CollRef } from "./rnfb-firestore";
+import type {
+	Timestamp as MTimestamp,
+	SnapshotMetadata as MSnapshotMetadata,
+} from "firebase/firestore";
+import type {
+	DocSnap,
+	QuerySnap,
+	Q,
+	DocRef,
+	CollRef,
+	GetOptions as ShimGetOptions,
+	ListenOptions,
+} from "./rnfb-firestore";
 
 /*
  * The `FirebaseFirestoreTypes` namespace, as the shared service layer imports
@@ -31,4 +42,7 @@ export namespace FirebaseFirestoreTypes {
 	export type CollectionReference = CollRef;
 	export type DocumentData = Record<string, any>;
 	export type FieldValue = unknown;
+	export type SnapshotMetadata = MSnapshotMetadata;
+	export type GetOptions = ShimGetOptions;
+	export type SnapshotListenOptions = ListenOptions;
 }

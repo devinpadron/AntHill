@@ -82,7 +82,13 @@ done
 # paused and rendered no form fields, and every migrated company lost its
 # dropdown choices because the editor wrote `options` while the migration
 # wrote `selectOptions`.
-OLD_FIELDS='\b(entry|item|timeEntry|event|doc|data|user|userData|snapshot|field)\??\.(clockInTime|clockOutTime|totalPausedSeconds|assignedWorkers|workerStatus|editHistory|connectedEvents|loggedInCompany|userNotes|generalForm|eventForm)\b'
+#
+# pauseStartTime joined them last, and it had been wrong the longest: the field
+# is pauseStartedAt, so useEntryElapsed read undefined on every paused shift and
+# fell back to "now". Worked time never froze during a break and the paused
+# total never climbed — on the big clock timer AND every entry card. Nothing
+# ever threw, because the fallback was a perfectly valid Date.
+OLD_FIELDS='\b(entry|item|timeEntry|event|doc|data|user|userData|snapshot|field)\??\.(clockInTime|clockOutTime|pauseStartTime|totalPausedSeconds|assignedWorkers|workerStatus|editHistory|connectedEvents|loggedInCompany|userNotes|generalForm|eventForm)\b'
 
 stale=$(
 	find src \( -name '*.ts' -o -name '*.tsx' \) -print0 2>/dev/null \
@@ -178,6 +184,27 @@ if [ -d web/src ]; then
 		status=1
 	done
 fi
+
+# --- 8. Platform storage inside the service layer --------------------------
+#
+# src/services is compiled VERBATIM by the web portal through the @app alias.
+# web/package.json has no @react-native-async-storage/async-storage dependency
+# and web/vite.config.ts has no alias for it, so an import there breaks
+# `npm run build` in web/ — and it breaks at the PORTAL build, which looks
+# entirely unrelated to whichever app change introduced it.
+#
+# Shared code that needs to persist something takes the injected backend from
+# src/lib/kvStore.ts instead. Same reasoning as NetInfo, which is why
+# src/lib/connectivity.ts is not under services either.
+storageInServices=$(
+	find src/services \( -name '*.ts' -o -name '*.tsx' \) -print0 2>/dev/null \
+		| xargs -0 grep -lE '@react-native-async-storage/async-storage|@react-native-community/netinfo' 2>/dev/null \
+		| sed "s|^\./||" | sort || true
+)
+for file in $storageInServices; do
+	echo "LAYERING: $file imports a native-only module — services are shared with web/. Use src/lib/kvStore.ts or src/lib/connectivity.ts."
+	status=1
+done
 
 if [ "$status" -eq 0 ]; then
 	echo "Layering OK."

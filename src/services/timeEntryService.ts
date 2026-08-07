@@ -2,7 +2,8 @@ import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
 import firestore from "@react-native-firebase/firestore";
 import db from "../lib/db";
 import { C } from "../constants/paths";
-import { TimeEntry, TimeEntryStatus } from "../types";
+import { SnapshotSync, TimeEntry, TimeEntryStatus } from "../types";
+import { track } from "./offline/pendingWrites";
 
 /*
  * Time entries.
@@ -10,11 +11,49 @@ import { TimeEntry, TimeEntryStatus } from "../types";
  * Three v1 defects are fixed at the source here rather than in a screen:
  *
  *   - clockOut read the document, computed a duration and wrote it back, which
- *     races with pause/resume. It is a transaction now.
+ *     races with pause/resume.
  *   - the approve path wrote rejectedAt/rejectedBy (TimeEntryDetails.tsx:258),
  *     which is why 2,104 of 2,116 approved entries carry a corrupt approver.
  *   - submitTimeEntryForApproval took the whole entry object from client state
  *     and wrote it back, so a stale client could revive old field values.
+ *
+ * THE CLOCK WORKS OFFLINE. That constraint shapes the four functions below, and
+ * it is worth understanding before changing them.
+ *
+ * Staff clock in at venues with no signal. Firestore's native persistence
+ * already handles most of this — writes land on disk, raise their snapshot
+ * immediately, and replay when the network returns, surviving a force-quit. Two
+ * things fought it:
+ *
+ *   1. A TRANSACTION CANNOT RUN OFFLINE. tx.get() issues a BatchGetDocuments
+ *      RPC straight to the datastore, bypassing the cache and the mutation
+ *      queue. clockOut and resumeEntry were transactions, so ending a shift
+ *      with no signal burned the SDK's retries and then failed outright. They
+ *      now compute from the entry the caller already holds — the live
+ *      subscribeActiveEntry snapshot — and write plainly.
+ *
+ *      The cost, stated plainly because the old comment promised otherwise:
+ *      two devices clocking out at the same instant no longer serialize, and
+ *      the last absolute write wins. resumeEntry avoids that with
+ *      FieldValue.increment, a transform the server applies to whatever the
+ *      document actually holds; clockOut cannot, because it needs the absolute
+ *      total to derive workedSeconds. One user, one open entry, usually one
+ *      device — an acceptable trade for a clock that works in a basement.
+ *
+ *   2. AN AWAITED WRITE HANGS OFFLINE. The promise from set()/update() resolves
+ *      on SERVER acknowledgement, not on the local write. Awaiting it left the
+ *      UI's isBusy flag stuck true forever with no toast and no way out. These
+ *      functions are therefore SYNCHRONOUS: they return once the write is
+ *      queued, and hand the promise to pendingWrites.track() so a genuine
+ *      rejection is still reported.
+ *
+ * Business timestamps are client-side (Timestamp.fromDate) and must stay that
+ * way. serverTimestamp() reads as NULL in every local snapshot — the serializer
+ * defaults serverTimestampBehavior to "none" — so a pause stamped by the server
+ * is invisible to the device that made it until it syncs, which silently
+ * dropped in-progress pauses from the paid total. createdAt/updatedAt stay on
+ * serverTimestamp deliberately: nothing in the app reads them, and the server's
+ * value is the better audit record.
  */
 
 const DEFAULT_LIMIT = 100;
@@ -39,15 +78,21 @@ export function dateKeyFor(date: Date, timeZone: string): string {
 	}).format(date);
 }
 
-export async function clockIn(
+/**
+ * Opens an entry. Returns its id immediately — the write is not awaited.
+ *
+ * The id comes from a client-generated auto-id, so it is known before anything
+ * touches the network and the caller can reference the entry straight away.
+ */
+export function clockIn(
 	companyId: string,
 	userId: string,
 	timeZone: string,
-): Promise<string> {
+): string {
 	const ref = db.collection(C.timeEntries).doc();
 	const now = new Date();
 
-	await ref.set({
+	const write = ref.set({
 		id: ref.id,
 		companyId,
 		userId,
@@ -72,45 +117,51 @@ export async function clockIn(
 		schemaVersion: 2,
 	});
 
+	track("clockIn", write);
 	return ref.id;
 }
+
+/** The fields clockOut needs. Satisfied by the live subscribeActiveEntry snapshot. */
+export type ClockOutInput = Pick<
+	TimeEntry,
+	"id" | "clockInAt" | "pausedSeconds" | "pauseStartedAt"
+>;
 
 /**
  * Closes an entry.
  *
- * A transaction because the paused totals it depends on are mutated by
- * pause/resume. v1 read, computed and wrote as three separate steps, so
- * clocking out while a pause was being resumed could lose the pause.
+ * Takes the entry rather than its id so it never has to read one back — see the
+ * offline note at the top of this file. `at` exists for tests; production always
+ * means "now".
  */
-export async function clockOut(entryId: string): Promise<void> {
-	const ref = db.collection(C.timeEntries).doc(entryId);
+export function clockOut(entry: ClockOutInput, at: Date = new Date()): void {
+	const now = at.getTime();
 
-	await db.runTransaction(async (tx) => {
-		const snap = await tx.get(ref);
-		if (!snap.exists()) throw new Error(`Time entry ${entryId} not found`);
-
-		const entry = snap.data() as TimeEntry;
-		const now = new Date();
-
-		// A pause still open at clock-out counts up to this moment.
-		let pausedSeconds = entry.pausedSeconds ?? 0;
-		if (entry.pauseStartedAt) {
-			pausedSeconds += Math.max(
-				0,
-				Math.round(
-					(now.getTime() - entry.pauseStartedAt.toMillis()) / 1000,
-				),
-			);
-		}
-
-		const elapsed = Math.max(
+	// A pause still open at clock-out counts up to this moment.
+	let pausedSeconds = entry.pausedSeconds ?? 0;
+	if (entry.pauseStartedAt) {
+		pausedSeconds += Math.max(
 			0,
-			Math.round((now.getTime() - entry.clockInAt.toMillis()) / 1000),
+			Math.round((now - entry.pauseStartedAt.toMillis()) / 1000),
 		);
+	}
 
-		tx.update(ref, {
+	const elapsed = Math.max(
+		0,
+		Math.round((now - entry.clockInAt.toMillis()) / 1000),
+	);
+
+	const write = db
+		.collection(C.timeEntries)
+		.doc(entry.id)
+		.update({
 			status: "completed",
-			clockOutAt: firestore.Timestamp.fromDate(now),
+			clockOutAt: firestore.Timestamp.fromDate(at),
+			/*
+			 * Absolute, not an increment: workedSeconds below is derived from
+			 * this exact total, so the two must agree. This is the write that
+			 * loses a genuine two-device race.
+			 */
 			pausedSeconds,
 			pauseStartedAt: null,
 			// Clamped so it can never exceed elapsed time — v1 clamped the lower
@@ -118,49 +169,87 @@ export async function clockOut(entryId: string): Promise<void> {
 			workedSeconds: Math.max(0, elapsed - pausedSeconds),
 			updatedAt: firestore.FieldValue.serverTimestamp(),
 		});
-	});
+
+	track("clockOut", write);
 }
 
-export async function pauseEntry(entryId: string): Promise<void> {
-	await db.collection(C.timeEntries).doc(entryId).update({
-		status: "paused",
-		pauseStartedAt: firestore.FieldValue.serverTimestamp(),
-		updatedAt: firestore.FieldValue.serverTimestamp(),
-	});
+/** Convenience for a caller without the entry in hand. Reads, then closes. */
+export async function clockOutById(entryId: string): Promise<void> {
+	const entry = await getTimeEntry(entryId);
+	if (!entry) throw new Error(`Time entry ${entryId} not found`);
+	clockOut(entry);
 }
 
-/** Accumulates the closed pause. A transaction for the same reason as clockOut. */
-export async function resumeEntry(entryId: string): Promise<void> {
-	const ref = db.collection(C.timeEntries).doc(entryId);
-
-	await db.runTransaction(async (tx) => {
-		const snap = await tx.get(ref);
-		if (!snap.exists()) return;
-
-		const entry = snap.data() as TimeEntry;
-		const pausedFor = entry.pauseStartedAt
-			? Math.max(
-					0,
-					Math.round(
-						(Date.now() - entry.pauseStartedAt.toMillis()) / 1000,
-					),
-				)
-			: 0;
-
-		tx.update(ref, {
-			status: "active",
-			pauseStartedAt: null,
-			pausedSeconds: (entry.pausedSeconds ?? 0) + pausedFor,
+export function pauseEntry(entryId: string, at: Date = new Date()): void {
+	const write = db
+		.collection(C.timeEntries)
+		.doc(entryId)
+		.update({
+			status: "paused",
+			/*
+			 * A CLIENT timestamp, deliberately. serverTimestamp() reads back as
+			 * null locally, so the device that paused could not see its own pause:
+			 * the worked-time counter kept climbing through the break, and clockOut
+			 * found no open pause to bank. That was wrong online too, not just off.
+			 */
+			pauseStartedAt: firestore.Timestamp.fromDate(at),
 			updatedAt: firestore.FieldValue.serverTimestamp(),
 		});
-	});
+
+	track("pauseEntry", write);
 }
 
-/** The user's open entry, if any. Synchronous unsubscribe. */
+/** The fields resumeEntry needs. */
+export type ResumeInput = Pick<TimeEntry, "id" | "pauseStartedAt">;
+
+/**
+ * Banks the pause that just ended.
+ *
+ * Uses FieldValue.increment rather than an absolute total. It is a transform:
+ * it queues offline like any write, and the server applies it to whatever the
+ * document actually holds — so two devices resuming do not clobber each other's
+ * banked time. That recovers most of what the old transaction guaranteed.
+ */
+export function resumeEntry(entry: ResumeInput, at: Date = new Date()): void {
+	const pausedFor = entry.pauseStartedAt
+		? Math.max(
+				0,
+				Math.round(
+					(at.getTime() - entry.pauseStartedAt.toMillis()) / 1000,
+				),
+			)
+		: 0;
+
+	const write = db
+		.collection(C.timeEntries)
+		.doc(entry.id)
+		.update({
+			status: "active",
+			pauseStartedAt: null,
+			pausedSeconds: firestore.FieldValue.increment(pausedFor),
+			updatedAt: firestore.FieldValue.serverTimestamp(),
+		});
+
+	track("resumeEntry", write);
+}
+
+/**
+ * The user's open entry, if any. Synchronous unsubscribe.
+ *
+ * Reports snapshot freshness as a trailing argument, following the
+ * `onChange(events, cursor)` shape eventService.subscribeEventsInRange already
+ * uses. The clock is the one screen that needs it: it is the only place a user
+ * acts offline and needs to know the action was kept.
+ *
+ * `includeMetadataChanges` is REQUIRED for that, not an optimisation. An
+ * acknowledgement does not change the document, so without it no further
+ * snapshot is raised and hasPendingWrites stays stuck true forever. Safe here
+ * because this is a limit(1) query; do NOT copy it onto list subscriptions.
+ */
 export function subscribeActiveEntry(
 	companyId: string,
 	userId: string,
-	onChange: (entry: TimeEntry | null) => void,
+	onChange: (entry: TimeEntry | null, sync: SnapshotSync) => void,
 ): () => void {
 	if (!companyId || !userId) return () => {};
 
@@ -171,8 +260,12 @@ export function subscribeActiveEntry(
 		.where("status", "in", ACTIVE_STATUSES)
 		.limit(1)
 		.onSnapshot(
+			{ includeMetadataChanges: true },
 			(snapshot) =>
-				onChange(snapshot.empty ? null : toEntry(snapshot.docs[0])),
+				onChange(snapshot.empty ? null : toEntry(snapshot.docs[0]), {
+					fromCache: snapshot.metadata.fromCache,
+					hasPendingWrites: snapshot.metadata.hasPendingWrites,
+				}),
 			(error) =>
 				console.error("Error subscribing to active entry", error),
 		);

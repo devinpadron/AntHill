@@ -28,6 +28,7 @@ export type { InputProps } from "./Input";
 
 export { ListRow } from "./ListRow";
 export { Loading, Skeleton, SkeletonList } from "./Loading";
+export { OfflineBanner } from "./OfflineBanner";
 export { Logo } from "./Logo";
 export { Pressable } from "./Pressable";
 export { SafeAreaBand } from "./SafeAreaBand";

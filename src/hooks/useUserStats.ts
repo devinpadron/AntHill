@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getMyEventHistory } from "../services/eventService";
 import { dateKeyFor, getAllTimeEntries } from "../services/timeEntryService";
+import { createCache } from "../services/offline/swrCache";
 import { Event, TimeEntry } from "../types";
 import {
 	ALL_TIME,
@@ -36,6 +37,25 @@ const EMPTY: History = { entries: [], events: [], truncated: false };
  * per company the signed-in user belongs to, and `refresh` is the escape hatch.
  */
 const cache = new Map<string, History>();
+
+/*
+ * The same thing again, on disk, for the cold-launch case.
+ *
+ * The Map above dies with the process, so the first visit after every launch
+ * paid the full sweep: up to 2,000 documents over ten sequential round trips,
+ * with the screen blocked behind it. Firestore's own cache does not help —
+ * every one of those documents may already be local and it is still ten bridge
+ * crossings and 2,000 deserialisations.
+ *
+ * Six hours because these numbers are a running total of completed shifts. A
+ * few hours out of date is unnoticeable; pull-to-refresh is there for anyone
+ * who disagrees, and a new clock-out invalidates nothing on its own.
+ */
+const persisted = createCache<History>({
+	name: "userStats",
+	version: 1,
+	ttlMs: 6 * 60 * 60 * 1000,
+});
 
 export function useUserStats(
 	companyId: string,
@@ -89,6 +109,7 @@ export function useUserStats(
 		};
 
 		cache.set(cacheKey, next);
+		void persisted.write(cacheKey, next);
 		if (activeKey.current !== cacheKey) return;
 
 		setHistory(next);
@@ -105,12 +126,38 @@ export function useUserStats(
 			return;
 		}
 
+		/*
+		 * Disk, then network. Show whatever was stored immediately — including
+		 * when it is stale, and including when there is no signal at all — and
+		 * sweep behind it.
+		 *
+		 * The activeKey guard is checked again after the read: it is async, so
+		 * a company swap can land between the effect firing and the value
+		 * arriving, and painting the previous company's hours would be worse
+		 * than the spinner this avoids.
+		 */
+		let cancelled = false;
+
+		void persisted.read(cacheKey).then((result) => {
+			if (cancelled || activeKey.current !== cacheKey) return;
+			if (result.value) {
+				cache.set(cacheKey, result.value);
+				setHistory(result.value);
+				setIsLoading(false);
+			}
+		});
+
 		load();
+
+		return () => {
+			cancelled = true;
+		};
 	}, [cacheKey, load]);
 
-	/** Drops the cache and re-reads. Wired to pull-to-refresh. */
+	/** Drops both caches and re-reads. Wired to pull-to-refresh. */
 	const refresh = useCallback(async () => {
 		cache.delete(cacheKey);
+		await persisted.invalidate(cacheKey);
 		await load();
 	}, [cacheKey, load]);
 

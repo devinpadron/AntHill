@@ -11,6 +11,7 @@ export * from "./enums/Role";
 export * from "./enums/FilterType";
 
 export * from "./common";
+export * from "./sync";
 export * from "./identity";
 export * from "./forms";
 export * from "./events";

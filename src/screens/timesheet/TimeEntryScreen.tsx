@@ -10,6 +10,8 @@ import { useEntryElapsed } from "../../hooks/useEntryElapsed";
 import { formatDuration, formatStopwatch } from "../../utils/timeUtils";
 import { submitForApproval } from "../../services/timeEntryService";
 import { setConnections } from "../../services/timeEntryEditService";
+import { track } from "../../services/offline/pendingWrites";
+import { getConnectivity } from "../../lib/connectivity";
 import { useUser } from "../../contexts/UserContext";
 import { useCompany } from "../../contexts/CompanyContext";
 import {
@@ -35,7 +37,25 @@ import { Theme, useTheme, useThemedStyles } from "../../theme";
  * The safe area is handled once, by `Screen`. This screen previously wrapped
  * itself in RN's `SafeAreaView` AND applied `paddingTop: insets.top`, so the
  * top inset was counted twice on iOS.
+ *
+ * Every clock action here works offline and none of them awaits the server —
+ * see the note in useTimeTracking. The confirmation toasts say so, because the
+ * failure this screen used to produce was silent: the write never landed, the
+ * button stayed spinning, and the worker had no idea whether their shift had
+ * been recorded.
  */
+
+/**
+ * Sub-copy telling the user their action was kept locally.
+ *
+ * Undefined when online, so the toast stays a plain confirmation. Replaces the
+ * old "Check your connection." — the action is not lost, so that read as a
+ * failure when it was a success.
+ */
+const offlineHint = (): string | undefined =>
+	getConnectivity() === "offline"
+		? "Saved on this device. It'll sync when you're back online."
+		: undefined;
 
 const TimeEntryScreen = ({ navigation }) => {
 	const theme = useTheme();
@@ -143,9 +163,34 @@ const TimeEntryScreen = ({ navigation }) => {
 		}
 	};
 
-	const handleClockIn = async () => {
-		await clockIn();
-		toast.success("Clocked in");
+	const handleClockIn = () => {
+		try {
+			clockIn();
+			toast.success("Clocked in", offlineHint());
+		} catch (error) {
+			// The write itself queues locally and cannot fail for lack of a
+			// network, so reaching here means something genuinely broke.
+			console.error("Error clocking in:", error);
+			toast.error("Could not clock in", "Please try again.");
+		}
+	};
+
+	const handlePause = () => {
+		try {
+			pauseTimer();
+		} catch (error) {
+			console.error("Error pausing:", error);
+			toast.error("Could not pause", "Please try again.");
+		}
+	};
+
+	const handleResume = () => {
+		try {
+			resumeTimer();
+		} catch (error) {
+			console.error("Error resuming:", error);
+			toast.error("Could not resume", "Please try again.");
+		}
 	};
 
 	const handleClockOut = () => {
@@ -154,39 +199,53 @@ const TimeEntryScreen = ({ navigation }) => {
 		setSubmitModalVisible(true);
 	};
 
+	/*
+	 * Ends the shift and submits it.
+	 *
+	 * NOTHING HERE IS AWAITED, deliberately. Every one of these writes lands on
+	 * local disk and replays when the network returns, but their promises only
+	 * settle on server acknowledgement — so awaiting them wedged the submit
+	 * sheet open on any job site with no signal, which is most of them. They are
+	 * handed to pendingWrites.track instead, which reports a genuine failure
+	 * without blocking the worker from going home.
+	 */
 	const handleSubmitTimeEntry = async (timeEntryId, entry) => {
 		if (!timeEntryId || !companyId) {
 			throw new Error("Missing required data for submission");
 		}
 
-		// If this is the active time entry, clock out first
-		const isActiveEntry =
-			activeTimeEntry && activeTimeEntry.id === timeEntryId;
-		if (isActiveEntry) {
-			try {
-				await clockOut();
-			} catch (error) {
-				console.error("Error clocking out:", error);
-				throw new Error("Failed to clock out");
+		try {
+			// If this is the active time entry, clock out first.
+			const isActiveEntry =
+				activeTimeEntry && activeTimeEntry.id === timeEntryId;
+			if (isActiveEntry) clockOut();
+
+			/*
+			 * Two targeted writes. v1 handed the whole enriched entry to a
+			 * service that wrote it back wholesale, embedding two form schemas
+			 * per submission along the way.
+			 */
+			track(
+				"submitForApproval",
+				submitForApproval(timeEntryId, {
+					notes: entry.notes,
+					formResponses: entry.formResponses,
+					formSchemaIds: entry.formSchemaIds,
+				}),
+			);
+
+			if (entry.connections?.length) {
+				track(
+					"setConnections",
+					setConnections(companyId, timeEntryId, entry.connections),
+				);
 			}
+		} catch (error) {
+			console.error("Error submitting time entry:", error);
+			throw new Error("Failed to submit");
 		}
 
-		/*
-		 * Two targeted writes. v1 handed the whole enriched entry to a service
-		 * that wrote it back wholesale, embedding two form schemas per
-		 * submission along the way.
-		 */
-		await submitForApproval(timeEntryId, {
-			notes: entry.notes,
-			formResponses: entry.formResponses,
-			formSchemaIds: entry.formSchemaIds,
-		});
-
-		if (entry.connections?.length) {
-			await setConnections(companyId, timeEntryId, entry.connections);
-		}
-
-		toast.success("Sent for approval");
+		toast.success("Sent for approval", offlineHint());
 		fetchTimeEntries();
 	};
 
@@ -290,8 +349,8 @@ const TimeEntryScreen = ({ navigation }) => {
 							isBusy={isPausingOrResuming}
 							onClockIn={handleClockIn}
 							onClockOut={handleClockOut}
-							onPause={pauseTimer}
-							onResume={resumeTimer}
+							onPause={handlePause}
+							onResume={handleResume}
 						/>
 
 						<Card style={styles.summary}>
