@@ -57,7 +57,10 @@ export const openMap = (
 	}
 	let scheme = "";
 	if (prefMap === "apple") {
-		`maps://?q=${label}&ll=${latitude},${longitude}`;
+		// Was a bare template literal with no assignment, so choosing Apple
+		// Maps in user preferences opened nothing at all — silently, since an
+		// empty `scheme` skips the openURL below.
+		scheme = `maps://?q=${label}&ll=${latitude},${longitude}`;
 	}
 	if (prefMap === "google") {
 		scheme = `https://www.google.com/maps/search/?api=1&query=${location}`;

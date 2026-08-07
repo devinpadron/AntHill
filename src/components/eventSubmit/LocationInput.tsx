@@ -2,11 +2,19 @@ import React from "react";
 import {
 	View,
 	Text,
+	StyleProp,
 	StyleSheet,
 	TouchableOpacity,
 	TextInput,
+	ViewStyle,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+/*
+ * Aliased, because this file still uses RN's Text for its legacy rows. Only the
+ * field label is themed so far — it is the one that sits beside `Input`s and
+ * had to match them.
+ */
+import { Text as ThemedText } from "../ui";
 import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
 import Constants from "expo-constants";
 import { GOOGLE_PLACES_API_KEY } from "@env";
@@ -49,6 +57,33 @@ type LocationInputProps = {
 	labelText: string;
 	setLabelText: (text: string) => void;
 	googlePlacesRef: React.RefObject<any>;
+	/**
+	 * Field heading. Plural by default because the event form takes a list, but
+	 * the geofence editor takes exactly one site and "Location(s)" there is a
+	 * promise of a feature that does not exist.
+	 */
+	label?: string;
+	/** Placeholder for the search field, for the same reason. */
+	placeholder?: string;
+	/**
+	 * The per-address tag editor — the pricetag button and its inline field.
+	 *
+	 * Off where the caller names the place itself. The geofence has a single
+	 * "Call it" field of its own, and two ways to label one address disagree the
+	 * moment somebody uses the other one.
+	 */
+	allowLabels?: boolean;
+	/** Hides the delete button, for a caller that clears the field another way. */
+	allowDelete?: boolean;
+	/**
+	 * Overrides the root spacing.
+	 *
+	 * The default bottom margin suits the event form, where fields are stacked
+	 * with margins. A parent that spaces its children with `gap` needs it zeroed
+	 * or the two compound into a gap half again as large as everything else on
+	 * the card.
+	 */
+	containerStyle?: StyleProp<ViewStyle>;
 };
 
 const LocationInputComponent = ({
@@ -61,19 +96,37 @@ const LocationInputComponent = ({
 	labelText,
 	setLabelText,
 	googlePlacesRef,
+	label: fieldLabel = "Location(s)",
+	placeholder = "Search for a location",
+	allowLabels = true,
+	allowDelete = true,
+	containerStyle,
 }: LocationInputProps) => {
 	const theme = useTheme();
 	const styles = useThemedStyles(locationStyles);
 	const [resetKey, setResetKey] = React.useState(0);
 
 	return (
-		<View style={styles.inputContainer}>
-			<Text style={styles.label}>Location(s)</Text>
-			<View style={styles.locationContainer}>
+		<View style={[styles.inputContainer, containerStyle]}>
+			<ThemedText
+				variant="label"
+				color="textSecondary"
+				style={styles.label}
+			>
+				{fieldLabel}
+			</ThemedText>
+			{/*
+			 * No paddingTop here, unlike the address rows below which reuse
+			 * `locationContainer` for their own spacing. The label already
+			 * carries its bottom margin, and having both put 18pt between a
+			 * label and its field — four times what `Input` uses, which is why
+			 * this field looked unrelated to the ones under it.
+			 */}
+			<View style={styles.searchRow}>
 				<GooglePlacesAutocomplete
 					key={resetKey}
 					ref={googlePlacesRef}
-					placeholder="Search for a location"
+					placeholder={placeholder}
 					onPress={(data, details = null) => {
 						if (details) {
 							onLocationSelect(details);
@@ -116,46 +169,57 @@ const LocationInputComponent = ({
 						<View style={styles.locationContainer}>
 							<Text style={styles.addressText}>{address}</Text>
 							<View style={styles.locationButtonContainer}>
-								<TouchableOpacity
-									onPress={() => {
-										if (
-											editingLabelForAddress === address
-										) {
-											setEditingLabelForAddress("");
-											setLabelText("");
-										} else {
-											setEditingLabelForAddress(address);
-											setLabelText(
-												locations[address]?.label || "",
-											);
+								{allowLabels && (
+									<TouchableOpacity
+										onPress={() => {
+											if (
+												editingLabelForAddress ===
+												address
+											) {
+												setEditingLabelForAddress("");
+												setLabelText("");
+											} else {
+												setEditingLabelForAddress(
+													address,
+												);
+												setLabelText(
+													locations[address]?.label ||
+														"",
+												);
+											}
+										}}
+										style={styles.addLocationButton}
+									>
+										<Ionicons
+											name={
+												editingLabelForAddress ===
+												address
+													? "pricetag"
+													: "pricetag-outline"
+											}
+											size={24}
+											color={theme.colors.textSecondary}
+										/>
+									</TouchableOpacity>
+								)}
+								{allowDelete && (
+									<TouchableOpacity
+										onPress={() =>
+											onLocationDelete(address)
 										}
-									}}
-									style={styles.addLocationButton}
-								>
-									<Ionicons
-										name={
-											editingLabelForAddress === address
-												? "pricetag"
-												: "pricetag-outline"
-										}
-										size={24}
-										color={theme.colors.textSecondary}
-									/>
-								</TouchableOpacity>
-								<TouchableOpacity
-									onPress={() => onLocationDelete(address)}
-									style={styles.deleteButton}
-								>
-									<Ionicons
-										name="trash-outline"
-										size={24}
-										color={theme.colors.danger}
-									/>
-								</TouchableOpacity>
+										style={styles.deleteButton}
+									>
+										<Ionicons
+											name="trash-outline"
+											size={24}
+											color={theme.colors.danger}
+										/>
+									</TouchableOpacity>
+								)}
 							</View>
 						</View>
 
-						{editingLabelForAddress === address ? (
+						{allowLabels && editingLabelForAddress === address ? (
 							<View style={styles.labelInputContainer}>
 								<TextInput
 									style={styles.labelInput}
@@ -191,19 +255,29 @@ const LocationInputComponent = ({
 const locationStyles = (theme: Theme) =>
 	StyleSheet.create({
 		inputContainer: {
-			marginBottom: 20,
+			marginBottom: theme.spacing.xl,
 		},
+		/*
+		 * Only the margin — the type and colour come from `Text variant="label"`
+		 * so this matches `Input`'s label exactly, font-scale cap included.
+		 * It was a hand-rolled 16pt/600 with an 8pt margin, so wherever this
+		 * component sits beside an Input (the geofence editor puts two right
+		 * under it) its heading was visibly bigger and further from its field
+		 * than its neighbours'.
+		 */
 		label: {
-			fontSize: 16,
-			marginBottom: 8,
-			color: theme.colors.textSecondary,
-			fontWeight: "600",
+			marginBottom: theme.spacing.xs,
+		},
+		searchRow: {
+			flexDirection: "row",
+			alignItems: "flex-start",
+			gap: theme.spacing.sm,
 		},
 		locationContainer: {
 			flexDirection: "row",
 			alignItems: "flex-start",
-			gap: 10,
-			paddingTop: 10,
+			gap: theme.spacing.sm,
+			paddingTop: theme.spacing.sm,
 		},
 		addressText: {
 			flex: 1,

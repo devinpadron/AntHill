@@ -1,5 +1,6 @@
 import { BaseDoc, CompanyScoped, Timestamp } from "./common";
 import { Role } from "./enums/Role";
+import { ClockReminderGeofence, LocationTrackingSettings } from "./location";
 
 /** users/{userId} */
 export interface User extends BaseDoc {
@@ -26,6 +27,20 @@ export interface UserSettings {
 	 * "system" — so the field is optional rather than defaulted on write.
 	 */
 	theme?: "light" | "dark" | "system";
+	/**
+	 * When this worker agreed to location tracking, keyed by company.
+	 *
+	 * PER COMPANY, because someone who works for two caterers agrees to one
+	 * employer recording their movements and not necessarily the other. Absent
+	 * means never asked; the clock screen asks before the first tracked
+	 * clock-in and will not record a thing until there is a timestamp here.
+	 *
+	 * Kept as a durable record rather than a local flag because it is the
+	 * evidence that the disclosure happened — reinstalling the app must not
+	 * quietly erase it. It is mirrored into AsyncStorage as well so a clock-in
+	 * with no signal can still tell whether consent exists.
+	 */
+	locationConsentByCompany?: Record<string, Timestamp>;
 	createdAt: Timestamp;
 	updatedAt: Timestamp;
 }
@@ -239,6 +254,28 @@ export interface CompanyPreferences extends CompanyScoped {
 	 * reminder behind a disabled requirement is how a setting starts lying.
 	 */
 	acknowledgementReminder: ReminderSchedule;
+
+	/**
+	 * Record where a worker goes between clock-in and clock-out.
+	 *
+	 * OFF by default, and it must stay that way: switching it on starts
+	 * recording the movements of every member of the company, and doing that to
+	 * an existing customer as a side effect of an update would be indefensible.
+	 * Separate from the geofence below so a company can have the helpful
+	 * reminder without tracking anyone.
+	 */
+	locationTracking: LocationTrackingSettings;
+
+	/**
+	 * Remind workers to clock in on arrival and out on departure.
+	 *
+	 * OFF by default. It only ever posts a notification — nothing here clocks
+	 * anyone in or out, and nothing should ever be added that does. Enabled with
+	 * no coordinates set is treated as unconfigured and monitors nothing, the
+	 * same way a zero-interval ReminderSchedule sends nothing.
+	 */
+	clockReminderGeofence: ClockReminderGeofence;
+
 	/** Refs into `formSchemas`, not inline schemas as in v1. */
 	eventFormSchemaId: string | null;
 	timeEntryFormSchemaId: string | null;

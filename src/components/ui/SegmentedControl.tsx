@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
 	LayoutChangeEvent,
 	Pressable,
@@ -61,35 +61,66 @@ export function SegmentedControl<T extends string>({
 }: SegmentedControlProps<T>) {
 	const theme = useTheme();
 	const styles = useThemedStyles(segmentStyles);
-	const [trackWidth, setTrackWidth] = useState(0);
+
+	/*
+	 * The thumb follows the segments' MEASURED geometry rather than an assumed
+	 * even split.
+	 *
+	 * It used to be `trackWidth / segments.length`, which is only right when
+	 * every segment is the same width — true under `fullWidth`, where they are
+	 * all `flex: 1`, and false the moment they size to their content. With
+	 * `fullWidth={false}` and labels of different lengths ("2024" beside "All
+	 * time") the thumb took even steps under uneven labels, so it sat visibly
+	 * off the text it was supposed to be highlighting, drifting further along
+	 * the row.
+	 *
+	 * Measuring each segment costs one layout pass and makes the two modes the
+	 * same code path instead of one correct case and one silent trap.
+	 */
+	const [layouts, setLayouts] = useState<{ x: number; width: number }[]>([]);
 
 	const index = Math.max(
 		0,
 		segments.findIndex((s) => s.value === value),
 	);
 
-	/*
-	 * The thumb travels inside the track's PADDING box, not its full width.
-	 *
-	 * `onLayout` reports the border-box width, so dividing that by the segment
-	 * count made each step one padding-width too wide — by the last segment the
-	 * thumb had walked off the right edge by twice the padding. The segments
-	 * themselves are `flex: 1` inside the same padding, so measuring the inner
-	 * box is also what keeps the thumb aligned with its label.
-	 */
-	const innerWidth = Math.max(0, trackWidth - TRACK_PADDING * 2);
-	const segmentWidth = innerWidth > 0 ? innerWidth / segments.length : 0;
+	const current = layouts[index];
 
-	const onLayout = useCallback((event: LayoutChangeEvent) => {
-		setTrackWidth(event.nativeEvent.layout.width);
-	}, []);
+	const onSegmentLayout = useCallback(
+		(position: number) => (event: LayoutChangeEvent) => {
+			const { x, width } = event.nativeEvent.layout;
+			setLayouts((prev) => {
+				const existing = prev[position];
+				if (existing?.x === x && existing?.width === width) return prev;
+				const next = [...prev];
+				next[position] = { x, width };
+				return next;
+			});
+		},
+		[],
+	);
+
+	/*
+	 * Stale entries would otherwise keep a thumb sized to a segment that no
+	 * longer exists. Every remaining segment re-reports its layout on the next
+	 * pass, so a single frame with no thumb is the whole cost.
+	 */
+	useEffect(() => {
+		setLayouts((prev) => (prev.length ? [] : prev));
+	}, [segments.length]);
 
 	const thumbStyle = useAnimatedStyle(() => ({
-		width: segmentWidth,
+		width: current?.width ?? 0,
 		transform: [
 			{
+				/*
+				 * `x` is already relative to the track's padding box, and the
+				 * thumb is positioned at that same inset — so this is a plain
+				 * offset with no padding arithmetic. The old version had to
+				 * subtract TRACK_PADDING twice and got it wrong once.
+				 */
 				translateX: withSpring(
-					index * segmentWidth,
+					current?.x ?? 0,
 					theme.motion.springPress,
 				),
 			},
@@ -97,22 +128,19 @@ export function SegmentedControl<T extends string>({
 	}));
 
 	return (
-		<View
-			style={[styles.track, style]}
-			onLayout={onLayout}
-			accessibilityRole="tablist"
-		>
+		<View style={[styles.track, style]} accessibilityRole="tablist">
 			{/* Hidden until measured, so it does not flash at x=0 on mount. */}
-			{segmentWidth > 0 && (
+			{!!current?.width && (
 				<Animated.View style={[styles.thumb, thumbStyle]} />
 			)}
 
-			{segments.map((segment) => {
+			{segments.map((segment, position) => {
 				const active = segment.value === value;
 
 				return (
 					<Pressable
 						key={segment.value}
+						onLayout={onSegmentLayout(position)}
 						onPress={() => {
 							if (active) return;
 							haptics.selection();
@@ -159,7 +187,13 @@ const segmentStyles = (theme: Theme) =>
 		thumb: {
 			position: "absolute",
 			top: TRACK_PADDING,
-			left: TRACK_PADDING,
+			/*
+			 * ZERO, not TRACK_PADDING. translateX now carries a segment's own
+			 * measured `x`, which already includes the track's padding — an
+			 * inset here would be counted twice and push the thumb 3px right of
+			 * every label.
+			 */
+			left: 0,
 			bottom: TRACK_PADDING,
 			borderRadius: theme.radius.sm + 1,
 			backgroundColor: theme.colors.surface,

@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { useUser } from "../../contexts/UserContext";
+import { useCompany } from "../../contexts/CompanyContext";
 import { useCompanyMembers } from "../../hooks/useCompanyMembers";
 import {
 	approveEntries,
@@ -42,6 +43,7 @@ import ManagerActions from "../../components/time/ManagerActions";
 import EditSheet from "../../components/time/EditSheet";
 import ExportSheet from "../../components/time/ExportSheet";
 import FieldTotalsCard from "../../components/time/FieldTotalsCard";
+import { TrackMapCard } from "../../components/time/TrackMapCard";
 import { Loading, Screen, ScreenHeader } from "../../components/ui";
 import { timeEntryDetailStyles } from "./TimeEntryDetails.styles";
 import { useTheme, useThemedStyles } from "../../theme";
@@ -54,8 +56,17 @@ const TimeEntryDetails = ({ route, navigation }) => {
 	const entryIdArray = Array.isArray(entryId) ? entryId : [entryId];
 
 	const insets = useSafeAreaInsets();
-	const { userId: currentUserId, companyId, isAdmin } = useUser();
+	const { userId: currentUserId, companyId, isAdmin, settings } = useUser();
 	const { byUserId: membersById } = useCompanyMembers(companyId ?? "");
+	const { preferences } = useCompany();
+
+	/*
+	 * Managers see every route. A worker sees their OWN only if the company
+	 * allows it — off means the person being recorded is the one party who
+	 * cannot see the recording, which is a choice the company gets to make and
+	 * the consent sheet is careful not to promise otherwise.
+	 */
+	const canSeeOwnRoute = preferences.locationTracking.workersSeeOwnRoutes;
 
 	// Core state
 	const [isLoading, setIsLoading] = useState(true);
@@ -691,21 +702,42 @@ const TimeEntryDetails = ({ route, navigation }) => {
 
 				{/* Time Entries List */}
 				{timeEntries.map((entry) => (
-					<TimeDetailCard
-						key={entry.id}
-						entry={entry}
-						isSelected={selectedEntries[entry.id]}
-						isAdmin={isAdmin}
-						onToggleSelection={toggleEntrySelection}
-						onEditEntry={handleEditEntry}
-						attachmentMap={attachmentMap}
-						connectedEvents={connectedEvents[entry.id] || []}
-						onFieldUpdate={handleFieldUpdate}
-						timeEntrySchema={
-							schemasByEntry[entry.id]?.timeEntrySchema
-						}
-						eventSchema={schemasByEntry[entry.id]?.eventSchema}
-					/>
+					<React.Fragment key={entry.id}>
+						<TimeDetailCard
+							entry={entry}
+							isSelected={selectedEntries[entry.id]}
+							isAdmin={isAdmin}
+							onToggleSelection={toggleEntrySelection}
+							onEditEntry={handleEditEntry}
+							attachmentMap={attachmentMap}
+							connectedEvents={connectedEvents[entry.id] || []}
+							onFieldUpdate={handleFieldUpdate}
+							timeEntrySchema={
+								schemasByEntry[entry.id]?.timeEntrySchema
+							}
+							eventSchema={schemasByEntry[entry.id]?.eventSchema}
+						/>
+
+						{/*
+						 * Managers reviewing anyone, and workers on their OWN
+						 * entries — the consent sheet promises them sight of what
+						 * was recorded, and a promise the app does not keep is
+						 * worse than not making it.
+						 *
+						 * Renders nothing at all when `locationTracking` is null,
+						 * which is every entry from a company with the feature off
+						 * and every entry predating it.
+						 */}
+						{(isAdmin ||
+							(entry.userId === currentUserId &&
+								canSeeOwnRoute)) && (
+							<TrackMapCard
+								entryId={entry.id}
+								summary={entry.locationTracking ?? null}
+								preferredMapApp={settings?.preferredMapApp}
+							/>
+						)}
+					</React.Fragment>
 				))}
 			</ScrollView>
 

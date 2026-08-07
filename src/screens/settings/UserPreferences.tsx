@@ -229,6 +229,7 @@ const UserPreferences = ({ navigation }) => {
 				{MAP_APPS.map((option, index) => (
 					<ListRow
 						key={option.value}
+						multiline
 						title={option.label}
 						icon={option.icon}
 						selected={prefMap === option.value}
@@ -261,6 +262,7 @@ const UserPreferences = ({ navigation }) => {
 				</Text>
 
 				<ListRow
+					multiline
 					title="Push notifications"
 					subtitle={
 						notifications.enabled
@@ -283,6 +285,7 @@ const UserPreferences = ({ navigation }) => {
 					rows.map((row, index) => (
 						<ListRow
 							key={row.channel}
+							multiline
 							title={row.title}
 							subtitle={row.subtitle}
 							icon={row.icon}
@@ -316,6 +319,7 @@ const UserPreferences = ({ navigation }) => {
 					</Text>
 
 					<ListRow
+						multiline
 						title="All events"
 						subtitle="Everything on the company calendar"
 						icon="albums-outline"
@@ -326,6 +330,7 @@ const UserPreferences = ({ navigation }) => {
 						}}
 					/>
 					<ListRow
+						multiline
 						title="My events"
 						subtitle="Only shifts you're scheduled on"
 						icon="person-outline"

@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
-import { RefreshControl, ScrollView, View } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { RefreshControl, View } from "react-native";
+import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { useUser } from "../../contexts/UserContext";
 import { useCompany } from "../../contexts/CompanyContext";
 import { useUserStats } from "../../hooks/useUserStats";
@@ -19,6 +20,7 @@ import {
 	Screen,
 	ScreenHeader,
 	SegmentedControl,
+	Sheet,
 	SkeletonList,
 	Text,
 } from "../../components/ui";
@@ -49,12 +51,41 @@ const Statistics = ({ navigation }: any) => {
 		useUserStats(companyId, userId, timeZone);
 
 	/*
+	 * Two controls, not one row of every year.
+	 *
+	 * A segment per year meant the picker grew by one every January, and it had
+	 * already outgrown the screen — hence the horizontal scroller it used to sit
+	 * in, which hid the older years behind a swipe nobody knew to make. The
+	 * scope question ("everything, or one year?") is now separate from the
+	 * which-year question, so the first control stays two segments wide forever
+	 * and the second scales to any amount of history.
+	 */
+	const [scope, setScope] = useState<"all" | "year">("year");
+
+	/*
 	 * Null means "whatever the newest year is". Derived rather than seeded by an
 	 * effect, so the first render after the sweep lands already shows a year
 	 * instead of flashing an empty all-time view.
 	 */
 	const [picked, setPicked] = useState<YearKey | null>(null);
-	const year = picked ?? years[0] ?? ALL_TIME;
+	const newestYear = years[0] ?? ALL_TIME;
+	const selectedYear = picked ?? newestYear;
+	const year = scope === "all" ? ALL_TIME : selectedYear;
+
+	const yearSheetRef = useRef<BottomSheet>(null);
+	const openYearPicker = useCallback(() => {
+		yearSheetRef.current?.snapToIndex(0);
+	}, []);
+	const closeYearPicker = useCallback(() => {
+		yearSheetRef.current?.close();
+	}, []);
+	const chooseYear = useCallback(
+		(value: YearKey) => {
+			setPicked(value);
+			closeYearPicker();
+		},
+		[closeYearPicker],
+	);
 
 	const [refreshing, setRefreshing] = useState(false);
 	const onRefresh = async () => {
@@ -92,10 +123,12 @@ const Statistics = ({ navigation }: any) => {
 
 	const stats = statsFor(year);
 	const period = year === ALL_TIME ? "all time" : year;
-	const segments = [
-		...years.map((value) => ({ value, label: value })),
-		{ value: ALL_TIME, label: "All time" },
-	];
+
+	/*
+	 * The year control is pointless with nothing to choose between — one year of
+	 * history means "By year" and "All time" are the same numbers.
+	 */
+	const canPickYear = years.length > 1;
 
 	/*
 	 * Which total leads.
@@ -107,189 +140,257 @@ const Statistics = ({ navigation }: any) => {
 	const hasHours = stats.shiftCount > 0;
 
 	return (
-		<Screen
-			scroll
-			padded
-			header={header}
-			refreshControl={
-				<RefreshControl
-					refreshing={refreshing}
-					onRefresh={onRefresh}
-					tintColor={theme.colors.accent}
+		/*
+		 * The sheet is a SIBLING of Screen, not a child.
+		 *
+		 * `Screen scroll` renders its children inside a ScrollView, and a bottom
+		 * sheet placed there is laid out within the scroll CONTENT rather than
+		 * over the window — it positions itself absolutely against the scrolling
+		 * view, so tapping the row appeared to do nothing at all. Same reason
+		 * CompanySwitcher hangs its sheet off the provider instead of the page.
+		 *
+		 * The flex wrapper is load-bearing too: gorhom measures its container to
+		 * work out where the snap points are, so the sheet needs a parent with a
+		 * real height.
+		 */
+		<View style={styles.flex}>
+			<Screen
+				scroll
+				padded
+				header={header}
+				refreshControl={
+					<RefreshControl
+						refreshing={refreshing}
+						onRefresh={onRefresh}
+						tintColor={theme.colors.accent}
+					/>
+				}
+			>
+				<Card style={styles.card}>
+					<View style={styles.hero}>
+						<Text variant="display">
+							{hasHours
+								? formatDuration(stats.totalSeconds)
+								: String(stats.eventsWorked)}
+						</Text>
+						<Text
+							variant="caption"
+							color="textSecondary"
+							align="center"
+							style={styles.heroCaption}
+						>
+							{hasHours
+								? `worked over ${period} · ${plural(stats.shiftCount, "shift")}`
+								: `${plural(stats.eventsWorked, "event")} worked over ${period}`}
+						</Text>
+					</View>
+				</Card>
+
+				{canPickYear && (
+					<View style={styles.scopeBlock}>
+						<SegmentedControl<"all" | "year">
+							segments={[
+								{ value: "year", label: "By year" },
+								{ value: "all", label: "All time" },
+							]}
+							value={scope}
+							onChange={setScope}
+						/>
+
+						{scope === "year" && (
+							<Card flush>
+								<ListRow
+									title="Year"
+									value={selectedYear}
+									icon="calendar-outline"
+									onPress={openYearPicker}
+								/>
+							</Card>
+						)}
+					</View>
+				)}
+
+				<Highlights
+					stats={stats}
+					onOpenShift={
+						// The Clock tab only exists when timesheets are on, and a
+						// company can switch the feature off with entries already
+						// written — so the tap-through has to check, not assume.
+						preferences.enableTimeSheet && stats.longestShift
+							? () =>
+									navigation.navigate("Clock", {
+										screen: "TimeEntryDetails",
+										params: {
+											entryId:
+												stats.longestShift!.entryId,
+											userId,
+										},
+									})
+							: undefined
+					}
 				/>
-			}
-		>
-			<Card style={styles.card}>
-				<View style={styles.hero}>
-					<Text variant="display">
-						{hasHours
-							? formatDuration(stats.totalSeconds)
-							: String(stats.eventsWorked)}
-					</Text>
-					<Text
-						variant="caption"
-						color="textSecondary"
-						align="center"
-						style={styles.heroCaption}
-					>
-						{hasHours
-							? `worked over ${period} · ${plural(stats.shiftCount, "shift")}`
-							: `${plural(stats.eventsWorked, "event")} worked over ${period}`}
+
+				{hasHours && (
+					<Card title="Hours" flush style={styles.card}>
+						<ListRow
+							title="Total worked"
+							value={formatDuration(stats.totalSeconds)}
+						/>
+						<ListRow
+							title="Shifts"
+							value={String(stats.shiftCount)}
+						/>
+						<ListRow
+							title="Days on the clock"
+							value={plural(stats.daysWorked, "day")}
+						/>
+						{stats.averageShiftSeconds !== null && (
+							<ListRow
+								title="Average shift"
+								value={formatDuration(
+									stats.averageShiftSeconds,
+								)}
+							/>
+						)}
+						{stats.totalPausedSeconds > 0 && (
+							<ListRow
+								title="Time on break"
+								value={formatDuration(stats.totalPausedSeconds)}
+							/>
+						)}
+						<ListRow
+							title="Round the clock"
+							subtitle="Your hours as whole 24-hour days"
+							value={`${stats.equivalentFullDays.toFixed(1)} days`}
+							separator={false}
+						/>
+					</Card>
+				)}
+
+				{hasHours && (
+					<Card title="Your rhythm" flush style={styles.card}>
+						{stats.busiestMonth && (
+							<ListRow
+								title="Busiest month"
+								value={stats.busiestMonth.label}
+								subtitle={plural(
+									stats.busiestMonth.count,
+									"shift",
+								)}
+							/>
+						)}
+						{stats.busiestWeekday && (
+							<ListRow
+								title="Favourite day"
+								value={stats.busiestWeekday.label}
+								subtitle={plural(
+									stats.busiestWeekday.count,
+									"shift",
+								)}
+							/>
+						)}
+						{stats.shortestShift && (
+							<ListRow
+								title="Shortest shift"
+								value={formatDuration(
+									stats.shortestShift.seconds,
+								)}
+								subtitle={formatDateKey(
+									stats.shortestShift.dateKey,
+								)}
+							/>
+						)}
+						{stats.firstShiftDateKey && (
+							<ListRow
+								title={
+									year === ALL_TIME
+										? "First ever shift"
+										: "First shift of the year"
+								}
+								value={formatDateKey(stats.firstShiftDateKey)}
+								separator={false}
+							/>
+						)}
+					</Card>
+				)}
+
+				{stats.eventsWorked > 0 && (
+					<Card title="Events" flush style={styles.card}>
+						<ListRow
+							title="Events worked"
+							value={String(stats.eventsWorked)}
+						/>
+						{stats.longestEvent && (
+							<ListRow
+								title="Longest event"
+								value={formatDuration(stats.longestEvent.value)}
+								subtitle={stats.longestEvent.title}
+							/>
+						)}
+						{stats.topVenue && (
+							<ListRow
+								title="Most-visited place"
+								value={stats.topVenue.label}
+								subtitle={`${stats.topVenue.count} times`}
+							/>
+						)}
+						{stats.busiestEventMonth && (
+							<ListRow
+								title="Busiest month"
+								value={stats.busiestEventMonth.label}
+								subtitle={plural(
+									stats.busiestEventMonth.count,
+									"event",
+								)}
+								separator={false}
+							/>
+						)}
+					</Card>
+				)}
+
+				<View style={styles.footnote}>
+					<Text variant="caption" color="textTertiary" align="center">
+						{truncated
+							? "Based on your most recent 2,000 records."
+							: "Counts every shift and event on your record."}
 					</Text>
 				</View>
-			</Card>
+			</Screen>
 
-			{segments.length > 1 && (
-				<ScrollView
-					horizontal
-					showsHorizontalScrollIndicator={false}
-					style={styles.yearScroll}
-					contentContainerStyle={styles.yearScrollContent}
-				>
-					<SegmentedControl<YearKey>
-						segments={segments}
-						value={year}
-						onChange={setPicked}
-						fullWidth={false}
-					/>
-				</ScrollView>
-			)}
-
-			<Highlights
-				stats={stats}
-				onOpenShift={
-					// The Clock tab only exists when timesheets are on, and a
-					// company can switch the feature off with entries already
-					// written — so the tap-through has to check, not assume.
-					preferences.enableTimeSheet && stats.longestShift
-						? () =>
-								navigation.navigate("Clock", {
-									screen: "TimeEntryDetails",
-									params: {
-										entryId: stats.longestShift!.entryId,
-										userId,
-									},
-								})
-						: undefined
-				}
-			/>
-
-			{hasHours && (
-				<Card title="Hours" flush style={styles.card}>
-					<ListRow
-						title="Total worked"
-						value={formatDuration(stats.totalSeconds)}
-					/>
-					<ListRow title="Shifts" value={String(stats.shiftCount)} />
-					<ListRow
-						title="Days on the clock"
-						value={plural(stats.daysWorked, "day")}
-					/>
-					{stats.averageShiftSeconds !== null && (
+			{/*
+			 * A sheet rather than a row of segments, because this list only ever
+			 * grows. It scrolls, so a worker of ten years' standing picks 2019
+			 * exactly as easily as last year.
+			 */}
+			<Sheet
+				ref={yearSheetRef}
+				snapPoints={["50%"]}
+				title="Choose a year"
+				onClose={closeYearPicker}
+			>
+				<BottomSheetScrollView>
+					{years.map((value, index) => (
 						<ListRow
-							title="Average shift"
-							value={formatDuration(stats.averageShiftSeconds)}
-						/>
-					)}
-					{stats.totalPausedSeconds > 0 && (
-						<ListRow
-							title="Time on break"
-							value={formatDuration(stats.totalPausedSeconds)}
-						/>
-					)}
-					<ListRow
-						title="Round the clock"
-						subtitle="Your hours as whole 24-hour days"
-						value={`${stats.equivalentFullDays.toFixed(1)} days`}
-						separator={false}
-					/>
-				</Card>
-			)}
-
-			{hasHours && (
-				<Card title="Your rhythm" flush style={styles.card}>
-					{stats.busiestMonth && (
-						<ListRow
-							title="Busiest month"
-							value={stats.busiestMonth.label}
-							subtitle={plural(stats.busiestMonth.count, "shift")}
-						/>
-					)}
-					{stats.busiestWeekday && (
-						<ListRow
-							title="Favourite day"
-							value={stats.busiestWeekday.label}
-							subtitle={plural(
-								stats.busiestWeekday.count,
-								"shift",
-							)}
-						/>
-					)}
-					{stats.shortestShift && (
-						<ListRow
-							title="Shortest shift"
-							value={formatDuration(stats.shortestShift.seconds)}
-							subtitle={formatDateKey(
-								stats.shortestShift.dateKey,
-							)}
-						/>
-					)}
-					{stats.firstShiftDateKey && (
-						<ListRow
-							title={
-								year === ALL_TIME
-									? "First ever shift"
-									: "First shift of the year"
+							key={value}
+							title={value}
+							icon={
+								value === selectedYear
+									? "calendar"
+									: "calendar-outline"
 							}
-							value={formatDateKey(stats.firstShiftDateKey)}
-							separator={false}
+							iconColor={
+								value === selectedYear
+									? "accent"
+									: "textSecondary"
+							}
+							selected={value === selectedYear}
+							separator={index < years.length - 1}
+							onPress={() => chooseYear(value)}
 						/>
-					)}
-				</Card>
-			)}
-
-			{stats.eventsWorked > 0 && (
-				<Card title="Events" flush style={styles.card}>
-					<ListRow
-						title="Events worked"
-						value={String(stats.eventsWorked)}
-					/>
-					{stats.longestEvent && (
-						<ListRow
-							title="Longest event"
-							value={formatDuration(stats.longestEvent.value)}
-							subtitle={stats.longestEvent.title}
-						/>
-					)}
-					{stats.topVenue && (
-						<ListRow
-							title="Most-visited place"
-							value={stats.topVenue.label}
-							subtitle={`${stats.topVenue.count} times`}
-						/>
-					)}
-					{stats.busiestEventMonth && (
-						<ListRow
-							title="Busiest month"
-							value={stats.busiestEventMonth.label}
-							subtitle={plural(
-								stats.busiestEventMonth.count,
-								"event",
-							)}
-							separator={false}
-						/>
-					)}
-				</Card>
-			)}
-
-			<View style={styles.footnote}>
-				<Text variant="caption" color="textTertiary" align="center">
-					{truncated
-						? "Based on your most recent 2,000 records."
-						: "Counts every shift and event on your record."}
-				</Text>
-			</View>
-		</Screen>
+					))}
+				</BottomSheetScrollView>
+			</Sheet>
+		</View>
 	);
 };
 

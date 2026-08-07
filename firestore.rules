@@ -197,6 +197,21 @@ service cloud.firestore {
            );
     }
 
+    /*
+     * The worker the time entry belongs to.
+     *
+     * Exists because location history needs a NARROWER audience than the rest
+     * of an entry's subcollections. connections and edits are readable by any
+     * company member, which is fine for "which event was this" and "who
+     * changed the hours". Where a colleague physically went during their shift
+     * is not company-readable, so locationSegments is scoped to that person and
+     * their managers and nobody else.
+     */
+    function v2IsOwnerOfEntry(entryId) {
+      return isSignedIn()
+        && get(/databases/$(database)/documents/timeEntries/$(entryId)).data.userId == uid();
+    }
+
     function v2IsManager(companyId) {
       return v2IsMember(companyId)
         && get(v2Membership(companyId)).data.role in ["owner", "manager"];
@@ -566,6 +581,40 @@ service cloud.firestore {
         allow read: if v2IsMemberOfEntry(entryId);
         allow create: if v2IsMemberOfEntry(entryId);
         allow update: if false;
+        allow delete: if v2IsManagerOfEntry(entryId);
+      }
+
+      /*
+       * Where the worker went during the shift.
+       *
+       * READ IS DELIBERATELY NOT v2IsMemberOfEntry. Its two neighbours above
+       * use that helper, and copying it here would let any member of the
+       * company pull up any colleague's movements — which is not what anyone
+       * agreed to in the consent sheet. Only the worker themselves and their
+       * managers.
+       *
+       * Create is restricted to the OWNER, not to managers: these documents
+       * are written by the device that recorded them and by nothing else. A
+       * manager who could write here could fabricate a route, and a fabricated
+       * route is worse than no route, because it looks like evidence.
+       *
+       * Update is allowed FOR THE OWNER ONLY, unlike `edits` which forbids it
+       * outright. Segment ids are deterministic (`entryId-0007`) so that a
+       * tracker killed between queueing a write and clearing its local buffer
+       * replays onto the same document instead of duplicating the leg. That
+       * replay is an update in rules terms, so `if false` here would reject
+       * every recovery and strand the buffer. Restricting it to the owner
+       * keeps the property that actually matters — nobody can rewrite somebody
+       * else's route — and the weaker one it gives up is not real: a worker who
+       * wants to falsify where they went carries the phone somewhere else.
+       *
+       * Managers may delete, and only so deleteTimeEntry can take the history
+       * down with its parent.
+       */
+      match /locationSegments/{segmentId} {
+        allow read: if v2IsManagerOfEntry(entryId) || v2IsOwnerOfEntry(entryId);
+        allow create: if v2IsOwnerOfEntry(entryId);
+        allow update: if v2IsOwnerOfEntry(entryId);
         allow delete: if v2IsManagerOfEntry(entryId);
       }
     }

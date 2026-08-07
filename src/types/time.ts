@@ -1,5 +1,6 @@
 import { BaseDoc, CompanyScoped, DateKey, Timestamp } from "./common";
 import { FormResponses } from "./forms";
+import { LocationTrackSummary } from "./location";
 
 export type TimeEntryStatus =
 	| "active"
@@ -65,6 +66,16 @@ export interface TimeEntry extends BaseDoc, CompanyScoped {
 	} | null;
 
 	review: TimeEntryReview | null;
+
+	/**
+	 * The shift's location track, or the reason there isn't one.
+	 *
+	 * NULL on every entry recorded before the feature existed, and on every
+	 * entry from a company that has it switched off. Null means "nobody was
+	 * asked to record this" and must render as nothing at all — it is not the
+	 * same as a track that came back empty, which `status` distinguishes.
+	 */
+	locationTracking: LocationTrackSummary | null;
 
 	/**
 	 * The raw v1 approval fields, copied verbatim. The `review` inference above

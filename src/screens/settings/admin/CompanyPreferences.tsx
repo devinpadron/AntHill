@@ -17,6 +17,7 @@ import {
 	Toggle,
 } from "../../../components/ui";
 import { IconName } from "../../../components/ui/Icon";
+import { GeofenceEditor } from "../../../components/settings/GeofenceEditor";
 import {
 	CompanyPreferences as CompanyPrefs,
 	ReminderSchedule,
@@ -73,6 +74,43 @@ const FLAGS: {
 ];
 
 /*
+ * What the app tells a tracked worker, and what it lets them refuse.
+ *
+ * All three default ON. They are listed together and worded as what the worker
+ * gets, not as what the company gains, because that is the decision actually
+ * being made — and because the OS-level indicators do not go away whatever is
+ * chosen here, which the footnote under these rows says plainly.
+ */
+type TransparencyKey =
+	"showRecordingIndicator" | "workersSeeOwnRoutes" | "allowDeclining";
+
+const TRANSPARENCY: {
+	key: TransparencyKey;
+	title: string;
+	subtitle: string;
+	icon: IconName;
+}[] = [
+	{
+		key: "showRecordingIndicator",
+		title: "Show workers when recording is on",
+		subtitle: "A line on their clock screen while a shift is tracked",
+		icon: "radio-outline",
+	},
+	{
+		key: "workersSeeOwnRoutes",
+		title: "Let workers see their own route",
+		subtitle: "On their own timesheets. Managers always see every route",
+		icon: "map-outline",
+	},
+	{
+		key: "allowDeclining",
+		title: "Let workers decline",
+		subtitle: "Off makes tracking a condition of clocking in here",
+		icon: "hand-left-outline",
+	},
+];
+
+/*
  * One repeating reminder: whether to send it, and how long to leave between
  * reminders to the same worker.
  *
@@ -121,6 +159,7 @@ function ReminderRows({
 	return (
 		<>
 			<ListRow
+				multiline
 				title={title}
 				subtitle={subtitle}
 				icon={icon}
@@ -194,6 +233,16 @@ const CompanyPreferences = ({ navigation }) => {
 
 	const save = (patch: Partial<CompanyPrefs>) =>
 		updatePreferences({ ...preferences, ...patch });
+
+	/*
+	 * Writes ONLY what changed, unlike `save` above.
+	 *
+	 * updatePreferences is documented as a field-level patch precisely so a
+	 * stale device cannot revive superseded values, and spreading the whole
+	 * live preferences object back defeats that. The older rows still do it;
+	 * new ones should not, and the location block below does not.
+	 */
+	const patch = (next: Partial<CompanyPrefs>) => updatePreferences(next);
 
 	/*
 	 * Absent on companies that predate the setting, and absent means REQUIRED —
@@ -277,6 +326,7 @@ const CompanyPreferences = ({ navigation }) => {
 				{FLAGS.map((flag, index) => (
 					<ListRow
 						key={flag.key}
+						multiline
 						title={flag.title}
 						subtitle={flag.subtitle}
 						icon={flag.icon}
@@ -326,6 +376,7 @@ const CompanyPreferences = ({ navigation }) => {
 				)}
 
 				<ListRow
+					multiline
 					title="Require shift confirmation"
 					subtitle="Assigned workers must confirm they have seen it"
 					icon="checkmark-circle-outline"
@@ -357,6 +408,136 @@ const CompanyPreferences = ({ navigation }) => {
 				)}
 			</Card>
 
+			{/*
+			 * Location, and only where there is a clock to attach it to.
+			 * Without time tracking there is no shift to record against and no
+			 * reason to remind anyone to punch one.
+			 */}
+			{preferences.enableTimeSheet && (
+				<Card title="Location" flush style={styles.card}>
+					<Text
+						variant="caption"
+						color="textSecondary"
+						style={styles.flushHint}
+					>
+						Both are off unless you turn them on. Workers are asked
+						to agree before anything is recorded, and can decline.
+					</Text>
+
+					<ListRow
+						multiline
+						title="Track location while clocked in"
+						subtitle="Records each worker's route for the whole shift"
+						icon="navigate-outline"
+						separator
+						accessory={
+							<Toggle
+								value={preferences.locationTracking.enabled}
+								onValueChange={(enabled) =>
+									patch({
+										locationTracking: {
+											...preferences.locationTracking,
+											enabled,
+										},
+									})
+								}
+							/>
+						}
+					/>
+
+					{preferences.locationTracking.enabled && (
+						<>
+							<View style={styles.notice}>
+								<Text variant="caption" color="warning">
+									Every worker on the clock has their position
+									recorded until they clock out, including
+									when the app is closed. Tell your staff
+									before you switch this on.
+								</Text>
+							</View>
+
+							{TRANSPARENCY.map((row) => (
+								<ListRow
+									key={row.key}
+									multiline
+									title={row.title}
+									subtitle={row.subtitle}
+									icon={row.icon}
+									separator
+									accessory={
+										<Toggle
+											value={
+												preferences.locationTracking[
+													row.key
+												]
+											}
+											onValueChange={(next) =>
+												patch({
+													locationTracking: {
+														...preferences.locationTracking,
+														[row.key]: next,
+													},
+												})
+											}
+										/>
+									}
+								/>
+							))}
+
+							{/*
+							 * Said once, here, rather than on each row: these
+							 * three change what the APP says, not what the
+							 * phone does. Selling them internally as "workers
+							 * won't know" would be wrong, so the screen refuses
+							 * to imply it.
+							 */}
+							<View style={styles.notice}>
+								<Text variant="caption" color="textTertiary">
+									Whatever you choose here, iPhones show a
+									blue location bar for the whole shift and
+									Android shows a permanent notification.
+									Workers are always told before their first
+									tracked shift — that disclosure is required
+									and cannot be switched off.
+								</Text>
+							</View>
+						</>
+					)}
+
+					<ListRow
+						multiline
+						title="Clock in/out reminders"
+						subtitle="Nudges workers to punch in and out around your address"
+						icon="notifications-outline"
+						separator={preferences.clockReminderGeofence.enabled}
+						accessory={
+							<Toggle
+								value={
+									preferences.clockReminderGeofence.enabled
+								}
+								onValueChange={(enabled) =>
+									patch({
+										clockReminderGeofence: {
+											...preferences.clockReminderGeofence,
+											enabled,
+										},
+									})
+								}
+							/>
+						}
+					/>
+
+					{preferences.clockReminderGeofence.enabled && (
+						<GeofenceEditor
+							value={preferences.clockReminderGeofence}
+							onChange={(clockReminderGeofence) =>
+								patch({ clockReminderGeofence })
+							}
+						/>
+					)}
+				</Card>
+			)}
+
 			<View style={styles.footnote}>
 				<Text variant="caption" color="textTertiary" align="center">
 					Feature changes reach everyone in the company immediately.
@@ -378,11 +559,38 @@ const companyPrefStyles = (theme: Theme) =>
 		},
 		flushHint: {
 			paddingHorizontal: theme.spacing.lg,
-			paddingBottom: theme.spacing.sm,
+			/*
+			 * Matched to the md the Card's title row already leaves above it.
+			 * At sm the intro copy sat closer to the first row than to the
+			 * heading it belongs to.
+			 */
+			paddingBottom: theme.spacing.md,
 		},
+		/*
+		 * Anything revealed BELOW a row by that row's own switch: the reminder
+		 * interval fields, the geofence editor.
+		 *
+		 * paddingTop is the fix. Without it these blocks began immediately under
+		 * the separator line, so the revealed content looked like it belonged to
+		 * the row beneath rather than the one that opened it.
+		 */
 		intervalBlock: {
 			paddingHorizontal: theme.spacing.lg,
+			paddingTop: theme.spacing.md,
 			paddingBottom: theme.spacing.md,
+			gap: theme.spacing.sm,
+		},
+		/*
+		 * The warning and footnote paragraphs inside a flush card.
+		 *
+		 * Its own style rather than borrowing intervalBlock: these are prose
+		 * between two rows, and they need the same breathing room above and
+		 * below or the sentence reads as a caption on whichever row it happens
+		 * to be nearer.
+		 */
+		notice: {
+			paddingHorizontal: theme.spacing.lg,
+			paddingVertical: theme.spacing.md,
 			gap: theme.spacing.sm,
 		},
 		intervalRow: {

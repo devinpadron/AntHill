@@ -111,6 +111,13 @@ export function clockIn(
 		editCount: 0,
 		submission: null,
 		review: null,
+		/*
+		 * Null, always, whatever the company preference says. The tracker sets
+		 * this to a real summary once it has consent and a permission — writing
+		 * an optimistic "recording" here would claim a route exists on entries
+		 * where the worker declines the very next prompt.
+		 */
+		locationTracking: null,
 		legacy: null,
 		createdAt: firestore.FieldValue.serverTimestamp(),
 		updatedAt: firestore.FieldValue.serverTimestamp(),
@@ -524,9 +531,10 @@ export async function deleteTimeEntry(
 ): Promise<void> {
 	const ref = db.collection(C.timeEntries).doc(entryId);
 
-	const [connections, edits, attachments] = await Promise.all([
+	const [connections, edits, segments, attachments] = await Promise.all([
 		ref.collection(C.connections).get(),
 		ref.collection(C.edits).get(),
+		ref.collection(C.locationSegments).get(),
 		db
 			.collection(C.attachments)
 			.where("companyId", "==", companyId)
@@ -538,6 +546,12 @@ export async function deleteTimeEntry(
 	const batch = db.batch();
 	for (const doc of connections.docs) batch.delete(doc.ref);
 	for (const doc of edits.docs) batch.delete(doc.ref);
+	/*
+	 * A shift's worth of location history outliving the shift it belongs to is
+	 * the worst kind of orphan — nothing links to it and nothing will ever look
+	 * at it, but it is still a record of where somebody went.
+	 */
+	for (const doc of segments.docs) batch.delete(doc.ref);
 	for (const doc of attachments.docs) batch.delete(doc.ref);
 	batch.delete(ref);
 

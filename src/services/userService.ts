@@ -4,6 +4,7 @@ import { C, APP_DATA, APP_CONFIG } from "../constants/paths";
 import { FALLBACK_ACTIVE_SCHEMA_VERSION } from "../constants/schema";
 import { User, UserSettings } from "../types";
 import { syncProfileToMemberships } from "./membershipService";
+import { track } from "./offline/pendingWrites";
 
 /*
  * User profiles.
@@ -197,6 +198,33 @@ export async function updateUserSettings(
 			},
 			{ merge: true },
 		);
+}
+
+/**
+ * Records that this worker agreed to location tracking for one company.
+ *
+ * A dotted path, not a whole-map write: a worker can consent for two employers
+ * and writing the map wholesale from a client that only knows about one would
+ * revoke the other. Not awaited — consent is granted at a venue as often as
+ * anywhere else, and the clock-in behind it must not wait on a server.
+ */
+export function recordLocationConsent(userId: string, companyId: string): void {
+	track(
+		"recordLocationConsent",
+		db
+			.collection(C.userSettings)
+			.doc(userId)
+			.set(
+				{
+					userId,
+					locationConsentByCompany: {
+						[companyId]: firestore.Timestamp.fromDate(new Date()),
+					},
+					updatedAt: firestore.FieldValue.serverTimestamp(),
+				},
+				{ merge: true },
+			),
+	);
 }
 
 /* ------------------------------------------------------------- app config */

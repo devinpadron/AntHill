@@ -3,6 +3,10 @@ import { Theme } from "../../theme";
 
 export const statisticsStyles = (theme: Theme) =>
 	StyleSheet.create({
+		/* Gives the bottom sheet a measured container to snap against. */
+		flex: {
+			flex: 1,
+		},
 		hero: {
 			alignItems: "center",
 			paddingVertical: theme.spacing.md,
@@ -10,11 +14,15 @@ export const statisticsStyles = (theme: Theme) =>
 		heroCaption: {
 			marginTop: theme.spacing.xs,
 		},
-		yearScroll: {
+		/*
+		 * Replaces the horizontal scroller that used to hold one segment per
+		 * year. The scope control and the year row are one block so the row
+		 * reads as belonging to the "By year" segment above it rather than as a
+		 * separate setting.
+		 */
+		scopeBlock: {
 			marginTop: theme.spacing.lg,
-		},
-		yearScrollContent: {
-			paddingRight: theme.spacing.lg,
+			gap: theme.spacing.sm,
 		},
 		card: {
 			marginTop: theme.spacing.lg,

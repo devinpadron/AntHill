@@ -55,12 +55,14 @@ const Settings = ({ navigation }: any) => {
 		<Screen scroll padded header={header}>
 			<Section title="Account">
 				<ListRow
+					multiline
 					title="Profile"
 					subtitle="Your name, email and companies"
 					icon="person-outline"
 					onPress={() => navigation.push("Profile")}
 				/>
 				<ListRow
+					multiline
 					title="Preferences"
 					subtitle="Appearance, maps and defaults"
 					icon="options-outline"
@@ -68,6 +70,7 @@ const Settings = ({ navigation }: any) => {
 				/>
 				{/* Everyone's own numbers — deliberately outside the admin block. */}
 				<ListRow
+					multiline
 					title="Statistics"
 					subtitle="Your hours, shifts and records"
 					icon="stats-chart-outline"
@@ -80,6 +83,7 @@ const Settings = ({ navigation }: any) => {
 				<>
 					<Section title="Company">
 						<ListRow
+							multiline
 							title="Company preferences"
 							subtitle="Features, invite code and week start"
 							icon="business-outline"
@@ -88,6 +92,7 @@ const Settings = ({ navigation }: any) => {
 							}
 						/>
 						<ListRow
+							multiline
 							title="Employees"
 							subtitle="Roster, roles and access"
 							icon="people-outline"
@@ -99,6 +104,7 @@ const Settings = ({ navigation }: any) => {
 						/>
 						{preferences.enableAvailability && (
 							<ListRow
+								multiline
 								title="Worker groups"
 								subtitle="Publish events to a subset of the crew"
 								icon="git-branch-outline"
@@ -108,6 +114,7 @@ const Settings = ({ navigation }: any) => {
 						)}
 						{preferences.enableTimeSheet && (
 							<ListRow
+								multiline
 								title="Payroll review"
 								subtitle="Approve and export hours"
 								icon="cash-outline"
@@ -120,6 +127,7 @@ const Settings = ({ navigation }: any) => {
 					<Section title="Build">
 						<ExpandableSettingsSection title="Forms, checklists & labels">
 							<ListRow
+								multiline
 								title="Timesheet form"
 								icon="document-text-outline"
 								onPress={() =>
@@ -129,6 +137,7 @@ const Settings = ({ navigation }: any) => {
 								}
 							/>
 							<ListRow
+								multiline
 								title="Event form"
 								icon="document-text-outline"
 								onPress={() =>
@@ -138,6 +147,7 @@ const Settings = ({ navigation }: any) => {
 								}
 							/>
 							<ListRow
+								multiline
 								title="Checklists"
 								icon="checkbox-outline"
 								onPress={() =>
@@ -145,6 +155,7 @@ const Settings = ({ navigation }: any) => {
 								}
 							/>
 							<ListRow
+								multiline
 								title="Packages"
 								icon="cube-outline"
 								onPress={() =>
@@ -152,6 +163,7 @@ const Settings = ({ navigation }: any) => {
 								}
 							/>
 							<ListRow
+								multiline
 								title="Event labels"
 								icon="pricetag-outline"
 								onPress={() => navigation.push("LabelCreator")}
@@ -164,6 +176,7 @@ const Settings = ({ navigation }: any) => {
 
 			<Section title="Account actions">
 				<ListRow
+					multiline
 					title="Log out"
 					icon="log-out-outline"
 					destructive

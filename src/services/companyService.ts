@@ -28,11 +28,85 @@ export const defaultPreferences: CompanyPreferences = {
 	 */
 	requireAssignmentAcknowledgement: true,
 	acknowledgementReminder: { enabled: false, hours: 0, minutes: 0 },
+	/*
+	 * Both location blocks default OFF, and the sampling numbers matter as much
+	 * as the flag.
+	 *
+	 * 50 m / 60 s is a shift route, not a movement study: it draws the trip from
+	 * the commissary to the venue legibly while letting the OS coalesce fixes and
+	 * keep the radio asleep between them. Tightening either is the fastest way to
+	 * turn this feature into the reason nobody's phone survives a double.
+	 *
+	 * 150 m is the geofence radius, and it is a floor as much as a default —
+	 * consumer GPS wanders far enough that a tighter fence reports the worker
+	 * arriving and leaving while the phone sits on a shelf.
+	 */
+	locationTracking: {
+		enabled: false,
+		minDistanceMeters: 50,
+		minIntervalSeconds: 60,
+		/*
+		 * The three transparency settings default ON, and it matters that they
+		 * are `true` here rather than merely documented as recommended: a
+		 * company that switches tracking on and never scrolls to the rest of
+		 * this card gets the open behaviour by default, not the quiet one.
+		 */
+		showRecordingIndicator: true,
+		workersSeeOwnRoutes: true,
+		allowDeclining: true,
+	},
+	clockReminderGeofence: {
+		enabled: false,
+		label: null,
+		address: null,
+		latitude: null,
+		longitude: null,
+		radiusMeters: 150,
+		/* What a shop-based company expects; the staging-site case opts in. */
+		clockOutTrigger: "leaving",
+	},
 	eventFormSchemaId: null,
 	timeEntryFormSchemaId: null,
 	updatedAt: null as unknown as CompanyPreferences["updatedAt"],
 	schemaVersion: 2,
 };
+
+/**
+ * Defaults under a stored document.
+ *
+ * The spread is SHALLOW, which is correct for the flat flags and wrong for the
+ * nested blocks: a document holding `{ locationTracking: { enabled: true } }`
+ * would shallow-merge to a settings object with no sampling numbers at all, and
+ * the tracker would ask the OS for `undefined` metres. The nested blocks are
+ * therefore merged a level deeper, by name. Add a nested block to
+ * CompanyPreferences and it belongs in this list.
+ */
+function withDefaults(
+	companyId: string,
+	stored: Partial<CompanyPreferences>,
+): CompanyPreferences {
+	return {
+		...defaultPreferences,
+		...stored,
+		companyId,
+		availabilityReminder: {
+			...defaultPreferences.availabilityReminder,
+			...stored.availabilityReminder,
+		},
+		acknowledgementReminder: {
+			...defaultPreferences.acknowledgementReminder,
+			...stored.acknowledgementReminder,
+		},
+		locationTracking: {
+			...defaultPreferences.locationTracking,
+			...stored.locationTracking,
+		},
+		clockReminderGeofence: {
+			...defaultPreferences.clockReminderGeofence,
+			...stored.clockReminderGeofence,
+		},
+	};
+}
 
 export async function getCompany(companyId: string): Promise<Company | null> {
 	try {
@@ -107,11 +181,12 @@ export function subscribePreferences(
 		.doc(companyId)
 		.onSnapshot(
 			(doc) =>
-				onChange({
-					...defaultPreferences,
-					companyId,
-					...(doc.exists() ? (doc.data() as CompanyPreferences) : {}),
-				}),
+				onChange(
+					withDefaults(
+						companyId,
+						doc.exists() ? (doc.data() as CompanyPreferences) : {},
+					),
+				),
 			(error) => console.error("Error subscribing to preferences", error),
 		);
 }
@@ -124,14 +199,13 @@ export async function getPreferences(
 			.collection(C.companyPreferences)
 			.doc(companyId)
 			.get();
-		return {
-			...defaultPreferences,
+		return withDefaults(
 			companyId,
-			...(doc.exists() ? (doc.data() as CompanyPreferences) : {}),
-		};
+			doc.exists() ? (doc.data() as CompanyPreferences) : {},
+		);
 	} catch (e) {
 		console.error("Error getting preferences", e);
-		return { ...defaultPreferences, companyId };
+		return withDefaults(companyId, {});
 	}
 }
 

@@ -1,3 +1,4 @@
+import firestore from "@react-native-firebase/firestore";
 import { kv } from "../../lib/kvStore";
 import { DATABASE_ID } from "../../constants/database";
 
@@ -43,6 +44,52 @@ function miss<T>(): SwrResult<T> {
 }
 
 /*
+ * Rebuilds Timestamps on the way out of JSON.
+ *
+ * REQUIRED, not a nicety. Timestamp.toJSON() returns a bare
+ * `{ seconds, nanoseconds }`, so a cached document round-trips into a plain
+ * object that still LOOKS right in a debugger and has lost every method on the
+ * class. The failure lands far from here — `entry.clockInAt.toDate is not a
+ * function` from a formatter three files away, on the second visit to a screen
+ * that worked perfectly on the first, because the first visit was served from
+ * memory and only the second came off disk.
+ *
+ * Anything cached here holds Firestore documents, so this is the cache's job
+ * rather than each caller's: a store that does not return what it was given is
+ * broken, and asking every reader to defend against it is how one of them
+ * forgets.
+ *
+ * The shape test is deliberately exact — two keys, both numbers. A domain
+ * object with precisely those two fields and nothing else would be caught
+ * wrongly; nothing in this schema has that shape, and the alternative of
+ * tagging every timestamp on write cannot read the entries already on disk.
+ */
+function reviveTimestamps(key: string, value: unknown): unknown {
+	if (typeof value !== "object" || value === null || Array.isArray(value)) {
+		return value;
+	}
+
+	const keys = Object.keys(value);
+	if (
+		keys.length !== 2 ||
+		!keys.includes("seconds") ||
+		!keys.includes("nanoseconds")
+	) {
+		return value;
+	}
+
+	const { seconds, nanoseconds } = value as {
+		seconds: unknown;
+		nanoseconds: unknown;
+	};
+	if (typeof seconds !== "number" || typeof nanoseconds !== "number") {
+		return value;
+	}
+
+	return new firestore.Timestamp(seconds, nanoseconds);
+}
+
+/*
  * Every key carries the database it came from.
  *
  * A dev build reads and writes a database literally named "test". This repo
@@ -77,7 +124,10 @@ export function createCache<T>(options: {
 				const raw = await kv().getItem(keyFor(key));
 				if (!raw) return miss<T>();
 
-				const entry = JSON.parse(raw) as CacheEntry<T>;
+				const entry = JSON.parse(
+					raw,
+					reviveTimestamps,
+				) as CacheEntry<T>;
 				/*
 				 * A version bump silently invalidates rather than migrating.
 				 * These are all re-derivable from Firestore, so the cost of

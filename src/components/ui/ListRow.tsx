@@ -37,6 +37,19 @@ type ListRowProps = {
 	onLongPress?: () => void;
 	/** Draws the bottom separator. Off for the last row in a group. */
 	separator?: boolean;
+	/**
+	 * Lets the title and subtitle run to as many lines as they need.
+	 *
+	 * For rows whose text is COPY rather than data — a settings row explaining
+	 * what a switch does has to be readable in full, and a row that ends in "…"
+	 * is a setting nobody can act on. Data rows (names, event titles, companies)
+	 * leave this off, where a long value truncating keeps the list scannable.
+	 *
+	 * Also the accessibility answer: at large system font sizes even short copy
+	 * outgrows two lines, and a fixed cap turns that into an ellipsis rather
+	 * than a taller row.
+	 */
+	multiline?: boolean;
 	style?: StyleProp<ViewStyle>;
 	testID?: string;
 };
@@ -55,6 +68,7 @@ export const ListRow: React.FC<ListRowProps> = ({
 	onPress,
 	onLongPress,
 	separator = true,
+	multiline = false,
 	style,
 	testID,
 }) => {
@@ -79,15 +93,28 @@ export const ListRow: React.FC<ListRowProps> = ({
 					</View>
 				)}
 
+				{/*
+				 * Two lines, not one.
+				 *
+				 * The text slot is what is left after the icon and a trailing
+				 * switch — roughly 260pt on a normal phone — and plenty of real
+				 * setting titles are exactly that wide, so a one-line cap
+				 * ellipsised them. `multiline` removes the cap altogether for
+				 * rows whose text is copy the reader has to finish.
+				 */}
 				<View style={styles.textSlot}>
-					<Text variant="body" color={tint} numberOfLines={1}>
+					<Text
+						variant="body"
+						color={tint}
+						numberOfLines={multiline ? undefined : 2}
+					>
 						{title}
 					</Text>
 					{!!subtitle && (
 						<Text
 							variant="caption"
 							color="textSecondary"
-							numberOfLines={2}
+							numberOfLines={multiline ? undefined : 3}
 							style={styles.subtitle}
 						>
 							{subtitle}
@@ -106,10 +133,27 @@ export const ListRow: React.FC<ListRowProps> = ({
 					</Text>
 				)}
 
-				{accessory}
+				{/*
+				 * The accessory needs its own inset.
+				 *
+				 * `value` and `chevron` each carry a marginLeft; the accessory
+				 * carried none, so it sat flush against the text slot — and
+				 * since that slot is flex:1, any title long enough to fill the
+				 * row ended up touching the switch. It reads as the title being
+				 * cut off by the control, which is exactly what it looks like on
+				 * the rows whose titles now wrap to two lines.
+				 */}
+				{!!accessory && (
+					<View style={styles.accessorySlot}>{accessory}</View>
+				)}
 
 				{selected && !accessory && (
-					<Icon name="checkmark" size="md" color="accent" />
+					<Icon
+						name="checkmark"
+						size="md"
+						color="accent"
+						style={styles.accessorySlot}
+					/>
 				)}
 
 				{showChevron && (
@@ -185,11 +229,20 @@ const listRowStyles = (theme: Theme) =>
 			flex: 1,
 		},
 		subtitle: {
-			marginTop: 2,
+			/*
+			 * A token, not the old 2px. That gap was set when a title was one
+			 * line and a subtitle two; now that both wrap, two lines of title
+			 * sitting 2px off the subtitle read as one run-on paragraph rather
+			 * than a heading and its explanation.
+			 */
+			marginTop: theme.spacing.xs,
 		},
 		value: {
 			marginLeft: theme.spacing.md,
 			maxWidth: "45%",
+		},
+		accessorySlot: {
+			marginLeft: theme.spacing.md,
 		},
 		chevron: {
 			marginLeft: theme.spacing.sm,

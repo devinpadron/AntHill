@@ -31,6 +31,7 @@ export const C = {
 	// Subcollections of timeEntries/{entryId}
 	connections: "connections",
 	edits: "edits",
+	locationSegments: "locationSegments",
 } as const;
 
 /*

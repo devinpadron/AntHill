@@ -59,6 +59,15 @@ const ROUTES: RouteName[] = [
 	"TimeEntryDetails",
 	"EmployeeList",
 	"Availability",
+	/*
+	 * The only entry here NOT sent by the functions repo. Geofence reminders
+	 * are posted on-device by lib/localNotifications, and they route through
+	 * this same table on purpose — one routing table beats a second one that
+	 * drifts. Like Availability, the tab only exists when the company has the
+	 * feature on, which is also the only condition under which the reminder
+	 * could have been posted.
+	 */
+	"Clock",
 ];
 
 const asRoute = (value: string | undefined): RouteName | null =>
@@ -107,6 +116,16 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 					 * landing is ever wanted.
 					 */
 					case "availability_nudge":
+						pendingNavigation.setAction(screen);
+						break;
+
+					/*
+					 * Posted locally by the geofence task, not by a server. It
+					 * carries no ids — the whole message is "you are here and
+					 * your clock says otherwise" — so it just opens the Clock
+					 * tab and lets the worker act.
+					 */
+					case "clock_reminder":
 						pendingNavigation.setAction(screen);
 						break;
 

@@ -3,6 +3,19 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { registerKvStore } from "./src/lib/kvStore";
+/*
+ * Imported for its SIDE EFFECT, and it has to be at module scope of the entry
+ * file.
+ *
+ * When the OS wakes the app to deliver a background location or a geofence
+ * crossing, it boots the bundle and immediately looks for a task registered
+ * under that name. Only definitions that ran during the boot exist at that
+ * moment — anything inside a component or an effect has not, because no tree
+ * mounted. An unregistered task drops the event silently, which is exactly how
+ * background tracking appears to work in testing and then does nothing in the
+ * field. Do not move this into a provider.
+ */
+import "./src/lib/locationTasks";
 import { NotifierWrapper } from "react-native-notifier";
 import { NavigationContainer } from "@react-navigation/native";
 import {

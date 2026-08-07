@@ -7,6 +7,8 @@ import TimeEntryCard from "../../components/time/TimeEntryCard";
 import TimeEntrySubmitModal from "../../components/time/TimeEntrySubmitModal";
 import { useTimeTracking } from "../../hooks/useTimeTracking";
 import { useEntryElapsed } from "../../hooks/useEntryElapsed";
+import { useLocationTracking } from "../../hooks/useLocationTracking";
+import { LocationConsentSheet } from "../../components/time/LocationConsentSheet";
 import { formatDuration, formatStopwatch } from "../../utils/timeUtils";
 import { submitForApproval } from "../../services/timeEntryService";
 import { setConnections } from "../../services/timeEntryEditService";
@@ -21,6 +23,7 @@ import {
 	EmptyState,
 	Icon,
 	IconButton,
+	Pressable,
 	Screen,
 	ScreenHeader,
 	Text,
@@ -61,7 +64,7 @@ const TimeEntryScreen = ({ navigation }) => {
 	const theme = useTheme();
 	const styles = useThemedStyles(clockStyles);
 	const { userId, companyId } = useUser();
-	const { preferences, timeZone } = useCompany();
+	const { company, preferences, timeZone } = useCompany();
 
 	const weekStartsOn = preferences?.workWeekStarts === "sunday" ? 0 : 1;
 
@@ -143,6 +146,50 @@ const TimeEntryScreen = ({ navigation }) => {
 	const [refreshing, setRefreshing] = useState(false);
 	const [submitModalVisible, setSubmitModalVisible] = useState(false);
 	const [selectedTimeEntry, setSelectedTimeEntry] = useState(null);
+
+	/*
+	 * Location, reconciled AFTER the clock rather than gating it.
+	 *
+	 * The consent sheet appears once a shift is open, not before clock-in. That
+	 * ordering is deliberate: clocking in works offline and must never wait on a
+	 * permission dialog, a settings round trip, or a worker reading four
+	 * paragraphs in a car park. The cost is the first few seconds of a shift
+	 * going unrecorded, which is worth it — a missed clock-in is a payroll
+	 * dispute, a missed minute of route is nothing.
+	 *
+	 * Play's prominent-disclosure requirement is still met: the sheet is shown
+	 * before any OS permission prompt, which is what the rule is about.
+	 */
+	const {
+		isRecording,
+		permission,
+		needsConsent,
+		acceptConsent,
+		declineConsent,
+		openSettings,
+	} = useLocationTracking(activeTimeEntry);
+
+	const handleAcceptConsent = async () => {
+		const level = await acceptConsent();
+		if (level === "always") return;
+
+		/*
+		 * Android 11+ refuses to grant background location from a dialog at all
+		 * — the request comes back denied and the settings page is the only
+		 * route. Said out loud, because otherwise the worker believes they
+		 * agreed to something that then quietly did not happen.
+		 *
+		 * The toast is the notification; the way to FIX it is the persistent
+		 * row in ClockControl below, not this. A transient banner is the wrong
+		 * place to put the only route to a settings page.
+		 */
+		toast.warning(
+			"Location isn't fully on",
+			level === "whileInUse"
+				? "Your route will only record while AntHill is open."
+				: "Location permission was declined, so this shift won't be tracked.",
+		);
+	};
 
 	useFocusEffect(
 		useCallback(() => {
@@ -351,6 +398,29 @@ const TimeEntryScreen = ({ navigation }) => {
 							onClockOut={handleClockOut}
 							onPause={handlePause}
 							onResume={handleResume}
+							isRecordingLocation={
+								isRecording &&
+								preferences.locationTracking
+									.showRecordingIndicator
+							}
+							locationNeedsAttention={
+								preferences.locationTracking.enabled &&
+								/*
+								 * Suppressed by the same switch as the
+								 * indicator: a company that has chosen to say
+								 * nothing about location on this screen does
+								 * not want a row about it appearing the moment
+								 * something goes wrong. Managers still see the
+								 * refusal on the timesheet either way, which is
+								 * where it gets acted on.
+								 */
+								preferences.locationTracking
+									.showRecordingIndicator &&
+								!needsConsent &&
+								!isRecording &&
+								permission !== "undetermined"
+							}
+							onFixLocation={openSettings}
 						/>
 
 						<Card style={styles.summary}>
@@ -444,6 +514,17 @@ const TimeEntryScreen = ({ navigation }) => {
 				onSubmit={handleSubmitTimeEntry}
 			/>
 
+			<LocationConsentSheet
+				visible={needsConsent}
+				companyName={company?.name || "Your employer"}
+				onAccept={handleAcceptConsent}
+				onDecline={declineConsent}
+				allowDeclining={preferences.locationTracking.allowDeclining}
+				workersSeeOwnRoutes={
+					preferences.locationTracking.workersSeeOwnRoutes
+				}
+			/>
+
 			<DatePicker
 				modal
 				mode="date"
@@ -483,6 +564,9 @@ const ClockControl = ({
 	onClockOut,
 	onPause,
 	onResume,
+	isRecordingLocation,
+	locationNeedsAttention,
+	onFixLocation,
 }) => {
 	const styles = useThemedStyles(clockStyles);
 	const elapsed = useEntryElapsed(activeEntry);
@@ -582,6 +666,43 @@ const ClockControl = ({
 					style={styles.flex}
 				/>
 			</View>
+
+			{/*
+			 * The visible half of the promise made in the consent sheet.
+			 *
+			 * iOS shows its blue bar and Android its foreground-service
+			 * notification regardless, so this is not what makes tracking
+			 * visible — it is what makes it legible, in the one place the
+			 * worker is already looking, in words rather than a system glyph.
+			 */}
+			{isRecordingLocation && (
+				<View style={styles.locationRow}>
+					<Icon name="navigate" size="sm" color="accent" />
+					<Text variant="caption" color="textSecondary">
+						Recording your location for this shift
+					</Text>
+				</View>
+			)}
+
+			{/*
+			 * Tracking is on for the company and this worker agreed, but the OS
+			 * is not letting us record. A persistent row rather than the toast
+			 * that fired once at clock-in — this is the only route to the
+			 * settings page, and it has to still be here an hour later.
+			 */}
+			{locationNeedsAttention && (
+				<Pressable
+					onPress={onFixLocation}
+					style={styles.locationRow}
+					accessibilityLabel="Open settings to allow location"
+				>
+					<Icon name="warning-outline" size="sm" color="warning" />
+					<Text variant="caption" color="warning" style={styles.flex}>
+						Location isn't being recorded. Tap to fix in Settings.
+					</Text>
+					<Icon name="chevron-forward" size="sm" color="warning" />
+				</Pressable>
+			)}
 		</Card>
 	);
 };
@@ -649,6 +770,15 @@ const clockStyles = (theme: Theme) =>
 		clockActions: {
 			flexDirection: "row",
 			gap: theme.spacing.sm,
+		},
+		locationRow: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: theme.spacing.sm,
+			marginTop: theme.spacing.md,
+			paddingTop: theme.spacing.md,
+			borderTopWidth: theme.hairlineWidth,
+			borderTopColor: theme.colors.border,
 		},
 		summary: {
 			marginTop: theme.spacing.lg,

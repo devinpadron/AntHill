@@ -15,6 +15,17 @@ export type RootStackParamList = {
 	 * only condition under which the nudge is ever sent.
 	 */
 	Availability: {};
+
+	/*
+	 * Where a geofence clock reminder lands. No params: the reminder says
+	 * "you're here and your clock disagrees", and the clock control is the whole
+	 * answer to that.
+	 *
+	 * Only mounted when preferences.enableTimeSheet is on — which is also the
+	 * only condition under which the reminder can have been posted, since the
+	 * geofence is registered off company preferences.
+	 */
+	Clock: {};
 	// Add other screens as needed
 };
 
