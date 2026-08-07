@@ -976,34 +976,49 @@ export async function getAllUnassignedUpcomingEvents(
 	}
 }
 
-/** Fetches events by id, chunked to Firestore's 30-value `in` limit. */
+/**
+ * Events by id, fetched ONE DOCUMENT AT A TIME.
+ *
+ * Not `where(documentId(), "in", chunk)`, which is what this used to be and
+ * what broke: a keyed lookup is a LIST operation, and the list rule reads
+ * `resource.data.companyId` with no tolerance for a key that resolves to
+ * nothing. Its sibling `get` rule opens with `resource == null ||` precisely
+ * because a single-document read has to survive that. One unresolvable id in
+ * the batch therefore failed the WHOLE query with permission-denied, taking
+ * every other event with it — and callers pass ids they hold second-hand, from
+ * response documents and from denormalized lists on the event.
+ *
+ * `getTimeEntries`' cursor aside, this is the same trap the shim conformance
+ * test hit: keyed lookups are not queries, and rules do not treat them alike.
+ *
+ * Costs the same reads — Firestore bills per document either way — and drops
+ * the 30-per-chunk ceiling. `companyId` is checked here rather than in the
+ * query, since a `get` cannot filter.
+ */
 export async function getEventsByIds(
 	companyId: string,
 	eventIds: string[],
 ): Promise<Event[]> {
 	if (!eventIds.length) return [];
 
-	const unique = [...new Set(eventIds)];
-	const chunks: string[][] = [];
-	for (let i = 0; i < unique.length; i += 30) {
-		chunks.push(unique.slice(i, i + 30));
-	}
+	const unique = [...new Set(eventIds.filter(Boolean))];
 
-	try {
-		const snapshots = await Promise.all(
-			chunks.map((chunk) =>
-				db
-					.collection(C.events)
-					.where("companyId", "==", companyId)
-					.where(firestore.FieldPath.documentId(), "in", chunk)
-					.get(),
-			),
-		);
-		return snapshots.flatMap((s) => s.docs.map(toEvent));
-	} catch (e) {
-		console.error("Error getting events by id", e);
-		return [];
-	}
+	const found = await Promise.all(
+		unique.map(async (id) => {
+			try {
+				const doc = await db.collection(C.events).doc(id).get();
+				if (!doc.exists()) return null;
+				const event = toEvent(doc);
+				return event.companyId === companyId ? event : null;
+			} catch (e) {
+				// One unreadable event must not lose the rest.
+				console.error(`Error getting event ${id}`, e);
+				return null;
+			}
+		}),
+	);
+
+	return found.filter((event): event is Event => event !== null);
 }
 
 /**

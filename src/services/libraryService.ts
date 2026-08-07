@@ -56,22 +56,32 @@ export async function getChecklistsByIds(
 
 	const result: Record<string, Checklist> = {};
 
-	// `in` accepts at most 30 values per query.
-	for (let i = 0; i < unique.length; i += 30) {
-		const chunk = unique.slice(i, i + 30);
-		try {
-			const snapshot = await db
-				.collection(C.checklists)
-				.where("companyId", "==", companyId)
-				.where(firestore.FieldPath.documentId(), "in", chunk)
-				.limit(30)
-				.get();
-			for (const checklist of mapDocs<Checklist>(snapshot)) {
-				result[checklist.id] = checklist;
+	/*
+	 * One document at a time, NOT `where(documentId(), "in", chunk)`.
+	 *
+	 * A keyed lookup is a list operation, and the read rule dereferences
+	 * `resource.data.companyId` — so a single id that resolves to nothing fails
+	 * the whole batch with permission-denied. These ids come off `event
+	 * .checklistIds`, denormalized at write time, so an admin deleting a
+	 * checklist leaves exactly that: an id pointing at nothing, which would
+	 * take every other checklist on the event down with it.
+	 */
+	const found = await Promise.all(
+		unique.map(async (id) => {
+			try {
+				const doc = await db.collection(C.checklists).doc(id).get();
+				if (!doc.exists()) return null;
+				const checklist = { ...(doc.data() as Checklist), id: doc.id };
+				return checklist.companyId === companyId ? checklist : null;
+			} catch (e) {
+				console.error(`Error getting checklist ${id}`, e);
+				return null;
 			}
-		} catch (e) {
-			console.error("Error getting checklists by id", e);
-		}
+		}),
+	);
+
+	for (const checklist of found) {
+		if (checklist) result[checklist.id] = checklist;
 	}
 
 	return result;
@@ -136,21 +146,29 @@ export async function getPackagesByIds(
 	companyId: string,
 	ids: string[],
 ): Promise<Package[]> {
-	const unique = [...new Set(ids.filter(Boolean))].slice(0, 30);
+	const unique = [...new Set(ids.filter(Boolean))];
 	if (!unique.length) return [];
 
-	try {
-		const snapshot = await db
-			.collection(C.packages)
-			.where("companyId", "==", companyId)
-			.where(firestore.FieldPath.documentId(), "in", unique)
-			.limit(30)
-			.get();
-		return mapDocs<Package>(snapshot);
-	} catch (e) {
-		console.error("Error getting packages by id", e);
-		return [];
-	}
+	/*
+	 * One document at a time, for the same reason as getChecklistsByIds: these
+	 * ids live on `event.packageIds`, so a deleted package leaves a dangling id
+	 * that a keyed `in` lookup turns into permission-denied for the whole set.
+	 */
+	const found = await Promise.all(
+		unique.map(async (id) => {
+			try {
+				const doc = await db.collection(C.packages).doc(id).get();
+				if (!doc.exists()) return null;
+				const pkg = { ...(doc.data() as Package), id: doc.id };
+				return pkg.companyId === companyId ? pkg : null;
+			} catch (e) {
+				console.error(`Error getting package ${id}`, e);
+				return null;
+			}
+		}),
+	);
+
+	return found.filter((pkg): pkg is Package => pkg !== null);
 }
 
 export async function savePackage(
