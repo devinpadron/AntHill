@@ -52,12 +52,24 @@ const TimeEntrySummary = ({
 
 	return (
 		<Card style={styles.card}>
+			{/*
+			 * Decimal hours lead, h/m explains them.
+			 *
+			 * The decimal figure is the one that gets typed into payroll, so it
+			 * is the number this block exists to hand over; "8h 30m" is the
+			 * sanity check on it, not the other way round. The unit moves to
+			 * the accessibility label rather than being dropped — a screen
+			 * reader announcing a bare "8.5" is not useful.
+			 */}
 			<View style={styles.hero}>
-				<Text variant="display">
-					{formatDuration(totalDurationSeconds)}
+				<Text
+					variant="display"
+					accessibilityLabel={`${totalDurationDecimal} decimal hours`}
+				>
+					{totalDurationDecimal}
 				</Text>
 				<Text variant="caption" color="textSecondary">
-					{totalDurationDecimal} decimal hours
+					{formatDuration(totalDurationSeconds)}
 				</Text>
 			</View>
 
