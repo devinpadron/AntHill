@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Linking } from "react-native";
+import { AppState, AppStateStatus, Linking } from "react-native";
 import * as Location from "expo-location";
 import {
 	LocationPermissionLevel,
@@ -55,6 +55,36 @@ import {
  * recorded on the entry so the manager sees a stated reason rather than an
  * empty map, and none of them stops the clock.
  */
+
+/*
+ * How long to keep asking the OS what it decided, after we have asked it for
+ * Always and it has answered something else.
+ *
+ * On iOS the background request resolves as soon as the system has NOTED it —
+ * the "Change to Always Allow?" dialog is shown afterwards, and often only once
+ * the app has been backgrounded for a while, so the promise routinely reports
+ * whileInUse for a shift the worker did in fact fully allow. There is no
+ * permission-change event to subscribe to, so this is a short poll.
+ *
+ * Five seconds, not longer, because acceptConsent waits this out before
+ * reporting a shortfall: the caller's warning must not be wrong, but a worker
+ * whose phone really did refuse is owed the news while they are still looking
+ * at the screen. Anything granted after the window still lands — the foreground
+ * re-read below catches it.
+ */
+const PERMISSION_SETTLE_ATTEMPTS = 5;
+const PERMISSION_SETTLE_INTERVAL_MS = 1000;
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * What the clock screen should say about location, if anything.
+ *
+ * Three states rather than two booleans, because the third one is the point:
+ * "none" covers both "the company does not want this shown" and "we do not yet
+ * know", and those must look identical — an unfinished check is not a finding.
+ */
+export type LocationIndicator = "recording" | "attention" | "none";
 
 /** What the OS will currently give us. */
 async function readPermissionLevel(): Promise<LocationPermissionLevel> {
@@ -151,14 +181,115 @@ export function useLocationTracking(activeEntry: TimeEntry | null) {
 		[],
 	);
 
-	useEffect(() => {
-		readPermissionLevel().then(setPermission);
-	}, [activeEntry?.id, trackingEnabled]);
+	/*
+	 * Whether we are still waiting to find out what the OS did with a request we
+	 * have already made. Suppresses the "denied" write below, so a worker who is
+	 * mid-way through granting Always is not recorded as having refused.
+	 */
+	const [settlingPermission, setSettlingPermission] = useState(false);
 
-	/* ------------------------------------------------- start / stop tracking */
+	/*
+	 * Whether the read below has come back yet for the CURRENT entry.
+	 *
+	 * `permission` cannot answer this on its own: its initial value is
+	 * "undetermined", which is a real answer meaning "not asked yet", so a
+	 * screen reading it during the first frames of a shift cannot tell an
+	 * unasked worker from one whose phone we simply have not queried.
+	 */
+	const [permissionChecked, setPermissionChecked] = useState(false);
 
 	useEffect(() => {
 		let cancelled = false;
+		setPermissionChecked(false);
+
+		readPermissionLevel().then((level) => {
+			// A read belonging to the previous entry must not land on this one.
+			if (cancelled) return;
+			setPermission(level);
+			setPermissionChecked(true);
+		});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [activeEntry?.id, trackingEnabled]);
+
+	/*
+	 * Permission can change while the app is running, and NOTHING tells us when.
+	 *
+	 * Both routes to Always end outside the promise we awaited: on Android 11+
+	 * the grant only exists after a round trip to the system settings page, and
+	 * on iOS the confirmation dialog is shown after the request has resolved.
+	 * Without these two re-reads the hook holds whileInUse for the rest of the
+	 * process — tracking never starts, the clock screen shows the "needs
+	 * attention" row, and a relaunch appears to be the fix because a relaunch is
+	 * the only thing that re-runs the read above.
+	 */
+	const appState = useRef(AppState.currentState);
+	const watchesPermission = trackingEnabled || geofence.enabled;
+
+	useEffect(() => {
+		if (!watchesPermission) return;
+
+		const subscription = AppState.addEventListener(
+			"change",
+			(next: AppStateStatus) => {
+				const returnedToForeground =
+					appState.current.match(/inactive|background/) &&
+					next === "active";
+				appState.current = next;
+
+				if (returnedToForeground) {
+					readPermissionLevel().then(setPermission);
+				}
+			},
+		);
+
+		return () => subscription.remove();
+	}, [watchesPermission]);
+
+	/**
+	 * Waits out a provisional answer and resolves with the real one.
+	 *
+	 * Awaited rather than fired and forgotten, so a caller reporting a shortfall
+	 * to the worker describes what the OS actually settled on. Telling someone
+	 * their route will not record, two seconds before it starts recording, is
+	 * how a working feature gets reported as broken.
+	 */
+	const settlePermission =
+		useCallback(async (): Promise<LocationPermissionLevel> => {
+			setSettlingPermission(true);
+			let level: LocationPermissionLevel = "denied";
+
+			try {
+				for (let i = 0; i < PERMISSION_SETTLE_ATTEMPTS; i++) {
+					await wait(PERMISSION_SETTLE_INTERVAL_MS);
+					level = await readPermissionLevel();
+					setPermission(level);
+					if (level === "always") break;
+				}
+			} finally {
+				setSettlingPermission(false);
+			}
+
+			return level;
+		}, []);
+
+	/* ------------------------------------------------- start / stop tracking */
+
+	/*
+	 * Whether the reconcile below is mid-flight.
+	 *
+	 * Starting the tracker is several awaits deep — read the session, ask
+	 * whether location services are even on, look up the next segment number on
+	 * the server, then hand off to the OS — so `isRecording` stays false for a
+	 * second or two at the start of every shift while nothing at all is wrong.
+	 */
+	const [reconciling, setReconciling] = useState(true);
+
+	useEffect(() => {
+		let cancelled = false;
+		setReconciling(true);
 
 		const reconcile = async () => {
 			const session = await readSession();
@@ -301,7 +432,12 @@ export function useLocationTracking(activeEntry: TimeEntry | null) {
 			}
 		};
 
-		reconcile();
+		reconcile()
+			.catch((e) => console.error("Error reconciling location", e))
+			.finally(() => {
+				if (!cancelled) setReconciling(false);
+			});
+
 		return () => {
 			cancelled = true;
 		};
@@ -326,12 +462,14 @@ export function useLocationTracking(activeEntry: TimeEntry | null) {
 	 * "undetermined" is excluded because we are still going to ask, and
 	 * "declined" is not handled here — that comes from declineConsent, since
 	 * only the sheet knows the difference between a refusal and a question that
-	 * has not been put yet.
+	 * has not been put yet. A request still settling is excluded for the same
+	 * reason: the answer we have is provisional, not a refusal.
 	 */
 	useEffect(() => {
 		if (!trackingEnabled || !hasConsent) return;
 		if (activeEntry?.status !== "active") return;
 		if (permission === "always" || permission === "undetermined") return;
+		if (settlingPermission) return;
 
 		recordStatus(
 			activeEntry.id,
@@ -344,6 +482,7 @@ export function useLocationTracking(activeEntry: TimeEntry | null) {
 		activeEntry?.status,
 		hasConsent,
 		permission,
+		settlingPermission,
 		recordStatus,
 	]);
 
@@ -432,6 +571,12 @@ export function useLocationTracking(activeEntry: TimeEntry | null) {
 	 * already been shown by the caller, then foreground, and only then
 	 * background — "Always" cannot be requested cold. Returns the level reached
 	 * so the caller can explain a shortfall.
+	 *
+	 * Anything short of Always takes a few seconds longer to resolve, because
+	 * that answer is provisional until settlePermission has confirmed it. The
+	 * consent sheet does not wait on this — it closes on the recorded consent —
+	 * so the delay is paid only by the caller's warning, which is exactly the
+	 * thing that must not be wrong.
 	 */
 	const acceptConsent =
 		useCallback(async (): Promise<LocationPermissionLevel> => {
@@ -454,17 +599,25 @@ export function useLocationTracking(activeEntry: TimeEntry | null) {
 				// it, and it is a separate prompt on every platform.
 				await requestNotificationPermission();
 
-				const level: LocationPermissionLevel = background.granted
-					? "always"
-					: "whileInUse";
-				setPermission(level);
-				return level;
+				if (background.granted) {
+					setPermission("always");
+					return "always";
+				}
+
+				/*
+				 * Provisional: the OS may still be about to ask, or the worker
+				 * may be on their way to the settings page. Report whileInUse
+				 * now so the UI is not stuck on a stale level, then wait for
+				 * the answer that counts.
+				 */
+				setPermission("whileInUse");
+				return await settlePermission();
 			} catch (e) {
 				console.error("Error requesting location permissions", e);
 				setPermission("denied");
 				return "denied";
 			}
-		}, [companyId, userId]);
+		}, [companyId, userId, settlePermission]);
 
 	/**
 	 * Records a refusal against the open entry.
@@ -496,11 +649,75 @@ export function useLocationTracking(activeEntry: TimeEntry | null) {
 		);
 	}, []);
 
+	/* ------------------------------------------------ what the worker is told */
+
+	/*
+	 * Everything above settles at a different moment, and for the first seconds
+	 * of a shift NONE of it has settled: permission is still being read, and the
+	 * tracker is still being handed to the OS. Rendering `isRecording` literally
+	 * during that window told a worker whose phone was about to start recording
+	 * "Location isn't being recorded. Tap to fix in Settings", and then took it
+	 * back a second later. An accusation that retracts itself is worse than
+	 * silence, and it trains people to ignore the row when it is real.
+	 *
+	 * So the row is resolved here, once, into what we are actually willing to
+	 * SAY — and while anything is still settling we say either what the entry
+	 * already recorded or nothing at all.
+	 */
+	const isResolving = !permissionChecked || settlingPermission || reconciling;
+
+	/*
+	 * The last status written for this entry, which is the cache: the summary
+	 * lives on the document, so a shift that was recording a moment ago goes on
+	 * saying so through a relaunch, a resume from break, or the gap while we
+	 * re-check the OS. An entry with no summary yet — a clock-in a few seconds
+	 * old — has nothing to fall back on, and gets silence.
+	 *
+	 * "declined" is deliberately NOT carried over into the warning: it is
+	 * written the moment the sheet is refused, when permission is usually still
+	 * "undetermined", and the resolved rule below stays quiet in that case. Only
+	 * the two statuses that imply the OS was actually asked survive the gap.
+	 */
+	const cached = activeEntry?.locationTracking?.status ?? null;
+	const cachedIndicator: LocationIndicator =
+		cached === "recording"
+			? "recording"
+			: cached === "denied" || cached === "unavailable"
+				? "attention"
+				: "none";
+
+	let locationIndicator: LocationIndicator = "none";
+	if (
+		trackingEnabled &&
+		/*
+		 * A company that has chosen to say nothing about location on the clock
+		 * screen does not want a row about it appearing the moment something
+		 * goes wrong either. Managers still see the refusal on the timesheet.
+		 */
+		preferences.locationTracking.showRecordingIndicator &&
+		/*
+		 * Paused shifts say nothing at all. Tracking is deliberately stopped for
+		 * the break, so neither row is true: "recording" would be a lie, and
+		 * pointing someone at the Settings app to fix a break is worse than one.
+		 */
+		activeEntry?.status === "active" &&
+		!needsConsent
+	) {
+		if (isResolving) locationIndicator = cachedIndicator;
+		else if (isRecording) locationIndicator = "recording";
+		else if (permission !== "undetermined") locationIndicator = "attention";
+	}
+
 	return {
 		/** The company wants shifts tracked. */
 		trackingEnabled,
 		/** Points are being written right now. Drives the clock-screen indicator. */
 		isRecording,
+		/**
+		 * The one thing the clock screen should show, already resolved: never
+		 * "attention" on the strength of a check that has not finished.
+		 */
+		locationIndicator,
 		permission,
 		hasConsent,
 		needsConsent,

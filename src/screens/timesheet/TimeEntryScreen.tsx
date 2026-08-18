@@ -161,8 +161,7 @@ const TimeEntryScreen = ({ navigation }) => {
 	 * before any OS permission prompt, which is what the rule is about.
 	 */
 	const {
-		isRecording,
-		permission,
+		locationIndicator,
 		needsConsent,
 		acceptConsent,
 		declineConsent,
@@ -178,6 +177,11 @@ const TimeEntryScreen = ({ navigation }) => {
 		 * — the request comes back denied and the settings page is the only
 		 * route. Said out loud, because otherwise the worker believes they
 		 * agreed to something that then quietly did not happen.
+		 *
+		 * acceptConsent deliberately takes a few seconds to resolve a shortfall,
+		 * because iOS reports one for grants it is still in the middle of
+		 * making. Warning someone that their route will not record, moments
+		 * before it starts recording, is worse than warning them late.
 		 *
 		 * The toast is the notification; the way to FIX it is the persistent
 		 * row in ClockControl below, not this. A transient banner is the wrong
@@ -398,28 +402,16 @@ const TimeEntryScreen = ({ navigation }) => {
 							onClockOut={handleClockOut}
 							onPause={handlePause}
 							onResume={handleResume}
-							isRecordingLocation={
-								isRecording &&
-								preferences.locationTracking
-									.showRecordingIndicator
-							}
-							locationNeedsAttention={
-								preferences.locationTracking.enabled &&
-								/*
-								 * Suppressed by the same switch as the
-								 * indicator: a company that has chosen to say
-								 * nothing about location on this screen does
-								 * not want a row about it appearing the moment
-								 * something goes wrong. Managers still see the
-								 * refusal on the timesheet either way, which is
-								 * where it gets acted on.
-								 */
-								preferences.locationTracking
-									.showRecordingIndicator &&
-								!needsConsent &&
-								!isRecording &&
-								permission !== "undetermined"
-							}
+							/*
+							 * One resolved value rather than two booleans
+							 * derived here. The company's showRecordingIndicator
+							 * switch, the consent sheet being open and every
+							 * check that has not finished yet are all folded in
+							 * by the hook — this screen used to combine them
+							 * itself and showed the warning row during the
+							 * second or two before tracking had started.
+							 */
+							locationIndicator={locationIndicator}
 							onFixLocation={openSettings}
 						/>
 
@@ -564,8 +556,7 @@ const ClockControl = ({
 	onClockOut,
 	onPause,
 	onResume,
-	isRecordingLocation,
-	locationNeedsAttention,
+	locationIndicator,
 	onFixLocation,
 }) => {
 	const styles = useThemedStyles(clockStyles);
@@ -594,12 +585,18 @@ const ClockControl = ({
 	}
 
 	return (
-		<Card
-			style={[
-				styles.clockCard,
-				isPaused ? styles.clockPaused : styles.clockRunning,
-			]}
-		>
+		<Card style={styles.clockCard}>
+			{/*
+			 * The state edge. A child rather than a border — see stateRail.
+			 */}
+			<View
+				style={[
+					styles.stateRail,
+					isPaused ? styles.stateRailPaused : styles.stateRailRunning,
+				]}
+				pointerEvents="none"
+			/>
+
 			<View style={styles.clockStatus}>
 				<Icon
 					name={isPaused ? "pause-circle" : "ellipse"}
@@ -675,7 +672,7 @@ const ClockControl = ({
 			 * visible — it is what makes it legible, in the one place the
 			 * worker is already looking, in words rather than a system glyph.
 			 */}
-			{isRecordingLocation && (
+			{locationIndicator === "recording" && (
 				<View style={styles.locationRow}>
 					<Icon name="navigate" size="sm" color="accent" />
 					<Text variant="caption" color="textSecondary">
@@ -689,8 +686,12 @@ const ClockControl = ({
 			 * is not letting us record. A persistent row rather than the toast
 			 * that fired once at clock-in — this is the only route to the
 			 * settings page, and it has to still be here an hour later.
+			 *
+			 * Never shown on an unfinished check: the hook holds this at "none"
+			 * until permission and the tracker have both settled, so the row
+			 * appears once and stays, rather than flashing at every clock-in.
 			 */}
-			{locationNeedsAttention && (
+			{locationIndicator === "attention" && (
 				<Pressable
 					onPress={onFixLocation}
 					style={styles.locationRow}
@@ -753,14 +754,31 @@ const clockStyles = (theme: Theme) =>
 			lineHeight: 50,
 			letterSpacing: -1,
 		},
-		/* A left edge that states the timer's state at a glance. */
-		clockRunning: {
-			borderLeftWidth: 3,
-			borderLeftColor: theme.colors.success,
+		/*
+		 * A left edge that states the timer's state at a glance.
+		 *
+		 * Drawn as a clipped child, NOT as `borderLeftWidth`. A 3pt left border
+		 * on a rounded card that already carries a hairline outline does not
+		 * stop at the corners: RN mitres the two widths together, so the colour
+		 * ran a sliver along the top and bottom edges — too thin to read as
+		 * deliberate, and it only appeared while clocked in.
+		 *
+		 * Inset by the hairline (absolute children position against the padding
+		 * box), and the card's own `overflow: "hidden"` rounds the rail's ends
+		 * to the card radius.
+		 */
+		stateRail: {
+			position: "absolute",
+			left: 0,
+			top: 0,
+			bottom: 0,
+			width: 3,
 		},
-		clockPaused: {
-			borderLeftWidth: 3,
-			borderLeftColor: theme.colors.warning,
+		stateRailRunning: {
+			backgroundColor: theme.colors.success,
+		},
+		stateRailPaused: {
+			backgroundColor: theme.colors.warning,
 		},
 		clockStatus: {
 			flexDirection: "row",
