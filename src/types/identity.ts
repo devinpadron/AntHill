@@ -76,15 +76,46 @@ export interface NotificationPreferences {
 	availability: boolean;
 	/** Your timesheets being approved or rejected. */
 	timesheets: boolean;
-	/** Manager-facing: people joining or leaving, and availability replies. */
+	/**
+	 * LEGACY. One switch over everything manager-facing, since split into the
+	 * three below.
+	 *
+	 * Kept, and maintained as a mirror — true when any of the three is on — for
+	 * two reasons. Installed app builds that predate the split read it, and so
+	 * do Cloud Functions until they are deployed; the app and the functions ship
+	 * from separate repos and cannot be released together. Never read it
+	 * directly; `notificationPrefs` expands it into the three.
+	 */
 	team: boolean;
+	/** Manager-facing: people joining or leaving the company. */
+	teamMembers: boolean;
+	/** Manager-facing: a worker accepting an event. */
+	availabilityConfirmed: boolean;
+	/** Manager-facing: a worker turning an event down. */
+	availabilityDeclined: boolean;
 }
 
+/**
+ * The switches a person actually sees, in display order.
+ *
+ * `team` is deliberately absent: it is the legacy mirror, and listing it here
+ * would make a manager who muted availability declines read as having muted two
+ * things in the member list summary.
+ */
 export const NOTIFICATION_CHANNELS = [
 	"events",
 	"availability",
 	"timesheets",
-	"team",
+	"teamMembers",
+	"availabilityConfirmed",
+	"availabilityDeclined",
+] as const;
+
+/** The three the legacy `team` switch used to cover, as one. */
+export const TEAM_NOTIFICATION_CHANNELS = [
+	"teamMembers",
+	"availabilityConfirmed",
+	"availabilityDeclined",
 ] as const;
 
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
@@ -95,6 +126,9 @@ export const defaultNotificationPreferences: NotificationPreferences = {
 	availability: true,
 	timesheets: true,
 	team: true,
+	teamMembers: true,
+	availabilityConfirmed: true,
+	availabilityDeclined: true,
 };
 
 /**
@@ -107,9 +141,43 @@ export const defaultNotificationPreferences: NotificationPreferences = {
  */
 export const notificationPrefs = (
 	membership: Pick<Membership, "notifications"> | null | undefined,
+): NotificationPreferences => {
+	const stored: Partial<NotificationPreferences> =
+		membership?.notifications ?? {};
+
+	/*
+	 * A manager who muted the old single `team` switch has `team: false` and
+	 * none of the three keys that replaced it. Defaults alone would hand them
+	 * back all three ON — the split would silently un-mute everyone who had
+	 * bothered to use the setting, which is the one outcome worse than not
+	 * having it. Explicit new keys still win: `stored` is spread last.
+	 */
+	const legacyTeam =
+		stored.team === false
+			? {
+					teamMembers: false,
+					availabilityConfirmed: false,
+					availabilityDeclined: false,
+				}
+			: {};
+
+	return { ...defaultNotificationPreferences, ...legacyTeam, ...stored };
+};
+
+/**
+ * Preferences with the legacy `team` mirror recomputed. Apply before writing.
+ *
+ * `team` means "anything manager-facing is on", so it is the OR of the three
+ * switches that replaced it. Keeping it accurate is what lets an old app build
+ * — or the Cloud Functions before their next deploy — read one field and still
+ * behave sensibly; they under-mute rather than over-mute, which is the right
+ * way round for a stale reader.
+ */
+export const withLegacyTeamMirror = (
+	prefs: NotificationPreferences,
 ): NotificationPreferences => ({
-	...defaultNotificationPreferences,
-	...(membership?.notifications ?? {}),
+	...prefs,
+	team: TEAM_NOTIFICATION_CHANNELS.some((channel) => prefs[channel]),
 });
 
 /**

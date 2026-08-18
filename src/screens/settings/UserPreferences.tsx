@@ -98,11 +98,33 @@ const NOTIFICATION_ROWS: {
 		subtitle: "When your hours are approved or rejected",
 		icon: "time-outline",
 	},
+	/*
+	 * Manager-facing, and three switches rather than the single "Team activity"
+	 * one they replaced. These are the pushes that arrive in volume — a busy
+	 * week is one per worker per event — and a manager who wanted to stop the
+	 * confirmations had to give up joins, departures and declines with them.
+	 * Declines are the ones that need acting on, so they are worth keeping when
+	 * the rest is off.
+	 */
 	{
-		channel: "team",
-		title: "Team activity",
-		subtitle: "People joining or leaving, and availability replies",
+		channel: "teamMembers",
+		title: "Joins and departures",
+		subtitle: "When someone joins or leaves the company",
 		icon: "people-outline",
+		adminOnly: true,
+	},
+	{
+		channel: "availabilityConfirmed",
+		title: "Availability confirmations",
+		subtitle: "When a worker accepts an event",
+		icon: "checkmark-circle-outline",
+		adminOnly: true,
+	},
+	{
+		channel: "availabilityDeclined",
+		title: "Availability declines",
+		subtitle: "When a worker turns an event down",
+		icon: "close-circle-outline",
 		adminOnly: true,
 	},
 ];

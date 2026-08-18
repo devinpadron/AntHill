@@ -51,7 +51,9 @@ const CHANNEL_LABELS: Record<string, string> = {
 	events: "shifts",
 	availability: "availability",
 	timesheets: "timesheets",
-	team: "team activity",
+	teamMembers: "joins and departures",
+	availabilityConfirmed: "availability confirmations",
+	availabilityDeclined: "availability declines",
 };
 
 function describeNotifications(prefs: NotificationPreferences): string {

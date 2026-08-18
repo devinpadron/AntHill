@@ -260,6 +260,8 @@ Its own `package.json` with `firebase-admin`, deliberately outside `src/` so adm
 
 Not in this repo. `CLOUD_FUNCTIONS_HANDOFF.md` documents the v1→v2 trigger migration for `~/repos/AH_Functions`, the field-rename table, and two live hazards (two deployed functions with no source in that repo; deploying v2 triggers during a delta sweep would fire a real push per migrated document).
 
+**Notification mutes are a second cross-repo contract.** `memberships/{id}.notifications` holds one boolean per channel (`src/types/identity.ts`), and `functions/src/utils/notifications.js` maps every push type onto a channel in `CHANNEL_BY_TYPE`, filtering in the one place every send passes through. Both sides **fail open** — absent means send, since the field is missing on every membership written before it existed. Adding a row to `NOTIFICATION_ROWS` without a matching entry in `CHANNEL_BY_TYPE` yields a switch that silences nothing. The manager-facing `team` switch was split into `teamMembers` / `availabilityConfirmed` / `availabilityDeclined`; `team` survives as a mirror (the OR of the three, written by `withLegacyTeamMirror`) so an un-deployed reader on either side under-mutes rather than over-mutes, and both repos expand a legacy `team: false` onto all three.
+
 **The FCM payload contract is frozen**: `data.type`, `screenName`, `companyId`, `eventId`, `timesheetId` (comma-delimited for batch types), `userId`. Changing it here couples two deployments that are already hard to sequence. Types currently handled: `assignment`, `update`, `assignment_ack_nudge`, `availability_nudge`, `timesheet_approval[_batch]`, `timesheet_rejection[_batch]`, `new_user_joined`, `user_left`, and the on-device `clock_reminder`.
 
 ## Conventions

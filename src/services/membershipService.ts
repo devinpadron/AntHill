@@ -5,6 +5,7 @@ import { C, membershipId } from "../constants/paths";
 import {
 	Membership,
 	NotificationPreferences,
+	withLegacyTeamMirror,
 	WorkerVisibility,
 } from "../types";
 import { Role } from "../types";
@@ -329,6 +330,10 @@ export async function changeMemberRole(
  * allow `notifications` in a self-update alongside the profile fields — role,
  * status, visibility and groups are still manager-only, so this cannot be used
  * to widen anyone's access.
+ *
+ * The legacy `team` mirror is recomputed HERE rather than at the call site, so
+ * a second screen that writes preferences cannot forget it and leave a stale
+ * value for readers that have not shipped the split yet.
  */
 export async function setNotificationPreferences(
 	companyId: string,
@@ -340,7 +345,7 @@ export async function setNotificationPreferences(
 			.collection(C.memberships)
 			.doc(membershipId(companyId, userId))
 			.update({
-				notifications: preferences,
+				notifications: withLegacyTeamMirror(preferences),
 				updatedAt: firestore.FieldValue.serverTimestamp(),
 			});
 	} catch (e) {
