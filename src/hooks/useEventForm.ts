@@ -10,6 +10,7 @@ import {
 	updateEvent,
 } from "../services/eventService";
 
+import { showConfirmation } from "../utils/alertUtils";
 import { useUser } from "../contexts/UserContext";
 import { useCompany } from "../contexts/CompanyContext";
 
@@ -439,20 +440,42 @@ export const useEventForm = (navigation, eventId?: string) => {
 	);
 
 	// Handle event deletion
-	const handleDelete = useCallback(async () => {
+	/*
+	 * Deleting asks first.
+	 *
+	 * The trash icon sits in the header a thumb's width from the back arrow,
+	 * and the tap used to go straight through to `deleteEvent` — which is a
+	 * cascade, not one document: the event, its checklist state, every
+	 * invitation and every attachment record go in one batch, with nothing to
+	 * undo it. The portal has always asked before this exact call; the phone,
+	 * where the mis-tap is far likelier, did not. Same wording as the portal.
+	 */
+	const handleDelete = useCallback(() => {
 		if (!isEditing || !editID) return;
 
-		try {
-			setIsLoading(true);
-			await deleteEvent(currentCompany, editID);
-			navigation.pop(2);
-		} catch (error) {
-			Alert.alert("Error deleting event, please try again");
-			console.error(error);
-		} finally {
-			setIsLoading(false);
-		}
-	}, [currentCompany, editID, isEditing, navigation]);
+		const name = title.trim();
+
+		showConfirmation(
+			name ? `Delete "${name}"?` : "Delete this event?",
+			"This also removes every invitation, checklist state and file attached to it. It cannot be undone.",
+			() => {
+				void (async () => {
+					try {
+						setIsLoading(true);
+						await deleteEvent(currentCompany, editID);
+						navigation.pop(2);
+					} catch (error) {
+						Alert.alert("Error deleting event, please try again");
+						console.error(error);
+					} finally {
+						setIsLoading(false);
+					}
+				})();
+			},
+			"Delete",
+			"destructive",
+		);
+	}, [currentCompany, editID, isEditing, navigation, title]);
 
 	const hasFormChanged = useCallback(() => {
 		// If we're not editing, any content is a change
