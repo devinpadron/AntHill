@@ -19,6 +19,8 @@ import {
 } from "../../services/libraryService";
 import { getAttachmentsForParent } from "../../services/attachmentService";
 import { LocationInput } from "../../components/eventSubmit/LocationInput";
+import { PersonPicker } from "../../components/eventSubmit/PersonPicker";
+import type { PersonOption } from "../../components/eventSubmit/PersonPicker";
 import { useUser } from "../../contexts/UserContext";
 import AttachmentsSelector from "../../components/ui/AttachmentsSelector";
 import type { SelectableAttachment } from "../../components/ui/AttachmentsSelector";
@@ -52,8 +54,9 @@ import { Theme, useTheme, useThemedStyles } from "../../theme";
  * workers, one for packages. They forced a `zIndex` ladder across the whole
  * form (3000 for workers, 2000 for packages, 1 for everything below), capped
  * selection at 5 workers, and rendered their own white dropdown regardless of
- * theme. Both are inline searchable lists now, which is also what the audience
- * picker below them already did.
+ * theme. Packages are an inline list now; the two people lists (assigned
+ * workers, and the audience's specific people) are `PersonPicker`, which shows
+ * the whole roster rather than a capped slice you had to search past.
  *
  * The submit bar is sticky rather than sitting at the bottom of a long scroll,
  * so saving never requires scrolling past six sections to find the button.
@@ -64,9 +67,6 @@ const RESPONSE_TONE: Record<string, BadgeTone> = {
 	pending: "warning",
 	declined: "danger",
 };
-
-/** How many rows a people list shows before asking you to search. */
-const PERSON_ROW_CAP = 12;
 
 const EventSubmit = ({ navigation }) => {
 	const theme = useTheme();
@@ -133,8 +133,6 @@ const EventSubmit = ({ navigation }) => {
 	const [loadingLabels, setLoadingLabels] = useState(false);
 
 	const [titleError, setTitleError] = useState<string>();
-	const [workerSearch, setWorkerSearch] = useState("");
-	const [personSearch, setPersonSearch] = useState("");
 
 	const { preferences } = useCompany();
 	const { groups } = useGroups(currentCompany ?? "");
@@ -191,19 +189,14 @@ const EventSubmit = ({ navigation }) => {
 		});
 	}, [members, workerResponses, showResponses]);
 
-	const selectedWorkers = useMemo(
-		() => orderedMembers.filter((m) => assignedWorkers.includes(m.userId)),
-		[orderedMembers, assignedWorkers],
+	const workerOptions = useMemo<PersonOption[]>(
+		() =>
+			orderedMembers.map((m) => ({
+				id: m.userId,
+				label: m.displayName,
+			})),
+		[orderedMembers],
 	);
-
-	const unselectedWorkers = useMemo(() => {
-		const term = workerSearch.trim().toLowerCase();
-		return orderedMembers.filter(
-			(m) =>
-				!assignedWorkers.includes(m.userId) &&
-				(!term || m.displayName.toLowerCase().includes(term)),
-		);
-	}, [orderedMembers, assignedWorkers, workerSearch]);
 
 	const toggleWorker = useCallback(
 		(id: string) =>
@@ -216,11 +209,9 @@ const EventSubmit = ({ navigation }) => {
 	);
 
 	/*
-	 * The audience picker.
-	 *
-	 * Selected people are pinned above the search box so that typing a name
-	 * cannot hide someone already chosen — otherwise a manager filtering for
-	 * one person appears to have lost the rest.
+	 * The audience picker. Same control as the worker list, over the roster in
+	 * its natural order — the response-status ordering above is meaningless
+	 * here, since nobody has been asked yet.
 	 */
 	const isTargetedAudience =
 		audienceGroupIds.length > 0 || audienceUserIds.length > 0;
@@ -235,27 +226,13 @@ const EventSubmit = ({ navigation }) => {
 		[setAudienceUserIds],
 	);
 
-	const selectedAudienceMembers = useMemo(
-		() => members.filter((m) => audienceUserIds.includes(m.userId)),
-		[members, audienceUserIds],
-	);
-
-	const matchingUnselected = useMemo(() => {
-		const term = personSearch.trim().toLowerCase();
-		return members.filter(
-			(m) =>
-				!audienceUserIds.includes(m.userId) &&
-				(!term || m.displayName.toLowerCase().includes(term)),
-		);
-	}, [members, audienceUserIds, personSearch]);
-
-	const unselectedAudienceMembers = matchingUnselected.slice(
-		0,
-		PERSON_ROW_CAP,
-	);
-	const hiddenPersonCount = Math.max(
-		0,
-		matchingUnselected.length - PERSON_ROW_CAP,
+	const audienceOptions = useMemo<PersonOption[]>(
+		() =>
+			members.map((m) => ({
+				id: m.userId,
+				label: m.displayName,
+			})),
+		[members],
 	);
 
 	// Packages: one live query for the catalogue.
@@ -614,66 +591,26 @@ const EventSubmit = ({ navigation }) => {
 				}
 				style={styles.card}
 			>
-				{selectedWorkers.map((member) => (
-					<Checkbox
-						key={member.userId}
-						checked
-						onPress={() => toggleWorker(member.userId)}
-						label={member.displayName}
-						style={styles.personRow}
-					/>
-				))}
-
-				{members.length > 8 && (
-					<Input
-						placeholder="Search workers"
-						icon="search"
-						value={workerSearch}
-						onChangeText={setWorkerSearch}
-						autoCapitalize="none"
-						autoCorrect={false}
-						containerStyle={styles.field}
-					/>
-				)}
-
-				{unselectedWorkers.length === 0 ? (
-					<Text variant="caption" color="textTertiary">
-						{workerSearch.trim()
-							? "Nobody matches that name."
-							: "Everyone is already assigned."}
-					</Text>
-				) : (
-					unselectedWorkers.slice(0, PERSON_ROW_CAP).map((member) => {
-						const status = workerResponses[member.userId];
+				<PersonPicker
+					options={workerOptions}
+					selectedIds={assignedWorkers}
+					onToggle={toggleWorker}
+					placeholder="Tap to choose workers"
+					searchPlaceholder="Search workers"
+					emptyText="Nobody has joined this company yet."
+					renderAccessory={(option) => {
+						const status = workerResponses[option.id];
+						if (!showResponses || !status) return null;
 
 						return (
-							<View key={member.userId} style={styles.personRow}>
-								<Checkbox
-									checked={false}
-									onPress={() => toggleWorker(member.userId)}
-									label={member.displayName}
-									style={styles.flex}
-								/>
-								{showResponses && !!status && (
-									<Badge
-										label={status}
-										tone={
-											RESPONSE_TONE[status] ?? "neutral"
-										}
-										dot
-									/>
-								)}
-							</View>
+							<Badge
+								label={status}
+								tone={RESPONSE_TONE[status] ?? "neutral"}
+								dot
+							/>
 						);
-					})
-				)}
-
-				{unselectedWorkers.length > PERSON_ROW_CAP && (
-					<Text variant="caption" color="textTertiary">
-						{unselectedWorkers.length - PERSON_ROW_CAP} more —
-						search to narrow the list.
-					</Text>
-				)}
+					}}
+				/>
 			</Card>
 
 			{/* Who gets asked about this event */}
@@ -732,11 +669,7 @@ const EventSubmit = ({ navigation }) => {
 						))
 					)}
 
-					{/*
-					 * Specific people, for the one-off a group cannot express.
-					 * Selected names are pinned above the search so filtering
-					 * never hides someone you already picked.
-					 */}
+					{/* Specific people, for the one-off a group cannot express. */}
 					<Text
 						variant="label"
 						color="textSecondary"
@@ -746,52 +679,12 @@ const EventSubmit = ({ navigation }) => {
 						Specific people
 					</Text>
 
-					{selectedAudienceMembers.map((member) => (
-						<Checkbox
-							key={member.userId}
-							checked
-							onPress={() => toggleAudienceUser(member.userId)}
-							label={member.displayName}
-						/>
-					))}
-
-					{members.length > 8 && (
-						<Input
-							placeholder="Search people"
-							icon="search"
-							value={personSearch}
-							onChangeText={setPersonSearch}
-							autoCapitalize="none"
-							autoCorrect={false}
-							containerStyle={styles.field}
-						/>
-					)}
-
-					{unselectedAudienceMembers.length === 0 ? (
-						<Text variant="caption" color="textTertiary">
-							{personSearch.trim()
-								? "Nobody matches that name."
-								: "Everyone is already selected."}
-						</Text>
-					) : (
-						unselectedAudienceMembers.map((member) => (
-							<Checkbox
-								key={member.userId}
-								checked={false}
-								onPress={() =>
-									toggleAudienceUser(member.userId)
-								}
-								label={member.displayName}
-							/>
-						))
-					)}
-
-					{hiddenPersonCount > 0 && (
-						<Text variant="caption" color="textTertiary">
-							{hiddenPersonCount} more — search to narrow the
-							list.
-						</Text>
-					)}
+					<PersonPicker
+						options={audienceOptions}
+						selectedIds={audienceUserIds}
+						onToggle={toggleAudienceUser}
+						emptyText="Nobody has joined this company yet."
+					/>
 				</Card>
 			)}
 
@@ -971,9 +864,6 @@ const LabelChip = ({
 
 const submitStyles = (theme: Theme) =>
 	StyleSheet.create({
-		flex: {
-			flex: 1,
-		},
 		card: {
 			marginTop: theme.spacing.lg,
 		},
@@ -996,11 +886,6 @@ const submitStyles = (theme: Theme) =>
 		rowPadded: {
 			paddingHorizontal: theme.spacing.lg,
 			paddingVertical: theme.spacing.xs,
-		},
-		personRow: {
-			flexDirection: "row",
-			alignItems: "center",
-			gap: theme.spacing.sm,
 		},
 		hint: {
 			marginBottom: theme.spacing.md,

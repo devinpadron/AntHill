@@ -1,14 +1,23 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, {
+	useState,
+	useEffect,
+	useMemo,
+	useCallback,
+	useRef,
+} from "react";
 import {
 	View,
 	Text,
 	FlatList,
 	SafeAreaView,
 	ActivityIndicator,
+	NativeScrollEvent,
+	NativeSyntheticEvent,
 	ScrollView,
 	RefreshControl,
 } from "react-native";
 import { TouchableOpacity } from "react-native-gesture-handler";
+import { useFocusEffect } from "@react-navigation/native";
 import {
 	format,
 	startOfWeek,
@@ -61,6 +70,77 @@ const PayrollReview = ({ navigation }) => {
 	const { byUserId: membersById } = useCompanyMembers(companyId ?? "");
 
 	/*
+	 * Where the reviewer had scrolled to.
+	 *
+	 * Payroll review is a walk DOWN the list: open someone, approve, come back,
+	 * open the next one. The list was landing back at the top after every
+	 * round trip, so each approval cost a re-scroll past everyone already done,
+	 * and it got worse the further down the list you were.
+	 *
+	 * Two things reset it, and both are handled here. The list used to be
+	 * swapped out for a spinner whenever the subscription was rebuilt (see the
+	 * effect below), which remounts the ScrollView at zero — `pendingRestore`
+	 * re-applies the offset once the rows are back and tall enough to hold it.
+	 * Separately, a native-stack screen can come back from a push with its
+	 * scroll position cleared, which no content-size change announces, so the
+	 * offset is re-applied on focus as well.
+	 *
+	 * Refs, not state: this updates on every frame of a scroll.
+	 */
+	const scrollRef = useRef<ScrollView>(null);
+	const scrollOffset = useRef(0);
+	const pendingRestore = useRef<number | null>(null);
+
+	const handleScroll = useCallback(
+		(event: NativeSyntheticEvent<NativeScrollEvent>) => {
+			scrollOffset.current = event.nativeEvent.contentOffset.y;
+			/* The reviewer has taken over; a queued restore is now stale. */
+			pendingRestore.current = null;
+		},
+		[],
+	);
+
+	const restoreScroll = useCallback((target: number) => {
+		if (target <= 0) return;
+		/* A frame late, so the rows are laid out and the offset is reachable. */
+		requestAnimationFrame(() =>
+			scrollRef.current?.scrollTo({ y: target, animated: false }),
+		);
+	}, []);
+
+	const handleContentSizeChange = useCallback(
+		(_width: number, height: number) => {
+			const target = pendingRestore.current;
+			if (target === null) return;
+			/* Wait for the content to be tall enough, or the scroll is clamped. */
+			if (height < target) return;
+			pendingRestore.current = null;
+			restoreScroll(target);
+		},
+		[restoreScroll],
+	);
+
+	useFocusEffect(
+		useCallback(() => {
+			restoreScroll(scrollOffset.current);
+		}, [restoreScroll]),
+	);
+
+	/*
+	 * The spinner replaces the list outright, so remember where to come back to
+	 * BEFORE the rows go away. Queued here rather than where the spinner is
+	 * raised because a week change deliberately zeroes the offset first.
+	 */
+	useEffect(() => {
+		if (isLoading && scrollOffset.current > 0) {
+			pendingRestore.current = scrollOffset.current;
+		}
+	}, [isLoading]);
+
+	/** The week currently on screen, so a re-subscribe can tell itself apart. */
+	const loadedRange = useRef<string | null>(null);
+
+	/*
 	 * Live, bounded, server-filtered.
 	 *
 	 * v1 subscribed with an `await` on a helper that returned a Promise rather
@@ -70,13 +150,30 @@ const PayrollReview = ({ navigation }) => {
 	 */
 	useEffect(() => {
 		if (!companyId) return;
-		setIsLoading(true);
+
+		const from = format(startDate, "yyyy-MM-dd");
+		const to = format(endDate, "yyyy-MM-dd");
+		const range = `${from}_${to}`;
+
+		/*
+		 * Only blank the list when what is on screen belongs to a DIFFERENT
+		 * week. This effect also re-runs whenever the membership snapshot
+		 * hands back a new lookup — showing a spinner for that threw the rows
+		 * away and, with them, the reviewer's place in the list.
+		 */
+		if (loadedRange.current !== range) {
+			/* A different week is a different list; landing mid-scroll in it
+			   would drop you somewhere meaningless. */
+			scrollOffset.current = 0;
+			pendingRestore.current = null;
+			setIsLoading(true);
+		}
 
 		return subscribeTimeEntries(
 			companyId,
 			{
-				from: format(startDate, "yyyy-MM-dd"),
-				to: format(endDate, "yyyy-MM-dd"),
+				from,
+				to,
 				limit: 500,
 			},
 			(entries) => {
@@ -115,6 +212,7 @@ const PayrollReview = ({ navigation }) => {
 					});
 					setExpandedEmployees(expanded);
 				}
+				loadedRange.current = range;
 				setIsLoading(false);
 			},
 		);
@@ -482,7 +580,13 @@ const PayrollReview = ({ navigation }) => {
 					</Text>
 				</View>
 			) : (
-				<ScrollView style={styles.content}>
+				<ScrollView
+					ref={scrollRef}
+					style={styles.content}
+					onScroll={handleScroll}
+					scrollEventThrottle={16}
+					onContentSizeChange={handleContentSizeChange}
+				>
 					{entriesByEmployee.map((employeeGroup) => (
 						<View
 							key={employeeGroup.userId}
