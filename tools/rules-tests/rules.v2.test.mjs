@@ -811,6 +811,77 @@ describe("v2 — issuing a code, exactly as setGroupJoinCode does", () => {
 	});
 });
 
+/*
+ * Revoking a code, exactly as clearGroupJoinCode and deleteGroup issue it.
+ *
+ * Both batch a delete of `groupJoinCodes/{groups.joinCode}` alongside the write
+ * that forgets the code. That pointer can name a document that is already gone
+ * — another manager rotating the code deletes the old one first — and a delete
+ * rule reading `resource.data` has nothing to evaluate then. Same class as the
+ * event-delete cascade.
+ */
+describe("v2 — revoking a group join code", () => {
+	test("a code that is still there", async () => {
+		await env.withSecurityRulesDisabled(async (ctx) => {
+			const db = ctx.firestore();
+			await setDoc(doc(db, "groups", "gRevoke"), {
+				id: "gRevoke",
+				companyId: A,
+				name: "Revoke",
+				joinCode: "REVOKE01",
+			});
+			await setDoc(doc(db, "groupJoinCodes", "REVOKE01"), {
+				id: "REVOKE01",
+				companyId: A,
+				groupId: "gRevoke",
+			});
+		});
+
+		const db = as(ALICE);
+		const batch = writeBatch(db);
+		batch.delete(doc(db, "groupJoinCodes", "REVOKE01"));
+		batch.update(doc(db, "groups", "gRevoke"), { joinCode: null });
+		await assertSucceeds(batch.commit());
+	});
+
+	test("a code the group still names but nothing holds", async () => {
+		await env.withSecurityRulesDisabled(async (ctx) => {
+			await setDoc(doc(ctx.firestore(), "groups", "gStale"), {
+				id: "gStale",
+				companyId: A,
+				name: "Stale",
+				joinCode: "STALE001",
+			});
+		});
+
+		const db = as(ALICE);
+		const batch = writeBatch(db);
+		batch.delete(doc(db, "groupJoinCodes", "STALE001"));
+		batch.update(doc(db, "groups", "gStale"), { joinCode: null });
+		await assertSucceeds(batch.commit());
+	});
+
+	test("a plain member still cannot revoke a code that exists", async () => {
+		await env.withSecurityRulesDisabled(async (ctx) => {
+			await setDoc(doc(ctx.firestore(), "groupJoinCodes", "GUARD001"), {
+				id: "GUARD001",
+				companyId: A,
+				groupId: "g1",
+			});
+		});
+
+		await assertFails(
+			deleteDoc(doc(as(BOB), "groupJoinCodes", "GUARD001")),
+		);
+	});
+
+	test("a manager of another company cannot revoke it either", async () => {
+		await assertFails(
+			deleteDoc(doc(as(MALLORY), "groupJoinCodes", "GUARD001")),
+		);
+	});
+});
+
 describe("v2 — group join codes", () => {
 	const JOINER = "joiner";
 
@@ -1301,6 +1372,96 @@ describe("v2 — remaining unscoped queries from the service sweep", () => {
 			updateDoc(doc(as(ALICE), "timeEntries", "t1", "edits", "t1-0001"), {
 				summary: "rewritten",
 			}),
+		);
+	});
+});
+
+/*
+ * The delete cascade, exactly as eventService.deleteEvent issues it.
+ *
+ * The service batches the event, its checklist state, its responses and its
+ * attachments into one commit. `eventChecklistStates/{eventId}` is written by
+ * the FIRST tick, so on an event nobody ticked there is nothing there to
+ * delete — and a delete rule phrased in terms of `resource.data` has nothing
+ * to evaluate when resource is null. Same bug class as the reads above, on the
+ * write side, and it fails the WHOLE batch rather than the one delete.
+ */
+describe("v2 — deleting an event and everything under it", () => {
+	test("an event whose checklist has been ticked", async () => {
+		await env.withSecurityRulesDisabled(async (ctx) => {
+			const db = ctx.firestore();
+			await setDoc(doc(db, "events", "eDelTicked"), {
+				id: "eDelTicked",
+				companyId: A,
+				title: "Ticked",
+				dateKey: "2025-07-01",
+			});
+			await setDoc(doc(db, "eventChecklistStates", "eDelTicked"), {
+				id: "eDelTicked",
+				companyId: A,
+				state: {},
+			});
+		});
+
+		// One instance: `as()` mints a fresh Firestore per call, and a batch
+		// will not accept references from another.
+		const db = as(ALICE);
+		const batch = writeBatch(db);
+		batch.delete(doc(db, "events", "eDelTicked"));
+		batch.delete(doc(db, "eventChecklistStates", "eDelTicked"));
+		await assertSucceeds(batch.commit());
+	});
+
+	test("control: the event document alone", async () => {
+		await env.withSecurityRulesDisabled(async (ctx) => {
+			await setDoc(doc(ctx.firestore(), "events", "eDelAlone"), {
+				id: "eDelAlone",
+				companyId: A,
+				title: "Alone",
+				dateKey: "2025-07-03",
+			});
+		});
+
+		await assertSucceeds(deleteDoc(doc(as(ALICE), "events", "eDelAlone")));
+	});
+
+	test("an event nobody ever ticked a checklist item on", async () => {
+		await env.withSecurityRulesDisabled(async (ctx) => {
+			await setDoc(doc(ctx.firestore(), "events", "eDelFresh"), {
+				id: "eDelFresh",
+				companyId: A,
+				title: "Fresh",
+				dateKey: "2025-07-02",
+			});
+		});
+
+		const db = as(ALICE);
+		const batch = writeBatch(db);
+		batch.delete(doc(db, "events", "eDelFresh"));
+		batch.delete(doc(db, "eventChecklistStates", "eDelFresh"));
+		await assertSucceeds(batch.commit());
+	});
+
+	/*
+	 * Tolerating an absent document must not tolerate a present one. A worker
+	 * ticking items is not a worker who may throw the whole state away.
+	 */
+	test("a plain member still cannot delete a checklist state that exists", async () => {
+		await env.withSecurityRulesDisabled(async (ctx) => {
+			await setDoc(
+				doc(ctx.firestore(), "eventChecklistStates", "eDelGuard"),
+				{ id: "eDelGuard", companyId: A, state: {} },
+			);
+		});
+
+		await assertFails(
+			deleteDoc(doc(as(BOB), "eventChecklistStates", "eDelGuard")),
+		);
+	});
+
+	test("a manager of another company cannot either", async () => {
+		await assertFails(
+			deleteDoc(doc(as(MALLORY), "eventChecklistStates", "eDelGuard")),
 		);
 	});
 });

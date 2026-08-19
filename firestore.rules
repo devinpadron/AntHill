@@ -391,7 +391,19 @@ service cloud.firestore {
       allow create: if v2IsManager(request.resource.data.companyId);
       allow update: if v2IsManager(resource.data.companyId)
                     && request.resource.data.companyId == resource.data.companyId;
-      allow delete: if v2IsManager(resource.data.companyId);
+      /*
+       * `resource == null` for the same reason as eventChecklistStates below:
+       * clearGroupJoinCode and deleteGroup batch this delete against the code
+       * named by `groups.joinCode`, and that pointer can outlive the document
+       * — another manager rotating the code deletes the old one first. The
+       * rule then had nothing to evaluate and denied, failing the whole batch,
+       * so clearing or deleting the group became impossible until someone
+       * re-issued a code. Deleting an absent document is a no-op, and `get`
+       * here is already open to any signed-in user; `list` stays denied, so
+       * this cannot be used to sweep the collection.
+       */
+      allow delete: if resource == null
+                    || v2IsManager(resource.data.companyId);
     }
 
     // ---- company library -------------------------------------------------
@@ -534,7 +546,19 @@ service cloud.firestore {
       // other because writes are per-item field paths, not whole-map sets.
       allow create: if v2IsMember(request.resource.data.companyId);
       allow update: if v2IsMember(resource.data.companyId);
-      allow delete: if v2IsManager(resource.data.companyId);
+      /*
+       * `resource == null` for the SAME reason as the get above, on the write
+       * side. eventService.deleteEvent batches this delete unconditionally
+       * because it cannot know whether anyone ticked anything, and on an event
+       * nobody ticked there is no document here — so the rule had nothing to
+       * evaluate and denied, which failed the WHOLE batch. Deleting an event
+       * that had no checklist activity was therefore impossible: the manager
+       * got "Error deleting event, please try again", and retrying could not
+       * help. A delete of an absent document is a no-op that reveals nothing;
+       * members can already read this document by id.
+       */
+      allow delete: if resource == null
+                    || v2IsManager(resource.data.companyId);
     }
 
     // ---- time entries ----------------------------------------------------
