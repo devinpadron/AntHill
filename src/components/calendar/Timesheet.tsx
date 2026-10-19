@@ -8,6 +8,7 @@ import React, {
 import {
 	ActivityIndicator,
 	FlatList,
+	RefreshControl,
 	StyleSheet,
 	View,
 	ViewToken,
@@ -46,16 +47,11 @@ import { calendarTheme } from "./calendarTheme";
  * so the first thing anyone saw was history, and their next shift was somewhere
  * below the fold. `pastWindow: "today"` starts the query at today instead.
  *
- * History is reached by SCROLLING UP, a week per approach to the top, the
- * mirror of how the future loads at the bottom. It used to be a pull-to-refresh
- * gesture, which nothing advertised. `maintainVisibleContentPosition` is what
- * makes prepending work: without it every week revealed shoved the viewport
- * down by its own height. The first near-the-top check fires on mount, so one
- * week sits above today from the start — today's row does not move, it just
- * has something to scroll up to. A caption at the top of the list says how far
- * back the window reaches and doubles as a manual trigger, because a week with
- * nothing in it adds no rows and the list only re-checks the top after you
- * scroll away and back.
+ * History is reached by PULLING DOWN, a week per pull. Nothing advertises it
+ * from the top of the list: a permanent "show earlier" row would put a control
+ * above the one thing this screen exists to answer, which is what you are
+ * working next. The badge in the header says how far back the window currently
+ * reaches, so the reveal still has a visible edge.
  *
  * The FUTURE extends by scrolling to the bottom, a quarter at a time. The
  * window used to stop dead at MONTHS_AFTER, so anything booked beyond about
@@ -116,6 +112,7 @@ export default function Timesheet(props: Props) {
 		error,
 		window,
 		loadPastEvents,
+		clearPastEvents,
 		hasLoadedPast,
 		loadMore,
 		hasMore,
@@ -282,6 +279,19 @@ export default function Timesheet(props: Props) {
 			);
 		},
 	).current;
+
+	/*
+	 * Fold the revealed history back up.
+	 *
+	 * `pendingFrom` is dropped too: collapsing restores the window this load
+	 * started from, so the "did the window move?" test that normally clears the
+	 * spinner would never fire and the refresh control would spin forever.
+	 */
+	const onClearEarlier = useCallback(() => {
+		setPendingFrom(null);
+		clearPastEvents();
+		listRef.current?.scrollToOffset({ offset: 0, animated: true });
+	}, [clearPastEvents]);
 
 	const jumpToToday = useCallback(() => {
 		const target = todayIndexRef.current;
@@ -466,6 +476,21 @@ export default function Timesheet(props: Props) {
 							tone="accent"
 						/>
 					)}
+					{/* Tapping it folds the revealed history back up — the badge
+					    is both the edge of the window and the way to undo it. */}
+					{hasLoadedPast && (
+						<Pressable
+							onPress={onClearEarlier}
+							haptic="tap"
+							accessibilityLabel={`Showing events back to ${moment(window.from, "YYYY-MM-DD").format("MMMM D")}. Tap to hide past events.`}
+						>
+							<Badge
+								label={`Back to ${moment(window.from, "YYYY-MM-DD").format("MMM D")}`}
+								tone="neutral"
+								icon="close-circle"
+							/>
+						</Pressable>
+					)}
 					{!!props.selectedDate && (
 						<Badge
 							label={moment(props.selectedDate).format("MMM D")}
@@ -508,24 +533,6 @@ export default function Timesheet(props: Props) {
 						if (props.selectedDate) return;
 						loadMore();
 					}}
-					onStartReachedThreshold={0.5}
-					// onLoadEarlier guards on a load already pending.
-					onStartReached={() => {
-						if (props.selectedDate) return;
-						onLoadEarlier();
-					}}
-					// Keep the first visible row where it is when rows are
-					// prepended above it.
-					maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-					ListHeaderComponent={
-						props.selectedDate === null ? (
-							<ScheduleHeader
-								loading={loadingPast}
-								from={window.from}
-								onPress={onLoadEarlier}
-							/>
-						) : null
-					}
 					ListFooterComponent={
 						props.selectedDate === null ? (
 							<ScheduleFooter
@@ -551,6 +558,17 @@ export default function Timesheet(props: Props) {
 							});
 						}, 150);
 					}}
+					refreshControl={
+						props.selectedDate === null ? (
+							<RefreshControl
+								refreshing={loadingPast}
+								onRefresh={onLoadEarlier}
+								title="Pull to reveal the week before"
+								tintColor={theme.colors.accent}
+								titleColor={theme.colors.textSecondary}
+							/>
+						) : undefined
+					}
 					ListEmptyComponent={
 						error ? null : (
 							<EmptyState
@@ -563,7 +581,7 @@ export default function Timesheet(props: Props) {
 								description={
 									props.selectedDate
 										? "Pick another date, or clear the filter to see everything."
-										: "Events you're scheduled on from today onwards appear here. Tap the date above to look back further."
+										: "Events you're scheduled on from today onwards appear here. Pull down to reveal earlier weeks."
 								}
 							/>
 						)
@@ -646,48 +664,6 @@ export default function Timesheet(props: Props) {
  * a line saying so — otherwise reaching the bottom of an infinite list is
  * indistinguishable from it having quietly failed to load.
  */
-/**
- * The top edge of the window.
- *
- * Says how far back the list currently reaches, and is the manual way to
- * reach further — the automatic trigger only re-arms after you scroll away
- * from the top, which an empty week gives you no reason to do.
- */
-function ScheduleHeader({
-	loading,
-	from,
-	onPress,
-}: {
-	loading: boolean;
-	from: string;
-	onPress: () => void;
-}) {
-	const styles = useThemedStyles(timesheetStyles);
-	const theme = useTheme();
-
-	if (loading) {
-		return (
-			<View style={styles.footer}>
-				<ActivityIndicator size="small" color={theme.colors.accent} />
-			</View>
-		);
-	}
-
-	return (
-		<Pressable
-			onPress={onPress}
-			haptic="tap"
-			style={styles.footer}
-			accessibilityLabel={`Showing events from ${moment(from, "YYYY-MM-DD").format("MMMM D")}. Tap to reveal the week before.`}
-		>
-			<Text variant="caption" color="textTertiary" style={styles.center}>
-				Showing from {moment(from, "YYYY-MM-DD").format("MMM D")} · tap
-				for earlier
-			</Text>
-		</Pressable>
-	);
-}
-
 function ScheduleFooter({
 	loading,
 	hasMore,
