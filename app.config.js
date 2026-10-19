@@ -10,7 +10,7 @@ export default {
 		// databases. required_version stays 1.0.100 until the migration window —
 		// raising it now would force everyone onto a build that then gates itself
 		// behind activeVersion 1.
-		version: "1.3.0",
+		version: "1.3.1",
 		orientation: "portrait",
 		// The app themes itself off the OS appearance, so it must be told about
 		// the OS appearance. Pinned to "light" until the theme layer existed.
