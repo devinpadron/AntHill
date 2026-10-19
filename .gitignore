@@ -58,3 +58,4 @@ tools/migration/reports/
 
 # Firebase CLI deploy cache (hashes of uploaded files)
 .firebase/
+.playwright-mcp/
