@@ -15,7 +15,7 @@ import { getEdits } from "../../services/timeEntryEditService";
 import type { TimeEntryEdit } from "../../types";
 import { useUser } from "../../contexts/UserContext";
 import { useCompanyMembers } from "../../hooks/useCompanyMembers";
-import { useCompany } from "../../contexts/CompanyContext";
+import { useWorkerPermissions } from "../../hooks/useWorkerPermissions";
 import { timeDetailCardStyles } from "./TimeDetailCard.styles";
 import { Badge } from "../ui";
 import { useTheme, useThemedStyles } from "../../theme";
@@ -62,8 +62,8 @@ const TimeDetailCard = ({
 	const isQuickEditable = (field) =>
 		["text", "number", "currency", "quantity"].includes(field.type);
 	const { companyId } = useUser();
+	const permissions = useWorkerPermissions();
 	const { byUserId: membersById } = useCompanyMembers(companyId ?? "");
-	const { preferences } = useCompany();
 	/*
 	 * Resolved by the parent from entry.formSchemaIds. v1 embedded a full copy
 	 * of both schemas on every entry (`generalForm` / `eventForm`); reading
@@ -571,7 +571,7 @@ const TimeDetailCard = ({
 
 				{/* Actions */}
 				{!(entry.status === "active" || entry.status === "paused") &&
-				(isAdmin || preferences?.allowUserEventEditing) ? (
+				(isAdmin || permissions.editEvents) ? (
 					<View style={styles.entryActions}>
 						<TouchableOpacity
 							style={styles.editButton}

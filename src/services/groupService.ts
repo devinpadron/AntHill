@@ -2,7 +2,13 @@ import { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
 import firestore from "@react-native-firebase/firestore";
 import db from "../lib/db";
 import { C, membershipId } from "../constants/paths";
-import { Group, GroupJoinCode, Membership, WorkerVisibility } from "../types";
+import {
+	Group,
+	GroupJoinCode,
+	GroupPermissions,
+	Membership,
+	WorkerVisibility,
+} from "../types";
 
 /*
  * Worker groups.
@@ -272,6 +278,21 @@ export async function renameGroup(
 		});
 	} catch (e) {
 		console.error("Error renaming group", e);
+		throw e;
+	}
+}
+
+export async function setGroupPermissions(
+	groupId: string,
+	permissions: GroupPermissions,
+): Promise<void> {
+	try {
+		await db.collection(C.groups).doc(groupId).update({
+			permissions,
+			updatedAt: firestore.FieldValue.serverTimestamp(),
+		});
+	} catch (e) {
+		console.error("Error setting group permissions", e);
 		throw e;
 	}
 }

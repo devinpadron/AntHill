@@ -7,6 +7,7 @@ import MapView, { Marker } from "react-native-maps";
 // Custom hooks and utilities
 import { AcknowledgeShiftBanner } from "../../components/calendar/AcknowledgeShiftBanner";
 import { useEventDetails } from "../../hooks/useEventDetails";
+import { useWorkerPermissions } from "../../hooks/useWorkerPermissions";
 import { getRegionForMarkers, openMap, MapMarker } from "../../utils/mapUtils";
 
 // Components
@@ -28,7 +29,6 @@ import {
 	toast,
 } from "../../components/ui";
 import { useUser } from "../../contexts/UserContext";
-import { useCompany } from "../../contexts/CompanyContext";
 import { Theme, useTheme, useThemedStyles } from "../../theme";
 
 /*
@@ -57,9 +57,9 @@ const EventDetails = ({ navigation }) => {
 	const [initialRegion, setInitialRegion] = useState(null);
 	const [isEditingNotes, setIsEditingNotes] = useState(false);
 
-	const { settings, isAdmin } = useUser();
+	const { settings } = useUser();
 	const prefMap = settings?.preferredMapApp || "";
-	const { preferences } = useCompany();
+	const permissions = useWorkerPermissions();
 
 	const {
 		event,
@@ -164,8 +164,10 @@ const EventDetails = ({ navigation }) => {
 		);
 	}
 
-	const showLabel =
-		(preferences.canViewEventLabels || isAdmin) && !!eventLabel;
+	const showLabel = permissions.viewEventLabels && !!eventLabel;
+	const showAssigned =
+		permissions.viewCoworkers && event.assignedUserIds?.length > 0;
+	const showManagerNotes = permissions.viewManagerNotes && !!event.adminNotes;
 
 	return (
 		<Screen
@@ -268,9 +270,9 @@ const EventDetails = ({ navigation }) => {
 			</Card>
 
 			{/* Who & what the manager said */}
-			{(event.assignedUserIds?.length > 0 || event.adminNotes) && (
+			{(showAssigned || showManagerNotes) && (
 				<Card style={styles.card}>
-					{event.assignedUserIds?.length > 0 && (
+					{showAssigned && (
 						<View style={styles.factRow}>
 							<Icon
 								name="people-outline"
@@ -289,12 +291,11 @@ const EventDetails = ({ navigation }) => {
 						</View>
 					)}
 
-					{event.adminNotes && (
+					{showManagerNotes && (
 						<View
 							style={[
 								styles.factRow,
-								event.assignedUserIds?.length > 0 &&
-									styles.factRowDivided,
+								showAssigned && styles.factRowDivided,
 							]}
 						>
 							<Icon

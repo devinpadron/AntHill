@@ -247,6 +247,26 @@ export interface Group extends BaseDoc, CompanyScoped {
 	joinCode: string | null;
 	/** What `visibility` a worker joining with that code is given. */
 	joinVisibility: WorkerVisibility;
+	/**
+	 * What members may see and do. Absent on groups written before this
+	 * existed; the resolver reads absent as the company baseline, so an old
+	 * group changes nothing for anyone. See useWorkerPermissions.
+	 */
+	permissions?: GroupPermissions;
+}
+
+/**
+ * Per-group permissions. A worker in several groups gets the OR of them —
+ * most permissive wins, the same way group audiences union on an event.
+ *
+ * Client-side only, like `canViewEventLabels` before it: the event document is
+ * still readable by every active member, so this hides, it does not protect.
+ */
+export interface GroupPermissions {
+	viewEventLabels: boolean;
+	viewManagerNotes: boolean;
+	viewCoworkers: boolean;
+	editEvents: boolean;
 }
 
 /**

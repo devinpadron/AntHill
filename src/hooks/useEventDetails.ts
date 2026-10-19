@@ -24,6 +24,7 @@ import {
 import { useCompanyMembers } from "./useCompanyMembers";
 import { useUser } from "../contexts/UserContext";
 import { useCompany } from "../contexts/CompanyContext";
+import { useWorkerPermissions } from "./useWorkerPermissions";
 
 /*
  * A single event.
@@ -37,6 +38,7 @@ import { useCompany } from "../contexts/CompanyContext";
 export function useEventDetails(eventId: string) {
 	const { userId, companyId, isAdmin, user } = useUser();
 	const { preferences } = useCompany();
+	const permissions = useWorkerPermissions();
 
 	const [event, setEvent] = useState<Event | null>(null);
 	const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -160,14 +162,14 @@ export function useEventDetails(eventId: string) {
 	const workerList = useMemo(() => workerNames.join(", "), [workerNames]);
 
 	/*
-	 * Admins always edit; everyone else only when the company allows it AND
-	 * they are actually on the event. The rules enforce the narrower version of
-	 * this (workerNotes only), so this is a UI affordance, not the guard.
+	 * Admins always edit; everyone else only when their groups (or, with no
+	 * groups, the company) allow it AND they are actually on the event. The
+	 * rules enforce the narrower version of this (workerNotes only), so this
+	 * is a UI affordance, not the guard.
 	 */
 	const hasEditPermission = Boolean(
 		isAdmin ||
-		(preferences.allowUserEventEditing &&
-			event?.assignedUserIds?.includes(userId)),
+		(permissions.editEvents && event?.assignedUserIds?.includes(userId)),
 	);
 
 	/*

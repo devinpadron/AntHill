@@ -9,11 +9,21 @@ import {
 	Alert,
 	ActivityIndicator,
 	KeyboardAvoidingView,
+	Modal,
 	Platform,
+	ScrollView,
+	Switch,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useUser } from "../../../contexts/UserContext";
+import { useCompany } from "../../../contexts/CompanyContext";
 import { useGroups } from "../../../hooks/useGroups";
+import {
+	PERMISSION_ROWS,
+	baselinePermissions,
+} from "../../../utils/permissionUtils";
+import { employeeListStyles } from "./EmployeeList.styles";
+import { Group, GroupPermissions } from "../../../types";
 import { useCompanyMembers } from "../../../hooks/useCompanyMembers";
 import {
 	clearGroupJoinCode,
@@ -21,6 +31,7 @@ import {
 	deleteGroup,
 	renameGroup,
 	setGroupJoinCode,
+	setGroupPermissions,
 } from "../../../services/groupService";
 import { Theme, useTheme, useThemedStyles } from "../../../theme";
 import { SafeAreaBand } from "../../../components/ui";
@@ -47,6 +58,7 @@ const WorkerGroups = ({ navigation }) => {
 
 	const [newName, setNewName] = useState("");
 	const [busy, setBusy] = useState(false);
+	const [permGroup, setPermGroup] = useState<Group | null>(null);
 
 	/** Headcount per group, derived from the member list already in memory. */
 	const counts = useMemo(() => {
@@ -236,6 +248,17 @@ const WorkerGroups = ({ navigation }) => {
 					</View>
 					<TouchableOpacity
 						style={styles.rowAction}
+						onPress={() => setPermGroup(item)}
+						accessibilityLabel={`Permissions for ${item.name}`}
+					>
+						<Ionicons
+							name="eye-outline"
+							size={18}
+							color={theme.colors.accent}
+						/>
+					</TouchableOpacity>
+					<TouchableOpacity
+						style={styles.rowAction}
 						onPress={() => rename(item)}
 						accessibilityLabel={`Rename ${item.name}`}
 					>
@@ -401,6 +424,17 @@ const WorkerGroups = ({ navigation }) => {
 					</TouchableOpacity>
 				</View>
 
+				{permGroup && (
+					<GroupPermissionsModal
+						// The live copy, so a save elsewhere shows here.
+						group={
+							groups.find((g) => g.id === permGroup.id) ??
+							permGroup
+						}
+						onClose={() => setPermGroup(null)}
+					/>
+				)}
+
 				<FlatList
 					data={groups}
 					renderItem={renderItem}
@@ -556,4 +590,104 @@ const workerGroupStyles = (theme: Theme) =>
 			lineHeight: 19,
 		},
 	});
+/**
+ * What members of one group may see and do.
+ *
+ * Seeded from the group, or from the company baseline for a group that has
+ * never been edited — which is exactly what its members get today, so the
+ * switches open showing the truth rather than a default.
+ */
+const GroupPermissionsModal = ({
+	group,
+	onClose,
+}: {
+	group: Group;
+	onClose: () => void;
+}) => {
+	const theme = useTheme();
+	const styles = useThemedStyles(employeeListStyles);
+	const { preferences } = useCompany();
+	const [perms, setPerms] = useState<GroupPermissions>(
+		() => group.permissions ?? baselinePermissions(preferences),
+	);
+	const [saving, setSaving] = useState(false);
+
+	const save = async () => {
+		setSaving(true);
+		try {
+			await setGroupPermissions(group.id, perms);
+			onClose();
+		} catch (e: any) {
+			console.error("Could not save group permissions", e);
+			Alert.alert("Could not save", e?.message ?? "Please try again.");
+		} finally {
+			setSaving(false);
+		}
+	};
+
+	return (
+		<Modal
+			visible
+			animationType="slide"
+			transparent
+			onRequestClose={onClose}
+		>
+			<View style={styles.modalBackdrop}>
+				<View style={styles.modalSheet}>
+					<View style={styles.modalHeader}>
+						<Text style={styles.modalTitle}>{group.name}</Text>
+						<TouchableOpacity onPress={onClose}>
+							<Ionicons
+								name="close"
+								size={24}
+								color={theme.colors.text}
+							/>
+						</TouchableOpacity>
+					</View>
+
+					<ScrollView style={{ maxHeight: 420 }}>
+						{PERMISSION_ROWS.map((row) => (
+							<View key={row.key} style={styles.modalRow}>
+								<View style={{ flex: 1, paddingRight: 12 }}>
+									<Text style={styles.modalRowTitle}>
+										{row.title}
+									</Text>
+									<Text style={styles.modalRowHint}>
+										{row.hint}
+									</Text>
+								</View>
+								<Switch
+									value={perms[row.key]}
+									onValueChange={(on) =>
+										setPerms((prev) => ({
+											...prev,
+											[row.key]: on,
+										}))
+									}
+								/>
+							</View>
+						))}
+						<Text style={styles.modalEmpty}>
+							A worker in several groups gets whatever any of them
+							allows.
+						</Text>
+					</ScrollView>
+
+					<TouchableOpacity
+						style={styles.modalSave}
+						onPress={save}
+						disabled={saving}
+					>
+						{saving ? (
+							<ActivityIndicator color={theme.colors.surface} />
+						) : (
+							<Text style={styles.modalSaveText}>Save</Text>
+						)}
+					</TouchableOpacity>
+				</View>
+			</View>
+		</Modal>
+	);
+};
+
 export default WorkerGroups;

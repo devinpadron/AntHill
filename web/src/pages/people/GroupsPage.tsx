@@ -6,9 +6,14 @@ import {
 	deleteGroup,
 	renameGroup,
 	setGroupJoinCode,
+	setGroupPermissions,
 	setMemberGroups,
 } from "@app/services/groupService";
 import { useGroups } from "@app/hooks/useGroups";
+import {
+	PERMISSION_ROWS,
+	baselinePermissions,
+} from "@app/utils/permissionUtils";
 import { useCompanyMembers } from "@app/hooks/useCompanyMembers";
 import { showConfirmation } from "@app/utils/alertUtils";
 import { Role } from "@app/types/enums/Role";
@@ -255,10 +260,12 @@ function GroupDetail({
 	canDelete: boolean;
 	onDeleted: () => void;
 }) {
-	const { companyId } = useCompany();
+	const { companyId, preferences } = useCompany();
 	const toast = useToast();
 
 	const [name, setName] = useState(group.name);
+	// Absent means the company baseline, which is what members get today.
+	const perms = group.permissions ?? baselinePermissions(preferences);
 	const [busy, setBusy] = useState<string | null>(null);
 	const [adding, setAdding] = useState(false);
 
@@ -465,6 +472,51 @@ function GroupDetail({
 							</div>
 						</>
 					)}
+				</section>
+
+				{/* ----------------------------------------- permissions */}
+				<section className={styles.section}>
+					<div className={styles.sectionHead}>
+						<Text variant="overline" tone="tertiary">
+							What members can see
+						</Text>
+					</div>
+					{PERMISSION_ROWS.map((row) => (
+						<label key={row.key} className={styles.toggleRow}>
+							<input
+								type="checkbox"
+								checked={perms[row.key]}
+								disabled={busy === `perm-${row.key}`}
+								onChange={(e) =>
+									void run(
+										`perm-${row.key}`,
+										() =>
+											setGroupPermissions(group.id, {
+												...perms,
+												[row.key]: e.target.checked,
+											}),
+										"Saved",
+									)
+								}
+							/>
+							<span className={styles.toggleText}>
+								<Text variant="bodyStrong" as="span">
+									{row.title}
+								</Text>
+								<Text
+									variant="caption"
+									tone="secondary"
+									as="span"
+								>
+									{row.hint}
+								</Text>
+							</span>
+						</label>
+					))}
+					<Text variant="caption" tone="tertiary">
+						A worker in several groups gets whatever any of them
+						allows.
+					</Text>
 				</section>
 
 				{/* --------------------------------------------- members */}
