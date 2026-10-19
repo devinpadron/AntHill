@@ -44,5 +44,6 @@ export type { Segment } from "./SegmentedControl";
 
 export { Sheet } from "./Sheet";
 export { Text } from "./Text";
+export { LinkText } from "./LinkText";
 export { toast, PushToast } from "./Toast";
 export { Toggle } from "./Toggle";

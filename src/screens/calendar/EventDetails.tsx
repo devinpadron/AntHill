@@ -20,6 +20,7 @@ import {
 	Icon,
 	IconButton,
 	Input,
+	LinkText,
 	Loading,
 	Screen,
 	ScreenHeader,
@@ -248,9 +249,11 @@ const EventDetails = ({ navigation }) => {
 						/>
 						<View style={styles.factBody}>
 							<Text variant="bodyStrong">
-								{moment(event.startAt).format("h:mm A")}
+								{moment(event.startAt.toDate()).format(
+									"h:mm A",
+								)}
 								{event.endAt
-									? ` – ${moment(event.endAt).format("h:mm A")}`
+									? ` – ${moment(event.endAt.toDate()).format("h:mm A")}`
 									: ""}
 							</Text>
 							{!!event.durationSeconds && (
@@ -304,9 +307,12 @@ const EventDetails = ({ navigation }) => {
 								<Text variant="label" color="textSecondary">
 									Event notes
 								</Text>
-								<Text variant="body" style={styles.factText}>
+								<LinkText
+									variant="body"
+									style={styles.factText}
+								>
 									{event.adminNotes}
-								</Text>
+								</LinkText>
 							</View>
 						</View>
 					)}
@@ -535,13 +541,13 @@ const EventDetails = ({ navigation }) => {
 						placeholder="Anything you want to remember about this event…"
 					/>
 				) : (
-					<Text
+					<LinkText
 						variant="body"
 						color={localNotes ? "text" : "textTertiary"}
 					>
 						{localNotes ||
 							"No notes yet. Tap the pencil to add some."}
-					</Text>
+					</LinkText>
 				)}
 			</Card>
 
