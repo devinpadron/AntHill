@@ -1,0 +1,23 @@
+.map {
+	width: 100%;
+	border-radius: var(--r-md);
+	overflow: hidden;
+	background: var(--c-surface-sunken);
+}
+.fallback {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--sp-xs);
+	width: 100%;
+	border-radius: var(--r-md);
+	background: var(--c-surface-sunken);
+	border: 1px dashed var(--c-border);
+	color: var(--c-accent);
+	text-decoration: none;
+}
+.fallback:hover {
+	border-color: var(--c-accent-border);
+	background: var(--c-accent-subtle);
+}

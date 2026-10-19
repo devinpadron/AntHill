@@ -431,9 +431,14 @@ export function PayrollPage() {
 			</header>
 
 			<div className={styles.stats}>
+				{/*
+				 * Decimal hours lead, h/m explains them — as the app's payroll
+				 * summary does. The decimal figure is the one that gets typed
+				 * into payroll; "8h 30m" is the sanity check on it.
+				 */}
 				<Stat
-					label="Net hours"
-					value={formatDuration(totals.netSeconds)}
+					label={`Net hours · ${formatDuration(totals.netSeconds)}`}
+					value={(totals.netSeconds / 3600).toFixed(2)}
 				/>
 				<Stat
 					label="Worked"

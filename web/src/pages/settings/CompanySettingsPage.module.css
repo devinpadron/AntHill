@@ -151,3 +151,48 @@
 	align-items: center;
 	gap: var(--sp-sm);
 }
+
+/* Prose between rows: the tracking warning and the OS-indicator footnote. */
+.notice {
+	display: flex;
+	gap: var(--sp-sm);
+	align-items: flex-start;
+	padding: var(--sp-md);
+	border-radius: var(--r-md);
+	background: var(--c-warning-subtle);
+	color: var(--c-warning);
+	margin: var(--sp-md) 0;
+}
+.notice.quiet {
+	background: var(--c-surface-sunken);
+	color: var(--c-text-tertiary);
+}
+
+.geofence {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-md);
+	padding-top: var(--sp-md);
+	border-top: 1px solid var(--c-border);
+}
+.site {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-sm);
+	padding: var(--sp-md);
+	border: 1px solid var(--c-accent-border);
+	border-radius: var(--r-md);
+	background: var(--c-accent-subtle);
+	color: var(--c-accent);
+}
+.site > :nth-child(2) {
+	flex: 1;
+	color: var(--c-text);
+}
+.siteClear {
+	color: var(--c-text-tertiary);
+	display: inline-flex;
+}
+.siteClear:hover {
+	color: var(--c-danger);
+}

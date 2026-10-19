@@ -37,3 +37,8 @@ export { ToastProvider, ToastBridge, useToast, toast } from "./Toast";
 export type { ToastTone } from "./Toast";
 
 export { AlertHost } from "./AlertHost";
+
+export { LinkText } from "./LinkText";
+
+export { MapCanvas } from "./MapCanvas";
+export type { LatLng } from "./MapCanvas";

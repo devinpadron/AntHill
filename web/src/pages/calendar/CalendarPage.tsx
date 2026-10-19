@@ -50,7 +50,14 @@ export function CalendarPage() {
 
 	const navigate = useNavigate();
 	const [params, setParams] = useSearchParams();
-	const view = (params.get("view") as ViewMode) ?? "month";
+	const [filters, setFilters] = useState<CalendarFilters>(DEFAULT_FILTERS);
+	/*
+	 * A date range forces the list: the month grid only draws the focused
+	 * month, so a span elsewhere would render as an empty calendar.
+	 */
+	const view: ViewMode = filters.range
+		? "list"
+		: ((params.get("view") as ViewMode) ?? "month");
 
 	const focusedMonth = useMemo(() => {
 		const raw = params.get("month");
@@ -61,7 +68,6 @@ export function CalendarPage() {
 		return new Date();
 	}, [params]);
 
-	const [filters, setFilters] = useState<CalendarFilters>(DEFAULT_FILTERS);
 	const [labels, setLabels] = useState<EventLabel[]>([]);
 
 	useEffect(() => subscribeEventLabels(companyId, setLabels), [companyId]);
@@ -75,6 +81,7 @@ export function CalendarPage() {
 			showAllSelectedOnly: filters.allSelected,
 			showExactSelectedOnly: filters.exactSelected,
 			focusedMonth,
+			range: filters.range ?? undefined,
 		});
 
 	const labelsById = useMemo(
@@ -252,7 +259,8 @@ export function CalendarPage() {
 					}
 					label="confirmed"
 				/>
-				{!hasLoadedPast && (
+				{/* A range already says where to look; the window is moot. */}
+				{!hasLoadedPast && !filters.range && (
 					<Button
 						variant="ghost"
 						size="small"

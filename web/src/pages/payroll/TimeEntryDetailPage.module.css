@@ -227,3 +227,11 @@
 		grid-column: auto;
 	}
 }
+
+.routeFooter {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--sp-md);
+	padding-top: var(--sp-md);
+}

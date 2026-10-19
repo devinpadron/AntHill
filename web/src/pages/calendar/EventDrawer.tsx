@@ -7,6 +7,7 @@ import {
 	Button,
 	EmptyState,
 	Icon,
+	LinkText,
 	LoadingPane,
 	MiniBar,
 	Text,
@@ -370,7 +371,9 @@ export function EventDrawer() {
 								Worker notes
 							</Text>
 							<div className={styles.readOnlyNotes}>
-								<Text variant="body">{event.workerNotes}</Text>
+								<LinkText variant="body">
+									{event.workerNotes}
+								</LinkText>
 							</div>
 						</>
 					)}

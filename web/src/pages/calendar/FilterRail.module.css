@@ -165,3 +165,12 @@
 	color: var(--c-text);
 	border-color: var(--c-border-strong);
 }
+
+.dates {
+	display: flex;
+	gap: var(--sp-sm);
+}
+.dates > * {
+	flex: 1;
+	min-width: 0;
+}

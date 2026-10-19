@@ -5,9 +5,16 @@ import {
 } from "@app/services/groupService";
 import { useGroups } from "@app/hooks/useGroups";
 import { Role } from "@app/types/enums/Role";
-import type { Membership, WorkerVisibility } from "@app/types";
+import {
+	NOTIFICATION_CHANNELS,
+	TEAM_NOTIFICATION_CHANNELS,
+	notificationPrefs,
+	type Membership,
+	type WorkerVisibility,
+} from "@app/types";
 import { useCompany } from "../../contexts/CompanyContext";
 import { Badge, Button, Icon, Text, useToast } from "../../ui";
+import { CHANNEL_LABELS } from "./notifications";
 import styles from "./JobAccessDrawer.module.css";
 
 /*
@@ -135,6 +142,17 @@ export function JobAccessDrawer({
 					)}
 				</section>
 
+				{/*
+				 * Which pushes this person receives, read-only — see
+				 * notifications.ts for why a manager cannot change them.
+				 */}
+				<section className={styles.section}>
+					<Text variant="overline" tone="tertiary">
+						Notifications
+					</Text>
+					<NotificationRows member={member} />
+				</section>
+
 				{member.role === Role.USER ? (
 					<section className={styles.section}>
 						<Text variant="overline" tone="tertiary">
@@ -244,6 +262,42 @@ export function JobAccessDrawer({
 			)}
 		</aside>
 	);
+}
+
+/*
+ * The manager-facing channels mean nothing on a worker's membership — the app
+ * hides those switches from workers too — so they are left off the list rather
+ * than shown as "On" for someone who never gets them.
+ */
+function NotificationRows({ member }: { member: Membership }) {
+	const prefs = notificationPrefs(member);
+	if (!prefs.enabled) {
+		return (
+			<div className={styles.warning}>
+				<Icon name="notifications-off-outline" size="sm" />
+				<Text variant="caption" as="span">
+					Notifications off — {member.firstName} will not be alerted
+					to anything.
+				</Text>
+			</div>
+		);
+	}
+	const channels =
+		member.role === Role.USER
+			? NOTIFICATION_CHANNELS.filter(
+					(channel) =>
+						!(
+							TEAM_NOTIFICATION_CHANNELS as readonly string[]
+						).includes(channel),
+				)
+			: NOTIFICATION_CHANNELS;
+	return channels.map((channel) => (
+		<Row
+			key={channel}
+			label={CHANNEL_LABELS[channel]}
+			value={prefs[channel] ? "On" : "Muted"}
+		/>
+	));
 }
 
 function Row({

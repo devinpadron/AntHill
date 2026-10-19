@@ -3,7 +3,7 @@ import { useCompanyMembers } from "@app/hooks/useCompanyMembers";
 import { useGroups } from "@app/hooks/useGroups";
 import { showMemberActions } from "@app/utils/memberActions";
 import { Role } from "@app/types/enums/Role";
-import type { Membership } from "@app/types";
+import { notificationPrefs, type Membership } from "@app/types";
 import { useCompany } from "../../contexts/CompanyContext";
 import {
 	Badge,
@@ -19,6 +19,7 @@ import {
 } from "../../ui";
 import { JobAccessDrawer } from "./JobAccessDrawer";
 import { InvitePanel } from "./InvitePanel";
+import { describeNotifications } from "./notifications";
 import styles from "./EmployeesPage.module.css";
 
 /*
@@ -223,6 +224,45 @@ export function EmployeesPage() {
 							<Badge tone="neutral">+{ids.length - 2}</Badge>
 						)}
 					</span>
+				);
+			},
+		},
+		{
+			id: "notifications",
+			header: "Alerts",
+			title: "Which pushes this person has chosen to receive. Read-only — it is their setting.",
+			// Off sorts first: that is the person a manager is looking for.
+			sortValue: (m) => {
+				const prefs = notificationPrefs(m);
+				return prefs.enabled ? describeNotifications(prefs) : "";
+			},
+			width: "140px",
+			render: (m) => {
+				const prefs = notificationPrefs(m);
+				const text = describeNotifications(prefs);
+				const quiet = prefs.enabled && text === "All notifications on";
+				return (
+					<Badge
+						tone={
+							!prefs.enabled
+								? "warning"
+								: quiet
+									? "success"
+									: "neutral"
+						}
+						icon={
+							prefs.enabled
+								? "notifications-outline"
+								: "notifications-off-outline"
+						}
+						title={text}
+					>
+						{!prefs.enabled
+							? "off"
+							: quiet
+								? "all on"
+								: "some muted"}
+					</Badge>
 				);
 			},
 		},

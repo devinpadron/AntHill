@@ -24,6 +24,7 @@ import {
 	Card,
 	EmptyState,
 	Icon,
+	LinkText,
 	LoadingPane,
 	Text,
 	useToast,
@@ -33,6 +34,7 @@ import { netSecondsOf } from "./usePayroll";
 import { FormResponseList } from "./FormResponseList";
 import { EditEntrySheet } from "./EditEntrySheet";
 import { useEntryEdits } from "./useEntryEdits";
+import { RouteCard } from "./RouteCard";
 import styles from "./TimeEntryDetailPage.module.css";
 
 /*
@@ -330,6 +332,16 @@ export function TimeEntryDetailPage() {
 						</dl>
 					</Card>
 
+					{/*
+					 * This page is manager-only, so the route is always shown;
+					 * the app additionally gates a worker's own view on
+					 * `workersSeeOwnRoutes`. Null summary renders nothing.
+					 */}
+					<RouteCard
+						entryId={entry.id}
+						summary={entry.locationTracking ?? null}
+					/>
+
 					{entry.submission && (
 						<Card title="Submitted">
 							<dl className={styles.facts}>
@@ -340,9 +352,9 @@ export function TimeEntryDetailPage() {
 							</dl>
 							{entry.submission.notes && (
 								<div className={styles.quote}>
-									<Text variant="body">
+									<LinkText variant="body">
 										{entry.submission.notes}
-									</Text>
+									</LinkText>
 								</div>
 							)}
 						</Card>
@@ -400,7 +412,7 @@ export function TimeEntryDetailPage() {
 
 					{entry.notes?.trim() && (
 						<Card title="Worker notes">
-							<Text variant="body">{entry.notes}</Text>
+							<LinkText variant="body">{entry.notes}</LinkText>
 						</Card>
 					)}
 				</div>

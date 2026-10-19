@@ -81,6 +81,12 @@ export function SideNav({
 				]
 			: []),
 		{
+			to: `${base}/stats`,
+			label: "Statistics",
+			icon: "stats-chart-outline",
+			iconActive: "stats-chart-outline",
+		},
+		{
 			to: `${base}/settings`,
 			label: "Settings",
 			icon: "settings-outline",

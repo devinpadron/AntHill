@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon, Input, Text } from "../../ui";
+import { MAPS_KEY as KEY, loadMaps } from "../../lib/googleMaps";
 import styles from "./PlacesInput.module.css";
 
 /*
@@ -11,10 +12,8 @@ import styles from "./PlacesInput.module.css";
  * than once (legacy `Autocomplete` → `PlaceAutocompleteElement`), and when it
  * moves again only this file changes.
  *
- * ⚠ The key must be a SEPARATE, browser-restricted key — not the mobile
- * GOOGLE_PLACES_API_KEY from .env. A key on a web page is public; restrict it by
- * HTTP referrer to portal.anthillapp.com/* and localhost:5173/*, and to the
- * Maps JavaScript + Places APIs.
+ * The script itself is loaded by lib/googleMaps.ts, shared with the map
+ * previews — see the key warning there.
  *
  * With no key configured this degrades to a plain address field that still
  * produces a usable location — just without coordinates. That matches the app,
@@ -26,26 +25,6 @@ export type PickedPlace = {
 	latitude: number | null;
 	longitude: number | null;
 };
-
-const KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY;
-
-let loaderPromise: Promise<void> | null = null;
-
-function loadMaps(): Promise<void> {
-	if (!KEY) return Promise.reject(new Error("No Maps key configured"));
-	if (loaderPromise) return loaderPromise;
-
-	loaderPromise = new Promise<void>((resolve, reject) => {
-		if ((window as never as { google?: unknown }).google) return resolve();
-		const script = document.createElement("script");
-		script.src = `https://maps.googleapis.com/maps/api/js?key=${KEY}&libraries=places&loading=async`;
-		script.async = true;
-		script.onload = () => resolve();
-		script.onerror = () => reject(new Error("Google Maps failed to load"));
-		document.head.appendChild(script);
-	});
-	return loaderPromise;
-}
 
 type Suggestion = { description: string; placeId: string };
 

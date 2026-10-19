@@ -4,6 +4,7 @@ import { useCompanyMembers } from "@app/hooks/useCompanyMembers";
 import type { CompanyPreferences, ReminderSchedule } from "@app/types";
 import { useCompany } from "../../contexts/CompanyContext";
 import { Badge, Button, Card, Icon, Input, Text, useToast } from "../../ui";
+import { GeofenceEditor } from "./GeofenceEditor";
 import styles from "./CompanySettingsPage.module.css";
 
 /*
@@ -18,6 +19,35 @@ import styles from "./CompanySettingsPage.module.css";
  * Never a whole-object write — a second admin client makes the stale-overwrite
  * hazard the app's comments warn about strictly worse.
  */
+/*
+ * What the app tells a tracked worker, and what it lets them refuse.
+ *
+ * All three default ON. Worded as what the worker gets, not what the company
+ * gains, because that is the decision actually being made.
+ */
+const TRANSPARENCY: {
+	key: "showRecordingIndicator" | "workersSeeOwnRoutes" | "allowDeclining";
+	label: string;
+	description: string;
+}[] = [
+	{
+		key: "showRecordingIndicator",
+		label: "Show workers when recording is on",
+		description: "A line on their clock screen while a shift is tracked.",
+	},
+	{
+		key: "workersSeeOwnRoutes",
+		label: "Let workers see their own route",
+		description:
+			"On their own timesheets. Managers always see every route.",
+	},
+	{
+		key: "allowDeclining",
+		label: "Let workers decline",
+		description: "Off makes tracking a condition of clocking in here.",
+	},
+];
+
 export function CompanySettingsPage() {
 	const { companyId, company, preferences, timeZone, updatePreferences } =
 		useCompany();
@@ -248,6 +278,135 @@ export function CompanySettingsPage() {
 							})
 						}
 					/>
+				)}
+
+				{/*
+				 * Location, and only where there is a clock to attach it to.
+				 * Without time tracking there is no shift to record against
+				 * and no reason to remind anyone to punch one.
+				 *
+				 * The nested blocks are written whole, as the app does: the
+				 * service merges them a level deeper than a plain patch, and
+				 * a partial `locationTracking` would otherwise wipe the
+				 * sampling numbers the tracker depends on.
+				 */}
+				{preferences.enableTimeSheet && (
+					<Card title="Location tracking">
+						<Text variant="caption" tone="secondary">
+							Off unless you turn it on. Workers are asked to
+							agree before anything is recorded, and can decline.
+						</Text>
+						<Toggle
+							label="Track location while clocked in"
+							description="Records each worker's route for the whole shift, including when the app is closed."
+							checked={preferences.locationTracking.enabled}
+							busy={busy === "tracking"}
+							onChange={(enabled) =>
+								patch("tracking", {
+									locationTracking: {
+										...preferences.locationTracking,
+										enabled,
+									},
+								})
+							}
+							affects={activeCount}
+						/>
+
+						{preferences.locationTracking.enabled && (
+							<>
+								<div className={styles.notice}>
+									<Icon name="warning" size="sm" />
+									<Text variant="caption" as="span">
+										Every worker on the clock has their
+										position recorded until they clock out.
+										Tell your staff before you switch this
+										on.
+									</Text>
+								</div>
+
+								{TRANSPARENCY.map((row) => (
+									<Toggle
+										key={row.key}
+										label={row.label}
+										description={row.description}
+										checked={
+											preferences.locationTracking[
+												row.key
+											]
+										}
+										busy={busy === row.key}
+										onChange={(next) =>
+											patch(row.key, {
+												locationTracking: {
+													...preferences.locationTracking,
+													[row.key]: next,
+												},
+											})
+										}
+									/>
+								))}
+
+								{/*
+								 * Said once, here, rather than on each row:
+								 * these three change what the APP says, not
+								 * what the phone does.
+								 */}
+								<div
+									className={[
+										styles.notice,
+										styles.quiet,
+									].join(" ")}
+								>
+									<Icon
+										name="information-circle-outline"
+										size="sm"
+									/>
+									<Text variant="caption" as="span">
+										Whatever you choose here, iPhones show a
+										blue location bar for the whole shift
+										and Android shows a permanent
+										notification. Workers are always told
+										before their first tracked shift — that
+										disclosure is required and cannot be
+										switched off.
+									</Text>
+								</div>
+							</>
+						)}
+					</Card>
+				)}
+
+				{preferences.enableTimeSheet && (
+					<Card title="Clock reminders">
+						<Text variant="caption" tone="secondary">
+							Nudges workers to punch in and out around your
+							address. Only ever a notification — nothing here
+							clocks anyone in or out.
+						</Text>
+						<Toggle
+							label="Clock in/out reminders"
+							description="Arriving off the clock prompts a clock-in; the clock-out prompt is configured below."
+							checked={preferences.clockReminderGeofence.enabled}
+							busy={busy === "geofence"}
+							onChange={(enabled) =>
+								patch("geofence", {
+									clockReminderGeofence: {
+										...preferences.clockReminderGeofence,
+										enabled,
+									},
+								})
+							}
+							affects={activeCount}
+						/>
+						{preferences.clockReminderGeofence.enabled && (
+							<GeofenceEditor
+								value={preferences.clockReminderGeofence}
+								onChange={(clockReminderGeofence) =>
+									patch("geofence", { clockReminderGeofence })
+								}
+							/>
+						)}
+					</Card>
 				)}
 
 				<Card title="Forms">

@@ -16,6 +16,7 @@ import {
 import { DiagnosticsPage } from "./pages/DiagnosticsPage";
 import { EmployeesPage } from "./pages/people/EmployeesPage";
 import { GroupsPage } from "./pages/people/GroupsPage";
+import { StatisticsPage } from "./pages/stats/StatisticsPage";
 import { CalendarPage } from "./pages/calendar/CalendarPage";
 import { EventDrawer } from "./pages/calendar/EventDrawer";
 import { EventEditorPage } from "./pages/calendar/EventEditorPage";
@@ -138,6 +139,10 @@ export function App() {
 										<Route
 											path="groups"
 											element={<GroupsPage />}
+										/>
+										<Route
+											path="stats"
+											element={<StatisticsPage />}
 										/>
 										<Route
 											path="settings"

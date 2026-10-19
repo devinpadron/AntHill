@@ -95,6 +95,9 @@ const FOR_PORTAL = [
 	"key-outline",
 	"link-outline",
 	"moon-outline",
+	"navigate-outline",
+	"notifications-off-outline",
+	"notifications-outline",
 	"open-outline",
 	"options-outline",
 	"pencil",
@@ -102,6 +105,7 @@ const FOR_PORTAL = [
 	"resize",
 	"save-outline",
 	"share-outline",
+	"stats-chart-outline",
 	"sunny-outline",
 	"swap-vertical",
 ];

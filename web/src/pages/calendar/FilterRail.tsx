@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { MAX_SELECTED_USERS } from "@app/services/eventService";
+import type { DateRange } from "@app/hooks/useCalendarEvents";
 import { FilterType } from "@app/types/enums/FilterType";
 import type { EventLabel, Membership } from "@app/types";
 import { Badge, Icon, Input, Text } from "../../ui";
@@ -22,6 +23,11 @@ import styles from "./FilterRail.module.css";
  */
 
 export type CalendarFilters = {
+	/**
+	 * An inclusive span of day keys, or null for the month window. Replaces
+	 * the hook's window outright — a span months away loads that span.
+	 */
+	range: DateRange | null;
 	filterType: FilterType;
 	selectedUsers: string[];
 	allSelected: boolean;
@@ -32,6 +38,7 @@ export type CalendarFilters = {
 };
 
 export const DEFAULT_FILTERS: CalendarFilters = {
+	range: null,
 	filterType: FilterType.ALL,
 	selectedUsers: [],
 	allSelected: false,
@@ -88,6 +95,17 @@ export function FilterRail({
 
 	const atCap = filters.selectedUsers.length >= MAX_SELECTED_USERS;
 
+	/*
+	 * One date alone is a range of one day; an earlier second date swaps the
+	 * two — the same rules as the app's picker.
+	 */
+	function setRange(from?: string, to?: string) {
+		const a = from || to;
+		const b = to || from;
+		if (!a || !b) return patch({ range: null });
+		patch({ range: a <= b ? { from: a, to: b } : { from: b, to: a } });
+	}
+
 	function toggleUser(userId: string) {
 		const chosen = filters.selectedUsers.includes(userId);
 		if (!chosen && atCap) return;
@@ -103,6 +121,47 @@ export function FilterRail({
 
 	return (
 		<aside className={styles.rail} aria-label="Calendar filters">
+			{/*
+			 * A chosen span replaces the month window, matching the app's
+			 * two-tap range picker. Native date inputs: the browser already has
+			 * a calendar, and the grid is right there anyway.
+			 */}
+			<section className={styles.section}>
+				<div className={styles.sectionHead}>
+					<Text variant="overline" tone="tertiary">
+						Dates
+					</Text>
+					{filters.range && (
+						<button
+							className={styles.clear}
+							onClick={() => patch({ range: null })}
+						>
+							Clear
+						</button>
+					)}
+				</div>
+				<div className={styles.dates}>
+					<Input
+						type="date"
+						aria-label="From"
+						value={filters.range?.from ?? ""}
+						max={filters.range?.to}
+						onChange={(e) =>
+							setRange(e.target.value, filters.range?.to)
+						}
+					/>
+					<Input
+						type="date"
+						aria-label="To"
+						value={filters.range?.to ?? ""}
+						min={filters.range?.from}
+						onChange={(e) =>
+							setRange(filters.range?.from, e.target.value)
+						}
+					/>
+				</div>
+			</section>
+
 			<section className={styles.section}>
 				<Text variant="overline" tone="tertiary">
 					Show
@@ -363,6 +422,7 @@ export function FilterRail({
 
 export function isFiltered(filters: CalendarFilters): boolean {
 	return (
+		filters.range !== null ||
 		filters.filterType !== FilterType.ALL ||
 		filters.selectedUsers.length > 0 ||
 		filters.labelIds.length > 0 ||
