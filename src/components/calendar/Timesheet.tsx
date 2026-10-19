@@ -18,7 +18,7 @@ import { CalendarList } from "react-native-calendars";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { useUser } from "../../contexts/UserContext";
 import { useCompany } from "../../contexts/CompanyContext";
-import { useCalendarEvents } from "../../hooks/useCalendarEvents";
+import { DateRange, useCalendarEvents } from "../../hooks/useCalendarEvents";
 import { useEventPrompts } from "../../hooks/useEventPrompts";
 import { FilterType } from "../../types";
 import {
@@ -66,8 +66,8 @@ type Props = {
 	navigation: any;
 	onCalOpen: () => void;
 	onCalClose: () => void;
-	selectedDate: string | null;
-	setSelectedDate: (date: string | null) => void;
+	dateRange: DateRange | null;
+	setDateRange: (range: DateRange | null) => void;
 	locked?: boolean;
 };
 
@@ -96,12 +96,7 @@ export default function Timesheet(props: Props) {
 	const { company } = useCompany();
 	const { unconfirmedIds } = useEventPrompts();
 
-	// A selected date anchors the window, so picking a month far away loads
-	// that month rather than returning nothing.
-	const focusedMonth = useMemo(
-		() => (props.selectedDate ? new Date(props.selectedDate) : undefined),
-		[props.selectedDate],
-	);
+	const range = props.dateRange;
 
 	const {
 		events,
@@ -125,7 +120,9 @@ export default function Timesheet(props: Props) {
 		selectedUsers: props.selectedUsers,
 		showAllSelectedOnly: props.showAllSelectedOnly,
 		showExactSelectedOnly: props.showExactSelectedOnly,
-		focusedMonth,
+		// A chosen range replaces the window, so a span months away loads
+		// that span rather than returning nothing.
+		range: range ?? undefined,
 		pastWindow: "today",
 		// Roughly two screens of rows, so reaching the bottom has the next page
 		// already on its way rather than starting the fetch from a standstill.
@@ -160,7 +157,8 @@ export default function Timesheet(props: Props) {
 		let currentYear: number | null = null;
 
 		const days = Object.keys(agendaItems)
-			.filter((day) => !props.selectedDate || day === props.selectedDate)
+			// Day keys are YYYY-MM-DD, so string order is date order.
+			.filter((day) => !range || (day >= range.from && day <= range.to))
 			.sort();
 
 		for (const day of days) {
@@ -209,7 +207,7 @@ export default function Timesheet(props: Props) {
 		}
 
 		return out;
-	}, [agendaItems, labels, props.selectedDate]);
+	}, [agendaItems, labels, range]);
 
 	const totalEvents = useMemo(
 		() =>
@@ -304,16 +302,15 @@ export default function Timesheet(props: Props) {
 	}, []);
 
 	/*
-	 * A picked date filters the list to one day, so the upcoming total would be
+	 * A picked range filters the list, so the upcoming total would be
 	 * answering a different question than the one on screen.
 	 */
 	const headerCount =
-		props.selectedDate || upcomingCount === null
-			? totalEvents
-			: upcomingCount;
+		range || upcomingCount === null ? totalEvents : upcomingCount;
 
 	const sheetRef = useRef<BottomSheet>(null);
 	const [calOpen, setCalOpen] = useState(false);
+	const [pendingStart, setPendingStart] = useState<string | null>(null);
 
 	const openCalendar = () => {
 		if (props.locked) return;
@@ -325,8 +322,47 @@ export default function Timesheet(props: Props) {
 	const closeCalendar = () => {
 		sheetRef.current?.close();
 		setCalOpen(false);
+		setPendingStart(null);
 		props.onCalClose();
 	};
+
+	/*
+	 * Two taps make a range. The first marks a start and keeps the sheet open;
+	 * the second sets the end and closes it. The same day twice is one day, and
+	 * an earlier day than the start swaps the two rather than refusing.
+	 */
+	const onDayPress = (day: string) => {
+		if (!pendingStart) {
+			setPendingStart(day);
+			return;
+		}
+		const [from, to] = [pendingStart, day].sort();
+		props.setDateRange({ from, to });
+		closeCalendar();
+	};
+
+	/** Event dots, plus the chosen or half-chosen span drawn as a period. */
+	const calendarMarks = useMemo(() => {
+		const span = pendingStart
+			? { from: pendingStart, to: pendingStart }
+			: range;
+		if (!span) return markedDates;
+		const marks = { ...markedDates };
+		const cursor = moment(span.from, "YYYY-MM-DD");
+		const end = moment(span.to, "YYYY-MM-DD");
+		while (!cursor.isAfter(end)) {
+			const key = cursor.format("YYYY-MM-DD");
+			marks[key] = {
+				...marks[key],
+				startingDay: key === span.from,
+				endingDay: key === span.to,
+				color: theme.colors.accent,
+				textColor: theme.colors.onAccent,
+			};
+			cursor.add(1, "day");
+		}
+		return marks;
+	}, [markedDates, pendingStart, range, theme]);
 
 	const renderDateColumn = (dateLabel: string) => {
 		const date = moment(dateLabel, "MMMM D, YYYY");
@@ -491,9 +527,13 @@ export default function Timesheet(props: Props) {
 							/>
 						</Pressable>
 					)}
-					{!!props.selectedDate && (
+					{!!range && (
 						<Badge
-							label={moment(props.selectedDate).format("MMM D")}
+							label={
+								range.from === range.to
+									? moment(range.from).format("MMM D")
+									: `${moment(range.from).format("MMM D")} – ${moment(range.to).format("MMM D")}`
+							}
 							tone="accent"
 							variant="solid"
 							icon="funnel"
@@ -529,12 +569,10 @@ export default function Timesheet(props: Props) {
 					// loadMore self-guards on hasMore and on a fetch already in
 					// flight, so onEndReached firing repeatedly — which it does
 					// whenever content is shorter than the screen — is harmless.
-					onEndReached={() => {
-						if (props.selectedDate) return;
-						loadMore();
-					}}
+					// A range can span more than one page, so paging stays on.
+					onEndReached={() => loadMore()}
 					ListFooterComponent={
-						props.selectedDate === null ? (
+						range === null ? (
 							<ScheduleFooter
 								loading={isLoadingMore}
 								hasMore={hasMore}
@@ -559,7 +597,7 @@ export default function Timesheet(props: Props) {
 						}, 150);
 					}}
 					refreshControl={
-						props.selectedDate === null ? (
+						range === null ? (
 							<RefreshControl
 								refreshing={loadingPast}
 								onRefresh={onLoadEarlier}
@@ -574,13 +612,15 @@ export default function Timesheet(props: Props) {
 							<EmptyState
 								icon="calendar-outline"
 								title={
-									props.selectedDate
-										? "Nothing on this day"
+									range
+										? range.from === range.to
+											? "Nothing on this day"
+											: "Nothing in this range"
 										: "Nothing coming up"
 								}
 								description={
-									props.selectedDate
-										? "Pick another date, or clear the filter to see everything."
+									range
+										? "Pick other dates, or tap Today to clear the filter."
 										: "Events you're scheduled on from today onwards appear here. Pull down to reveal earlier weeks."
 								}
 							/>
@@ -625,31 +665,24 @@ export default function Timesheet(props: Props) {
 				/>
 			)}
 
-			{props.selectedDate === null &&
-				todayDirection !== null &&
-				rows.length > 0 && (
-					<JumpToToday
-						direction={todayDirection}
-						onPress={jumpToToday}
-					/>
-				)}
+			{range === null && todayDirection !== null && rows.length > 0 && (
+				<JumpToToday direction={todayDirection} onPress={jumpToToday} />
+			)}
 
 			<Sheet
 				ref={sheetRef}
 				snapPoints={["58%", "92%"]}
-				title="Jump to a date"
+				title={pendingStart ? "Pick an end date" : "Pick a start date"}
 				onClose={closeCalendar}
 			>
 				<CalendarList
-					markedDates={markedDates}
-					date={props.selectedDate ?? undefined}
+					markingType="period"
+					markedDates={calendarMarks}
+					date={range?.from ?? undefined}
 					pastScrollRange={50}
 					futureScrollRange={50}
 					scrollEnabled
-					onDayPress={(day) => {
-						closeCalendar();
-						props.setSelectedDate(day.dateString);
-					}}
+					onDayPress={(day) => onDayPress(day.dateString)}
 					theme={calendarTheme(theme)}
 				/>
 			</Sheet>

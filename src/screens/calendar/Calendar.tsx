@@ -8,6 +8,7 @@ import { useBottomSheetController } from "../../hooks/useBottomSheetController";
 import { FilterPanel } from "../../components/calendar/FilterPanel";
 import { FloatingActionButtons } from "../../components/calendar/FloatingActionButtons";
 import Timesheet from "../../components/calendar/Timesheet";
+import { DateRange } from "../../hooks/useCalendarEvents";
 import LoadingScreen from "../LoadingScreen";
 import { FilterType } from "../../types";
 
@@ -26,7 +27,7 @@ const CalendarScreen = ({ navigation }: { navigation: any }) => {
 	const { user, isAdmin, isLoading, settings, companyId } = useUser();
 	const { members } = useCompanyMembers(companyId ?? "");
 
-	const [selectedDate, setSelectedDate] = useState<string | null>(null);
+	const [dateRange, setDateRange] = useState<DateRange | null>(null);
 	const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
 	const [showAllSelectedOnly, setShowAllSelectedOnly] = useState(false);
 	const [showExactSelectedOnly, setShowExactSelectedOnly] = useState(false);
@@ -86,8 +87,8 @@ const CalendarScreen = ({ navigation }: { navigation: any }) => {
 						navigation={navigation}
 						onCalOpen={() => setCalendarOpen(true)}
 						onCalClose={() => setCalendarOpen(false)}
-						selectedDate={selectedDate}
-						setSelectedDate={setSelectedDate}
+						dateRange={dateRange}
+						setDateRange={setDateRange}
 						locked={isBottomSheetVisible}
 					/>
 				) : (
@@ -116,14 +117,14 @@ const CalendarScreen = ({ navigation }: { navigation: any }) => {
 
 			<FloatingActionButtons
 				isAdmin={isAdmin}
-				selectedDate={selectedDate}
+				filtered={dateRange !== null}
 				today={today}
 				isBottomSheetVisible={isBottomSheetVisible || calendarOpen}
 				onAddEvent={() =>
 					navigation.navigate("EditEvent", { event: null })
 				}
 				onFilterPress={handleToggleBottomSheet}
-				onTodayPress={() => setSelectedDate(null)}
+				onTodayPress={() => setDateRange(null)}
 			/>
 		</Screen>
 	);

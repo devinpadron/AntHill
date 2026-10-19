@@ -18,7 +18,8 @@ import { Theme, useTheme, useThemedStyles } from "../../theme";
 
 type FloatingActionButtonsProps = {
 	isAdmin: boolean;
-	selectedDate: string | null;
+	/** Whether the list is pinned to a date range; shows the Today button. */
+	filtered: boolean;
 	today: string;
 	isBottomSheetVisible: boolean;
 	onAddEvent: () => void;
@@ -28,7 +29,7 @@ type FloatingActionButtonsProps = {
 
 export const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({
 	isAdmin,
-	selectedDate,
+	filtered,
 	isBottomSheetVisible,
 	onAddEvent,
 	onFilterPress,
@@ -39,8 +40,8 @@ export const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({
 	/* Same offset the FABStack opposite it uses, so the two line up. */
 	const bottom = useFloatingOffset();
 
-	/* Only meaningful once the user has pinned the list to a specific day. */
-	const showTodayButton = selectedDate !== null;
+	/* Only meaningful once the user has pinned the list to a date range. */
+	const showTodayButton = filtered;
 
 	const fadeStyle = useAnimatedStyle(() => ({
 		opacity: withTiming(isBottomSheetVisible ? 0 : 1, {

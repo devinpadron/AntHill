@@ -45,6 +45,9 @@ const MONTHS_BEFORE = 1;
  */
 export type PastWindow = "month" | "today";
 
+/** An inclusive span of day keys. */
+export type DateRange = { from: string; to: string };
+
 const PAST_STEP_DAYS: Record<PastWindow, number> = {
 	month: 365,
 	today: 7,
@@ -99,6 +102,12 @@ export type UseCalendarEventsOptions = {
 	/** Where the window starts. Defaults to "month" — see PastWindow. */
 	pastWindow?: PastWindow;
 	/**
+	 * A user-chosen span. Replaces the window outright: the query runs over
+	 * exactly these days, so a range months away loads that span rather than
+	 * returning nothing, and paging stays inside it.
+	 */
+	range?: DateRange;
+	/**
 	 * Events per page. Defaults to the whole allowance in one go, which is what
 	 * a month grid wants — it draws a bounded range and has nothing to page.
 	 * A list should pass something screen-sized and call `loadMore`.
@@ -115,6 +124,7 @@ export function useCalendarEvents({
 	showExactSelectedOnly = false,
 	focusedMonth,
 	pastWindow = "month",
+	range,
 	pageSize = EVENT_QUERY_LIMIT,
 }: UseCalendarEventsOptions) {
 	/*
@@ -188,8 +198,11 @@ export function useCalendarEvents({
 	);
 
 	const window = useMemo(
-		() => ({ from: dayKey(windowStart, -pastDays), to: windowTo }),
-		[windowStart, windowTo, pastDays],
+		() =>
+			range
+				? { from: range.from, to: range.to }
+				: { from: dayKey(windowStart, -pastDays), to: windowTo },
+		[windowStart, windowTo, pastDays, range?.from, range?.to],
 	);
 
 	// Serialized so the effect compares by value, not by array identity.
