@@ -3,6 +3,7 @@ import { RefreshControl, View } from "react-native";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { useUser } from "../../contexts/UserContext";
 import { useCompany } from "../../contexts/CompanyContext";
+import { useCompanyMembers } from "../../hooks/useCompanyMembers";
 import { useUserStats } from "../../hooks/useUserStats";
 import { getConnections } from "../../services/timeEntryEditService";
 import { formatDuration } from "../../utils/timeUtils";
@@ -37,6 +38,10 @@ import { statisticsStyles } from "./Statistics.styles";
  * Not gated on isAdmin: these are the reader's own hours, and there is nothing
  * here a manager should see that the person who worked them should not.
  *
+ * A manager can also point it at anyone on the roster. The hook is keyed by
+ * user, and the rules already let any member read the company's entries, so
+ * "whose" is one more piece of state rather than a second screen.
+ *
  * Event stats are separate from hour stats on purpose. A company with
  * `enableTimeSheet` off has no time entries at all, and this page still has
  * something true to say to them.
@@ -44,11 +49,25 @@ import { statisticsStyles } from "./Statistics.styles";
 const Statistics = ({ navigation }: any) => {
 	const styles = useThemedStyles(statisticsStyles);
 	const theme = useTheme();
-	const { userId, companyId } = useUser();
+	const { userId, companyId, isAdmin } = useUser();
 	const { timeZone, preferences } = useCompany();
 
+	/*
+	 * Whose numbers. Null is the reader's own, which is also what a worker
+	 * always sees — the roster subscription is only opened for managers.
+	 */
+	const [viewedUserId, setViewedUserId] = useState<string | null>(null);
+	const subjectId = viewedUserId ?? userId;
+	const isSelf = subjectId === userId;
+	const { members } = useCompanyMembers(isAdmin ? companyId : "");
+	const subject = members.find((m) => m.userId === subjectId);
+	const subjectName =
+		subject?.firstName || subject?.displayName || "This worker";
+	const whose = isSelf ? "Your" : `${subjectName}'s`;
+	const whoseLower = isSelf ? "your" : `${subjectName}'s`;
+
 	const { years, isLoading, truncated, hasAnyData, statsFor, refresh } =
-		useUserStats(companyId, userId, timeZone);
+		useUserStats(companyId, subjectId, timeZone);
 
 	/*
 	 * Two controls, not one row of every year.
@@ -87,6 +106,24 @@ const Statistics = ({ navigation }: any) => {
 		[closeYearPicker],
 	);
 
+	const personSheetRef = useRef<BottomSheet>(null);
+	const openPersonPicker = useCallback(() => {
+		personSheetRef.current?.snapToIndex(0);
+	}, []);
+	const closePersonPicker = useCallback(() => {
+		personSheetRef.current?.close();
+	}, []);
+	const choosePerson = useCallback(
+		(nextUserId: string) => {
+			setViewedUserId(nextUserId === userId ? null : nextUserId);
+			// Their years are not this person's years.
+			setPicked(null);
+			setScope("year");
+			closePersonPicker();
+		},
+		[userId, closePersonPicker],
+	);
+
 	const [refreshing, setRefreshing] = useState(false);
 	const onRefresh = async () => {
 		setRefreshing(true);
@@ -101,23 +138,85 @@ const Statistics = ({ navigation }: any) => {
 		<ScreenHeader title="Statistics" onBack={() => navigation.goBack()} />
 	);
 
+	/*
+	 * The person bar and its sheet appear in every state, including empty —
+	 * a manager who picks someone with no shifts yet still needs a way back.
+	 */
+	const personBar = isAdmin ? (
+		<Card flush style={styles.card}>
+			<ListRow
+				title="Viewing"
+				value={isSelf ? "You" : (subject?.displayName ?? "…")}
+				icon="person-outline"
+				onPress={openPersonPicker}
+			/>
+		</Card>
+	) : null;
+
+	const personSheet = isAdmin ? (
+		<Sheet
+			ref={personSheetRef}
+			snapPoints={["70%"]}
+			title="Whose stats"
+			onClose={closePersonPicker}
+		>
+			<BottomSheetScrollView>
+				{members.map((member, index) => (
+					<ListRow
+						key={member.userId}
+						title={
+							member.userId === userId
+								? `${member.displayName} (you)`
+								: member.displayName
+						}
+						icon={
+							member.userId === subjectId
+								? "person"
+								: "person-outline"
+						}
+						iconColor={
+							member.userId === subjectId
+								? "accent"
+								: "textSecondary"
+						}
+						selected={member.userId === subjectId}
+						separator={index < members.length - 1}
+						onPress={() => choosePerson(member.userId)}
+					/>
+				))}
+			</BottomSheetScrollView>
+		</Sheet>
+	) : null;
+
 	if (isLoading) {
 		return (
-			<Screen header={header}>
-				<SkeletonList rows={6} />
-			</Screen>
+			<View style={styles.flex}>
+				<Screen header={header} padded>
+					{personBar}
+					<SkeletonList rows={6} />
+				</Screen>
+				{personSheet}
+			</View>
 		);
 	}
 
 	if (!hasAnyData) {
 		return (
-			<Screen header={header}>
-				<EmptyState
-					icon="stats-chart-outline"
-					title="Nothing to show yet"
-					description="Work a shift and your stats will start filling in."
-				/>
-			</Screen>
+			<View style={styles.flex}>
+				<Screen header={header} padded>
+					{personBar}
+					<EmptyState
+						icon="stats-chart-outline"
+						title="Nothing to show yet"
+						description={
+							isSelf
+								? "Work a shift and your stats will start filling in."
+								: `${subjectName} has not worked a shift yet.`
+						}
+					/>
+				</Screen>
+				{personSheet}
+			</View>
 		);
 	}
 
@@ -166,6 +265,7 @@ const Statistics = ({ navigation }: any) => {
 					/>
 				}
 			>
+				{personBar}
 				<Card style={styles.card}>
 					<View style={styles.hero}>
 						<Text variant="display">
@@ -223,7 +323,7 @@ const Statistics = ({ navigation }: any) => {
 										params: {
 											entryId:
 												stats.longestShift!.entryId,
-											userId,
+											userId: subjectId,
 										},
 									})
 							: undefined
@@ -260,7 +360,7 @@ const Statistics = ({ navigation }: any) => {
 						)}
 						<ListRow
 							title="Round the clock"
-							subtitle="Your hours as whole 24-hour days"
+							subtitle={`${whose} hours as whole 24-hour days`}
 							value={`${stats.equivalentFullDays.toFixed(1)} days`}
 							separator={false}
 						/>
@@ -268,7 +368,7 @@ const Statistics = ({ navigation }: any) => {
 				)}
 
 				{hasHours && (
-					<Card title="Your rhythm" flush style={styles.card}>
+					<Card title={`${whose} rhythm`} flush style={styles.card}>
 						{stats.busiestMonth && (
 							<ListRow
 								title="Busiest month"
@@ -351,8 +451,8 @@ const Statistics = ({ navigation }: any) => {
 				<View style={styles.footnote}>
 					<Text variant="caption" color="textTertiary" align="center">
 						{truncated
-							? "Based on your most recent 2,000 records."
-							: "Counts every shift and event on your record."}
+							? `Based on ${whoseLower} most recent 2,000 records.`
+							: `Counts every shift and event on ${whoseLower} record.`}
 					</Text>
 				</View>
 			</Screen>
@@ -390,6 +490,8 @@ const Statistics = ({ navigation }: any) => {
 					))}
 				</BottomSheetScrollView>
 			</Sheet>
+
+			{personSheet}
 		</View>
 	);
 };
