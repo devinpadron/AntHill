@@ -199,14 +199,18 @@ function TextLike({
 	onSave: (next: unknown, previousDisplay: string) => Promise<void>;
 }) {
 	const toast = useToast();
-	const initial = value === null || value === undefined ? "" : String(value);
+	// Trimmed, because `dirty` and `commit` compare the trimmed draft against
+	// this. A stored answer with a trailing space or newline (common from a
+	// multiline phone keyboard) otherwise reads as "unsaved" before any edit.
+	const initial =
+		value === null || value === undefined ? "" : String(value).trim();
 	const [draft, setDraft] = useState(initial);
 	const committed = useRef(initial);
 
 	// Re-seed when the underlying value changes, but never mid-edit — that
 	// would erase what the admin is typing.
 	useEffect(() => {
-		if (draft === committed.current) {
+		if (draft.trim() === committed.current) {
 			setDraft(initial);
 			committed.current = initial;
 		}

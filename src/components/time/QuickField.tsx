@@ -36,7 +36,11 @@ export function QuickField({
 	const theme = useTheme();
 	const styles = useThemedStyles(quickFieldStyles);
 
-	const initial = value === null || value === undefined ? "" : String(value);
+	// Trimmed, because `dirty` and `commit` compare the trimmed draft against
+	// this. A stored answer with a trailing space or newline (common from a
+	// multiline phone keyboard) otherwise reads as "unsaved" before any edit.
+	const initial =
+		value === null || value === undefined ? "" : String(value).trim();
 	const [draft, setDraft] = useState(initial);
 	const [saving, setSaving] = useState(false);
 	const committed = useRef(initial);
@@ -47,7 +51,7 @@ export function QuickField({
 	 * refetches, so this is the path that accepts the server's value.
 	 */
 	useEffect(() => {
-		if (draft === committed.current) {
+		if (draft.trim() === committed.current) {
 			setDraft(initial);
 			committed.current = initial;
 		}
