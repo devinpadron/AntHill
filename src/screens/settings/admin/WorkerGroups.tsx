@@ -32,6 +32,7 @@ import {
 	renameGroup,
 	setGroupJoinCode,
 	setGroupPermissions,
+	setGroupVisibility,
 } from "../../../services/groupService";
 import { Theme, useTheme, useThemedStyles } from "../../../theme";
 import { SafeAreaBand } from "../../../components/ui";
@@ -610,12 +611,25 @@ const GroupPermissionsModal = ({
 	const [perms, setPerms] = useState<GroupPermissions>(
 		() => group.permissions ?? baselinePermissions(preferences),
 	);
+	const [restricted, setRestricted] = useState(
+		group.joinVisibility === "restricted",
+	);
 	const [saving, setSaving] = useState(false);
 
 	const save = async () => {
 		setSaving(true);
 		try {
-			await setGroupPermissions(group.id, perms);
+			const visibility = restricted ? "restricted" : "open";
+			await Promise.all([
+				setGroupPermissions(group.id, perms),
+				visibility !== group.joinVisibility &&
+					setGroupVisibility(
+						group.companyId,
+						group.id,
+						visibility,
+						group.joinCode,
+					),
+			]);
 			onClose();
 		} catch (e: any) {
 			console.error("Could not save group permissions", e);
@@ -646,6 +660,23 @@ const GroupPermissionsModal = ({
 					</View>
 
 					<ScrollView style={{ maxHeight: 420 }}>
+						<View style={styles.modalRow}>
+							<View style={{ flex: 1, paddingRight: 12 }}>
+								<Text style={styles.modalRowTitle}>
+									Invited jobs only
+								</Text>
+								<Text style={styles.modalRowHint}>
+									Members stop seeing open jobs and only get
+									what you send to the group. Applies to
+									everyone in it now and anyone who joins with
+									its code.
+								</Text>
+							</View>
+							<Switch
+								value={restricted}
+								onValueChange={setRestricted}
+							/>
+						</View>
 						{PERMISSION_ROWS.map((row) => (
 							<View key={row.key} style={styles.modalRow}>
 								<View style={{ flex: 1, paddingRight: 12 }}>

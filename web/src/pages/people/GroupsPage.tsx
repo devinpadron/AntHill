@@ -7,6 +7,7 @@ import {
 	renameGroup,
 	setGroupJoinCode,
 	setGroupPermissions,
+	setGroupVisibility,
 	setMemberGroups,
 } from "@app/services/groupService";
 import { useGroups } from "@app/hooks/useGroups";
@@ -481,6 +482,44 @@ function GroupDetail({
 							What members can see
 						</Text>
 					</div>
+					<label className={styles.toggleRow}>
+						<input
+							type="checkbox"
+							checked={group.joinVisibility === "restricted"}
+							disabled={busy === "visibility"}
+							onChange={(e) =>
+								void run(
+									"visibility",
+									() =>
+										setGroupVisibility(
+											companyId,
+											group.id,
+											e.target.checked
+												? "restricted"
+												: "open",
+											group.joinCode,
+										),
+									`${members.length} member${
+										members.length === 1 ? "" : "s"
+									} set to ${
+										e.target.checked
+											? "invited jobs only"
+											: "all open jobs"
+									}`,
+								)
+							}
+						/>
+						<span className={styles.toggleText}>
+							<Text variant="bodyStrong" as="span">
+								Invited jobs only
+							</Text>
+							<Text variant="caption" tone="secondary" as="span">
+								Members stop seeing open jobs and only get what
+								you publish to the group. Applies to everyone in
+								it now and anyone who joins with its code.
+							</Text>
+						</span>
+					</label>
 					{PERMISSION_ROWS.map((row) => (
 						<label key={row.key} className={styles.toggleRow}>
 							<input

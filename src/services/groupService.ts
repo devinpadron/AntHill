@@ -298,6 +298,55 @@ export async function setGroupPermissions(
 }
 
 /**
+ * Makes a group open or invited-only, for everyone in it.
+ *
+ * Visibility is a MEMBERSHIP field — it is what the availability query and
+ * the rules read — so "this group is restricted" has to be written onto each
+ * member. Three things move together: the group's `joinVisibility`, the join
+ * code document (the rules compare a joiner's visibility against it, so a
+ * stale code would reject every new hire), and every current member.
+ *
+ * A worker in two groups that disagree gets whichever was set last; the
+ * employee list can still override one person afterwards.
+ */
+export async function setGroupVisibility(
+	companyId: string,
+	groupId: string,
+	visibility: WorkerVisibility,
+	joinCode?: string | null,
+): Promise<void> {
+	try {
+		// ponytail: one batch, 500-write ceiling shared with deleteGroup; chunk if a group ever nears it.
+		const members = await db
+			.collection(C.memberships)
+			.where("companyId", "==", companyId)
+			.where("groupIds", "array-contains", groupId)
+			.limit(MEMBER_LIMIT)
+			.get();
+
+		const batch = db.batch();
+		const now = firestore.FieldValue.serverTimestamp();
+
+		for (const doc of members.docs) {
+			batch.update(doc.ref, { visibility, updatedAt: now });
+		}
+		if (joinCode) {
+			batch.update(db.collection(C.groupJoinCodes).doc(joinCode), {
+				visibility,
+			});
+		}
+		batch.update(db.collection(C.groups).doc(groupId), {
+			joinVisibility: visibility,
+			updatedAt: now,
+		});
+		await batch.commit();
+	} catch (e) {
+		console.error("Error setting group visibility", e);
+		throw e;
+	}
+}
+
+/**
  * Deletes a group and removes it from every membership that referenced it.
  *
  * The cleanup is the point. A dangling groupId on a membership is invisible —
