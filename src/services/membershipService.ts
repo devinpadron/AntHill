@@ -274,30 +274,27 @@ export async function joinCompanyWithAccessCode(
  * which is why 48 event assignments now point at users that cannot be
  * resolved.
  *
- * If this was the user's active company, their active company is cleared —
- * never their profile. v1 deleted the user document when they left their last
- * company, which left the Auth account behind and crashed the app on next
- * launch (useAuth.ts reads `userData.email` off the resulting null).
+ * Only the membership is written. Profiles are self-only in the rules, so a
+ * manager cannot read or clear the target's `loggedInCompanyId` — an earlier
+ * version did both inside a transaction and every removal by a manager was
+ * permission-denied. The removed user's own device clears its active company
+ * when it sees the status flip (UserContext), and a user leaving on their own
+ * clears it right after this (useProfile.leaveCompany). Never the profile
+ * itself: v1 deleted the user document when they left their last company,
+ * which left the Auth account behind and crashed the app on next launch.
  */
 export async function removeMember(
 	companyId: string,
 	userId: string,
 ): Promise<void> {
-	const id = membershipId(companyId, userId);
-
 	try {
-		await db.runTransaction(async (tx) => {
-			const membershipRef = db.collection(C.memberships).doc(id);
-			const userRef = db.collection(C.users).doc(userId);
-			const user = await tx.get(userRef);
-			const now = firestore.FieldValue.serverTimestamp();
-
-			tx.update(membershipRef, { status: "removed", updatedAt: now });
-
-			if (user.data()?.loggedInCompanyId === companyId) {
-				tx.update(userRef, { loggedInCompanyId: null, updatedAt: now });
-			}
-		});
+		await db
+			.collection(C.memberships)
+			.doc(membershipId(companyId, userId))
+			.update({
+				status: "removed",
+				updatedAt: firestore.FieldValue.serverTimestamp(),
+			});
 	} catch (e) {
 		console.error("Error removing member", e);
 		throw e;

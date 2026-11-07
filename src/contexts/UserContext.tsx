@@ -14,6 +14,7 @@ import {
 	subscribeUser,
 	subscribeUserSettings,
 	removePushToken,
+	setActiveCompany,
 } from "../services/userService";
 import { subscribeMembership } from "../services/membershipService";
 import { isSignupInProgress } from "./signupInProgress";
@@ -385,6 +386,20 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 		}
 		return subscribeMembership(companyId, userId, setMembership);
 	}, [userId, companyId]);
+
+	/*
+	 * Removed by a manager.
+	 *
+	 * The manager cannot clear our loggedInCompanyId (profiles are self-only),
+	 * so we do it ourselves the moment the membership flips. Otherwise every
+	 * query keeps running against a company we no longer belong to.
+	 */
+	useEffect(() => {
+		if (!userId || !companyId || membership?.status !== "removed") return;
+		setActiveCompany(userId, null).catch((e) =>
+			console.error("Error clearing removed company", e),
+		);
+	}, [userId, companyId, membership?.status]);
 
 	const logout = useCallback(async () => {
 		try {

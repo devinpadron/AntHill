@@ -48,6 +48,10 @@ const DAN = "dan";
 const ERIN = "erin";
 /** Invited to one job by name, belonging to no group. */
 const FRANK = "frank";
+/** Removed by a manager in the removal tests; never referenced elsewhere. */
+const GUS = "gus";
+/** Leaves on his own in the removal tests; never referenced elsewhere. */
+const HANK = "hank";
 
 let env;
 
@@ -93,12 +97,15 @@ before(async () => {
 		await member(A, BOB, "user");
 		await member(A, CARL, "user");
 		await member(A, RITA, "user", "removed");
+		await member(A, GUS, "user");
+		await member(A, HANK, "user");
 		await member(B, MALLORY, "user");
 
-		for (const uid of [ALICE, BOB, CARL, MALLORY, RITA]) {
+		for (const uid of [ALICE, BOB, CARL, MALLORY, RITA, GUS, HANK]) {
 			await setDoc(doc(db, "users", uid), {
 				id: uid,
 				email: `${uid}@e.com`,
+				loggedInCompanyId: A,
 			});
 		}
 
@@ -377,6 +384,73 @@ describe("v2 — user profiles are self-only", () => {
 					where("companyId", "==", A),
 				),
 			),
+		);
+	});
+});
+
+/*
+ * Removing a member, exactly as removeMember issues it.
+ *
+ * Profiles are self-only, so a manager cannot read or write the target's
+ * users/{id} document — the removal only touches the membership. The removed
+ * user's own device clears loggedInCompanyId when it sees status "removed".
+ * Leaving is the same status change issued by the member themselves, which
+ * the self-update clause must allow without widening anything else.
+ */
+describe("v2 — removing a member", () => {
+	test("a manager cannot read the target's profile inside the removal", async () => {
+		const dbA = as(ALICE);
+		await assertFails(
+			runTransaction(dbA, async (tx) => {
+				const user = await tx.get(doc(dbA, "users", GUS));
+				tx.update(doc(dbA, "memberships", mid(A, GUS)), {
+					status: "removed",
+				});
+				if (user.data()?.loggedInCompanyId === A) {
+					tx.update(doc(dbA, "users", GUS), {
+						loggedInCompanyId: null,
+					});
+				}
+			}),
+		);
+	});
+
+	test("a manager marks the membership removed", async () => {
+		await assertSucceeds(
+			updateDoc(doc(as(ALICE), "memberships", mid(A, GUS)), {
+				status: "removed",
+			}),
+		);
+	});
+
+	test("the removed user clears their own active company", async () => {
+		await assertSucceeds(
+			updateDoc(doc(as(GUS), "users", GUS), { loggedInCompanyId: null }),
+		);
+	});
+
+	test("a member can leave on their own", async () => {
+		await assertSucceeds(
+			updateDoc(doc(as(HANK), "memberships", mid(A, HANK)), {
+				status: "removed",
+			}),
+		);
+	});
+
+	test("but cannot reactivate themselves", async () => {
+		await assertFails(
+			updateDoc(doc(as(HANK), "memberships", mid(A, HANK)), {
+				status: "active",
+			}),
+		);
+	});
+
+	test("nor leave AND promote in the same write", async () => {
+		await assertFails(
+			updateDoc(doc(as(ERIN), "memberships", mid(A, ERIN)), {
+				status: "removed",
+				role: "owner",
+			}),
 		);
 	});
 });

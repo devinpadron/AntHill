@@ -349,7 +349,15 @@ service cloud.firestore {
                     || (isSelf(resource.data.userId)
                         && request.resource.data.diff(resource.data)
                              .affectedKeys()
-                             .hasOnly(["firstName","lastName","email","phone","notifications","updatedAt"]));
+                             .hasOnly(["firstName","lastName","email","phone","notifications","updatedAt"]))
+                    // Leaving is the one status change a member may make to
+                    // themselves, and only in that direction: nothing else may
+                    // change in the same write, so it cannot smuggle a role.
+                    || (isSelf(resource.data.userId)
+                        && request.resource.data.status == "removed"
+                        && request.resource.data.diff(resource.data)
+                             .affectedKeys()
+                             .hasOnly(["status","updatedAt"]));
       allow delete: if false;   // removal is a status change, not a delete
     }
 

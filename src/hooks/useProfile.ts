@@ -178,6 +178,7 @@ export const useProfile = () => {
 		if (!companyId) return false;
 		try {
 			await removeMember(companyId, userId);
+			await setActiveCompany(userId, null);
 			return true;
 		} catch (error) {
 			console.error("Error leaving company:", error);
