@@ -12,12 +12,14 @@ import {
 	subscribeEventLabels,
 	subscribePackages,
 } from "@app/services/libraryService";
+import { subscribeTaskTemplates } from "@app/services/eventTaskService";
+import { ASSIGNEE_MODE_LABEL, describeOffset } from "@app/utils/eventTaskUtils";
 import { useCompanyMembers } from "@app/hooks/useCompanyMembers";
 import { useGroups } from "@app/hooks/useGroups";
 import { showConfirmation } from "@app/utils/alertUtils";
 import { FilterType } from "@app/types/enums/FilterType";
 import { Role } from "@app/types/enums/Role";
-import type { Event, EventLabel, Package } from "@app/types";
+import type { Event, EventLabel, Package, TaskTemplate } from "@app/types";
 import { useAuth } from "../../contexts/AuthContext";
 import { useCompany } from "../../contexts/CompanyContext";
 import { useUploads } from "../../contexts/UploadContext";
@@ -66,6 +68,10 @@ type Draft = {
 	audienceGroupIds: string[];
 	audienceUserIds: string[];
 	packageIds: string[];
+	/** Tasks picked for this event directly; packages bring their own. */
+	taskTemplateIds: string[];
+	/** Who does each "specific people" task, keyed by template id. */
+	taskAssignees: Record<string, string[]>;
 	locations: Record<
 		string,
 		{ latitude: number; longitude: number; label?: string | null }
@@ -94,6 +100,8 @@ const EMPTY: Draft = {
 	audienceGroupIds: [],
 	audienceUserIds: [],
 	packageIds: [],
+	taskTemplateIds: [],
+	taskAssignees: {},
 	locations: {},
 };
 
@@ -114,6 +122,7 @@ export function EventEditorPage() {
 	const [draft, setDraft] = useState<Draft>(EMPTY);
 	const [labels, setLabels] = useState<EventLabel[]>([]);
 	const [packages, setPackages] = useState<Package[]>([]);
+	const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>([]);
 	const [sameDay, setSameDay] = useState<Event[]>([]);
 	const [loading, setLoading] = useState(!isNew);
 	const [saving, setSaving] = useState(false);
@@ -126,6 +135,10 @@ export function EventEditorPage() {
 
 	useEffect(() => subscribeEventLabels(companyId!, setLabels), [companyId]);
 	useEffect(() => subscribePackages(companyId!, setPackages), [companyId]);
+	useEffect(
+		() => subscribeTaskTemplates(companyId!, setTaskTemplates),
+		[companyId],
+	);
 
 	/* ---- load an existing event ---- */
 	useEffect(() => {
@@ -149,6 +162,8 @@ export function EventEditorPage() {
 					audienceGroupIds: event.audienceGroupIds ?? [],
 					audienceUserIds: event.audienceUserIds ?? [],
 					packageIds: event.packageIds ?? [],
+					taskTemplateIds: event.taskTemplateIds ?? [],
+					taskAssignees: event.taskAssignees ?? {},
 					locations: event.locations ?? {},
 				});
 			})
@@ -257,6 +272,32 @@ export function EventEditorPage() {
 		members,
 	]);
 
+	/*
+	 * Every task this event will carry: its own picks, plus whatever the
+	 * ticked packages bring. `viaPackage` names the package, so the row can
+	 * say why it is ticked and why it cannot be unticked here.
+	 */
+	const tasksOn = preferences.enableEventTasks;
+	const effectiveTasks = useMemo(() => {
+		const viaPackage = new Map<string, string>();
+		for (const pkg of packages) {
+			if (!draft.packageIds.includes(pkg.id)) continue;
+			for (const id of pkg.taskTemplateIds ?? []) {
+				if (!viaPackage.has(id)) viaPackage.set(id, pkg.title);
+			}
+		}
+		return taskTemplates
+			.filter(
+				(template) =>
+					viaPackage.has(template.id) ||
+					draft.taskTemplateIds.includes(template.id),
+			)
+			.map((template) => ({
+				template,
+				viaPackage: viaPackage.get(template.id) ?? null,
+			}));
+	}, [packages, draft.packageIds, draft.taskTemplateIds, taskTemplates]);
+
 	const timesInvalid =
 		!draft.isAllDay &&
 		draft.endTime !== "" &&
@@ -289,6 +330,32 @@ export function EventEditorPage() {
 				audienceGroupIds: draft.audienceGroupIds,
 				audienceUserIds: draft.audienceUserIds,
 				locations: draft.locations,
+				/*
+				 * Only the picks, and only while the feature is on — a card
+				 * that is not shown must not overwrite what the event holds.
+				 * The task DOCUMENTS are derived from the saved event inside
+				 * createEvent / updateEvent, so there is no extra write here.
+				 */
+				...(tasksOn
+					? {
+							taskTemplateIds: draft.taskTemplateIds,
+							// Only for tasks still on the event, so a name
+							// picked for a task then unticked is not kept.
+							taskAssignees: Object.fromEntries(
+								effectiveTasks
+									.filter(
+										(row) =>
+											row.template.assigneeMode ===
+											"specific",
+									)
+									.map((row) => [
+										row.template.id,
+										draft.taskAssignees[row.template.id] ??
+											[],
+									]),
+							),
+						}
+					: {}),
 			};
 
 			const id = eventId
@@ -331,7 +398,7 @@ export function EventEditorPage() {
 		if (!eventId) return;
 		showConfirmation(
 			`Delete "${draft.title}"?`,
-			"This also removes every invitation, checklist state and file attached to it. It cannot be undone.",
+			"This also removes every invitation, task, checklist state and file attached to it. It cannot be undone.",
 			() => {
 				void (async () => {
 					try {
@@ -1124,9 +1191,226 @@ export function EventEditorPage() {
 														?.length === 1
 														? ""
 														: "s"}
+													{tasksOn &&
+													pkg.taskTemplateIds?.length
+														? ` · ${pkg.taskTemplateIds.length} task${
+																pkg
+																	.taskTemplateIds
+																	.length ===
+																1
+																	? ""
+																	: "s"
+															}`
+														: ""}
 												</Text>
 											</span>
 										</label>
+									);
+								})}
+							</div>
+						</Card>
+					)}
+
+					{tasksOn && taskTemplates.length > 0 && (
+						<Card title={`Tasks (${effectiveTasks.length})`}>
+							<div className={styles.stack}>
+								<Text variant="caption" tone="secondary">
+									Things the crew must do and confirm. Whoever
+									still owes one is reminded until it's done.
+								</Text>
+
+								{taskTemplates.map((template) => {
+									const row = effectiveTasks.find(
+										(r) => r.template.id === template.id,
+									);
+									const picked =
+										draft.taskAssignees[template.id] ?? [];
+
+									return (
+										<div key={template.id}>
+											<label
+												className={styles.checkRow}
+												title={
+													row?.viaPackage
+														? `Comes with ${row.viaPackage} — untick the package to remove it`
+														: undefined
+												}
+											>
+												<input
+													type="checkbox"
+													checked={Boolean(row)}
+													// A package's task goes
+													// when the package does.
+													disabled={Boolean(
+														row?.viaPackage,
+													)}
+													onChange={() =>
+														set({
+															taskTemplateIds:
+																draft.taskTemplateIds.includes(
+																	template.id,
+																)
+																	? draft.taskTemplateIds.filter(
+																			(
+																				id,
+																			) =>
+																				id !==
+																				template.id,
+																		)
+																	: [
+																			...draft.taskTemplateIds,
+																			template.id,
+																		],
+														})
+													}
+												/>
+												<span>
+													<Text
+														variant="body"
+														as="span"
+													>
+														{template.title}
+													</Text>
+													<Text
+														variant="caption"
+														tone="tertiary"
+														as="span"
+													>
+														{row?.viaPackage
+															? `From ${row.viaPackage}`
+															: `${ASSIGNEE_MODE_LABEL[template.assigneeMode]} · due ${describeOffset(
+																	template.dueAnchor,
+																	template.dueOffsetSeconds,
+																)}`}
+													</Text>
+												</span>
+											</label>
+
+											{/*
+											 * "Specific people" means nothing
+											 * until someone is named, so the
+											 * question is asked right where
+											 * the task is ticked.
+											 */}
+											{row &&
+												template.assigneeMode ===
+													"specific" && (
+													<div
+														className={
+															styles.taskPeople
+														}
+													>
+														<ul
+															className={
+																styles.workerList
+															}
+														>
+															{members
+																.filter(
+																	(m) =>
+																		m.status ===
+																		"active",
+																)
+																.map(
+																	(
+																		member,
+																	) => {
+																		const on =
+																			picked.includes(
+																				member.userId,
+																			);
+																		return (
+																			<li
+																				key={
+																					member.id
+																				}
+																			>
+																				<label
+																					className={
+																						styles.workerRow
+																					}
+																				>
+																					<input
+																						type="checkbox"
+																						checked={
+																							on
+																						}
+																						onChange={() =>
+																							set(
+																								{
+																									taskAssignees:
+																										{
+																											...draft.taskAssignees,
+																											[template.id]:
+																												on
+																													? picked.filter(
+																															(
+																																id,
+																															) =>
+																																id !==
+																																member.userId,
+																														)
+																													: [
+																															...picked,
+																															member.userId,
+																														],
+																										},
+																								},
+																							)
+																						}
+																					/>
+																					<span
+																						className={
+																							styles.workerMain
+																						}
+																					>
+																						<Text
+																							variant="body"
+																							as="span"
+																							clamp={
+																								1
+																							}
+																						>
+																							{
+																								member.firstName
+																							}{" "}
+																							{
+																								member.lastName
+																							}
+																						</Text>
+																					</span>
+																				</label>
+																			</li>
+																		);
+																	},
+																)}
+														</ul>
+														{picked.length ===
+															0 && (
+															<div
+																className={
+																	styles.reachWarning
+																}
+															>
+																<Icon
+																	name="warning"
+																	size="sm"
+																/>
+																<Text
+																	variant="caption"
+																	as="span"
+																>
+																	Nobody
+																	picked yet —
+																	no one will
+																	be asked or
+																	reminded.
+																</Text>
+															</div>
+														)}
+													</div>
+												)}
+										</div>
 									);
 								})}
 							</div>

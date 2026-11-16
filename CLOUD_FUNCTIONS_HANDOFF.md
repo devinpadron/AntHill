@@ -145,3 +145,129 @@ cutover. Mirroring how the Firestore rules were handled:
 >    cutover data sweep would fire a real push for every migrated document.
 >
 > Work through it in that order and check in after step 1.
+
+---
+
+## Event tasks — the scheduler
+
+Added after the migration, and independent of it. The app and portal write
+everything below; the scheduler that sends the reminders is
+`functions/src/tasks/remindEventTasks.js` in `AH_Functions`, with its copy of
+the schedule arithmetic in `functions/src/utils/taskSchedule.js`.
+
+**Nothing sends a reminder until that function is deployed.** Shipping the
+clients first is safe — tasks can be created, ticked and reviewed, they are
+just never chased. What follows is the contract the function implements, kept
+here because both repos have to agree on it.
+
+### What the clients write
+
+`eventTasks/{eventId}_{templateId}` — one per task per event. Types in
+`src/types/tasks.ts`; written by `src/services/eventTaskService.ts`.
+
+| Field                             | Written by                  | Meaning                                                       |
+| --------------------------------- | --------------------------- | ------------------------------------------------------------- |
+| `companyId`, `eventId`, `dateKey` | client                      | scoping                                                       |
+| `eventTitle`, `title`             | client                      | for the push text — no second read needed                     |
+| `assigneeMode`                    | client                      | `anyone` \| `everyone` \| `specific`                          |
+| `assigneeUserIds`                 | client                      | everyone responsible                                          |
+| `pendingUserIds`                  | client                      | **who to push**. Empty means settled                          |
+| `completions{uid}`                | client                      | `{completedAt, completedByUserId, note}`                      |
+| `eventStartAt`, `eventEndAt`      | client                      | resolved anchors (all-day events use 09:00 / 17:00)           |
+| `dueAt`                           | client                      |                                                               |
+| `reminders[]`                     | client                      | `{id, anchor, offsetSeconds, repeat:{enabled,hours,minutes}}` |
+| `nextReminderAt`                  | client **and** scheduler    | when the next reminder is due; `null` = nothing scheduled     |
+| `lastRemindedAt`                  | **scheduler only**          | set on every send                                             |
+| `overdueAlertAt`                  | client, nulled by scheduler | when to tell managers it is still open; `null` = no alert due |
+| `overdueAlertedAt`                | **scheduler only**          | set when the manager alert goes out                           |
+| `expiresAt`                       | client                      | never send anything after this (event end + 7 days)           |
+
+### The function
+
+One `onSchedule` function, hourly — the same cadence as
+`nudgePendingResponses`, and the reason the editors only offer hours and days.
+Two bounded queries, both on a single field so no composite index is needed:
+
+```js
+// 1. worker reminders
+db.collection("eventTasks").where("nextReminderAt", "<=", now).limit(500);
+// 2. manager alerts
+db.collection("eventTasks").where("overdueAlertAt", "<=", now).limit(500);
+```
+
+For each document from query 1:
+
+1. If `pendingUserIds` is empty, or `now > expiresAt`: set `nextReminderAt: null`
+   and send nothing. (Two workers finishing an `everyone` task offline each see
+   the other still pending, so neither client clears the field — this is where
+   it gets cleared.)
+2. If the company has `companyPreferences.enableEventTasks !== true`: skip
+   without sending, and set `nextReminderAt: null`. The flag is the company
+   switching the feature off; the client re-derives the schedule the next time
+   the event is saved.
+3. Otherwise push `task_reminder` to every uid in `pendingUserIds`, then write
+   `lastRemindedAt: now` and `nextReminderAt: computeNextReminderMs(...)` — see
+   below. **Group by user**: a worker with three tasks due in the same pass
+   should get one push covering them, the way the availability nudge does,
+   with `eventId` set to the soonest.
+
+For each document from query 2: if `pendingUserIds` is non-empty and not
+expired, push `task_overdue` to the company's active managers and owners; in
+every case write `overdueAlertAt: null`, and `overdueAlertedAt: now` when sent.
+
+Quiet hours are worth adding here rather than in the clients: resolve the hour
+in `companies/{id}.timeZone` and, between roughly 21:00 and 07:00, leave the
+document alone so the next pass picks it up.
+
+### Advancing `nextReminderAt`
+
+Copy `computeNextReminderMs`, `anchorMs` and `repeatGapSeconds` from
+`src/utils/eventTaskUtils.ts` verbatim — they are plain arithmetic on epoch
+milliseconds with no Firestore or React Native in them, and the client runs the
+same function whenever an event is saved or a task is reopened. If the two
+copies disagree, a reminder is either sent twice or never. Call it with:
+
+```js
+computeNextReminderMs({
+	rules: task.reminders,
+	startMs: task.eventStartAt.toMillis(),
+	endMs: task.eventEndAt.toMillis(),
+	lastRemindedMs: now, // the send that just happened
+	nowMs: now,
+	expiresMs: task.expiresAt.toMillis(),
+	hasPending: task.pendingUserIds.length > 0,
+});
+```
+
+### Payloads — no change to the frozen contract
+
+Both types use fields the contract already has:
+
+| `data.type`     | To                                | `screenName` | Also carries           |
+| --------------- | --------------------------------- | ------------ | ---------------------- |
+| `task_reminder` | each uid in `pendingUserIds`      | `Details`    | `companyId`, `eventId` |
+| `task_overdue`  | active managers/owners of company | `Details`    | `companyId`, `eventId` |
+
+The app already routes both (`NotificationContext`), opening the event, which
+is where a worker ticks the task and a manager sees who has not.
+
+### Mutes — two new channels
+
+Add to `CHANNEL_BY_TYPE` in `functions/src/utils/notifications.js`:
+
+```js
+task_reminder: "tasks",
+task_overdue: "tasksOverdue",
+```
+
+Both fail open like every other channel: absent on a membership means send.
+`tasksOverdue` is deliberately **not** part of the legacy `team` expansion — it
+did not exist when `team` did, so a manager with `team: false` never chose to
+silence it.
+
+### Deletes
+
+`deleteEvent` removes an event's tasks in the same batch. No trigger is needed
+for that; if one is ever added for events deleted by other means, it should
+delete `eventTasks` where `eventId` matches, or the scheduler will keep
+pushing people about an event that no longer exists.

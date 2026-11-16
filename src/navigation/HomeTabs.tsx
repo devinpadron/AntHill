@@ -53,7 +53,8 @@ const HomeTabs = () => {
 	const switcher = useCompanySwitcher();
 	const theme = useTheme();
 	const insets = useSafeAreaInsets();
-	const { unconfirmedCount, awaitingReply } = useEventPrompts();
+	const { unconfirmedCount, awaitingReply, pendingTaskCount } =
+		useEventPrompts();
 
 	/*
 	 * ONE badge style for every tab.
@@ -112,8 +113,13 @@ const HomeTabs = () => {
 					 *
 					 * Undefined (not 0) when there are none: react-navigation
 					 * renders a dot for 0.
+					 *
+					 * Event tasks still owed are added to the same number.
+					 * Both mean "something on your calendar is waiting on
+					 * you", and both are cleared from the event itself.
 					 */
-					tabBarBadge: unconfirmedCount || undefined,
+					tabBarBadge:
+						unconfirmedCount + pendingTaskCount || undefined,
 					tabBarBadgeStyle: badgeStyle,
 				}}
 			/>

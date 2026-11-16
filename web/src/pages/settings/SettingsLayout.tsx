@@ -50,11 +50,25 @@ export function SettingsLayout() {
 			icon: "list",
 			hint: "Reusable task lists",
 		},
+		// Only while the feature is on, like the timesheet form above: a
+		// library for something the company does not use is just clutter.
+		...(preferences.enableEventTasks
+			? [
+					{
+						to: `${base}/tasks`,
+						label: "Tasks",
+						icon: "checkmark-circle-outline" as IconName,
+						hint: "Things to do and confirm on an event",
+					},
+				]
+			: []),
 		{
 			to: `${base}/packages`,
 			label: "Packages",
 			icon: "albums-outline",
-			hint: "Bundles of checklists",
+			hint: preferences.enableEventTasks
+				? "Bundles of checklists and tasks"
+				: "Bundles of checklists",
 		},
 		{
 			to: `${base}/labels`,

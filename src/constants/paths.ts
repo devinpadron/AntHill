@@ -27,6 +27,8 @@ export const C = {
 	packages: "packages",
 	checklists: "checklists",
 	eventLabels: "eventLabels",
+	taskTemplates: "taskTemplates",
+	eventTasks: "eventTasks",
 
 	// Subcollections of timeEntries/{entryId}
 	connections: "connections",
@@ -48,3 +50,7 @@ export const membershipId = (companyId: string, userId: string) =>
 
 export const eventResponseId = (eventId: string, userId: string) =>
 	`${eventId}_${userId}`;
+
+/** One task per (event, template), so re-syncing an event is idempotent. */
+export const eventTaskId = (eventId: string, templateId: string) =>
+	`${eventId}_${templateId}`;

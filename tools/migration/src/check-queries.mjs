@@ -252,6 +252,35 @@ const shapes = [
 				.limit(200),
 	],
 	[
+		"eventTaskService.subscribeTaskTemplates",
+		() =>
+			firestore
+				.collection(C.taskTemplates)
+				.where("companyId", "==", companyId)
+				.orderBy("title")
+				.limit(200),
+	],
+	[
+		"eventTaskService.subscribeEventTasks",
+		() =>
+			firestore
+				.collection(C.eventTasks)
+				.where("companyId", "==", companyId)
+				.where("eventId", "==", eventId)
+				.limit(100),
+	],
+	[
+		"eventTaskService.subscribeMyPendingTasks",
+		() =>
+			firestore
+				.collection(C.eventTasks)
+				.where("companyId", "==", companyId)
+				.where("pendingUserIds", "array-contains", userId)
+				.where("dateKey", ">=", FROM)
+				.orderBy("dateKey")
+				.limit(100),
+	],
+	[
 		"formSchemaService.getActiveSchema",
 		() =>
 			firestore

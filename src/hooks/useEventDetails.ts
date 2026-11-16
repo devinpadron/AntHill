@@ -22,6 +22,7 @@ import {
 	Package,
 } from "../types";
 import { useCompanyMembers } from "./useCompanyMembers";
+import { useEventTasks } from "./useEventTasks";
 import { useUser } from "../contexts/UserContext";
 import { useCompany } from "../contexts/CompanyContext";
 import { useWorkerPermissions } from "./useWorkerPermissions";
@@ -214,6 +215,22 @@ export function useEventDetails(eventId: string) {
 		acknowledged: Boolean(myDoc?.acknowledgedAt),
 	};
 
+	/*
+	 * Event tasks. The subscription is unconditional and only the RESULT is
+	 * gated on the company flag, the same way useEventPrompts gates its
+	 * counts — a company switching the feature on should not have to remount
+	 * a listener to see the card appear.
+	 */
+	const {
+		tasks: allTasks,
+		complete: completeTask,
+		reopen: reopenTask,
+	} = useEventTasks(companyId ?? "", eventId, userId);
+	const tasks = useMemo(
+		() => (preferences.enableEventTasks ? allTasks : []),
+		[preferences.enableEventTasks, allTasks],
+	);
+
 	const acknowledge = useCallback(async () => {
 		if (!companyId || !event) return;
 		await acknowledgeAssignment(companyId, event.id, userId, event.dateKey);
@@ -228,6 +245,11 @@ export function useEventDetails(eventId: string) {
 		responses,
 		myAcknowledgement,
 		acknowledge,
+		tasks,
+		completeTask,
+		reopenTask,
+		isAdmin,
+		userId,
 		myResponse,
 		workerNames,
 		workerList,

@@ -76,6 +76,8 @@ export interface NotificationPreferences {
 	availability: boolean;
 	/** Your timesheets being approved or rejected. */
 	timesheets: boolean;
+	/** Reminders about event tasks you still owe. */
+	tasks: boolean;
 	/**
 	 * LEGACY. One switch over everything manager-facing, since split into the
 	 * three below.
@@ -93,6 +95,14 @@ export interface NotificationPreferences {
 	availabilityConfirmed: boolean;
 	/** Manager-facing: a worker turning an event down. */
 	availabilityDeclined: boolean;
+	/**
+	 * Manager-facing: an event task still open past its due time.
+	 *
+	 * NOT one of the three the legacy `team` switch expands to. It did not
+	 * exist when `team` did, so nobody who muted `team` was muting this, and
+	 * folding it in would silence an alert they never chose to silence.
+	 */
+	tasksOverdue: boolean;
 }
 
 /**
@@ -106,9 +116,11 @@ export const NOTIFICATION_CHANNELS = [
 	"events",
 	"availability",
 	"timesheets",
+	"tasks",
 	"teamMembers",
 	"availabilityConfirmed",
 	"availabilityDeclined",
+	"tasksOverdue",
 ] as const;
 
 /** The three the legacy `team` switch used to cover, as one. */
@@ -125,10 +137,12 @@ export const defaultNotificationPreferences: NotificationPreferences = {
 	events: true,
 	availability: true,
 	timesheets: true,
+	tasks: true,
 	team: true,
 	teamMembers: true,
 	availabilityConfirmed: true,
 	availabilityDeclined: true,
+	tasksOverdue: true,
 };
 
 /**
@@ -342,6 +356,16 @@ export interface CompanyPreferences extends CompanyScoped {
 	 * reminder behind a disabled requirement is how a setting starts lying.
 	 */
 	acknowledgementReminder: ReminderSchedule;
+
+	/**
+	 * Event tasks: things assigned workers must do and confirm, with reminders.
+	 *
+	 * OFF by default, like Availability and the Clock. A company that never
+	 * switches it on sees no Tasks library, no task pickers and no badge. The
+	 * flag gates the UI and the scheduler; it does not delete task documents,
+	 * so switching it off and on again loses nothing.
+	 */
+	enableEventTasks: boolean;
 
 	/**
 	 * Record where a worker goes between clock-in and clock-out.

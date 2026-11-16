@@ -154,6 +154,16 @@ const Settings = ({ navigation }: any) => {
 									navigation.push("ChecklistCreator")
 								}
 							/>
+							{preferences.enableEventTasks && (
+								<ListRow
+									multiline
+									title="Tasks"
+									icon="checkmark-done-outline"
+									onPress={() =>
+										navigation.push("TaskTemplates")
+									}
+								/>
+							)}
 							<ListRow
 								multiline
 								title="Packages"

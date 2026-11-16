@@ -45,6 +45,11 @@ import {
 import { useUploadManager } from "../../contexts/UploadManagerContext";
 import { useCompany } from "../../contexts/CompanyContext";
 import { useGroups } from "../../hooks/useGroups";
+import { useTaskTemplates } from "../../hooks/useTaskTemplates";
+import {
+	ASSIGNEE_MODE_LABEL,
+	describeOffset,
+} from "../../utils/eventTaskUtils";
 import { Theme, useTheme, useThemedStyles } from "../../theme";
 
 /*
@@ -115,6 +120,7 @@ const EventSubmit = ({ navigation }) => {
 		setAudienceGroupIds,
 		audienceUserIds,
 		setAudienceUserIds,
+		loadedExtras,
 	} = useEventForm(navigation, eventId);
 
 	const { userId, companyId: currentCompany } = useUser();
@@ -136,6 +142,36 @@ const EventSubmit = ({ navigation }) => {
 
 	const { preferences } = useCompany();
 	const { groups } = useGroups(currentCompany ?? "");
+
+	/*
+	 * Tasks picked for THIS event directly, and who does each "specific" one.
+	 * Tasks that arrive through a package are not stored here — they follow
+	 * the package, so unticking the package takes them with it.
+	 */
+	const { templates: taskTemplates } = useTaskTemplates(currentCompany ?? "");
+	const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+	const [taskAssignees, setTaskAssignees] = useState<
+		Record<string, string[]>
+	>({});
+
+	/*
+	 * Seed the pickers from the saved event, ONCE.
+	 *
+	 * Once, because the event is a live subscription: re-seeding on every
+	 * snapshot would throw away a package the manager had just ticked the
+	 * moment anything else touched the document. Packages and the label were
+	 * never seeded at all before this, so editing an event silently stripped
+	 * both.
+	 */
+	const seeded = useRef(false);
+	useEffect(() => {
+		if (!loadedExtras || seeded.current) return;
+		seeded.current = true;
+		setSelectedPackages(loadedExtras.packageIds);
+		setSelectedLabelId(loadedExtras.labelId);
+		setSelectedTaskIds(loadedExtras.taskTemplateIds);
+		setTaskAssignees(loadedExtras.taskAssignees);
+	}, [loadedExtras]);
 
 	const isMounted = useRef(true);
 	useEffect(() => {
@@ -394,10 +430,77 @@ const EventSubmit = ({ navigation }) => {
 			labelId: selectedLabelId,
 			audienceGroupIds,
 			audienceUserIds,
+			/*
+			 * Sent only while the feature is on. With it off the card is not
+			 * shown, and an unshown picker must not get to overwrite what the
+			 * event already holds.
+			 */
+			...(preferences.enableEventTasks
+				? {
+						taskTemplateIds: selectedTaskIds,
+						// Only for tasks still on the event, so a name picked
+						// for a task that was then unticked is not kept.
+						taskAssignees: Object.fromEntries(
+							effectiveTasks
+								.filter(
+									(row) =>
+										row.template.assigneeMode ===
+										"specific",
+								)
+								.map((row) => [
+									row.template.id,
+									taskAssignees[row.template.id] ?? [],
+								]),
+						),
+					}
+				: {}),
 		});
 
 		if (savedId) await handleAttachmentSubmit(savedId);
 	};
+
+	/*
+	 * Every task this event will carry: its own picks, plus whatever the
+	 * ticked packages bring. `viaPackage` names the package so the row can say
+	 * why it is ticked and cannot be unticked here.
+	 */
+	const effectiveTasks = useMemo(() => {
+		const viaPackage = new Map<string, string>();
+		for (const pkg of availablePackages) {
+			if (!selectedPackages.includes(pkg.id)) continue;
+			for (const id of pkg.taskTemplateIds ?? []) {
+				if (!viaPackage.has(id)) viaPackage.set(id, pkg.title);
+			}
+		}
+		return taskTemplates
+			.filter(
+				(template) =>
+					viaPackage.has(template.id) ||
+					selectedTaskIds.includes(template.id),
+			)
+			.map((template) => ({
+				template,
+				viaPackage: viaPackage.get(template.id) ?? null,
+			}));
+	}, [availablePackages, selectedPackages, selectedTaskIds, taskTemplates]);
+
+	const toggleTask = (templateId: string) =>
+		setSelectedTaskIds((prev) =>
+			prev.includes(templateId)
+				? prev.filter((id) => id !== templateId)
+				: [...prev, templateId],
+		);
+
+	const toggleTaskAssignee = (templateId: string, personId: string) =>
+		setTaskAssignees((prev) => {
+			const current = prev[templateId] ?? [];
+			return {
+				...prev,
+				[templateId]: current.includes(personId)
+					? current.filter((id) => id !== personId)
+					: [...current, personId],
+			};
+		});
 
 	const togglePackage = (packageId: string) =>
 		setSelectedPackages((prev) =>
@@ -709,7 +812,10 @@ const EventSubmit = ({ navigation }) => {
 					</Text>
 				) : (
 					availablePackages.map((pkg) => {
-						const count = pkg.checklists?.length ?? 0;
+						const count = pkg.checklistIds?.length ?? 0;
+						const taskCount = preferences.enableEventTasks
+							? (pkg.taskTemplateIds?.length ?? 0)
+							: 0;
 						const showing = shownDescriptions.includes(pkg.id);
 
 						return (
@@ -725,6 +831,14 @@ const EventSubmit = ({ navigation }) => {
 											count === 1
 												? "checklist"
 												: "checklists"
+										}${
+											taskCount
+												? ` · ${taskCount} ${
+														taskCount === 1
+															? "task"
+															: "tasks"
+													}`
+												: ""
 										}`}
 										style={styles.packageCheckbox}
 									/>
@@ -767,6 +881,106 @@ const EventSubmit = ({ navigation }) => {
 					})
 				)}
 			</Card>
+
+			{/* Tasks */}
+			{preferences.enableEventTasks && (
+				<Card
+					title="Tasks"
+					titleAccessory={
+						effectiveTasks.length > 0 ? (
+							<Badge
+								label={String(effectiveTasks.length)}
+								tone="accent"
+							/>
+						) : undefined
+					}
+					style={styles.card}
+				>
+					{taskTemplates.length === 0 ? (
+						<Text variant="caption" color="textTertiary">
+							No tasks yet — create them under Settings › Tasks.
+						</Text>
+					) : (
+						<>
+							<Text
+								variant="caption"
+								color="textSecondary"
+								style={styles.hint}
+							>
+								Things the crew must do and confirm. Whoever
+								still owes one is reminded until it is done.
+							</Text>
+
+							{taskTemplates.map((template) => {
+								const row = effectiveTasks.find(
+									(r) => r.template.id === template.id,
+								);
+								const picked = taskAssignees[template.id] ?? [];
+
+								return (
+									<View key={template.id}>
+										<Checkbox
+											checked={!!row}
+											// A package's task goes when the
+											// package does, not from here.
+											disabled={!!row?.viaPackage}
+											onPress={() =>
+												toggleTask(template.id)
+											}
+											label={template.title}
+											description={
+												row?.viaPackage
+													? `From ${row.viaPackage}`
+													: `${ASSIGNEE_MODE_LABEL[template.assigneeMode]} · due ${describeOffset(
+															template.dueAnchor,
+															template.dueOffsetSeconds,
+														)}`
+											}
+										/>
+
+										{/*
+										 * "Specific people" means nothing until
+										 * someone is named, so the question is
+										 * asked right where the task is ticked.
+										 */}
+										{!!row &&
+											template.assigneeMode ===
+												"specific" && (
+												<View style={styles.taskPeople}>
+													<PersonPicker
+														options={
+															audienceOptions
+														}
+														selectedIds={picked}
+														onToggle={(id) =>
+															toggleTaskAssignee(
+																template.id,
+																id,
+															)
+														}
+														placeholder="Choose who does this"
+														searchPlaceholder="Search people"
+														emptyText="Nobody has joined this company yet."
+													/>
+													{picked.length === 0 && (
+														<Text
+															variant="caption"
+															color="warning"
+														>
+															Nobody picked yet —
+															no one will be asked
+															or reminded.
+														</Text>
+													)}
+												</View>
+											)}
+									</View>
+								);
+							})}
+						</>
+					)}
+				</Card>
+			)}
 
 			{/* Label */}
 			<Card title="Label" style={styles.card}>
@@ -874,6 +1088,11 @@ const submitStyles = (theme: Theme) =>
 		},
 		packageCheckbox: {
 			flex: 1,
+		},
+		taskPeople: {
+			paddingLeft: theme.spacing.xl + theme.spacing.sm,
+			paddingBottom: theme.spacing.md,
+			gap: theme.spacing.xs,
 		},
 		packageDescription: {
 			paddingLeft: theme.spacing.xl + theme.spacing.sm,

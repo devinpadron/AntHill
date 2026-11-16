@@ -322,3 +322,24 @@
 .unacked {
 	color: var(--c-text-tertiary);
 }
+
+/* One event task: a heading line, then who has and has not done it. */
+.task {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-sm);
+	padding: var(--sp-md);
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-md);
+}
+.taskHead {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--sp-sm);
+}
+.taskMain {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	line-height: 1.35;
+}

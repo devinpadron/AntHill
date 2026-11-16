@@ -135,6 +135,11 @@ timeEntries/{entryId}               status, clockInAt/clockOutAt, dateKey, worke
   locationSegments/{entryId}-{seq}
 attachments/{attachmentId}          top-level, not per-parent
 packages / checklists / eventLabels
+taskTemplates/{templateId}          title, assigneeMode, dueAnchor/dueOffsetSeconds,
+                                    requireNote, reminders[], overdueAlertSeconds
+eventTasks/{eventId}_{templateId}   a SNAPSHOT of the template plus assigneeUserIds[],
+                                    pendingUserIds[], completions{}, dueAt,
+                                    nextReminderAt, overdueAlertAt, expiresAt
 
 AppData/Data.required_version       pre-auth, deliberately NOT renamed in v2
 appConfig/schema                    pre-auth: activeVersion, maintenance, message
@@ -195,7 +200,7 @@ The native launch screen is a **solid colour with no image** — `SplashScreen.t
 
 `AppNavigator` → splash while `initializing` → `AuthStack` if not logged in → **`NoCompanyScreen` if signed in with no company** (gated on `!isLoading` so it doesn't flash on launch) → `HomeTabs`.
 
-Tabs are feature-flagged off live company preferences: Availability needs `enableAvailability`, Clock needs `enableTimeSheet`. Because preferences are a live subscription, toggling a flag adds/removes a tab without a relaunch. Labels are hidden; badges come from `useEventPrompts` (unconfirmed shifts on Calendar, unanswered invitations on Availability) and share one style.
+Tabs are feature-flagged off live company preferences: Availability needs `enableAvailability`, Clock needs `enableTimeSheet`. Because preferences are a live subscription, toggling a flag adds/removes a tab without a relaunch. Labels are hidden; badges come from `useEventPrompts` (unconfirmed shifts plus open event tasks on Calendar, unanswered invitations on Availability) and share one style.
 
 Stacks: `CalendarStack`, `AvailabilityStack`, `ClockStack`, `SettingStack` (which nests `PayrollReviewStack`), plus `AuthStack` and the dev-only `DiagnosticsNavigator`. Shared options in `stackOptions.ts`; screens draw their own headers.
 
@@ -224,6 +229,17 @@ Off by default per company, and everything about it is designed so the clock is 
 - Points are batched into **segments** (`timeEntries/{id}/locationSegments/{entryId}-{seq}`), not one doc per fix. The summary on the parent entry carries a **status** (`recording | completed | declined | denied | unavailable`), so an absent track is never presented as a fact about the worker. `null` means the feature was never on for that entry.
 - Consent is recorded per company in `userSettings.locationConsentByCompany` and mirrored locally so an offline clock-in can check it. `LocationConsentSheet` shows the Play-Store-required prominent disclosure; `allowDeclining` only controls whether it offers a real "no".
 - Geofence reminders are posted on-device with **notifee** (not expo-notifications, which would fight RNFirebase for the FCM token) and carry the same `data` shape as server pushes so they route through the one table in `NotificationContext`.
+
+### Event tasks
+
+Things a manager needs someone on an event to do and confirm ("final call with the client"), with a due time and reminders. Off by default behind `companyPreferences.enableEventTasks`, which gates the UI and the scheduler but never deletes task documents.
+
+- **Not checklists.** `eventChecklistStates` is one shared tri-state map with no who/when and nothing a scheduler can query. A task is one flat document per (event, template).
+- `taskTemplates` is the library; every time in it is **relative to the event** (`dueAnchor` + `dueOffsetSeconds`, same shape per reminder rule), so one template serves every event. Attached through `packages.taskTemplateIds` or `events.taskTemplateIds`; `events.taskAssignees` names who does each `specific` task.
+- `eventTasks` documents are **derived from the saved event** by `syncEventTasks`, which `eventService.createEvent`/`updateEvent` call themselves — not the forms, because the portal's staffing board assigns crew with a bare `updateEvent`. They are snapshots: editing a template does not rewrite tasks already on events, and re-syncing never touches `completions`.
+- `pendingUserIds` is who still owes it (the worker badge query and the push audience); `nextReminderAt` is materialized so the scheduler is one bounded query. Completing is `arrayRemove` + a `completions.{uid}` field path, queued through `pendingWrites.track` and never awaited.
+- The arithmetic lives in `src/utils/eventTaskUtils.ts` with no Firestore in it. **`computeNextReminderMs` is duplicated in the functions repo** and the two copies must stay identical — see the event tasks section of `CLOUD_FUNCTIONS_HANDOFF.md`, which is also the contract for the scheduler that sends `task_reminder` / `task_overdue`.
+- Rules: managers arrange tasks; an assignee may write only their own entry in `completions` and their own id in `pendingUserIds` (an `anyone` task is the exception — one completion settles it for the crew).
 
 ### Company-customizable forms
 
@@ -262,7 +278,7 @@ Not in this repo. `CLOUD_FUNCTIONS_HANDOFF.md` documents the v1→v2 trigger mig
 
 **Notification mutes are a second cross-repo contract.** `memberships/{id}.notifications` holds one boolean per channel (`src/types/identity.ts`), and `functions/src/utils/notifications.js` maps every push type onto a channel in `CHANNEL_BY_TYPE`, filtering in the one place every send passes through. Both sides **fail open** — absent means send, since the field is missing on every membership written before it existed. Adding a row to `NOTIFICATION_ROWS` without a matching entry in `CHANNEL_BY_TYPE` yields a switch that silences nothing. The manager-facing `team` switch was split into `teamMembers` / `availabilityConfirmed` / `availabilityDeclined`; `team` survives as a mirror (the OR of the three, written by `withLegacyTeamMirror`) so an un-deployed reader on either side under-mutes rather than over-mutes, and both repos expand a legacy `team: false` onto all three.
 
-**The FCM payload contract is frozen**: `data.type`, `screenName`, `companyId`, `eventId`, `timesheetId` (comma-delimited for batch types), `userId`. Changing it here couples two deployments that are already hard to sequence. Types currently handled: `assignment`, `update`, `assignment_ack_nudge`, `availability_nudge`, `timesheet_approval[_batch]`, `timesheet_rejection[_batch]`, `new_user_joined`, `user_left`, and the on-device `clock_reminder`.
+**The FCM payload contract is frozen**: `data.type`, `screenName`, `companyId`, `eventId`, `timesheetId` (comma-delimited for batch types), `userId`. Changing it here couples two deployments that are already hard to sequence. Types currently handled: `assignment`, `update`, `assignment_ack_nudge`, `availability_nudge`, `timesheet_approval[_batch]`, `timesheet_rejection[_batch]`, `new_user_joined`, `user_left`, `task_reminder`, `task_overdue`, and the on-device `clock_reminder`.
 
 ## Conventions
 

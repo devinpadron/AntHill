@@ -10,6 +10,7 @@ import Statistics from "../screens/settings/Statistics";
 import CompanyCustomForm from "../screens/settings/admin/CompanyCustomForm";
 import ChecklistCreator from "../screens/settings/admin/ChecklistCreator";
 import PackageCreator from "../screens/settings/admin/PackageCreator";
+import TaskTemplates from "../screens/settings/admin/TaskTemplates";
 import LabelCreator from "../screens/settings/admin/LabelCreator";
 import WorkerGroups from "../screens/settings/admin/WorkerGroups";
 import PayrollReviewStack from "./PayrollReviewStack";
@@ -38,6 +39,7 @@ const SettingStack = () => (
 		<Stack.Screen name="Statistics" component={Statistics} />
 		<Stack.Screen name="ChecklistCreator" component={ChecklistCreator} />
 		<Stack.Screen name="PackageCreator" component={PackageCreator} />
+		<Stack.Screen name="TaskTemplates" component={TaskTemplates} />
 		<Stack.Screen name="LabelCreator" component={LabelCreator} />
 		<Stack.Screen name="WorkerGroups" component={WorkerGroups} />
 	</Stack.Navigator>
