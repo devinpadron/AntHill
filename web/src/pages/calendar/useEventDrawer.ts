@@ -13,6 +13,7 @@ import {
 	subscribeEventLabels,
 } from "@app/services/libraryService";
 import { useCompanyMembers } from "@app/hooks/useCompanyMembers";
+import { useEventTasks } from "@app/hooks/useEventTasks";
 import { FilterType } from "@app/types/enums/FilterType";
 import type {
 	Attachment,
@@ -53,7 +54,7 @@ export type RosterRow = {
 };
 
 export function useEventDrawer(eventId: string) {
-	const { companyId } = useCompany();
+	const { companyId, preferences } = useCompany();
 	const { userId } = useAuth();
 	const { members, byUserId } = useCompanyMembers(companyId);
 
@@ -206,6 +207,22 @@ export function useEventDrawer(eventId: string) {
 		[event, userId],
 	);
 
+	/*
+	 * Event tasks, through the SAME hook the app's event screen uses — it
+	 * takes its ids as arguments precisely so it can be shared, unlike
+	 * useEventDetails. Gated on the company flag after the fact, so switching
+	 * the feature on shows the section without a remount.
+	 */
+	const {
+		tasks: allTasks,
+		complete: completeTask,
+		reopen: reopenTask,
+	} = useEventTasks(companyId, eventId, userId);
+	const tasks = useMemo(
+		() => (preferences.enableEventTasks ? allTasks : []),
+		[preferences.enableEventTasks, allTasks],
+	);
+
 	const label = useMemo(
 		() =>
 			event?.labelId
@@ -228,5 +245,8 @@ export function useEventDrawer(eventId: string) {
 		notFound,
 		setResponse,
 		saveAdminNotes,
+		tasks,
+		completeTask,
+		reopenTask,
 	};
 }

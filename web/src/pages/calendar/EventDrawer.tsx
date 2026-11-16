@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import type { EventResponseStatus } from "@app/types";
+import type { EventResponseStatus, EventTask, Membership } from "@app/types";
+import { ASSIGNEE_MODE_LABEL } from "@app/utils/eventTaskUtils";
 import { useCompany } from "../../contexts/CompanyContext";
 import {
 	Badge,
@@ -61,6 +62,10 @@ export function EventDrawer() {
 		notFound,
 		setResponse,
 		saveAdminNotes,
+		tasks,
+		completeTask,
+		reopenTask,
+		byUserId,
 	} = useEventDrawer(eventId ?? "");
 
 	const [notes, setNotes] = useState<string | null>(null);
@@ -267,6 +272,40 @@ export function EventDrawer() {
 						</>
 					)}
 				</section>
+
+				{/* --------------------------------------------- tasks */}
+				{tasks.length > 0 && (
+					<section className={styles.section}>
+						<div className={styles.sectionHead}>
+							<Text variant="overline" tone="tertiary">
+								Tasks ({tasks.length})
+							</Text>
+							<Text variant="caption" tone="secondary" as="span">
+								{
+									tasks.filter(
+										(t) => !t.pendingUserIds?.length,
+									).length
+								}
+								/{tasks.length} done
+							</Text>
+						</div>
+						{tasks.map((task) => (
+							<TaskView
+								key={task.id}
+								task={task}
+								byUserId={byUserId}
+								onComplete={(forUserId) => {
+									completeTask(task, "", forUserId);
+									toast.success("Marked done");
+								}}
+								onReopen={(forUserId) => {
+									reopenTask(task, forUserId);
+									toast.success("Reopened");
+								}}
+							/>
+						))}
+					</section>
+				)}
 
 				{/* ------------------------------------------ audience */}
 				<section className={styles.section}>
@@ -481,6 +520,159 @@ export function EventDrawer() {
 	);
 }
 
+/* ------------------------------------------------------------------- task */
+
+/*
+ * One task: what it is, when it is due, who has done it and who has not.
+ *
+ * The app shows a worker a checkbox; an admin here is never the one ticking
+ * for themselves, so every row is the manager's view — "Mark done" on
+ * someone's behalf, "Reopen" when it was not really done. Both are the same
+ * service calls the app makes, and the completion records who pressed.
+ */
+function TaskView({
+	task,
+	byUserId,
+	onComplete,
+	onReopen,
+}: {
+	task: EventTask;
+	byUserId: Record<string, Membership> | undefined;
+	onComplete: (forUserId?: string) => void;
+	onReopen: (forUserId: string) => void;
+}) {
+	const nameOf = (id: string) => {
+		const member = byUserId?.[id];
+		return member
+			? `${member.firstName} ${member.lastName}`.trim()
+			: "Former member";
+	};
+
+	const completions = Object.entries(task.completions ?? {});
+	const pending = task.pendingUserIds ?? [];
+	const settled = pending.length === 0;
+	const noOne = (task.assigneeUserIds ?? []).length === 0;
+	const due = task.dueAt?.toDate?.();
+	const overdue = !settled && !!due && due.getTime() < Date.now();
+
+	return (
+		<div className={styles.task}>
+			<div className={styles.taskHead}>
+				<span className={settled ? styles.acked : styles.unacked}>
+					<Icon
+						name={settled ? "checkmark-circle" : "time-outline"}
+						size="sm"
+					/>
+				</span>
+				<span className={styles.taskMain}>
+					<Text variant="bodyStrong" as="span">
+						{task.title}
+					</Text>
+					<Text
+						variant="caption"
+						tone={overdue ? "danger" : "tertiary"}
+						as="span"
+					>
+						{ASSIGNEE_MODE_LABEL[task.assigneeMode]}
+						{due
+							? ` · ${overdue ? "overdue, was due" : "due"} ${formatDue(due)}`
+							: ""}
+					</Text>
+				</span>
+			</div>
+
+			{/*
+			 * A task nobody is responsible for reminds no one and can be
+			 * ticked by no one — worth saying where it can be fixed.
+			 */}
+			{noOne && (
+				<div className={styles.warnBox}>
+					<Icon name="warning" size="sm" />
+					<Text variant="caption" as="span">
+						{task.assigneeMode === "specific"
+							? "Nobody has been picked for this task. Edit the event to choose who does it."
+							: "Nobody is on the crew yet, so nobody is being asked."}
+					</Text>
+				</div>
+			)}
+
+			<ul className={styles.invitedList}>
+				{completions.map(([doneId, done]) => (
+					<li key={doneId} className={styles.invitedRow}>
+						<span className={styles.taskMain}>
+							<Text variant="caption" as="span">
+								{nameOf(doneId)}
+								{done.completedByUserId &&
+								done.completedByUserId !== doneId
+									? ` · marked by ${nameOf(done.completedByUserId)}`
+									: ""}
+								{done.completedAt?.toDate
+									? ` · ${formatDue(done.completedAt.toDate())}`
+									: ""}
+							</Text>
+							{done.note && (
+								<Text
+									variant="caption"
+									tone="secondary"
+									as="span"
+								>
+									“{done.note}”
+								</Text>
+							)}
+						</span>
+						<Button
+							variant="ghost"
+							size="small"
+							onClick={() => onReopen(doneId)}
+						>
+							Reopen
+						</Button>
+					</li>
+				))}
+
+				{task.assigneeMode === "anyone"
+					? !settled &&
+						!noOne && (
+							<li className={styles.invitedRow}>
+								<Text
+									variant="caption"
+									tone="secondary"
+									as="span"
+								>
+									Nobody has done this yet
+								</Text>
+								<Button
+									variant="ghost"
+									size="small"
+									onClick={() => onComplete()}
+								>
+									Mark done
+								</Button>
+							</li>
+						)
+					: pending.map((pendingId) => (
+							<li key={pendingId} className={styles.invitedRow}>
+								<Text
+									variant="caption"
+									tone="secondary"
+									as="span"
+								>
+									{nameOf(pendingId)} · not yet
+								</Text>
+								<Button
+									variant="ghost"
+									size="small"
+									onClick={() => onComplete(pendingId)}
+								>
+									Mark done
+								</Button>
+							</li>
+						))}
+			</ul>
+		</div>
+	);
+}
+
 /* ------------------------------------------------------------- roster row */
 
 function RosterRowView({
@@ -609,6 +801,15 @@ function formatWhen(event: {
 
 	return date + span;
 }
+
+const formatDue = (date: Date) =>
+	date.toLocaleString(undefined, {
+		weekday: "short",
+		month: "short",
+		day: "numeric",
+		hour: "numeric",
+		minute: "2-digit",
+	});
 
 function formatStamp(stamp?: { toDate?: () => Date } | null): string {
 	const date = stamp?.toDate?.();

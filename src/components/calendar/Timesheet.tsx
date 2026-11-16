@@ -94,7 +94,7 @@ export default function Timesheet(props: Props) {
 	const styles = useThemedStyles(timesheetStyles);
 	const { userId, companyId, user, isAdmin } = useUser();
 	const { company } = useCompany();
-	const { unconfirmedIds } = useEventPrompts();
+	const { unconfirmedIds, pendingTaskEventIds } = useEventPrompts();
 
 	const range = props.dateRange;
 
@@ -402,6 +402,8 @@ export default function Timesheet(props: Props) {
 		 * to go instead of tapping through every shift in the week.
 		 */
 		const needsConfirming = unconfirmedIds.has(entry.id);
+		/* Same idea for event tasks: the badge counts them, this points. */
+		const hasOpenTask = pendingTaskEventIds.has(entry.id);
 
 		return (
 			<Pressable
@@ -413,7 +415,7 @@ export default function Timesheet(props: Props) {
 				haptic="tap"
 				accessibilityLabel={`${entry.title}, ${entry.description || "all day"}${
 					needsConfirming ? ", not yet confirmed" : ""
-				}`}
+				}${hasOpenTask ? ", task to do" : ""}`}
 				style={[styles.entryCard, isPast && styles.past]}
 			>
 				{/*
@@ -445,6 +447,13 @@ export default function Timesheet(props: Props) {
 								label="Confirm"
 								tone="warning"
 								icon="alert-circle"
+							/>
+						)}
+						{hasOpenTask && (
+							<Badge
+								label="Task"
+								tone="warning"
+								icon="checkbox-outline"
 							/>
 						)}
 					</View>

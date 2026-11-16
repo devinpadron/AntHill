@@ -213,6 +213,16 @@ export function CompanySettingsPage() {
 						affects={activeCount}
 					/>
 					<Toggle
+						label="Event tasks"
+						description="Things assigned workers must do and confirm — a final call with the client, a photo of the setup — with reminders until it's done. Adds the Tasks library and a task picker on events and packages."
+						checked={preferences.enableEventTasks}
+						busy={busy === "eventTasks"}
+						onChange={(v) =>
+							patch("eventTasks", { enableEventTasks: v })
+						}
+						affects={activeCount}
+					/>
+					<Toggle
 						label="Workers can edit events"
 						description="Assigned workers may change event details and their own time entries after submitting."
 						checked={preferences.allowUserEventEditing}

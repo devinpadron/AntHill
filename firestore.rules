@@ -443,6 +443,23 @@ service cloud.firestore {
       allow update, delete: if v2IsManager(resource.data.companyId);
     }
 
+    /*
+     * `get` tolerates a missing document, unlike the three above.
+     *
+     * Template ids are held second-hand — on events and on packages — and
+     * deleting a template deliberately leaves them dangling, because the tasks
+     * already made from it are snapshots that keep running. So a by-id read of
+     * a template that is gone is routine here, and must answer "not found"
+     * rather than permission-denied.
+     */
+    match /taskTemplates/{templateId} {
+      allow get: if resource == null
+                 || v2IsMember(resource.data.companyId);
+      allow list: if v2IsMember(resource.data.companyId);
+      allow create: if v2IsManager(request.resource.data.companyId);
+      allow update, delete: if v2IsManager(resource.data.companyId);
+    }
+
     // ---- events ----------------------------------------------------------
 
     match /events/{eventId} {
@@ -535,6 +552,67 @@ service cloud.firestore {
                              .hasOnly(["status","respondedAt","updatedAt",
                                        "dateKey","acknowledgedAt"]));
 
+      allow delete: if v2IsManager(resource.data.companyId);
+    }
+
+    /*
+     * One document per (event, task template).
+     *
+     * Managers arrange tasks: which exist, who is responsible, when they are
+     * due. A worker's whole power here is to state that THEY did it, or to
+     * take that back.
+     *
+     * The contrast with eventChecklistStates below is the point. There any
+     * member ticks anything, because a checklist is a shared scratchpad. A
+     * task is a record a manager acts on and a scheduler pushes people about,
+     * so who may write which part of it is spelled out.
+     */
+    match /eventTasks/{taskId} {
+      /*
+       * The worker's completion, and nothing dressed up as one.
+       *
+       *   - only the keys a completion or its undo touches. `nextReminderAt`
+       *     and `overdueAlertAt` are here because the last person to finish
+       *     clears them; who is responsible and when it is due are not.
+       *   - inside `completions`, only their OWN entry — rules can diff a
+       *     nested map, so ticking on a colleague's behalf is refused. A
+       *     manager doing exactly that goes through the manager branch.
+       *   - that entry credits them and nobody else.
+       *   - on `everyone` and `specific` tasks, `pendingUserIds` may only
+       *     change by their own id. On an `anyone` task one completion settles
+       *     it for the whole crew, so the list legitimately empties (and
+       *     refills on undo) in a single write.
+       */
+      function ownCompletionOnly() {
+        let before = resource.data;
+        let after = request.resource.data;
+        let was = before.get("pendingUserIds", []).toSet();
+        let next = after.get("pendingUserIds", []).toSet();
+        return after.diff(before).affectedKeys()
+                 .hasOnly(["completions","pendingUserIds","nextReminderAt",
+                           "overdueAlertAt","updatedAt"])
+          && after.get("completions", {})
+               .diff(before.get("completions", {}))
+               .affectedKeys().hasOnly([uid()])
+          && (!(uid() in after.get("completions", {}))
+              || after.completions[uid()].completedByUserId == uid())
+          && (before.get("assigneeMode", "") == "anyone"
+              || was.difference(next).union(next.difference(was))
+                   .hasOnly([uid()]));
+      }
+
+      // `resource == null`: a push can outlive the task it points at.
+      allow get: if resource == null
+                 || v2IsMember(resource.data.companyId);
+      allow list: if v2IsMember(resource.data.companyId);
+      allow create: if v2IsManager(request.resource.data.companyId)
+                    && taskId == request.resource.data.eventId + "_"
+                                 + request.resource.data.templateId;
+      allow update: if (v2IsManager(resource.data.companyId)
+                        && request.resource.data.companyId == resource.data.companyId)
+                    || (v2IsMember(resource.data.companyId)
+                        && uid() in resource.data.get("assigneeUserIds", [])
+                        && ownCompletionOnly());
       allow delete: if v2IsManager(resource.data.companyId);
     }
 

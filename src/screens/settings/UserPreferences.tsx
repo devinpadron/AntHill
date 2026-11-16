@@ -79,6 +79,8 @@ const NOTIFICATION_ROWS: {
 	subtitle: string;
 	icon: IconName;
 	adminOnly?: boolean;
+	/** Shown only while the company has event tasks switched on. */
+	needsEventTasks?: boolean;
 }[] = [
 	{
 		channel: "events",
@@ -97,6 +99,13 @@ const NOTIFICATION_ROWS: {
 		title: "Timesheet decisions",
 		subtitle: "When your hours are approved or rejected",
 		icon: "time-outline",
+	},
+	{
+		channel: "tasks",
+		title: "Task reminders",
+		subtitle: "Things you still need to do for an event",
+		icon: "checkbox-outline",
+		needsEventTasks: true,
 	},
 	/*
 	 * Manager-facing, and three switches rather than the single "Team activity"
@@ -127,12 +136,20 @@ const NOTIFICATION_ROWS: {
 		icon: "close-circle-outline",
 		adminOnly: true,
 	},
+	{
+		channel: "tasksOverdue",
+		title: "Overdue tasks",
+		subtitle: "When an event task is still open past its due time",
+		icon: "alert-circle-outline",
+		adminOnly: true,
+		needsEventTasks: true,
+	},
 ];
 
 const UserPreferences = ({ navigation }) => {
 	const styles = useThemedStyles(preferenceStyles);
 	const { userId, companyId, isAdmin } = useUser();
-	const { company } = useCompany();
+	const { company, preferences } = useCompany();
 	const { mode, scheme, selectMode } = useThemePreference();
 
 	/*
@@ -168,7 +185,15 @@ const UserPreferences = ({ navigation }) => {
 		}
 	};
 
-	const rows = NOTIFICATION_ROWS.filter((row) => isAdmin || !row.adminOnly);
+	/*
+	 * A switch for a push the company never sends is a setting that lies, so
+	 * the two task rows exist only while the feature does.
+	 */
+	const rows = NOTIFICATION_ROWS.filter(
+		(row) =>
+			(isAdmin || !row.adminOnly) &&
+			(!row.needsEventTasks || preferences.enableEventTasks),
+	);
 
 	const [loading, setLoading] = useState(true);
 	const [prefMap, setPrefMap] = useState(

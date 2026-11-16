@@ -15,6 +15,7 @@ export * from "./sync";
 export * from "./identity";
 export * from "./forms";
 export * from "./events";
+export * from "./tasks";
 export * from "./time";
 export * from "./location";
 export * from "./attachments";

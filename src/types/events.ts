@@ -34,6 +34,20 @@ export interface Event extends BaseDoc, CompanyScoped {
 	/** Flattened from the packages at write time. */
 	checklistIds: string[];
 	labelId: string | null;
+	/**
+	 * Task templates attached to THIS event directly, on top of whatever its
+	 * packages bring. Optional: absent on every event written before tasks
+	 * existed, and absent means none.
+	 */
+	taskTemplateIds?: string[];
+	/**
+	 * Who does each "specific" task on this event, keyed by template id.
+	 *
+	 * On the event rather than only on the task document because the form
+	 * edits it alongside the crew, and because it has to survive the task
+	 * being re-synced from scratch.
+	 */
+	taskAssignees?: Record<string, string[]>;
 	attachmentCount: number;
 	/**
 	 * Groups this event was published to. Empty means open to everyone, which
@@ -152,6 +166,11 @@ export interface Package extends BaseDoc, CompanyScoped {
 	description: string;
 	/** Was `checklists: [{checklistId}]`. */
 	checklistIds: string[];
+	/**
+	 * Tasks every event using this package picks up — "Wedding" brings "Final
+	 * client call" with it. Optional: absent on packages that predate tasks.
+	 */
+	taskTemplateIds?: string[];
 }
 
 /** eventLabels/{labelId} */

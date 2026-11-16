@@ -39,6 +39,7 @@ type FlagKey =
 	| "allowUserEventEditing"
 	| "enableTimeSheet"
 	| "enableAvailability"
+	| "enableEventTasks"
 	| "canViewEventLabels";
 
 const FLAGS: {
@@ -58,6 +59,12 @@ const FLAGS: {
 		title: "Availability",
 		subtitle: "Adds the Availability tab and worker groups",
 		icon: "people-outline",
+	},
+	{
+		key: "enableEventTasks",
+		title: "Event tasks",
+		subtitle: "Things workers must do and confirm, with reminders",
+		icon: "checkbox-outline",
 	},
 	{
 		key: "allowUserEventEditing",

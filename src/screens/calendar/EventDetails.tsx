@@ -6,6 +6,7 @@ import MapView, { Marker } from "react-native-maps";
 
 // Custom hooks and utilities
 import { AcknowledgeShiftBanner } from "../../components/calendar/AcknowledgeShiftBanner";
+import { EventTasksCard } from "../../components/tasks/EventTasksCard";
 import { useEventDetails } from "../../hooks/useEventDetails";
 import { useWorkerPermissions } from "../../hooks/useWorkerPermissions";
 import { getRegionForMarkers, openMap, MapMarker } from "../../utils/mapUtils";
@@ -74,6 +75,12 @@ const EventDetails = ({ navigation }) => {
 		eventLabel,
 		myAcknowledgement,
 		acknowledge,
+		tasks,
+		completeTask,
+		reopenTask,
+		isAdmin,
+		userId,
+		membersById,
 	} = useEventDetails(eventId);
 
 	/*
@@ -268,6 +275,20 @@ const EventDetails = ({ navigation }) => {
 					</View>
 				)}
 			</Card>
+
+			{/*
+			 * Directly under the date, above the crew and the notes. A task is
+			 * something this screen is ASKING of the reader, and a request
+			 * found below the map is a request nobody sees.
+			 */}
+			<EventTasksCard
+				tasks={tasks}
+				userId={userId}
+				isManager={isAdmin}
+				membersById={membersById}
+				complete={completeTask}
+				reopen={reopenTask}
+			/>
 
 			{/* Who & what the manager said */}
 			{(showAssigned || showManagerNotes) && (

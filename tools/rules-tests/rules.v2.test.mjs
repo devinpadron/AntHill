@@ -161,6 +161,41 @@ before(async () => {
 			companyId: A,
 			title: "Setup",
 		});
+		/*
+		 * Event tasks. Bob and Carl are on the "everyone" task; the "anyone"
+		 * task has the same two. Erin is on neither.
+		 */
+		await setDoc(doc(db, "taskTemplates", "tt1"), {
+			id: "tt1",
+			companyId: A,
+			title: "Final client call",
+		});
+		await setDoc(doc(db, "eventTasks", "e1_tt1"), {
+			id: "e1_tt1",
+			companyId: A,
+			eventId: "e1",
+			templateId: "tt1",
+			dateKey: "2025-06-15",
+			assigneeMode: "everyone",
+			assigneeUserIds: [BOB, CARL],
+			pendingUserIds: [BOB, CARL],
+			completions: {},
+			nextReminderAt: null,
+			overdueAlertAt: null,
+		});
+		await setDoc(doc(db, "eventTasks", "e1_tt2"), {
+			id: "e1_tt2",
+			companyId: A,
+			eventId: "e1",
+			templateId: "tt2",
+			dateKey: "2025-06-15",
+			assigneeMode: "anyone",
+			assigneeUserIds: [BOB, CARL],
+			pendingUserIds: [BOB, CARL],
+			completions: {},
+			nextReminderAt: null,
+			overdueAlertAt: null,
+		});
 		await setDoc(doc(db, "attachments", "a1"), {
 			id: "a1",
 			companyId: A,
@@ -1536,6 +1571,203 @@ describe("v2 — deleting an event and everything under it", () => {
 	test("a manager of another company cannot either", async () => {
 		await assertFails(
 			deleteDoc(doc(as(MALLORY), "eventChecklistStates", "eDelGuard")),
+		);
+	});
+});
+
+/*
+ * Event tasks. Kept at the END of the file on purpose: an earlier suite
+ * promotes Carl to manager, so by here "Carl" proves nothing about workers —
+ * every worker assertion below uses Bob (an assignee) or Erin (not one).
+ */
+describe("v2 — event tasks", () => {
+	const done = (by) => ({
+		completedAt: new Date(),
+		completedByUserId: by,
+		note: "",
+	});
+
+	test("a worker cannot create a task template", async () => {
+		await assertFails(
+			setDoc(doc(as(BOB), "taskTemplates", "ttNope"), {
+				companyId: A,
+				title: "Nope",
+			}),
+		);
+	});
+
+	test("a manager can", async () => {
+		await assertSucceeds(
+			setDoc(doc(as(ALICE), "taskTemplates", "ttYes"), {
+				companyId: A,
+				title: "Yes",
+			}),
+		);
+	});
+
+	test("a template that was deleted reads as missing, not denied", async () => {
+		// Ids dangle on events and packages by design.
+		await assertSucceeds(getDoc(doc(as(BOB), "taskTemplates", "gone")));
+	});
+
+	test("another company cannot read a template", async () => {
+		await assertFails(getDoc(doc(as(MALLORY), "taskTemplates", "tt1")));
+	});
+
+	test("a worker cannot create a task on an event", async () => {
+		await assertFails(
+			setDoc(doc(as(BOB), "eventTasks", "e1_ttX"), {
+				companyId: A,
+				eventId: "e1",
+				templateId: "ttX",
+				assigneeUserIds: [BOB],
+				pendingUserIds: [BOB],
+				completions: {},
+			}),
+		);
+	});
+
+	test("a manager can, under the canonical id only", async () => {
+		const task = {
+			companyId: A,
+			eventId: "e1",
+			templateId: "ttM",
+			assigneeMode: "everyone",
+			assigneeUserIds: [BOB],
+			pendingUserIds: [BOB],
+			completions: {},
+		};
+		await assertFails(
+			setDoc(doc(as(ALICE), "eventTasks", "whatever"), task),
+		);
+		await assertSucceeds(
+			setDoc(doc(as(ALICE), "eventTasks", "e1_ttM"), task),
+		);
+	});
+
+	test("a worker lists the tasks still pending on them", async () => {
+		await assertSucceeds(
+			getDocs(
+				query(
+					collection(as(BOB), "eventTasks"),
+					where("companyId", "==", A),
+					where("pendingUserIds", "array-contains", BOB),
+				),
+			),
+		);
+	});
+
+	test("a worker cannot complete a task on a colleague's behalf", async () => {
+		await assertFails(
+			updateDoc(doc(as(BOB), "eventTasks", "e1_tt1"), {
+				[`completions.${CARL}`]: done(BOB),
+				pendingUserIds: [BOB],
+			}),
+		);
+	});
+
+	test("nor credit their own completion to someone else", async () => {
+		await assertFails(
+			updateDoc(doc(as(BOB), "eventTasks", "e1_tt1"), {
+				[`completions.${BOB}`]: done(CARL),
+				pendingUserIds: [CARL],
+			}),
+		);
+	});
+
+	test("nor clear a colleague from an 'everyone' task while ticking", async () => {
+		await assertFails(
+			updateDoc(doc(as(BOB), "eventTasks", "e1_tt1"), {
+				[`completions.${BOB}`]: done(BOB),
+				pendingUserIds: [],
+			}),
+		);
+	});
+
+	test("nor move the deadline or the assignees", async () => {
+		await assertFails(
+			updateDoc(doc(as(BOB), "eventTasks", "e1_tt1"), {
+				assigneeUserIds: [CARL],
+			}),
+		);
+		await assertFails(
+			updateDoc(doc(as(BOB), "eventTasks", "e1_tt1"), {
+				dueAt: new Date(),
+			}),
+		);
+	});
+
+	test("someone not assigned cannot tick it at all", async () => {
+		await assertFails(
+			updateDoc(doc(as(ERIN), "eventTasks", "e1_tt1"), {
+				[`completions.${ERIN}`]: done(ERIN),
+			}),
+		);
+	});
+
+	test("an assignee completes their own part", async () => {
+		await assertSucceeds(
+			updateDoc(doc(as(BOB), "eventTasks", "e1_tt1"), {
+				[`completions.${BOB}`]: done(BOB),
+				pendingUserIds: [CARL],
+				updatedAt: new Date(),
+			}),
+		);
+	});
+
+	test("and can take it back", async () => {
+		const { deleteField } = await import("firebase/firestore");
+		await assertSucceeds(
+			updateDoc(doc(as(BOB), "eventTasks", "e1_tt1"), {
+				[`completions.${BOB}`]: deleteField(),
+				pendingUserIds: [CARL, BOB],
+				nextReminderAt: null,
+			}),
+		);
+	});
+
+	test("one completion settles an 'anyone' task for the whole crew", async () => {
+		await assertSucceeds(
+			updateDoc(doc(as(BOB), "eventTasks", "e1_tt2"), {
+				[`completions.${BOB}`]: done(BOB),
+				pendingUserIds: [],
+				nextReminderAt: null,
+				overdueAlertAt: null,
+			}),
+		);
+	});
+
+	test("a manager completes on a worker's behalf", async () => {
+		await assertSucceeds(
+			updateDoc(doc(as(ALICE), "eventTasks", "e1_tt1"), {
+				[`completions.${BOB}`]: done(ALICE),
+				pendingUserIds: [CARL],
+			}),
+		);
+	});
+
+	test("a manager cannot move a task to another company", async () => {
+		await assertFails(
+			updateDoc(doc(as(ALICE), "eventTasks", "e1_tt1"), {
+				companyId: B,
+			}),
+		);
+	});
+
+	test("a worker cannot delete a task; a manager can", async () => {
+		await assertFails(deleteDoc(doc(as(BOB), "eventTasks", "e1_ttM")));
+		await assertSucceeds(deleteDoc(doc(as(ALICE), "eventTasks", "e1_ttM")));
+	});
+
+	test("another company sees none of it", async () => {
+		await assertFails(getDoc(doc(as(MALLORY), "eventTasks", "e1_tt1")));
+		await assertFails(
+			getDocs(
+				query(
+					collection(as(MALLORY), "eventTasks"),
+					where("companyId", "==", A),
+				),
+			),
 		);
 	});
 });

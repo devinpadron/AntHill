@@ -28,6 +28,7 @@ export const defaultPreferences: CompanyPreferences = {
 	 */
 	requireAssignmentAcknowledgement: true,
 	acknowledgementReminder: { enabled: false, hours: 0, minutes: 0 },
+	enableEventTasks: false,
 	/*
 	 * Both location blocks default OFF, and the sampling numbers matter as much
 	 * as the flag.

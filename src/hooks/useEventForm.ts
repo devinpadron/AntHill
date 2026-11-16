@@ -43,6 +43,21 @@ export const useEventForm = (navigation, eventId?: string) => {
 	/** Individually invited workers, seeded for the same reason as the groups. */
 	const [audienceUserIds, setAudienceUserIds] = useState<string[]>([]);
 	const [notes, setNotes] = useState("");
+	/*
+	 * The parts of a saved event this hook does not edit itself — packages,
+	 * label and tasks, whose pickers live in the screen.
+	 *
+	 * Null until the event has loaded. The screen seeds its pickers from this
+	 * ONCE; without it they opened empty on every edit, and since the submit
+	 * always sends them, saving any change to an existing event wrote
+	 * `packageIds: []` and `labelId: null` over whatever it had.
+	 */
+	const [loadedExtras, setLoadedExtras] = useState<{
+		packageIds: string[];
+		labelId: string | null;
+		taskTemplateIds: string[];
+		taskAssignees: Record<string, string[]>;
+	} | null>(null);
 	const [originalValues, setOriginalValues] = useState({
 		title: "",
 		date: new Date(),
@@ -100,6 +115,12 @@ export const useEventForm = (navigation, eventId?: string) => {
 				setAudienceGroupIds(data.audienceGroupIds || []);
 				setAudienceUserIds(data.audienceUserIds || []);
 				setNotes(data.adminNotes || "");
+				setLoadedExtras({
+					packageIds: data.packageIds || [],
+					labelId: data.labelId ?? null,
+					taskTemplateIds: data.taskTemplateIds || [],
+					taskAssignees: data.taskAssignees || {},
+				});
 
 				setOriginalValues({
 					title: data.title,
@@ -283,6 +304,8 @@ export const useEventForm = (navigation, eventId?: string) => {
 			labelId?: string | null;
 			audienceGroupIds?: string[];
 			audienceUserIds?: string[];
+			taskTemplateIds?: string[];
+			taskAssignees?: Record<string, string[]>;
 		}) => {
 			if (!validateFields()) return;
 
@@ -358,6 +381,17 @@ export const useEventForm = (navigation, eventId?: string) => {
 						: {}),
 					...(extra?.audienceUserIds
 						? { audienceUserIds: extra.audienceUserIds }
+						: {}),
+					/*
+					 * Only the picks. The task DOCUMENTS are derived from the
+					 * saved event by eventService, so there is no second write
+					 * to sequence here and nothing for a failed one to strand.
+					 */
+					...(extra?.taskTemplateIds
+						? { taskTemplateIds: extra.taskTemplateIds }
+						: {}),
+					...(extra?.taskAssignees
+						? { taskAssignees: extra.taskAssignees }
 						: {}),
 				};
 
@@ -457,7 +491,7 @@ export const useEventForm = (navigation, eventId?: string) => {
 
 		showConfirmation(
 			name ? `Delete "${name}"?` : "Delete this event?",
-			"This also removes every invitation, checklist state and file attached to it. It cannot be undone.",
+			"This also removes every invitation, task, checklist state and file attached to it. It cannot be undone.",
 			() => {
 				void (async () => {
 					try {
@@ -581,6 +615,7 @@ export const useEventForm = (navigation, eventId?: string) => {
 		notes,
 		setNotes,
 		originalValues,
+		loadedExtras,
 
 		// UI state
 		openSelect,

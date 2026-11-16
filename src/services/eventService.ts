@@ -5,6 +5,7 @@ import { C, eventResponseId } from "../constants/paths";
 import { Event, EventResponse, WorkerVisibility } from "../types";
 import { FilterType } from "../types/enums/FilterType";
 import { getMembersInGroups } from "./groupService";
+import { syncEventTasks } from "./eventTaskService";
 
 /*
  * Events.
@@ -481,7 +482,49 @@ export async function createEvent(
 		);
 	}
 
+	await resyncTasks(ref.id);
+
 	return ref.id;
+}
+
+/*
+ * The fields an event's task documents are derived from. A patch touching none
+ * of them — a note, a label, a location — cannot change who owes a task or
+ * when it is due, so it must not cost a sync.
+ */
+const TASK_RELEVANT_KEYS: (keyof EventWriteInput)[] = [
+	"title",
+	"dateKey",
+	"isAllDay",
+	"startAt",
+	"endAt",
+	"assignedUserIds",
+	"packageIds",
+	"taskTemplateIds",
+	"taskAssignees",
+];
+
+/**
+ * Re-derives an event's tasks from the SAVED event.
+ *
+ * Here, in the two functions every event write goes through, rather than in
+ * the forms: the portal's staffing board assigns crew with a bare updateEvent,
+ * and a sync that lived in the form would never hear about it — the task would
+ * go on reminding yesterday's crew.
+ *
+ * Best-effort, like the acknowledgement records and for the same reason: the
+ * event is already written, so a failure here cannot be reported as "saving
+ * failed" without inviting a duplicate. A worker with edit rights lands here
+ * too and is simply denied by the rules — tasks are a manager's to arrange.
+ * Re-saving repairs it.
+ */
+async function resyncTasks(eventId: string): Promise<void> {
+	try {
+		const saved = await getEvent(eventId);
+		if (saved) await syncEventTasks(saved);
+	} catch (e) {
+		console.error("Event tasks not synced", e);
+	}
 }
 
 /**
@@ -554,6 +597,10 @@ export async function updateEvent(
 			console.error("Assignment records not updated", e);
 		}
 	}
+
+	if (TASK_RELEVANT_KEYS.some((key) => patch[key] !== undefined)) {
+		await resyncTasks(eventId);
+	}
 }
 
 /**
@@ -561,13 +608,17 @@ export async function updateEvent(
  *
  * v1's deleteEvent removed only the event document, orphaning its Attachments
  * and Checklists subcollections permanently.
+ *
+ * Tasks go too, and that is not just tidiness: an orphaned task keeps its
+ * `nextReminderAt`, so the scheduler would go on pushing workers about an
+ * event that no longer exists.
  */
 export async function deleteEvent(
 	companyId: string,
 	eventId: string,
 ): Promise<void> {
 	try {
-		const [responses, attachments] = await Promise.all([
+		const [responses, attachments, tasks] = await Promise.all([
 			db
 				.collection(C.eventResponses)
 				.where("companyId", "==", companyId)
@@ -579,6 +630,11 @@ export async function deleteEvent(
 				.where("parentType", "==", "event")
 				.where("parentId", "==", eventId)
 				.get(),
+			db
+				.collection(C.eventTasks)
+				.where("companyId", "==", companyId)
+				.where("eventId", "==", eventId)
+				.get(),
 		]);
 
 		const batch = db.batch();
@@ -586,6 +642,7 @@ export async function deleteEvent(
 		batch.delete(db.collection(C.eventChecklistStates).doc(eventId));
 		for (const doc of responses.docs) batch.delete(doc.ref);
 		for (const doc of attachments.docs) batch.delete(doc.ref);
+		for (const doc of tasks.docs) batch.delete(doc.ref);
 
 		await batch.commit();
 	} catch (e) {

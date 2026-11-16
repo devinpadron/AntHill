@@ -138,6 +138,15 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 					 * Calendar tab badge covers however many others there are.
 					 */
 					case "assignment_ack_nudge":
+					/*
+					 * Event tasks. Both open the event, which is where a
+					 * worker ticks the task and where a manager sees who has
+					 * not: `task_reminder` goes to whoever still owes it,
+					 * `task_overdue` to managers once it is past due. Neither
+					 * needed a new payload field — eventId was already there.
+					 */
+					case "task_reminder":
+					case "task_overdue":
 						if (data.eventId) {
 							pendingNavigation.setAction(screen, {
 								eventId: data.eventId,

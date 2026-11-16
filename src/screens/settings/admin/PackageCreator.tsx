@@ -12,6 +12,8 @@ import {
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import { useUser } from "../../../contexts/UserContext";
+import { useCompany } from "../../../contexts/CompanyContext";
+import { useTaskTemplates } from "../../../hooks/useTaskTemplates";
 
 // Define types for our package data
 type Checklist = {
@@ -45,12 +47,16 @@ type Package = {
 	title: string;
 	description: string;
 	checklists: PackageChecklist[];
+	/** Persisted as-is; there is no legacy object form to convert from. */
+	taskTemplateIds: string[];
 };
 
 const PackageCreator = ({ navigation }) => {
 	const theme = useTheme();
 	const styles = useThemedStyles(packageStyles);
 	const { companyId } = useUser();
+	const { preferences } = useCompany();
+	const { templates: taskTemplates } = useTaskTemplates(companyId ?? "");
 
 	// States
 	const [packages, setPackages] = useState<Package[]>([]);
@@ -82,6 +88,7 @@ const PackageCreator = ({ navigation }) => {
 					checklists: (pkg.checklistIds ?? []).map((checklistId) => ({
 						checklistId,
 					})),
+					taskTemplateIds: pkg.taskTemplateIds ?? [],
 				})),
 			);
 			setLoading(false);
@@ -100,6 +107,7 @@ const PackageCreator = ({ navigation }) => {
 			title: "",
 			description: "",
 			checklists: [],
+			taskTemplateIds: [],
 		};
 
 		setCurrentPackage(newPackage);
@@ -128,6 +136,7 @@ const PackageCreator = ({ navigation }) => {
 			title: `${pkg.title} (Copy)`,
 			description: pkg.description,
 			checklists: [...pkg.checklists],
+			taskTemplateIds: [...pkg.taskTemplateIds],
 		};
 
 		setCurrentPackage(duplicatedPackage);
@@ -214,6 +223,20 @@ const PackageCreator = ({ navigation }) => {
 		}
 	};
 
+	// Toggle a task on the package being edited
+	const toggleTask = (templateId: string) => {
+		if (!currentPackage) return;
+		const has = currentPackage.taskTemplateIds.includes(templateId);
+		setCurrentPackage({
+			...currentPackage,
+			taskTemplateIds: has
+				? currentPackage.taskTemplateIds.filter(
+						(id) => id !== templateId,
+					)
+				: [...currentPackage.taskTemplateIds, templateId],
+		});
+	};
+
 	// Save package to Firestore
 	const savePackage = async () => {
 		if (!currentPackage || !companyId) return;
@@ -234,6 +257,7 @@ const PackageCreator = ({ navigation }) => {
 				checklistIds: currentPackage.checklists.map(
 					(entry) => entry.checklistId,
 				),
+				taskTemplateIds: currentPackage.taskTemplateIds,
 			});
 
 			// Refresh package list
@@ -538,6 +562,110 @@ const PackageCreator = ({ navigation }) => {
 								</View>
 							)}
 						</View>
+
+						{/*
+						 * Tasks ride along with the package the same way
+						 * checklists do: every event using it picks them up.
+						 * Only while the company has tasks switched on — and
+						 * saving with it off leaves the stored list untouched.
+						 */}
+						{preferences.enableEventTasks && (
+							<View style={styles.formGroup}>
+								<Text style={styles.label}>Select Tasks</Text>
+								<Text style={styles.sectionDescription}>
+									Every event using this package gets these
+									tasks, with their reminders
+								</Text>
+
+								{taskTemplates.length === 0 ? (
+									<View style={styles.noChecklistsContainer}>
+										<Icon
+											name="error-outline"
+											size={48}
+											color={theme.colors.textTertiary}
+										/>
+										<Text style={styles.noChecklistsText}>
+											No tasks available
+										</Text>
+										<TouchableOpacity
+											style={styles.createChecklistButton}
+											onPress={() =>
+												navigation.navigate(
+													"TaskTemplates",
+												)
+											}
+										>
+											<Text
+												style={
+													styles.createChecklistButtonText
+												}
+											>
+												Create Tasks
+											</Text>
+										</TouchableOpacity>
+									</View>
+								) : (
+									<View
+										style={
+											styles.checklistSelectionContainer
+										}
+									>
+										{taskTemplates.map((template) => {
+											const on =
+												!!currentPackage?.taskTemplateIds.includes(
+													template.id,
+												);
+											return (
+												<TouchableOpacity
+													key={template.id}
+													style={
+														styles.checklistSelectionItem
+													}
+													onPress={() =>
+														toggleTask(template.id)
+													}
+												>
+													<View
+														style={
+															styles.checklistSelectionContent
+														}
+													>
+														<Text
+															style={
+																styles.checklistSelectionTitle
+															}
+														>
+															{template.title}
+														</Text>
+													</View>
+													<Switch
+														value={on}
+														onValueChange={() =>
+															toggleTask(
+																template.id,
+															)
+														}
+														trackColor={{
+															false: theme.colors
+																.border,
+															true: theme.colors
+																.success,
+														}}
+														thumbColor={
+															on
+																? theme.colors
+																		.success
+																: theme.colors
+																		.surface
+														}
+													/>
+												</TouchableOpacity>
+											);
+										})}
+									</View>
+								)}
+							</View>
+						)}
 
 						{currentPackage?.checklists.length ? (
 							<View style={styles.selectedChecklistsContainer}>

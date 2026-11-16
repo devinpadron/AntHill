@@ -4,7 +4,8 @@ import {
 	subscribeMyResponseDocs,
 	subscribeMyUpcomingEvents,
 } from "../services/eventService";
-import { Event, EventResponse, FilterType } from "../types";
+import { subscribeMyPendingTasks } from "../services/eventTaskService";
+import { Event, EventResponse, EventTask, FilterType } from "../types";
 import { useUser } from "../contexts/UserContext";
 import { useCompany } from "../contexts/CompanyContext";
 
@@ -28,6 +29,11 @@ import { useCompany } from "../contexts/CompanyContext";
  * Availability badge and the per-event warning would otherwise be three
  * screens each opening their own listeners for the same data.
  *
+ * A THIRD question joined them later: event tasks ("have you made the final
+ * call with the client"). Those live in their own collection, already narrowed
+ * server-side to the ones still pending on this user, so they are one more
+ * subscription rather than something derived from the first two.
+ *
  * Admins are INCLUDED. They were excluded on the reasoning that a manager who
  * assigns themselves already knows they did — but the same exclusion also took
  * away their confirm button, so a manager on their own crew showed as
@@ -36,13 +42,31 @@ import { useCompany } from "../contexts/CompanyContext";
  */
 
 /** Local YYYY-MM-DD. toISOString would shift the day in most time zones. */
-function todayKey(): string {
-	const now = new Date();
+function dateKeyOf(date: Date): string {
 	return [
-		now.getFullYear(),
-		String(now.getMonth() + 1).padStart(2, "0"),
-		String(now.getDate()).padStart(2, "0"),
+		date.getFullYear(),
+		String(date.getMonth() + 1).padStart(2, "0"),
+		String(date.getDate()).padStart(2, "0"),
 	].join("-");
+}
+
+const todayKey = () => dateKeyOf(new Date());
+
+/*
+ * How far back the task query reaches.
+ *
+ * A task can fall due after its event — "return the van keys" — so asking for
+ * today onwards would drop exactly the overdue ones. Tasks stop being chased
+ * TASK_EXPIRY_SECONDS (7 days) after the event ends; one day more than that
+ * covers an event that ran past midnight. Anything the floor lets through
+ * that has since expired is filtered out below.
+ */
+const TASK_LOOKBACK_DAYS = 8;
+
+function taskFloorKey(): string {
+	const floor = new Date();
+	floor.setDate(floor.getDate() - TASK_LOOKBACK_DAYS);
+	return dateKeyOf(floor);
 }
 
 export function useEventPrompts() {
@@ -54,8 +78,10 @@ export function useEventPrompts() {
 		{},
 	);
 	const [unstaffed, setUnstaffed] = useState<Event[]>([]);
+	const [myTasks, setMyTasks] = useState<EventTask[]>([]);
 
 	const from = todayKey();
+	const taskFrom = taskFloorKey();
 	const enabled = Boolean(companyId && userId);
 
 	useEffect(() => {
@@ -102,6 +128,21 @@ export function useEventPrompts() {
 			() => setUnstaffed([]),
 		);
 	}, [enabled, companyId, userId, from]);
+
+	useEffect(() => {
+		if (!enabled) {
+			setMyTasks([]);
+			return;
+		}
+		return subscribeMyPendingTasks(
+			companyId!,
+			userId,
+			taskFrom,
+			setMyTasks,
+			// A missing index must read as "no tasks", not as a stale list.
+			() => setMyTasks([]),
+		);
+	}, [enabled, companyId, userId, taskFrom]);
 
 	/*
 	 * The subscriptions run regardless; only the COUNTS are gated on
@@ -181,7 +222,41 @@ export function useEventPrompts() {
 		return ids.size;
 	}, [events, unstaffed, responses, restricted, chaseOn]);
 
+	/*
+	 * Tasks this worker still owes, soonest due first.
+	 *
+	 * Gated on the company flag for the same reason the availability count
+	 * follows its setting: a company that switched tasks off has decided not
+	 * to ask, and a badge that cannot be cleared from any visible screen is
+	 * the worst kind of nag.
+	 */
+	const tasksOn = Boolean(preferences.enableEventTasks);
+
+	const pendingTasks = useMemo(() => {
+		if (!tasksOn) return [];
+		const now = Date.now();
+		return myTasks
+			.filter((task) => {
+				const expires = task.expiresAt?.toMillis?.();
+				return expires === undefined || expires > now;
+			})
+			.sort(
+				(a, b) =>
+					(a.dueAt?.toMillis?.() ?? 0) - (b.dueAt?.toMillis?.() ?? 0),
+			);
+	}, [myTasks, tasksOn]);
+
+	/** Event ids with a task outstanding, for marking rows in a list. */
+	const pendingTaskEventIds = useMemo(
+		() => new Set(pendingTasks.map((task) => task.eventId)),
+		[pendingTasks],
+	);
+
 	return {
+		/** Event tasks still pending on this worker. */
+		pendingTasks,
+		pendingTaskEventIds,
+		pendingTaskCount: pendingTasks.length,
 		/** Assigned, upcoming, not yet confirmed. */
 		unconfirmed,
 		unconfirmedIds,

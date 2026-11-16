@@ -10,8 +10,9 @@ import {
 	subscribeEventLabels,
 	subscribePackages,
 } from "@app/services/libraryService";
+import { subscribeTaskTemplates } from "@app/services/eventTaskService";
 import { showConfirmation } from "@app/utils/alertUtils";
-import type { Checklist, EventLabel, Package } from "@app/types";
+import type { Checklist, EventLabel, Package, TaskTemplate } from "@app/types";
 import { useCompany } from "../../contexts/CompanyContext";
 import {
 	Badge,
@@ -243,17 +244,23 @@ function ItemListEditor({
 /* --------------------------------------------------------------- packages */
 
 export function PackagesPage() {
-	const { companyId } = useCompany();
+	const { companyId, preferences } = useCompany();
 	const toast = useToast();
 	const [packages, setPackages] = useState<Package[]>([]);
 	const [checklists, setChecklists] = useState<Checklist[]>([]);
+	const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>([]);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 
 	useEffect(() => subscribePackages(companyId, setPackages), [companyId]);
 	useEffect(() => subscribeChecklists(companyId, setChecklists), [companyId]);
+	useEffect(
+		() => subscribeTaskTemplates(companyId, setTaskTemplates),
+		[companyId],
+	);
 
 	const selected = packages.find((p) => p.id === selectedId) ?? null;
+	const tasksOn = preferences.enableEventTasks;
 
 	const itemCount = useMemo(
 		() =>
@@ -294,11 +301,19 @@ export function PackagesPage() {
 	return (
 		<TwoPane
 			title="Packages"
-			subtitle="Bundles of checklists. Attaching a package to an event attaches all of its lists."
+			subtitle={
+				tasksOn
+					? "Bundles of checklists and tasks. Attaching a package to an event attaches all of them."
+					: "Bundles of checklists. Attaching a package to an event attaches all of its lists."
+			}
 			items={packages.map((p) => ({
 				id: p.id,
 				label: p.title,
-				meta: `${p.checklistIds?.length ?? 0} checklist${p.checklistIds?.length === 1 ? "" : "s"}`,
+				meta:
+					`${p.checklistIds?.length ?? 0} checklist${p.checklistIds?.length === 1 ? "" : "s"}` +
+					(tasksOn && p.taskTemplateIds?.length
+						? ` · ${p.taskTemplateIds.length} task${p.taskTemplateIds.length === 1 ? "" : "s"}`
+						: ""),
 			}))}
 			selectedId={selectedId}
 			onSelect={setSelectedId}
@@ -430,6 +445,77 @@ export function PackagesPage() {
 							</ul>
 						)}
 					</div>
+
+					{/*
+					 * Tasks ride with the package the same way checklists do.
+					 * Shown only while the feature is on; with it off nothing
+					 * here writes `taskTemplateIds`, so the stored list
+					 * survives a company switching tasks off and on again.
+					 */}
+					{tasksOn && (
+						<div className={styles.items}>
+							<div className={styles.itemsHead}>
+								<Text variant="overline" tone="tertiary">
+									Tasks
+								</Text>
+								<Text variant="caption" tone="tertiary">
+									Added to every event that uses this package
+								</Text>
+							</div>
+
+							{taskTemplates.length === 0 ? (
+								<Text variant="caption" tone="tertiary">
+									No tasks to add yet — create them under
+									Settings › Tasks.
+								</Text>
+							) : (
+								<ul className={styles.checkList}>
+									{taskTemplates.map((template) => {
+										const current =
+											selected.taskTemplateIds ?? [];
+										const chosen = current.includes(
+											template.id,
+										);
+										return (
+											<li key={template.id}>
+												<label
+													className={styles.checkRow}
+												>
+													<input
+														type="checkbox"
+														checked={chosen}
+														onChange={() =>
+															void save({
+																taskTemplateIds:
+																	chosen
+																		? current.filter(
+																				(
+																					id,
+																				) =>
+																					id !==
+																					template.id,
+																			)
+																		: [
+																				...current,
+																				template.id,
+																			],
+															})
+														}
+													/>
+													<Text
+														variant="body"
+														as="span"
+													>
+														{template.title}
+													</Text>
+												</label>
+											</li>
+										);
+									})}
+								</ul>
+							)}
+						</div>
+					)}
 				</div>
 			)}
 		</TwoPane>
@@ -606,7 +692,7 @@ export function LabelsPage() {
 
 /* ---------------------------------------------------------- shared shell */
 
-function TwoPane({
+export function TwoPane({
 	title,
 	subtitle,
 	items,
@@ -718,5 +804,5 @@ function TwoPane({
 	);
 }
 
-const asMessage = (error: unknown) =>
+export const asMessage = (error: unknown) =>
 	error instanceof Error ? error.message : undefined;

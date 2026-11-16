@@ -31,6 +31,7 @@ import {
 	PackagesPage,
 	LabelsPage,
 } from "./pages/settings/LibraryPages";
+import { TasksPage } from "./pages/settings/TasksPage";
 import "./styles/global.css";
 
 /*
@@ -161,6 +162,10 @@ export function App() {
 											<Route
 												path="checklists"
 												element={<ChecklistsPage />}
+											/>
+											<Route
+												path="tasks"
+												element={<TasksPage />}
 											/>
 											<Route
 												path="packages"

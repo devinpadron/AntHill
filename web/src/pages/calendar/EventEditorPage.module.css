@@ -308,3 +308,11 @@
 		position: static;
 	}
 }
+
+/* The "who does this" list under a specific-people task. */
+.taskPeople {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-sm);
+	margin: var(--sp-xs) 0 var(--sp-md) var(--sp-xl);
+}

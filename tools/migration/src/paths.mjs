@@ -22,6 +22,10 @@ export const C = {
 	packages: "packages",
 	checklists: "checklists",
 	eventLabels: "eventLabels",
+	// Not migrated — they have no v1 counterpart. Listed so check-queries can
+	// exercise the indexes their services need.
+	taskTemplates: "taskTemplates",
+	eventTasks: "eventTasks",
 	connections: "connections",
 	edits: "edits",
 };

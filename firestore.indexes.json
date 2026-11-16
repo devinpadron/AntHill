@@ -475,6 +475,38 @@
 			]
 		},
 		{
+			"collectionGroup": "taskTemplates",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "title",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
+			"collectionGroup": "eventTasks",
+			"queryScope": "COLLECTION",
+			"fields": [
+				{
+					"fieldPath": "companyId",
+					"order": "ASCENDING"
+				},
+				{
+					"fieldPath": "pendingUserIds",
+					"arrayConfig": "CONTAINS"
+				},
+				{
+					"fieldPath": "dateKey",
+					"order": "ASCENDING"
+				}
+			]
+		},
+		{
 			"collectionGroup": "timeEntries",
 			"queryScope": "COLLECTION",
 			"fields": [
