@@ -99,3 +99,23 @@
 		grid-template-columns: 88px 1fr;
 	}
 }
+
+/* What the overdue-alert switch reveals: when, how often, who. */
+.alert {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-md);
+	padding-left: calc(var(--sp-sm) + 16px);
+}
+.alertRow {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-xs, 4px);
+}
+/* "N · hours|days". */
+.span {
+	display: grid;
+	grid-template-columns: 88px 120px;
+	gap: var(--sp-sm);
+	align-items: end;
+}

@@ -6,6 +6,8 @@ import {
 } from "@app/services/eventTaskService";
 import { subscribePackages } from "@app/services/libraryService";
 import { showConfirmation } from "@app/utils/alertUtils";
+import { useCompanyMembers } from "@app/hooks/useCompanyMembers";
+import { Role } from "@app/types/enums/Role";
 import {
 	ASSIGNEE_MODE_HINT,
 	ASSIGNEE_MODE_LABEL,
@@ -76,6 +78,19 @@ export function TasksPage() {
 	useEffect(() => subscribePackages(companyId, setPackages), [companyId]);
 
 	const selected = templates.find((t) => t.id === selectedId) ?? null;
+
+	const { members } = useCompanyMembers(companyId);
+	/*
+	 * Who an overdue alert can be addressed to: managers and owners, the only
+	 * people the scheduler sends it to.
+	 */
+	const managers = useMemo(
+		() =>
+			members.filter(
+				(m) => m.role === Role.MANAGER || m.role === Role.OWNER,
+			),
+		[members],
+	);
 
 	const usedBy = useMemo(
 		() =>
@@ -342,6 +357,56 @@ export function TasksPage() {
 						)}
 					</div>
 
+					{/* -------------------------------------- warning */}
+					<div className={styles.block}>
+						<label className={styles.toggle}>
+							<input
+								type="checkbox"
+								checked={(selected.dueWarningSeconds ?? 0) > 0}
+								onChange={(e) =>
+									void save({
+										dueWarningSeconds: e.target.checked
+											? 24 * 3600
+											: null,
+									})
+								}
+							/>
+							<span className={styles.modeText}>
+								<Text variant="body" as="span">
+									Warn managers before it's due
+								</Text>
+								<Text
+									variant="caption"
+									tone="tertiary"
+									as="span"
+								>
+									A heads-up if nobody has done it yet, while
+									there is still time.
+								</Text>
+							</span>
+						</label>
+
+						{(selected.dueWarningSeconds ?? 0) > 0 && (
+							<div className={styles.alert}>
+								<div className={styles.alertRow}>
+									<Text variant="caption" tone="tertiary">
+										How long before it is due
+									</Text>
+									<SpanFields
+										label="How long before it is due"
+										min={1}
+										seconds={
+											selected.dueWarningSeconds ?? 0
+										}
+										onCommit={(dueWarningSeconds) =>
+											void save({ dueWarningSeconds })
+										}
+									/>
+								</div>
+							</div>
+						)}
+					</div>
+
 					{/* -------------------------------------- overdue */}
 					<div className={styles.block}>
 						<label className={styles.toggle}>
@@ -365,25 +430,37 @@ export function TasksPage() {
 									tone="tertiary"
 									as="span"
 								>
-									One alert when it is still open past its due
-									time.
+									An alert when it is still open past its due
+									time. Nothing is sent overnight.
 								</Text>
 							</span>
 						</label>
 
 						{selected.overdueAlertSeconds !== null &&
 							selected.overdueAlertSeconds !== undefined && (
-								<div className={styles.narrow}>
-									<HoursField
-										label="Hours after due"
-										seconds={selected.overdueAlertSeconds}
-										onCommit={(overdueAlertSeconds) =>
-											void save({ overdueAlertSeconds })
-										}
-									/>
-								</div>
+								<OverdueAlertFields
+									template={selected}
+									onSave={(patch) => void save(patch)}
+								/>
 							)}
 					</div>
+
+					{/* One answer to "who", shared by the warning and the
+					    alert — shown when either is on. */}
+					{((selected.dueWarningSeconds ?? 0) > 0 ||
+						(selected.overdueAlertSeconds !== null &&
+							selected.overdueAlertSeconds !== undefined)) && (
+						<div className={styles.block}>
+							<AlertRecipients
+								template={selected}
+								managers={managers.map((m) => ({
+									id: m.userId,
+									name: m.displayName,
+								}))}
+								onSave={(patch) => void save(patch)}
+							/>
+						</div>
+					)}
 				</div>
 			)}
 		</TwoPane>
@@ -423,6 +500,172 @@ function HoursField({
 				if (next !== hours) onCommit(next * 3600);
 			}}
 		/>
+	);
+}
+
+/** "N hours|days", committed on blur for the reason HoursField gives. */
+function SpanFields({
+	seconds,
+	min = 0,
+	label,
+	onCommit,
+}: {
+	seconds: number;
+	/** In the chosen unit. */
+	min?: number;
+	label: string;
+	onCommit: (seconds: number) => void;
+}) {
+	const parts = offsetToParts(seconds);
+	const [amount, setAmount] = useState(String(parts.amount));
+
+	useEffect(() => setAmount(String(parts.amount)), [parts.amount]);
+
+	const commit = (unit: OffsetUnit) => {
+		const typed = Math.max(min, parseInt(amount, 10) || 0);
+		setAmount(String(typed));
+		const next = partsToOffset({
+			amount: typed,
+			unit,
+			direction: "after",
+		});
+		if (next !== seconds) onCommit(next);
+	};
+
+	return (
+		<div className={styles.span}>
+			<Input
+				type="number"
+				min={min}
+				value={amount}
+				onChange={(e) => setAmount(e.target.value)}
+				onBlur={() => commit(parts.unit)}
+				aria-label={label}
+			/>
+			<Select
+				value={parts.unit}
+				onChange={(e) => commit(e.target.value as OffsetUnit)}
+				aria-label={`${label}: unit`}
+			>
+				<option value="hours">hours</option>
+				<option value="days">days</option>
+			</Select>
+		</div>
+	);
+}
+
+/** When the overdue alert goes out, and whether it repeats. */
+function OverdueAlertFields({
+	template,
+	onSave,
+}: {
+	template: TaskTemplate;
+	onSave: (patch: Partial<TaskTemplate>) => void;
+}) {
+	const repeat = template.overdueAlertRepeatSeconds ?? 0;
+
+	return (
+		<div className={styles.alert}>
+			<div className={styles.alertRow}>
+				<Text variant="caption" tone="tertiary">
+					How long after it was due
+				</Text>
+				<SpanFields
+					label="How long after it was due"
+					seconds={template.overdueAlertSeconds ?? 0}
+					onCommit={(overdueAlertSeconds) =>
+						onSave({ overdueAlertSeconds })
+					}
+				/>
+			</div>
+
+			<div className={styles.alertRow}>
+				<label className={styles.toggle}>
+					<input
+						type="checkbox"
+						checked={repeat > 0}
+						onChange={(e) =>
+							onSave({
+								overdueAlertRepeatSeconds: e.target.checked
+									? 24 * 3600
+									: null,
+							})
+						}
+					/>
+					<Text variant="body" as="span">
+						Keep alerting until done, every
+					</Text>
+				</label>
+				{repeat > 0 && (
+					<SpanFields
+						label="Repeat every"
+						min={1}
+						seconds={repeat}
+						onCommit={(overdueAlertRepeatSeconds) =>
+							onSave({ overdueAlertRepeatSeconds })
+						}
+					/>
+				)}
+			</div>
+		</div>
+	);
+}
+
+/**
+ * Which managers get the warning and the overdue alert.
+ *
+ * Nobody ticked means every manager — the default, and how every task saved
+ * before recipients existed reads. A recipient who has since left or been made
+ * a worker is dropped the next time the list is edited; the scheduler ignores
+ * them in the meantime.
+ */
+function AlertRecipients({
+	template,
+	managers,
+	onSave,
+}: {
+	template: TaskTemplate;
+	managers: { id: string; name: string }[];
+	onSave: (patch: Partial<TaskTemplate>) => void;
+}) {
+	const managerIds = new Set(managers.map((m) => m.id));
+	const picked = (template.overdueAlertUserIds ?? []).filter((id) =>
+		managerIds.has(id),
+	);
+
+	return (
+		<div className={styles.alert}>
+			<div className={styles.alertRow}>
+				<Text variant="caption" tone="tertiary">
+					Who gets these —{" "}
+					{picked.length
+						? `only the ${picked.length} ticked`
+						: "nobody ticked means every manager and owner"}
+				</Text>
+				<div className={styles.modes}>
+					{managers.map((manager) => (
+						<label key={manager.id} className={styles.mode}>
+							<input
+								type="checkbox"
+								checked={picked.includes(manager.id)}
+								onChange={(e) =>
+									onSave({
+										overdueAlertUserIds: e.target.checked
+											? [...picked, manager.id]
+											: picked.filter(
+													(id) => id !== manager.id,
+												),
+									})
+								}
+							/>
+							<Text variant="body" as="span">
+								{manager.name}
+							</Text>
+						</label>
+					))}
+				</div>
+			</div>
+		</div>
 	);
 }
 

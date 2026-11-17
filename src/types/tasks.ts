@@ -61,10 +61,29 @@ export interface TaskTemplate extends BaseDoc, CompanyScoped {
 	requireNote: boolean;
 	reminders: TaskReminderRule[];
 	/**
+	 * Warn managers this long BEFORE the due time if nobody has done it yet —
+	 * while there is still time to act. Null, zero or absent means no warning.
+	 * Independent of the overdue alert below; goes to the same people.
+	 */
+	dueWarningSeconds?: number | null;
+	/**
 	 * Tell managers when the task is still open this long after it was due.
 	 * Null means never.
 	 */
 	overdueAlertSeconds: number | null;
+	/**
+	 * Tell them AGAIN this often while it stays open. Null or zero means the
+	 * alert is sent once. Absent on templates saved before this existed.
+	 */
+	overdueAlertRepeatSeconds?: number | null;
+	/**
+	 * Which managers get the alert. EMPTY MEANS ALL OF THEM — both the default
+	 * and what every template saved before this existed reads as, so nobody
+	 * stops hearing about overdue tasks because a field was added. The
+	 * scheduler only ever sends to people who are still active managers or
+	 * owners, whatever is named here.
+	 */
+	overdueAlertUserIds?: string[];
 }
 
 export interface TaskCompletion {
@@ -138,10 +157,20 @@ export interface EventTask extends BaseDoc, CompanyScoped {
 	/** Written by the scheduler only. */
 	lastRemindedAt: Timestamp | null;
 
+	/** Snapshot of the template's; see there. */
+	dueWarningSeconds?: number | null;
 	overdueAlertSeconds: number | null;
-	/** When to tell managers it is still open. Nulled once sent or settled. */
+	/** Snapshot of the template's; see there. */
+	overdueAlertRepeatSeconds?: number | null;
+	/** Snapshot of the template's. Empty or absent means every manager. */
+	overdueAlertUserIds?: string[];
+	/**
+	 * When managers next hear about it: the warning before due, then the
+	 * overdue alert, then its repeats — see computeNextManagerAlertMs. Null
+	 * once settled or when nothing more is owed.
+	 */
 	overdueAlertAt: Timestamp | null;
-	/** Written by the scheduler only. */
+	/** Written by the scheduler only: the most recent warning or alert. */
 	overdueAlertedAt: Timestamp | null;
 
 	/** No reminder is ever sent after this, whatever the rules say. */
@@ -157,7 +186,10 @@ export const defaultTaskTemplate: Pick<
 	| "dueOffsetSeconds"
 	| "requireNote"
 	| "reminders"
+	| "dueWarningSeconds"
 	| "overdueAlertSeconds"
+	| "overdueAlertRepeatSeconds"
+	| "overdueAlertUserIds"
 > = {
 	title: "",
 	description: "",
@@ -167,5 +199,8 @@ export const defaultTaskTemplate: Pick<
 	dueOffsetSeconds: -24 * 3600,
 	requireNote: false,
 	reminders: [],
+	dueWarningSeconds: null,
 	overdueAlertSeconds: null,
+	overdueAlertRepeatSeconds: null,
+	overdueAlertUserIds: [],
 };

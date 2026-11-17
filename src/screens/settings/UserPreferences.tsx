@@ -138,8 +138,9 @@ const NOTIFICATION_ROWS: {
 	},
 	{
 		channel: "tasksOverdue",
-		title: "Overdue tasks",
-		subtitle: "When an event task is still open past its due time",
+		title: "Unfinished tasks",
+		subtitle:
+			"When an event task is nearly due or overdue and still not done",
 		icon: "alert-circle-outline",
 		adminOnly: true,
 		needsEventTasks: true,

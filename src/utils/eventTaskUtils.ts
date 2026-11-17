@@ -163,6 +163,68 @@ export function computeNextReminderMs(input: {
 }
 
 /* ------------------------------------------------------------ editor glue */
+/**
+ * When managers should next hear about a task, or null for never.
+ *
+ * ONE clock — `overdueAlertAt` — carries up to three kinds of send, in order:
+ *
+ *   the warning   `warningSeconds` BEFORE the due time: "this is due soon and
+ *                 nobody has done it". Skipped once the due time has passed —
+ *                 a warning about a deadline already missed is just the
+ *                 overdue alert with the wrong words.
+ *   the alert     `alertSeconds` AFTER the due time.
+ *   its repeats   one `repeatSeconds` gap after the last send, until done.
+ *
+ * `alertedMs` is the most recent send of ANY of them. That is enough to know
+ * where in the sequence the task is: nothing sent means start at the top; a
+ * send earlier than the first overdue alert means that alert is still owed
+ * (the warning went out, or went out late after quiet hours); anything later
+ * means only repeats are left.
+ *
+ * THE CLOUD FUNCTION RUNS THIS SAME FUNCTION after each send, passing the send
+ * time as `alertedMs`, to move `overdueAlertAt` on. Change one and the other
+ * must follow.
+ */
+export function computeNextManagerAlertMs(input: {
+	dueMs: number;
+	/** How long before due to warn. Null, absent or zero means no warning. */
+	warningSeconds: number | null | undefined;
+	/** How long after due to alert. Null or absent means no alert. */
+	alertSeconds: number | null | undefined;
+	repeatSeconds: number | null | undefined;
+	alertedMs: number | null;
+	nowMs: number;
+	expiresMs: number;
+	hasPending: boolean;
+}): number | null {
+	if (!input.hasPending) return null;
+
+	const warningSeconds = Math.max(0, input.warningSeconds || 0);
+	const repeatSeconds = Math.max(0, input.repeatSeconds || 0);
+	const alertOn =
+		input.alertSeconds !== null && input.alertSeconds !== undefined;
+	const firstAlertMs = alertOn
+		? input.dueMs + Math.max(0, input.alertSeconds || 0) * 1000
+		: null;
+
+	let nextMs: number | null;
+	if (input.alertedMs === null) {
+		nextMs =
+			warningSeconds > 0 && input.nowMs < input.dueMs
+				? input.dueMs - warningSeconds * 1000
+				: firstAlertMs;
+	} else if (firstAlertMs !== null && input.alertedMs < firstAlertMs) {
+		nextMs = firstAlertMs;
+	} else {
+		nextMs =
+			alertOn && repeatSeconds > 0
+				? input.alertedMs + repeatSeconds * 1000
+				: null;
+	}
+
+	// Anything that could only fire after expiry is not scheduled at all.
+	return nextMs !== null && nextMs <= input.expiresMs ? nextMs : null;
+}
 
 /*
  * Offsets are edited as "N hours|days before|after" — never minutes. The

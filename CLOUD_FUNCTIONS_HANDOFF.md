@@ -165,22 +165,25 @@ here because both repos have to agree on it.
 `eventTasks/{eventId}_{templateId}` — one per task per event. Types in
 `src/types/tasks.ts`; written by `src/services/eventTaskService.ts`.
 
-| Field                             | Written by                  | Meaning                                                       |
-| --------------------------------- | --------------------------- | ------------------------------------------------------------- |
-| `companyId`, `eventId`, `dateKey` | client                      | scoping                                                       |
-| `eventTitle`, `title`             | client                      | for the push text — no second read needed                     |
-| `assigneeMode`                    | client                      | `anyone` \| `everyone` \| `specific`                          |
-| `assigneeUserIds`                 | client                      | everyone responsible                                          |
-| `pendingUserIds`                  | client                      | **who to push**. Empty means settled                          |
-| `completions{uid}`                | client                      | `{completedAt, completedByUserId, note}`                      |
-| `eventStartAt`, `eventEndAt`      | client                      | resolved anchors (all-day events use 09:00 / 17:00)           |
-| `dueAt`                           | client                      |                                                               |
-| `reminders[]`                     | client                      | `{id, anchor, offsetSeconds, repeat:{enabled,hours,minutes}}` |
-| `nextReminderAt`                  | client **and** scheduler    | when the next reminder is due; `null` = nothing scheduled     |
-| `lastRemindedAt`                  | **scheduler only**          | set on every send                                             |
-| `overdueAlertAt`                  | client, nulled by scheduler | when to tell managers it is still open; `null` = no alert due |
-| `overdueAlertedAt`                | **scheduler only**          | set when the manager alert goes out                           |
-| `expiresAt`                       | client                      | never send anything after this (event end + 7 days)           |
+| Field                             | Written by               | Meaning                                                                |
+| --------------------------------- | ------------------------ | ---------------------------------------------------------------------- |
+| `companyId`, `eventId`, `dateKey` | client                   | scoping                                                                |
+| `eventTitle`, `title`             | client                   | for the push text — no second read needed                              |
+| `assigneeMode`                    | client                   | `anyone` \| `everyone` \| `specific`                                   |
+| `assigneeUserIds`                 | client                   | everyone responsible                                                   |
+| `pendingUserIds`                  | client                   | **who to push**. Empty means settled                                   |
+| `completions{uid}`                | client                   | `{completedAt, completedByUserId, note}`                               |
+| `eventStartAt`, `eventEndAt`      | client                   | resolved anchors (all-day events use 09:00 / 17:00)                    |
+| `dueAt`                           | client                   |                                                                        |
+| `reminders[]`                     | client                   | `{id, anchor, offsetSeconds, repeat:{enabled,hours,minutes}}`          |
+| `nextReminderAt`                  | client **and** scheduler | when the next reminder is due; `null` = nothing scheduled              |
+| `lastRemindedAt`                  | **scheduler only**       | set on every send                                                      |
+| `overdueAlertAt`                  | client **and** scheduler | when to tell managers it is still open; `null` = no alert due          |
+| `overdueAlertedAt`                | **scheduler only**       | set when the manager alert goes out (the most recent one)              |
+| `dueWarningSeconds`               | client                   | warn managers this long BEFORE due; absent, `null` or `0` = no warning |
+| `overdueAlertRepeatSeconds`       | client                   | gap between repeat alerts; absent, `null` or `0` = send once           |
+| `overdueAlertUserIds`             | client                   | which managers get it; absent or empty = **all of them**               |
+| `expiresAt`                       | client                   | never send anything after this (event end + 7 days)                    |
 
 ### The function
 
@@ -211,13 +214,36 @@ For each document from query 1:
    should get one push covering them, the way the availability nudge does,
    with `eventId` set to the soonest.
 
-For each document from query 2: if `pendingUserIds` is non-empty and not
-expired, push `task_overdue` to the company's active managers and owners; in
-every case write `overdueAlertAt: null`, and `overdueAlertedAt: now` when sent.
+For each document from query 2: if `pendingUserIds` is empty or the task has
+expired, write `overdueAlertAt: null` and send nothing. Otherwise push
+`task_overdue` and write `overdueAlertedAt: now`.
 
-Quiet hours are worth adding here rather than in the clients: resolve the hour
-in `companies/{id}.timeZone` and, between roughly 21:00 and 07:00, leave the
-document alone so the next pass picks it up.
+**Who gets it** is the task's `overdueAlertUserIds`, honoured only as a
+narrowing of the company's active managers and owners: a named person who has
+left or been made a worker is skipped. Empty, absent, or nobody named still a
+manager all mean every manager — the field is missing on every task written
+before it existed, so both sides **fail open** to the old behaviour. One push
+per manager per run, covering every task addressed to them.
+
+**When the next one is** — `overdueAlertAt` is one clock for three kinds of
+send: a warning `dueWarningSeconds` before the due time, the alert
+`overdueAlertSeconds` after it, and repeats of the alert every
+`overdueAlertRepeatSeconds`. After each send the scheduler writes
+`overdueAlertAt: computeNextManagerAlertMs({..., alertedMs: now})`, a second
+function copied verbatim from `src/utils/eventTaskUtils.ts` into
+`functions/src/utils/taskSchedule.js`; the app runs its copy with
+`overdueAlertedAt` in that argument when an event is saved or a task reopened.
+The two must stay identical, like `computeNextReminderMs`.
+
+The warning has **no push type of its own**: it is sent as `task_overdue`
+(so the frozen payload contract and the `tasksOverdue` mute both cover it) and
+only the title and body differ, chosen by whether `dueAt` has passed at send
+time. A warning held back by quiet hours until after the deadline goes out
+worded as overdue.
+
+A scheduler deployed before recipients and repeats existed clears the field
+after the first send and alerts every manager; one deployed before the warning
+existed sends it worded as overdue.
 
 ### Advancing `nextReminderAt`
 

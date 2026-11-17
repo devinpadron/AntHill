@@ -5,6 +5,7 @@ import { C, eventTaskId } from "../constants/paths";
 import { Event, EventTask, TaskCompletion, TaskTemplate } from "../types";
 import {
 	anchorMs,
+	computeNextManagerAlertMs,
 	computeNextReminderMs,
 	pendingFor,
 	resolveAnchors,
@@ -228,13 +229,17 @@ export function subscribeMyPendingTasks(
 function scheduleFor(input: {
 	task: Pick<
 		EventTask,
-		"reminders" | "overdueAlertSeconds" | "lastRemindedAt"
+		| "reminders"
+		| "dueWarningSeconds"
+		| "overdueAlertSeconds"
+		| "overdueAlertRepeatSeconds"
+		| "lastRemindedAt"
 	>;
 	startMs: number;
 	endMs: number;
 	dueMs: number;
 	hasPending: boolean;
-	/** Null once the alert has gone out and should not repeat. */
+	/** When managers were last warned or alerted; null if never. */
 	overdueAlertedMs: number | null;
 	nowMs: number;
 }) {
@@ -250,21 +255,21 @@ function scheduleFor(input: {
 		hasPending: input.hasPending,
 	});
 
-	const alertSeconds = input.task.overdueAlertSeconds;
-	const alertMs =
-		input.hasPending &&
-		alertSeconds !== null &&
-		alertSeconds !== undefined &&
-		input.overdueAlertedMs === null
-			? input.dueMs + alertSeconds * 1000
-			: null;
+	const alertMs = computeNextManagerAlertMs({
+		dueMs: input.dueMs,
+		warningSeconds: input.task.dueWarningSeconds,
+		alertSeconds: input.task.overdueAlertSeconds,
+		repeatSeconds: input.task.overdueAlertRepeatSeconds,
+		alertedMs: input.overdueAlertedMs,
+		nowMs: input.nowMs,
+		expiresMs,
+		hasPending: input.hasPending,
+	});
 
 	return {
 		expiresMs,
 		nextReminderAt: nextMs === null ? null : ts(nextMs),
-		// An alert that could only fire after expiry is not scheduled at all.
-		overdueAlertAt:
-			alertMs !== null && alertMs <= expiresMs ? ts(alertMs) : null,
+		overdueAlertAt: alertMs === null ? null : ts(alertMs),
 	};
 }
 
@@ -362,7 +367,11 @@ export async function syncEventTasks(event: Event): Promise<void> {
 					template.dueOffsetSeconds * 1000;
 				const fresh = {
 					reminders: template.reminders ?? [],
+					dueWarningSeconds: template.dueWarningSeconds ?? null,
 					overdueAlertSeconds: template.overdueAlertSeconds ?? null,
+					overdueAlertRepeatSeconds:
+						template.overdueAlertRepeatSeconds ?? null,
+					overdueAlertUserIds: template.overdueAlertUserIds ?? [],
 					lastRemindedAt: null,
 				};
 				const schedule = scheduleFor({

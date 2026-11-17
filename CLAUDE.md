@@ -136,7 +136,9 @@ timeEntries/{entryId}               status, clockInAt/clockOutAt, dateKey, worke
 attachments/{attachmentId}          top-level, not per-parent
 packages / checklists / eventLabels
 taskTemplates/{templateId}          title, assigneeMode, dueAnchor/dueOffsetSeconds,
-                                    requireNote, reminders[], overdueAlertSeconds
+                                    requireNote, reminders[], overdueAlertSeconds,
+                                    overdueAlertRepeatSeconds, overdueAlertUserIds[],
+                                    dueWarningSeconds
 eventTasks/{eventId}_{templateId}   a SNAPSHOT of the template plus assigneeUserIds[],
                                     pendingUserIds[], completions{}, dueAt,
                                     nextReminderAt, overdueAlertAt, expiresAt
@@ -239,6 +241,7 @@ Things a manager needs someone on an event to do and confirm ("final call with t
 - `eventTasks` documents are **derived from the saved event** by `syncEventTasks`, which `eventService.createEvent`/`updateEvent` call themselves — not the forms, because the portal's staffing board assigns crew with a bare `updateEvent`. They are snapshots: editing a template does not rewrite tasks already on events, and re-syncing never touches `completions`.
 - `pendingUserIds` is who still owes it (the worker badge query and the push audience); `nextReminderAt` is materialized so the scheduler is one bounded query. Completing is `arrayRemove` + a `completions.{uid}` field path, queued through `pendingWrites.track` and never awaited.
 - The arithmetic lives in `src/utils/eventTaskUtils.ts` with no Firestore in it. **`computeNextReminderMs` is duplicated in the functions repo** and the two copies must stay identical — see the event tasks section of `CLOUD_FUNCTIONS_HANDOFF.md`, which is also the contract for the scheduler that sends `task_reminder` / `task_overdue`.
+- The manager alert (`task_overdue`) is per-task: `overdueAlertUserIds` names which managers get it — **empty means all of them**, and the scheduler only ever narrows within active managers/owners — `overdueAlertRepeatSeconds` repeats it until done, and `dueWarningSeconds` adds a warning _before_ the due time (sent as the same push type, worded differently). All ride the one `overdueAlertAt` clock, advanced by `computeNextManagerAlertMs` — **also duplicated in the functions repo**. They are snapshotted onto `eventTasks` and absent on older documents, so every reader defaults them.
 - Rules: managers arrange tasks; an assignee may write only their own entry in `completions` and their own id in `pendingUserIds` (an `anyone` task is the exception — one completion settles it for the crew).
 
 ### Company-customizable forms
