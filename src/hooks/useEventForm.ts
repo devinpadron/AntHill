@@ -22,7 +22,12 @@ export type Location = {
 	};
 };
 
-export const useEventForm = (navigation, eventId?: string) => {
+export const useEventForm = (
+	navigation,
+	eventId?: string,
+	/** Called just before the hook navigates away by itself (after a delete). */
+	beforeLeave?: () => void,
+) => {
 	// Form state
 	const [title, setTitle] = useState("");
 	const [date, setDate] = useState(new Date());
@@ -497,6 +502,9 @@ export const useEventForm = (navigation, eventId?: string) => {
 					try {
 						setIsLoading(true);
 						await deleteEvent(currentCompany, editID);
+						// The form may still hold edits; the exit guard must not
+						// ask about saving an event that no longer exists.
+						beforeLeave?.();
 						navigation.pop(2);
 					} catch (error) {
 						Alert.alert("Error deleting event, please try again");
@@ -509,7 +517,7 @@ export const useEventForm = (navigation, eventId?: string) => {
 			"Delete",
 			"destructive",
 		);
-	}, [currentCompany, editID, isEditing, navigation, title]);
+	}, [beforeLeave, currentCompany, editID, isEditing, navigation, title]);
 
 	const hasFormChanged = useCallback(() => {
 		// If we're not editing, any content is a change

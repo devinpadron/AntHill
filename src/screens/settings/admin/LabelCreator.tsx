@@ -263,6 +263,7 @@ const LabelCreator = ({ navigation }) => {
 					<View style={styles.formContent}>
 						<Text style={styles.inputLabel}>Label Name</Text>
 						<TextInput
+							placeholderTextColor={theme.colors.textTertiary}
 							style={styles.textInput}
 							value={labelName}
 							onChangeText={setLabelName}

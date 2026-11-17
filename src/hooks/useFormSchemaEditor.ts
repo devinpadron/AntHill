@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
-import { Alert } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "../contexts/UserContext";
 import { useCompany } from "../contexts/CompanyContext";
 import { getSchema, publishSchema } from "../services/formSchemaService";
@@ -30,12 +29,21 @@ const EMPTY_DRAFT: FormDraft = {
  * the company preference at it, which is what lets a time entry submitted a
  * year ago still render against the schema it was actually submitted under.
  * So this hook edits a local draft and publishes; it never mutates in place.
+ *
+ * `isDirty` compares the draft with what was last loaded or published. The
+ * screen used to have no way to tell, so its Save button looked the same
+ * before and after an edit and leaving simply dropped the draft.
  */
 export const useFormSchemaEditor = (isEventForm: boolean) => {
 	const { companyId, userId } = useUser();
 	const { preferences, updatePreferences, isLoading } = useCompany();
 
 	const [draft, setDraft] = useState<FormDraft>(EMPTY_DRAFT);
+	/** The draft as last loaded or published — what "unchanged" means. */
+	const [baseline, setBaseline] = useState<FormDraft>(EMPTY_DRAFT);
+	const [loadedSchemaId, setLoadedSchemaId] = useState<string | null>(null);
+	const savingRef = useRef(false);
+	const publishedIdRef = useRef<string | null>(null);
 	const [isSaving, setIsSaving] = useState(false);
 	const [checklists, setChecklists] = useState<ChecklistOption[]>([]);
 
@@ -46,17 +54,30 @@ export const useFormSchemaEditor = (isEventForm: boolean) => {
 	// The preference holds a REFERENCE, so the schema is a second read.
 	useEffect(() => {
 		if (!schemaId) return;
+		// Our own publish repoints the preference at a schema whose content is
+		// already the draft. Reloading it would overwrite anything typed in the
+		// moment between the save landing and the read coming back.
+		if (schemaId === publishedIdRef.current) {
+			setLoadedSchemaId(schemaId);
+			return;
+		}
 		let cancelled = false;
 
-		getSchema(schemaId).then((schema) => {
-			if (cancelled || !schema) return;
-			setDraft({
-				title: schema.title,
-				description: schema.description,
-				isEnabled: schema.isEnabled,
-				fields: schema.fields,
+		getSchema(schemaId)
+			.then((schema) => {
+				if (cancelled || !schema) return;
+				const loaded: FormDraft = {
+					title: schema.title,
+					description: schema.description,
+					isEnabled: schema.isEnabled,
+					fields: schema.fields,
+				};
+				setDraft(loaded);
+				setBaseline(loaded);
+			})
+			.finally(() => {
+				if (!cancelled) setLoadedSchemaId(schemaId);
 			});
-		});
 
 		return () => {
 			cancelled = true;
@@ -76,10 +97,12 @@ export const useFormSchemaEditor = (isEventForm: boolean) => {
 		);
 	}, [companyId]);
 
-	const save = useCallback(async () => {
-		if (!companyId) return;
+	/** Publishes the draft. Resolves whether it was saved; the caller reports it. */
+	const save = useCallback(async (): Promise<boolean> => {
+		if (!companyId || savingRef.current) return false;
 
 		try {
+			savingRef.current = true;
 			setIsSaving(true);
 			const kind = isEventForm ? "eventForm" : "timeEntryForm";
 			const newSchemaId = await publishSchema(
@@ -89,17 +112,20 @@ export const useFormSchemaEditor = (isEventForm: boolean) => {
 				userId,
 			);
 
+			publishedIdRef.current = newSchemaId;
 			await updatePreferences(
 				isEventForm
 					? { eventFormSchemaId: newSchemaId }
 					: { timeEntryFormSchemaId: newSchemaId },
 			);
 
-			Alert.alert("Success", "Form settings saved successfully");
+			setBaseline(draft);
+			return true;
 		} catch (error) {
 			console.error("Failed to save form:", error);
-			Alert.alert("Error", "Failed to save form");
+			return false;
 		} finally {
+			savingRef.current = false;
 			setIsSaving(false);
 		}
 	}, [companyId, userId, isEventForm, draft, updatePreferences]);
@@ -192,11 +218,20 @@ export const useFormSchemaEditor = (isEventForm: boolean) => {
 		[checklists],
 	);
 
+	const isDirty = useMemo(
+		() => JSON.stringify(draft) !== JSON.stringify(baseline),
+		[draft, baseline],
+	);
+
 	return {
 		draft,
 		setMeta,
-		isLoading,
+		// The schema is a second read behind the preference. Until it lands the
+		// draft is the empty placeholder, and edits made to that would be
+		// overwritten when the real one arrived.
+		isLoading: isLoading || (!!schemaId && loadedSchemaId !== schemaId),
 		isSaving,
+		isDirty,
 		save,
 
 		checklists,

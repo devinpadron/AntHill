@@ -56,6 +56,13 @@ export type ColorTokens = {
 	/* misc */
 	/** Scrim behind modals and sheets. */
 	overlay: string;
+	/**
+	 * Foreground on a fixed-dark scrim or over media — the photo viewer's chrome,
+	 * upload progress on a thumbnail. White in BOTH modes: these sat on
+	 * `surface`, which is near-black in dark mode, so the viewer's close button
+	 * and page count vanished against the black behind them.
+	 */
+	onScrim: string;
 	shadow: string;
 	/** Track color for an unchecked switch. */
 	switchTrack: string;
@@ -94,6 +101,7 @@ export const lightColors: ColorTokens = {
 	infoSubtle: accent[50],
 
 	overlay: "rgba(23, 24, 28, 0.45)",
+	onScrim: constant.white,
 	shadow: constant.black,
 	switchTrack: neutral[300],
 	skeleton: neutral[100],
@@ -134,6 +142,7 @@ export const darkColors: ColorTokens = {
 	infoSubtle: "rgba(168, 191, 110, 0.14)",
 
 	overlay: "rgba(0, 0, 0, 0.6)",
+	onScrim: constant.white,
 	/*
 	 * Shadows are nearly invisible on near-black anyway; keeping them black
 	 * rather than tinted avoids a muddy halo around raised surfaces.

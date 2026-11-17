@@ -1114,7 +1114,10 @@ const TimeEntrySubmitModal = ({ visible, timeEntry, onClose, onSubmit }) => {
 						disabled={isSubmitting || !isFormReady}
 					>
 						{isSubmitting || !isFormReady ? (
-							<ActivityIndicator size="small" color="white" />
+							<ActivityIndicator
+								size="small"
+								color={theme.colors.onAccent}
+							/>
 						) : (
 							<Text style={styles.submitButtonText}>
 								Submit for Approval

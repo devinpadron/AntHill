@@ -6,11 +6,12 @@ import React, {
 	useMemo,
 	useCallback,
 } from "react";
-import { Alert, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useRoute } from "@react-navigation/native";
 import DatePicker from "react-native-date-picker";
 import moment from "moment";
 import { useEventForm } from "../../hooks/useEventForm";
+import { useExitGuard } from "../../hooks/useExitGuard";
 import { useCompanyMembers } from "../../hooks/useCompanyMembers";
 import { subscribeEventResponses } from "../../services/eventService";
 import {
@@ -79,6 +80,9 @@ const EventSubmit = ({ navigation }) => {
 	const route = useRoute<any>();
 	const eventId = route.params?.uid;
 	const googlePlacesRef = useRef(null);
+	// Filled in once the exit guard exists (it needs handleSubmit, declared far
+	// below); useEventForm's delete calls through it before navigating away.
+	const allowExitRef = useRef<() => void>(() => {});
 
 	const {
 		title,
@@ -121,7 +125,7 @@ const EventSubmit = ({ navigation }) => {
 		audienceUserIds,
 		setAudienceUserIds,
 		loadedExtras,
-	} = useEventForm(navigation, eventId);
+	} = useEventForm(navigation, eventId, () => allowExitRef.current());
 
 	const { userId, companyId: currentCompany } = useUser();
 	const { uploadFiles, deleteAttachments, isUploading, uploadProgress } =
@@ -320,25 +324,16 @@ const EventSubmit = ({ navigation }) => {
 		fetchAttachments();
 	}, [eventId, currentCompany]);
 
-	const handleBackPress = () => {
-		if (!hasFormChanged()) {
-			navigation.goBack();
-			return;
-		}
-
-		Alert.alert(
-			"Discard changes?",
-			"You have unsaved changes to this event.",
-			[
-				{ text: "Keep editing", style: "cancel" },
-				{
-					text: "Discard",
-					style: "destructive",
-					onPress: () => navigation.goBack(),
-				},
-			],
-		);
-	};
+	/*
+	 * Leaving with edits asks: save, discard, or stay.
+	 *
+	 * This prompt used to live in the back arrow's handler, so the Android
+	 * back button and the iOS edge swipe skipped it and dropped the edits. It
+	 * also offered no way to save — only to throw the work away or go back and
+	 * find the button. The guard itself is installed below, once handleSubmit
+	 * exists.
+	 */
+	const handleBackPress = () => navigation.goBack();
 
 	const handleAttachmentSubmit = async (savedId: string) => {
 		try {
@@ -399,6 +394,7 @@ const EventSubmit = ({ navigation }) => {
 			// Only navigate after all operations are complete
 			if (isMounted.current) {
 				toast.success(isEditing ? "Event updated" : "Event created");
+				allowExitRef.current();
 				navigation.pop();
 			}
 		} catch (error) {
@@ -458,6 +454,18 @@ const EventSubmit = ({ navigation }) => {
 
 		if (savedId) await handleAttachmentSubmit(savedId);
 	};
+
+	const { allowExit } = useExitGuard(navigation, {
+		isDirty: hasFormChanged(),
+		// handleSubmit leaves by itself once the event and its files are saved,
+		// and stays put if validation stops it — so the guard never has to.
+		onSave: async () => {
+			await handleSubmit();
+			return false;
+		},
+		message: "You have unsaved changes to this event.",
+	});
+	allowExitRef.current = allowExit;
 
 	/*
 	 * Every task this event will carry: its own picks, plus whatever the

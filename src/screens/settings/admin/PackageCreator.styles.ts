@@ -190,6 +190,7 @@ export const packageStyles = (theme: Theme) =>
 			marginBottom: 15,
 		},
 		input: {
+			color: theme.colors.text,
 			backgroundColor: theme.colors.surface,
 			borderWidth: 1,
 			borderColor: theme.colors.border,

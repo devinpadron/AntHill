@@ -258,6 +258,7 @@ export const timeDetailCardStyles = (theme: Theme) =>
 			marginTop: 4,
 		},
 		pauseValue: {
+			color: theme.colors.text,
 			fontSize: 15,
 			flex: 1,
 		},

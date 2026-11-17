@@ -161,7 +161,7 @@ const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
 									<Ionicons
 										name="play-circle"
 										size={22}
-										color={theme.colors.surface}
+										color={theme.colors.onScrim}
 									/>
 								</View>
 							)}
@@ -369,13 +369,13 @@ const thumbnailStyles = (theme: Theme) =>
 			backgroundColor: theme.colors.accent,
 		},
 		progressText: {
-			color: theme.colors.surface,
+			color: theme.colors.onScrim,
 			marginTop: 5,
 			fontSize: 12,
 			fontWeight: "bold",
 		},
 		errorText: {
-			color: theme.colors.surface,
+			color: theme.colors.onScrim,
 			marginTop: 5,
 			fontSize: 12,
 			fontWeight: "bold",

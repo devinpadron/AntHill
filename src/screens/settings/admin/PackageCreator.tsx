@@ -31,6 +31,7 @@ import {
 import type { Package as PackageDoc } from "../../../types";
 import { packageStyles } from "./PackageCreator.styles";
 import { useTheme, useThemedStyles } from "../../../theme";
+import { useExitGuard } from "../../../hooks/useExitGuard";
 import { SafeAreaBand } from "../../../components/ui";
 
 type PackageChecklist = {
@@ -70,6 +71,11 @@ const PackageCreator = ({ navigation }) => {
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [isEditing, setIsEditing] = useState(false);
+
+	// The header arrow already asks before closing the editor. The Android back
+	// button and the edge swipe leave the whole screen instead, and used to
+	// take the draft with them unasked.
+	useExitGuard(navigation, { isDirty: isEditing });
 	const [loadingChecklists, setLoadingChecklists] = useState(false);
 
 	// Fetch packages on component mount
@@ -426,6 +432,7 @@ const PackageCreator = ({ navigation }) => {
 						<View style={styles.formGroup}>
 							<Text style={styles.label}>Package Title</Text>
 							<TextInput
+								placeholderTextColor={theme.colors.textTertiary}
 								style={styles.input}
 								value={currentPackage?.title || ""}
 								onChangeText={(text) =>
@@ -443,6 +450,7 @@ const PackageCreator = ({ navigation }) => {
 								Description (Optional)
 							</Text>
 							<TextInput
+								placeholderTextColor={theme.colors.textTertiary}
 								style={[styles.input, styles.textArea]}
 								value={currentPackage?.description || ""}
 								onChangeText={(text) =>

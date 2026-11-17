@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
 	View,
 	Text,
@@ -19,7 +19,8 @@ import { useFormSchemaEditor } from "../../../hooks/useFormSchemaEditor";
 import { customFormStyles } from "./CompanyCustomForm.styles";
 import { useTheme, useThemedStyles } from "../../../theme";
 import { FormFieldType } from "../../../types";
-import { SafeAreaBand } from "../../../components/ui";
+import { SafeAreaBand, toast } from "../../../components/ui";
+import { useExitGuard } from "../../../hooks/useExitGuard";
 
 const FIELD_TYPES = [
 	{ label: "Text Input", value: "text" },
@@ -54,7 +55,8 @@ const CompanyCustomForm = ({ navigation }) => {
 		setMeta,
 		isLoading,
 		isSaving,
-		save: saveForm,
+		isDirty,
+		save: publishForm,
 		checklists,
 		addField: appendField,
 		updateField,
@@ -80,7 +82,33 @@ const CompanyCustomForm = ({ navigation }) => {
 	// Kept so the JSX can go on calling setCustomForm({...customForm, x}).
 	const setCustomForm = setMeta;
 
-	const addField = () => setEditingField(appendField());
+	/*
+	 * One save, and the screen always says whether it is owed.
+	 *
+	 * There used to be two: "Save Field" put an edit into the draft, and the
+	 * header's "Save" published the draft. Nothing distinguished them, so the
+	 * common outcome was pressing Save Field, seeing the list update, and
+	 * leaving — with nothing published and no prompt on the way out. Field
+	 * edits now land in the draft as they are typed, the header shows whether
+	 * the draft differs from what the team has, and leaving with a difference
+	 * asks.
+	 */
+	const saveForm = async (): Promise<boolean> => {
+		const saved = await publishForm();
+		if (saved) toast.success("Form saved");
+		else toast.error("Could not save the form", "Please try again.");
+		return saved;
+	};
+
+	useExitGuard(navigation, {
+		isDirty,
+		onSave: saveForm,
+		message: "This form has changes that have not been saved yet.",
+	});
+
+	// Through editField, so the editor's type picker starts on the new field's
+	// type instead of whatever the last field opened was.
+	const addField = () => editField(appendField());
 
 	const deleteField = (fieldId) => {
 		Alert.alert(
@@ -100,7 +128,23 @@ const CompanyCustomForm = ({ navigation }) => {
 		);
 	};
 
+	// What the editor held when it opened, until the first real change. Just
+	// opening a field must not rewrite it (resolveFieldEdit normalises), or
+	// tapping a row would be enough to mark the form unsaved.
+	const openedSnapshot = useRef<string | null>(null);
+
 	const editField = (field) => {
+		const options = field.selectOptions?.join(", ") || "";
+		const checklistId =
+			field.type === "checklist"
+				? field.checklistId || null
+				: selectedChecklistId;
+		openedSnapshot.current = JSON.stringify([
+			field,
+			field.type,
+			options,
+			checklistId,
+		]);
 		setEditingField(field);
 		setCurrentFieldType(field.type);
 		setCurrentOptions(field.selectOptions?.join(", ") || "");
@@ -109,8 +153,19 @@ const CompanyCustomForm = ({ navigation }) => {
 		}
 	};
 
-	const saveFieldChanges = () => {
+	// Field edits go straight into the draft — see saveForm.
+	useEffect(() => {
 		if (!editingField) return;
+		if (openedSnapshot.current !== null) {
+			const now = JSON.stringify([
+				editingField,
+				currentFieldType,
+				currentOptions,
+				selectedChecklistId,
+			]);
+			if (now === openedSnapshot.current) return;
+			openedSnapshot.current = null;
+		}
 		updateField(
 			editingField.id,
 			resolveFieldEdit(
@@ -120,8 +175,8 @@ const CompanyCustomForm = ({ navigation }) => {
 				selectedChecklistId,
 			),
 		);
-		setEditingField(null);
-	};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [editingField, currentFieldType, currentOptions, selectedChecklistId]);
 
 	const onDragEnd = ({ data }) => reorderFields(data);
 
@@ -153,18 +208,45 @@ const CompanyCustomForm = ({ navigation }) => {
 						color={theme.colors.text}
 					/>
 				</TouchableOpacity>
-				<Text style={styles.headerTitle}>Custom Time Entry Forms</Text>
-				<TouchableOpacity onPress={saveForm} disabled={isSaving}>
+				<Text style={styles.headerTitle}>
+					{isEventForm ? "Event form" : "Timesheet form"}
+				</Text>
+				<TouchableOpacity
+					onPress={saveForm}
+					disabled={isSaving || !isDirty}
+					accessibilityRole="button"
+					accessibilityLabel={isDirty ? "Save form" : "Form saved"}
+				>
 					{isSaving ? (
 						<ActivityIndicator
 							size="small"
 							color={theme.colors.accent}
 						/>
 					) : (
-						<Text style={styles.saveButton}>Save</Text>
+						<Text
+							style={[
+								styles.saveButton,
+								!isDirty && styles.saveButtonIdle,
+							]}
+						>
+							{isDirty ? "Save" : "Saved"}
+						</Text>
 					)}
 				</TouchableOpacity>
 			</View>
+
+			{isDirty && (
+				<View style={styles.unsavedBanner}>
+					<Ionicons
+						name="ellipse"
+						size={8}
+						color={theme.colors.warning}
+					/>
+					<Text style={styles.unsavedBannerText}>
+						Unsaved changes — your team sees them once you tap Save.
+					</Text>
+				</View>
+			)}
 
 			<ScrollView
 				style={styles.content}
@@ -174,6 +256,7 @@ const CompanyCustomForm = ({ navigation }) => {
 				<View style={styles.formControl}>
 					<Text style={styles.label}>Form Title</Text>
 					<TextInput
+						placeholderTextColor={theme.colors.textTertiary}
 						style={styles.input}
 						value={customForm.title}
 						onChangeText={(text) =>
@@ -186,6 +269,7 @@ const CompanyCustomForm = ({ navigation }) => {
 				<View style={styles.formControl}>
 					<Text style={styles.label}>Description</Text>
 					<TextInput
+						placeholderTextColor={theme.colors.textTertiary}
 						style={styles.textArea}
 						value={customForm.description}
 						onChangeText={(text) =>
@@ -211,7 +295,9 @@ const CompanyCustomForm = ({ navigation }) => {
 					</View>
 					<Text style={styles.helperText}>
 						{customForm.isEnabled
-							? "Custom form will be displayed when employees submit time entries"
+							? isEventForm
+								? "Employees fill this in for each event on a time entry they submit"
+								: "Employees fill this in when they submit a time entry"
 							: "Custom form is disabled"}
 					</Text>
 				</View>
@@ -340,6 +426,9 @@ const CompanyCustomForm = ({ navigation }) => {
 							<View style={styles.formControl}>
 								<Text style={styles.label}>Field Label</Text>
 								<TextInput
+									placeholderTextColor={
+										theme.colors.textTertiary
+									}
 									style={styles.expandableInput}
 									value={editingField.label}
 									onChangeText={(text) =>
@@ -385,6 +474,9 @@ const CompanyCustomForm = ({ navigation }) => {
 							<View style={styles.formControl}>
 								<Text style={styles.label}>Placeholder</Text>
 								<TextInput
+									placeholderTextColor={
+										theme.colors.textTertiary
+									}
 									style={styles.input}
 									value={editingField.placeholder || ""}
 									onChangeText={(text) =>
@@ -412,6 +504,9 @@ const CompanyCustomForm = ({ navigation }) => {
 									Options (comma separated)
 								</Text>
 								<TextInput
+									placeholderTextColor={
+										theme.colors.textTertiary
+									}
 									style={styles.textArea}
 									value={currentOptions}
 									onChangeText={setCurrentOptions}
@@ -531,7 +626,7 @@ const CompanyCustomForm = ({ navigation }) => {
 												size={20}
 												color={theme.colors.accent}
 											/>
-											<Text style={{ marginLeft: 6 }}>
+											<Text style={styles.radioLabel}>
 												At least one
 											</Text>
 										</TouchableOpacity>
@@ -558,7 +653,7 @@ const CompanyCustomForm = ({ navigation }) => {
 												size={20}
 												color={theme.colors.accent}
 											/>
-											<Text style={{ marginLeft: 6 }}>
+											<Text style={styles.radioLabel}>
 												All items
 											</Text>
 										</TouchableOpacity>
@@ -653,6 +748,9 @@ const CompanyCustomForm = ({ navigation }) => {
 												Multiplier Value
 											</Text>
 											<TextInput
+												placeholderTextColor={
+													theme.colors.textTertiary
+												}
 												style={styles.input}
 												value={
 													editingField.multiplierText ||
@@ -714,6 +812,9 @@ const CompanyCustomForm = ({ navigation }) => {
 												Unit (Optional)
 											</Text>
 											<TextInput
+												placeholderTextColor={
+													theme.colors.textTertiary
+												}
 												style={styles.input}
 												value={editingField.unit || ""}
 												onChangeText={(text) =>
@@ -732,9 +833,9 @@ const CompanyCustomForm = ({ navigation }) => {
 
 						<TouchableOpacity
 							style={styles.saveFieldButton}
-							onPress={saveFieldChanges}
+							onPress={() => setEditingField(null)}
 						>
-							<Text style={styles.saveFieldText}>Save Field</Text>
+							<Text style={styles.saveFieldText}>Done</Text>
 						</TouchableOpacity>
 					</View>
 				)}
@@ -747,7 +848,7 @@ const CompanyCustomForm = ({ navigation }) => {
 					<Ionicons
 						name={showPreview ? "eye-off" : "eye"}
 						size={22}
-						color="white"
+						color={theme.colors.onAccent}
 					/>
 					<Text style={styles.previewButtonText}>
 						{showPreview ? "Hide Preview" : "Show Preview"}
@@ -784,6 +885,9 @@ const CompanyCustomForm = ({ navigation }) => {
 
 									{field.type === "text" && (
 										<TextInput
+											placeholderTextColor={
+												theme.colors.textTertiary
+											}
 											style={styles.previewInput}
 											placeholder={
 												field.placeholder ||
@@ -796,6 +900,9 @@ const CompanyCustomForm = ({ navigation }) => {
 									{field.type === "number" && (
 										<View>
 											<TextInput
+												placeholderTextColor={
+													theme.colors.textTertiary
+												}
 												style={styles.previewInput}
 												placeholder={
 													field.placeholder || "0"

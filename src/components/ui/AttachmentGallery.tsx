@@ -325,7 +325,7 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 					<Ionicons
 						name="play-circle"
 						size={28}
-						color={theme.colors.surface}
+						color={theme.colors.onScrim}
 					/>
 				</View>
 			)}
@@ -340,7 +340,7 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 					<Ionicons
 						name="cloud-upload-outline"
 						size={14}
-						color={theme.colors.surface}
+						color={theme.colors.onScrim}
 					/>
 				</View>
 			)}
@@ -396,7 +396,7 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 								<Ionicons
 									name="play-circle"
 									size={50}
-									color="white"
+									color={theme.colors.onScrim}
 								/>
 							</View>
 						</View>
@@ -478,7 +478,7 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 							<Ionicons
 								name="close"
 								size={28}
-								color={theme.colors.surface}
+								color={theme.colors.onScrim}
 							/>
 						</TouchableOpacity>
 						<Text style={styles.carouselTitle} numberOfLines={1}>
@@ -497,13 +497,13 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 								{savingMedia ? (
 									<ActivityIndicator
 										size="small"
-										color={theme.colors.surface}
+										color={theme.colors.onScrim}
 									/>
 								) : (
 									<Ionicons
 										name="download-outline"
 										size={24}
-										color={theme.colors.surface}
+										color={theme.colors.onScrim}
 									/>
 								)}
 							</TouchableOpacity>
@@ -519,13 +519,13 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 								{sharingMedia ? (
 									<ActivityIndicator
 										size="small"
-										color={theme.colors.surface}
+										color={theme.colors.onScrim}
 									/>
 								) : (
 									<Ionicons
 										name="share-outline"
 										size={24}
-										color={theme.colors.surface}
+										color={theme.colors.onScrim}
 									/>
 								)}
 							</TouchableOpacity>
@@ -604,7 +604,7 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 							<Ionicons
 								name="chevron-back"
 								size={30}
-								color={theme.colors.surface}
+								color={theme.colors.onScrim}
 							/>
 						</TouchableOpacity>
 						<Text style={styles.pageIndicator}>
@@ -617,7 +617,7 @@ const AttachmentGallery: React.FC<AttachmentGalleryProps> = ({
 							<Ionicons
 								name="chevron-forward"
 								size={30}
-								color={theme.colors.surface}
+								color={theme.colors.onScrim}
 							/>
 						</TouchableOpacity>
 					</View>
@@ -895,7 +895,7 @@ const galleryStyles = (theme: Theme) =>
 			padding: 4,
 		},
 		carouselTitle: {
-			color: theme.colors.surface,
+			color: theme.colors.onScrim,
 			fontSize: 16,
 			fontWeight: "500",
 			flex: 1,
@@ -933,7 +933,7 @@ const galleryStyles = (theme: Theme) =>
 			padding: 8,
 		},
 		pageIndicator: {
-			color: theme.colors.surface,
+			color: theme.colors.onScrim,
 			fontSize: 14,
 		},
 		videoContainer: {

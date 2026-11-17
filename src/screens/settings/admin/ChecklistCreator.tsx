@@ -28,6 +28,7 @@ import {
 } from "../../../services/libraryService";
 import { checklistStyles } from "./ChecklistCreator.styles";
 import { useTheme, useThemedStyles } from "../../../theme";
+import { useExitGuard } from "../../../hooks/useExitGuard";
 import { SafeAreaBand } from "../../../components/ui";
 
 /*
@@ -52,6 +53,11 @@ const ChecklistCreator = ({ navigation }) => {
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [isEditing, setIsEditing] = useState(false);
+
+	// The header arrow already asks before closing the editor. The Android back
+	// button and the edge swipe leave the whole screen instead, and used to
+	// take the draft with them unasked.
+	useExitGuard(navigation, { isDirty: isEditing });
 
 	// Add ref for the TextInput
 	const itemInputRef = useRef(null);
@@ -368,6 +374,7 @@ const ChecklistCreator = ({ navigation }) => {
 						<View style={styles.formGroup}>
 							<Text style={styles.label}>Checklist Title</Text>
 							<TextInput
+								placeholderTextColor={theme.colors.textTertiary}
 								style={[
 									styles.input,
 									{ height: Math.max(44, titleInputHeight) },
@@ -394,6 +401,9 @@ const ChecklistCreator = ({ navigation }) => {
 							<Text style={styles.label}>Checklist Items</Text>
 							<View style={styles.itemInputContainer}>
 								<TextInput
+									placeholderTextColor={
+										theme.colors.textTertiary
+									}
 									ref={itemInputRef}
 									style={[
 										styles.itemInput,
