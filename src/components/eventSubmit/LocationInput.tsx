@@ -222,6 +222,9 @@ const LocationInputComponent = ({
 						{allowLabels && editingLabelForAddress === address ? (
 							<View style={styles.labelInputContainer}>
 								<TextInput
+									placeholderTextColor={
+										theme.colors.textTertiary
+									}
 									style={styles.labelInput}
 									placeholder="Enter location label"
 									value={labelText}

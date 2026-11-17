@@ -31,6 +31,31 @@ export const customFormStyles = (theme: Theme) =>
 			fontWeight: "600",
 			color: theme.colors.accent,
 		},
+		/* Nothing to save: reads as a status, not a button. */
+		saveButtonIdle: {
+			color: theme.colors.textTertiary,
+			fontWeight: "500",
+		},
+		unsavedBanner: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: 8,
+			paddingHorizontal: 16,
+			paddingVertical: 8,
+			backgroundColor: theme.colors.warningSubtle,
+			borderBottomWidth: 1,
+			borderBottomColor: theme.colors.border,
+		},
+		unsavedBannerText: {
+			flex: 1,
+			fontSize: 13,
+			color: theme.colors.text,
+		},
+		radioLabel: {
+			marginLeft: 6,
+			fontSize: 15,
+			color: theme.colors.text,
+		},
 		content: {
 			flex: 1,
 			padding: 16,
@@ -45,6 +70,7 @@ export const customFormStyles = (theme: Theme) =>
 			color: theme.colors.text,
 		},
 		input: {
+			color: theme.colors.text,
 			height: 48,
 			borderWidth: 1,
 			borderColor: theme.colors.border,
@@ -54,6 +80,7 @@ export const customFormStyles = (theme: Theme) =>
 			backgroundColor: theme.colors.surface,
 		},
 		textArea: {
+			color: theme.colors.text,
 			minHeight: 80,
 			borderWidth: 1,
 			borderColor: theme.colors.border,
@@ -151,6 +178,7 @@ export const customFormStyles = (theme: Theme) =>
 			flexShrink: 1,
 		},
 		expandableInput: {
+			color: theme.colors.text,
 			minHeight: 48,
 			borderWidth: 1,
 			borderColor: theme.colors.border,
@@ -264,7 +292,7 @@ export const customFormStyles = (theme: Theme) =>
 			marginTop: 16,
 		},
 		saveFieldText: {
-			color: theme.colors.surface,
+			color: theme.colors.onAccent,
 			fontSize: 16,
 			fontWeight: "600",
 		},
@@ -278,7 +306,7 @@ export const customFormStyles = (theme: Theme) =>
 			marginVertical: 16,
 		},
 		previewButtonText: {
-			color: theme.colors.surface,
+			color: theme.colors.onAccent,
 			marginLeft: 8,
 			fontSize: 16,
 			fontWeight: "500",
@@ -326,6 +354,7 @@ export const customFormStyles = (theme: Theme) =>
 			color: theme.colors.danger,
 		},
 		previewInput: {
+			color: theme.colors.text,
 			height: 42,
 			borderWidth: 1,
 			borderColor: theme.colors.border,

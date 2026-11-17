@@ -112,7 +112,7 @@ export const labelStyles = (theme: Theme) =>
 			borderRadius: 16,
 		},
 		previewText: {
-			color: theme.colors.surface,
+			color: theme.colors.onScrim,
 			fontWeight: "500",
 			fontSize: 14,
 			textShadowColor: "rgba(0, 0, 0, 0.3)",

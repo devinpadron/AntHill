@@ -30,6 +30,9 @@ ios/
 # Google service files
 google-services.json
 GoogleService-Info.plist
+# `eas env:pull` writes the file-type variables (the two above) here and points
+# .env at them. Pre-commit runs `git add -A`, so unignored they get committed.
+.eas/
 
 # Environment variables
 .env

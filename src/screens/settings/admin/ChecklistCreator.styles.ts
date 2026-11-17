@@ -160,6 +160,7 @@ export const checklistStyles = (theme: Theme) =>
 			marginBottom: 8,
 		},
 		input: {
+			color: theme.colors.text,
 			backgroundColor: theme.colors.surface,
 			borderWidth: 1,
 			borderColor: theme.colors.border,
@@ -173,6 +174,7 @@ export const checklistStyles = (theme: Theme) =>
 			alignItems: "center",
 		},
 		itemInput: {
+			color: theme.colors.text,
 			flex: 1,
 			backgroundColor: theme.colors.surface,
 			borderWidth: 1,

@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
 import { useUser } from "../../../contexts/UserContext";
 import { useTaskTemplates } from "../../../hooks/useTaskTemplates";
+import { useCompanyMembers } from "../../../hooks/useCompanyMembers";
+import { useExitGuard } from "../../../hooks/useExitGuard";
 import {
 	deleteTaskTemplate,
 	saveTaskTemplate,
@@ -15,11 +17,15 @@ import {
 	describeOffset,
 	describeReminderRule,
 	newReminderRule,
+	offsetToParts,
+	OffsetUnit,
+	partsToOffset,
 	repeatGapSeconds,
 } from "../../../utils/eventTaskUtils";
 import {
 	defaultTaskTemplate,
 	Package,
+	Role,
 	TaskAssigneeMode,
 	TaskReminderRule,
 	TaskTemplate,
@@ -36,12 +42,14 @@ import {
 	Screen,
 	ScreenFooter,
 	ScreenHeader,
+	SegmentedControl,
 	SkeletonList,
 	Text,
 	toast,
 	Toggle,
 } from "../../../components/ui";
 import { TaskOffsetEditor } from "../../../components/tasks/TaskOffsetEditor";
+import { PersonPicker } from "../../../components/eventSubmit/PersonPicker";
 import { Theme, useThemedStyles } from "../../../theme";
 
 /*
@@ -68,7 +76,10 @@ type Draft = Pick<
 	| "dueOffsetSeconds"
 	| "requireNote"
 	| "reminders"
+	| "dueWarningSeconds"
 	| "overdueAlertSeconds"
+	| "overdueAlertRepeatSeconds"
+	| "overdueAlertUserIds"
 > & { id?: string };
 
 const MODES: TaskAssigneeMode[] = ["anyone", "everyone", "specific"];
@@ -82,8 +93,17 @@ const toDraft = (template: TaskTemplate): Draft => ({
 	dueOffsetSeconds: template.dueOffsetSeconds ?? 0,
 	requireNote: Boolean(template.requireNote),
 	reminders: template.reminders ?? [],
+	dueWarningSeconds: template.dueWarningSeconds ?? null,
 	overdueAlertSeconds: template.overdueAlertSeconds ?? null,
+	overdueAlertRepeatSeconds: template.overdueAlertRepeatSeconds ?? null,
+	overdueAlertUserIds: template.overdueAlertUserIds ?? [],
 });
+
+/** "2 hours", "1 day" — for the sentence under the alert's settings. */
+const describeSpan = (seconds: number): string => {
+	const { amount, unit } = offsetToParts(seconds);
+	return `${amount} ${amount === 1 ? unit.slice(0, -1) : unit}`;
+};
 
 /** "Anyone on the crew · due 1 day before the event starts · 2 reminders". */
 const summarize = (template: TaskTemplate): string => {
@@ -104,6 +124,22 @@ const TaskTemplates = ({ navigation }) => {
 	const styles = useThemedStyles(taskTemplateStyles);
 	const { companyId } = useUser();
 	const { templates, isLoading } = useTaskTemplates(companyId ?? "");
+	const { members, isLoading: membersLoading } = useCompanyMembers(
+		companyId ?? "",
+	);
+
+	/*
+	 * Who an overdue alert can be addressed to: managers and owners, the only
+	 * people the scheduler will send it to. A worker named here would simply
+	 * never hear anything, so they are not offered.
+	 */
+	const managerOptions = useMemo(
+		() =>
+			members
+				.filter((m) => m.role === Role.MANAGER || m.role === Role.OWNER)
+				.map((m) => ({ id: m.userId, label: m.displayName })),
+		[members],
+	);
 
 	const [packages, setPackages] = useState<Package[]>([]);
 	const [draft, setDraft] = useState<Draft | null>(null);
@@ -160,6 +196,14 @@ const TaskTemplates = ({ navigation }) => {
 		]);
 	};
 
+	// The header arrow already asks before closing the editor. The Android back
+	// button and the edge swipe leave the whole screen instead, and used to
+	// take the draft with them unasked.
+	useExitGuard(navigation, {
+		isDirty: !!draft && dirty,
+		message: "This task has unsaved changes.",
+	});
+
 	const save = async () => {
 		if (!draft || !companyId) return;
 
@@ -171,10 +215,24 @@ const TaskTemplates = ({ navigation }) => {
 
 		setSaving(true);
 		try {
+			/*
+			 * Someone picked for the alert who has since left or been made a
+			 * worker is dropped here. Left in, they would be an invisible
+			 * selection — the picker only lists current managers — and once the
+			 * rest were unticked the task would look addressed to "everyone"
+			 * on screen while still naming them underneath. Skipped while the
+			 * roster is loading, when "not in the list" means nothing.
+			 */
+			const managerIds = new Set(managerOptions.map((o) => o.id));
+			const alertUserIds = draft.overdueAlertUserIds ?? [];
+
 			await saveTaskTemplate(companyId, {
 				...draft,
 				title: draft.title.trim(),
 				description: draft.description.trim(),
+				overdueAlertUserIds: membersLoading
+					? alertUserIds
+					: alertUserIds.filter((id) => managerIds.has(id)),
 			});
 			toast.success(draft.id ? "Task saved" : "Task created");
 			close();
@@ -221,6 +279,13 @@ const TaskTemplates = ({ navigation }) => {
 
 	if (draft) {
 		const alertOn = draft.overdueAlertSeconds !== null;
+		const warning = draft.dueWarningSeconds ?? 0;
+		const warningOn = warning > 0;
+		const alertRepeat = draft.overdueAlertRepeatSeconds ?? 0;
+		const alertUserIds = draft.overdueAlertUserIds ?? [];
+		const alertNames = managerOptions
+			.filter((o) => alertUserIds.includes(o.id))
+			.map((o) => o.label);
 
 		return (
 			<Screen
@@ -396,13 +461,56 @@ const TaskTemplates = ({ navigation }) => {
 					)}
 				</Card>
 
+				{/*
+				 * What managers hear, as opposed to the reminders above, which
+				 * go to whoever owes the task. Two independent switches — a
+				 * warning while there is still time, an alert once there is
+				 * not — and one answer to "who", shared by both.
+				 */}
 				<Card flush style={styles.card}>
 					<ListRow
 						multiline
+						title="Warn managers before it is due"
+						subtitle="A heads-up if nobody has done it yet, while there is still time"
+						icon="time-outline"
+						accessory={
+							<Toggle
+								value={warningOn}
+								onValueChange={(on) =>
+									change({
+										dueWarningSeconds: on
+											? 24 * 3600
+											: null,
+									})
+								}
+							/>
+						}
+					/>
+					{warningOn && (
+						<View style={styles.revealed}>
+							<Text
+								variant="label"
+								color="textSecondary"
+								uppercase
+							>
+								How long before it is due
+							</Text>
+							<SpanInput
+								min={1}
+								accessibilityLabel="How long before it is due"
+								seconds={warning}
+								onChange={(dueWarningSeconds) =>
+									change({ dueWarningSeconds })
+								}
+							/>
+						</View>
+					)}
+					<ListRow
+						multiline
 						title="Tell managers if it is overdue"
-						subtitle="One alert when it is still open past its due time"
+						subtitle="An alert when it is still open past its due time"
 						icon="alert-circle-outline"
-						separator={alertOn}
+						separator={alertOn || warningOn}
 						accessory={
 							<Toggle
 								value={alertOn}
@@ -416,19 +524,106 @@ const TaskTemplates = ({ navigation }) => {
 					/>
 					{alertOn && (
 						<View style={styles.revealed}>
-							<HoursInput
-								label="Hours after it was due"
+							<Text
+								variant="label"
+								color="textSecondary"
+								uppercase
+							>
+								How long after it was due
+							</Text>
+							<SpanInput
 								seconds={draft.overdueAlertSeconds ?? 0}
 								onChange={(overdueAlertSeconds) =>
 									change({ overdueAlertSeconds })
 								}
 							/>
+
+							<View style={styles.repeatRow}>
+								<View style={styles.flex}>
+									<Text variant="body">
+										Keep alerting until done
+									</Text>
+								</View>
+								<Toggle
+									value={alertRepeat > 0}
+									onValueChange={(on) =>
+										change({
+											overdueAlertRepeatSeconds: on
+												? 24 * 3600
+												: null,
+										})
+									}
+								/>
+							</View>
+							{alertRepeat > 0 && (
+								<SpanInput
+									min={1}
+									accessibilityLabel="Repeat every"
+									seconds={alertRepeat}
+									onChange={(overdueAlertRepeatSeconds) =>
+										change({ overdueAlertRepeatSeconds })
+									}
+								/>
+							)}
+						</View>
+					)}
+					{(alertOn || warningOn) && (
+						<View style={styles.revealed}>
+							<Text
+								variant="label"
+								color="textSecondary"
+								uppercase
+							>
+								{alertOn && warningOn
+									? "Who gets them"
+									: "Who gets it"}
+							</Text>
+							<PersonPicker
+								options={managerOptions}
+								selectedIds={alertUserIds}
+								onToggle={(id) =>
+									change({
+										overdueAlertUserIds:
+											alertUserIds.includes(id)
+												? alertUserIds.filter(
+														(x) => x !== id,
+													)
+												: [...alertUserIds, id],
+									})
+								}
+								placeholder="Every manager and owner"
+								searchPlaceholder="Search managers"
+								emptyText="No managers found."
+							/>
+
+							{/* The whole rule in one sentence, so nobody has to
+							    assemble it from four controls. */}
 							<Text variant="caption" color="textSecondary">
-								{draft.overdueAlertSeconds
-									? `Managers hear about it ${
-											draft.overdueAlertSeconds / 3600
-										}h after the due time.`
-									: "Managers hear about it as soon as it is past due."}
+								{alertNames.length
+									? `Only ${alertNames.join(", ")}`
+									: "Every manager and owner"}{" "}
+								{alertNames.length > 1 ? "hear" : "hears"} about
+								it{" "}
+								{[
+									warningOn
+										? `${describeSpan(warning)} before it is due`
+										: null,
+									alertOn
+										? `${
+												draft.overdueAlertSeconds
+													? `${describeSpan(draft.overdueAlertSeconds)} after the due time`
+													: "as soon as it is past due"
+											}${
+												alertRepeat > 0
+													? `, then every ${describeSpan(alertRepeat)} until it is done`
+													: ""
+											}`
+										: null,
+								]
+									.filter(Boolean)
+									.join(", and again ")}
+								. Only while it is still not done, and never
+								overnight.
 							</Text>
 						</View>
 					)}
@@ -533,6 +728,64 @@ const HoursInput = ({
 			}}
 			keyboardType="number-pad"
 		/>
+	);
+};
+
+/**
+ * A length of time as "N hours|days". The scheduler runs hourly, so nothing
+ * finer is offered. `min` is in the chosen unit: a repeat gap of zero would
+ * read as "does not repeat" one control below the switch that says it does.
+ */
+const SpanInput = ({
+	seconds,
+	onChange,
+	min = 0,
+	accessibilityLabel = "How many",
+}: {
+	seconds: number;
+	onChange: (seconds: number) => void;
+	min?: number;
+	accessibilityLabel?: string;
+}) => {
+	const styles = useThemedStyles(taskTemplateStyles);
+	const parts = offsetToParts(seconds);
+	// Held as text and committed on blur, for the reason HoursInput gives.
+	const [text, setText] = useState(String(parts.amount));
+
+	useEffect(() => {
+		setText(String(parts.amount));
+	}, [parts.amount]);
+
+	const typed = () => Math.max(min, parseInt(text, 10) || 0);
+
+	const commit = (unit: OffsetUnit) => {
+		const amount = typed();
+		setText(String(amount));
+		const next = partsToOffset({ amount, unit, direction: "after" });
+		if (next !== seconds) onChange(next);
+	};
+
+	return (
+		<View style={styles.spanRow}>
+			<Input
+				value={text}
+				onChangeText={setText}
+				onBlur={() => commit(parts.unit)}
+				keyboardType="number-pad"
+				accessibilityLabel={accessibilityLabel}
+				containerStyle={styles.spanAmount}
+			/>
+			<SegmentedControl<OffsetUnit>
+				fullWidth
+				style={styles.flex}
+				segments={[
+					{ value: "hours", label: "Hours" },
+					{ value: "days", label: "Days" },
+				]}
+				value={parts.unit}
+				onChange={commit}
+			/>
+		</View>
 	);
 };
 
@@ -658,6 +911,17 @@ const taskTemplateStyles = (theme: Theme) =>
 			flexDirection: "row",
 			alignItems: "center",
 			justifyContent: "space-between",
+		},
+		groupLabel: {
+			marginTop: theme.spacing.sm,
+		},
+		spanRow: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: theme.spacing.md,
+		},
+		spanAmount: {
+			width: 84,
 		},
 		repeatRow: {
 			flexDirection: "row",

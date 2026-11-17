@@ -10,7 +10,7 @@ export default {
 		// databases. required_version stays 1.0.100 until the migration window —
 		// raising it now would force everyone onto a build that then gates itself
 		// behind activeVersion 1.
-		version: "1.3.1",
+		version: "1.3.2",
 		orientation: "portrait",
 		// The app themes itself off the OS appearance, so it must be told about
 		// the OS appearance. Pinned to "light" until the theme layer existed.
@@ -176,6 +176,12 @@ export default {
 					},
 				},
 			],
+			// Xcode 27 rejects pods that still declare an iOS deployment target
+			// below 15 — see the plugin header.
+			"./plugins/withMinPodDeploymentTarget",
+			// Xcode 27 also refuses to launch an app without the UIScene life
+			// cycle. A no-op on older Xcodes, EAS included — see the plugin header.
+			"./plugins/withSceneLifecycle",
 		],
 		extra: {
 			eas: {
